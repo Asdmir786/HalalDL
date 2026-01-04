@@ -4,40 +4,42 @@
 - yt-dlp (required)
 - ffmpeg (recommended)
 - aria2 (optional)
-- Deno (optional JS runtime)
+- Deno (optional JS runtime; Full includes it)
 
 ## Tool Modes
 - Bundled (Full only)
 - System (PATH)
-- Custom path
+- Custom path (user-selected)
 
 ## Detection Order
 1. Bundled (if Full)
 2. System PATH
-3. Custom path (user-selected)
+3. Custom path (if configured)
 
 ## Behavior by Tool
 
 ### yt-dlp
-- Always required
-- Update allowed in Full
-- Lite may guide user
+- Required
+- Full: update supported (in-app)
+- Lite: may guide user for updates (optional v1)
 
 ### ffmpeg
 - Recommended
-- Lite: no update button, guide only
-- Full: bundled, update optional later
+- Lite: update button disabled, show guide only
+- Full: bundled (update optional later)
 
 ### aria2
 - Optional
-- Disabled by default
-- Toggle: “Use aria2 if available”
+- Lite: update button disabled, show guide only
+- Full: bundled
+- Toggle: “Use aria2 if available” (off by default)
 
 ### Deno
 - Optional runtime
-- Included in Full
-- Lite: guide + browse to exe
+- Full: bundled, allow “Download/Replace” optional
+- Lite: show guide + browse path
 
-## Feature Enablement
-- Missing tools disable dependent features with UI notice
-- No hard failures without explanation
+## Feature Enablement Rules
+- Missing tools disable dependent features with clear UI notice
+- Do not fail silently
+- Always provide reason and guidance when disabled

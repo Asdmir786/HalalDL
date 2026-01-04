@@ -14,12 +14,12 @@
   ├─ aria2/
   └─ deno/
 
-## Tool Location Rules
-- Prefer tools next to app executable
-- If not writable, copy to AppData and update paths automatically
+## Tool Location Rules (Windows v1)
+- Prefer tools next to app executable in Full
+- If installed in protected path, allow copying tools to AppData and update stored paths
 
-## Update Safety
-- Download new binary
-- Verify basic integrity
+## Update Safety (Full)
+- Download new binary to temp
 - Replace atomically
 - Keep .old backup
+- Never update while a job is running

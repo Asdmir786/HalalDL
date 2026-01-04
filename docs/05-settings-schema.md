@@ -1,5 +1,10 @@
 # settings.json Schema (v1)
 
+## Location
+- Stored in app data directory (per user)
+
+## Structure
+
 {
   "ui": {
     "theme": "dark",
@@ -33,3 +38,7 @@
     "useAria2": false
   }
 }
+
+## Notes
+- tool mode values: "bundled" | "system" | "custom"
+- fileCollision values: "skip" | "rename" | "overwrite"
