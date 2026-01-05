@@ -1,7 +1,6 @@
 import { useState } from "react";
-import reactLogo from "./assets/react.svg";
 import { invoke } from "@tauri-apps/api/core";
-import "./App.css";
+import { Button } from "@/components/ui/button";
 
 function App() {
   const [greetMsg, setGreetMsg] = useState("");
@@ -13,24 +12,12 @@ function App() {
   }
 
   return (
-    <main className="container">
-      <h1>Welcome to Tauri + React</h1>
-
-      <div className="row">
-        <a href="https://vite.dev" target="_blank">
-          <img src="/vite.svg" className="logo vite" alt="Vite logo" />
-        </a>
-        <a href="https://tauri.app" target="_blank">
-          <img src="/tauri.svg" className="logo tauri" alt="Tauri logo" />
-        </a>
-        <a href="https://react.dev" target="_blank">
-          <img src={reactLogo} className="logo react" alt="React logo" />
-        </a>
-      </div>
-      <p>Click on the Tauri, Vite, and React logos to learn more.</p>
+    <main className="flex flex-col items-center justify-center min-h-screen p-4 space-y-4">
+      <h1 className="text-4xl font-bold">HalalDL</h1>
+      <p className="text-muted-foreground">Tauri v2 + React + TailwindCSS + shadcn/ui</p>
 
       <form
-        className="row"
+        className="flex gap-2"
         onSubmit={(e) => {
           e.preventDefault();
           greet();
@@ -38,12 +25,13 @@ function App() {
       >
         <input
           id="greet-input"
+          className="px-3 py-2 border rounded-md bg-background"
           onChange={(e) => setName(e.currentTarget.value)}
           placeholder="Enter a name..."
         />
-        <button type="submit">Greet</button>
+        <Button type="submit">Greet</Button>
       </form>
-      <p>{greetMsg}</p>
+      <p className="font-medium">{greetMsg}</p>
     </main>
   );
 }
