@@ -1,8 +1,8 @@
 import { Sidebar } from "@/components/Sidebar";
 import { useNavigationStore } from "@/store/navigation";
+import { DownloadsScreen } from "@/screens/DownloadsScreen";
 
 // Screen Placeholders
-const DownloadsScreen = () => <div className="p-8">Downloads Screen Skeleton</div>;
 const PresetsScreen = () => <div className="p-8">Presets Screen Skeleton</div>;
 const ToolsScreen = () => <div className="p-8">Tools Manager Skeleton</div>;
 const LogsScreen = () => <div className="p-8">Logs & Diagnostics Skeleton</div>;
