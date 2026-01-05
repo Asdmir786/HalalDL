@@ -4,10 +4,8 @@ import { DownloadsScreen } from "@/screens/DownloadsScreen";
 import { PresetsScreen } from "@/screens/PresetsScreen";
 import { ToolsScreen } from "@/screens/ToolsScreen";
 import { LogsScreen } from "@/screens/LogsScreen";
+import { SettingsScreen } from "@/screens/SettingsScreen";
 import { Toaster } from "@/components/ui/sonner";
-
-// Screen Placeholders
-const SettingsScreen = () => <div className="p-8">Settings Skeleton</div>;
 
 export default function App() {
   const currentScreen = useNavigationStore((state) => state.currentScreen);
