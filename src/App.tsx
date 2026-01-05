@@ -2,10 +2,10 @@ import { Sidebar } from "@/components/Sidebar";
 import { useNavigationStore } from "@/store/navigation";
 import { DownloadsScreen } from "@/screens/DownloadsScreen";
 import { PresetsScreen } from "@/screens/PresetsScreen";
+import { ToolsScreen } from "@/screens/ToolsScreen";
 import { Toaster } from "@/components/ui/sonner";
 
 // Screen Placeholders
-const ToolsScreen = () => <div className="p-8">Tools Manager Skeleton</div>;
 const LogsScreen = () => <div className="p-8">Logs & Diagnostics Skeleton</div>;
 const SettingsScreen = () => <div className="p-8">Settings Skeleton</div>;
 
