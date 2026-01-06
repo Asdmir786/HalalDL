@@ -10,13 +10,14 @@ export interface Preset {
 
 interface PresetsState {
   presets: Preset[];
+  setPresets: (presets: Preset[]) => void;
   addPreset: (preset: Omit<Preset, "id">) => void;
   updatePreset: (id: string, preset: Partial<Preset>) => void;
   deletePreset: (id: string) => void;
   duplicatePreset: (id: string) => void;
 }
 
-const BUILT_IN_PRESETS: Preset[] = [
+export const BUILT_IN_PRESETS: Preset[] = [
   {
     id: "default",
     name: "Global Default",
@@ -77,6 +78,7 @@ const BUILT_IN_PRESETS: Preset[] = [
 
 export const usePresetsStore = create<PresetsState>((set) => ({
   presets: BUILT_IN_PRESETS,
+  setPresets: (presets) => set({ presets }),
   addPreset: (preset) => set((state) => ({
     presets: [...state.presets, { ...preset, id: Math.random().toString(36).substring(7) }],
   })),

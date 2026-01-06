@@ -20,6 +20,7 @@ export interface Settings {
 
 interface SettingsState {
   settings: Settings;
+  setSettings: (settings: Settings) => void;
   updateSettings: (settings: Partial<Settings>) => void;
   resetSettings: () => void;
 }
@@ -30,12 +31,13 @@ const DEFAULT_SETTINGS: Settings = {
   maxConcurrency: 2,
   maxRetries: 3,
   fileCollision: "rename",
-  defaultDownloadDir: "", // Will be set to user's download folder in Batch 7
+  defaultDownloadDir: "", 
   tempDir: "",
 };
 
 export const useSettingsStore = create<SettingsState>((set) => ({
   settings: DEFAULT_SETTINGS,
+  setSettings: (settings) => set({ settings }),
   updateSettings: (newSettings) =>
     set((state) => ({
       settings: { ...state.settings, ...newSettings },

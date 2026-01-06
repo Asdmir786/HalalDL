@@ -1,0 +1,28 @@
+{
+  "$schema": "../gen/schemas/desktop-schema.json",
+  "identifier": "shell-allow",
+  "description": "Allow execution of external binaries",
+  "windows": ["main"],
+  "permissions": [
+    {
+      "identifier": "shell:allow-execute",
+      "allow": [
+        {
+          "name": "yt-dlp",
+          "cmd": "yt-dlp",
+          "args": true
+        },
+        {
+          "name": "ffmpeg",
+          "cmd": "ffmpeg",
+          "args": true
+        },
+        {
+          "name": "aria2c",
+          "cmd": "aria2c",
+          "args": true
+        }
+      ]
+    }
+  ]
+}

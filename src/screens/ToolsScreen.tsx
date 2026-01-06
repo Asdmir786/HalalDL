@@ -26,7 +26,7 @@ import {
 
 export function ToolsScreen() {
   const { tools, updateTool } = useToolsStore();
-  const isLite = true; // Placeholder for Lite vs Full detection
+  const isLite = import.meta.env.VITE_APP_MODE !== 'FULL';
 
   const ToolCard = ({ tool }: { tool: Tool }) => (
     <Card className="flex flex-col h-full overflow-hidden">

@@ -6,6 +6,7 @@ import { ToolsScreen } from "@/screens/ToolsScreen";
 import { LogsScreen } from "@/screens/LogsScreen";
 import { SettingsScreen } from "@/screens/SettingsScreen";
 import { Toaster } from "@/components/ui/sonner";
+import { PersistenceManager } from "@/components/PersistenceManager";
 
 export default function App() {
   const currentScreen = useNavigationStore((state) => state.currentScreen);
@@ -23,6 +24,7 @@ export default function App() {
 
   return (
     <div className="flex h-screen bg-background text-foreground overflow-hidden">
+      <PersistenceManager />
       <Sidebar />
       <main className="flex-1 overflow-auto">
         {renderScreen()}

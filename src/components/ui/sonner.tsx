@@ -5,13 +5,13 @@ import {
   OctagonX,
   TriangleAlert,
 } from "lucide-react"
-import { useTheme } from "next-themes"
+import { useSettingsStore } from "@/store/settings"
 import { Toaster as Sonner } from "sonner"
 
 type ToasterProps = React.ComponentProps<typeof Sonner>
 
 const Toaster = ({ ...props }: ToasterProps) => {
-  const { theme = "system" } = useTheme()
+  const { theme } = useSettingsStore((state) => state.settings)
 
   return (
     <Sonner

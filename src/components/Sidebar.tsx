@@ -34,9 +34,9 @@ export function Sidebar() {
               key={item.id}
               onClick={() => setScreen(item.id)}
               className={cn(
-                "w-full flex items-center gap-3 px-3 py-2 rounded-md transition-colors",
-                "hover:bg-accent hover:text-accent-foreground",
-                isActive ? "bg-accent text-accent-foreground font-medium" : "text-muted-foreground"
+                "w-full flex items-center gap-3 px-3 py-2 rounded-md transition-all duration-200 cursor-pointer",
+                "hover:bg-accent hover:text-accent-foreground hover:pl-4",
+                isActive ? "bg-accent text-accent-foreground font-medium shadow-sm" : "text-muted-foreground"
               )}
             >
               <Icon className="w-5 h-5" />

@@ -47,9 +47,24 @@ importers:
       '@tauri-apps/api':
         specifier: ^2
         version: 2.9.1
+      '@tauri-apps/plugin-dialog':
+        specifier: ~2.4.2
+        version: 2.4.2
+      '@tauri-apps/plugin-fs':
+        specifier: ~2.4.4
+        version: 2.4.4
       '@tauri-apps/plugin-opener':
         specifier: ^2
         version: 2.5.2
+      '@tauri-apps/plugin-os':
+        specifier: ~2.3.2
+        version: 2.3.2
+      '@tauri-apps/plugin-shell':
+        specifier: ~2.3.3
+        version: 2.3.3
+      '@tauri-apps/plugin-store':
+        specifier: ~2.4.1
+        version: 2.4.1
       class-variance-authority:
         specifier: ^0.7.1
         version: 0.7.1
@@ -105,6 +120,9 @@ importers:
       autoprefixer:
         specifier: ^10.4.23
         version: 10.4.23(postcss@8.5.6)
+      cross-env:
+        specifier: ^10.1.0
+        version: 10.1.0
       eslint:
         specifier: ^9.39.2
         version: 9.39.2(jiti@2.6.1)
@@ -229,6 +247,9 @@ packages:
   '@babel/types@7.28.5':
     resolution: {integrity: sha512-qQ5m48eI/MFLQ5PxQj4PFaprjyCTLI37ElWMmNs0K8Lk3dVeOdNpB3ks8jc7yM5CDmVC73eMVk/trk3fgmrUpA==}
     engines: {node: '>=6.9.0'}
+
+  '@epic-web/invariant@1.0.0':
+    resolution: {integrity: sha512-lrTPqgvfFQtR/eY/qkIzp98OGdNJu0m5ji3q/nJI8v3SXkRKEnWiOxMmbvcSoAIzv/cGiuvRy57k4suKQSAdwA==}
 
   '@esbuild/aix-ppc64@0.27.2':
     resolution: {integrity: sha512-GZMB+a0mOMZs4MpDbj8RJp4cw+w1WV5NYD6xzgvzUJ5Ek2jerwfO2eADyI6ExDSUED+1X8aMbegahsJi+8mgpw==}
@@ -1196,8 +1217,23 @@ packages:
     engines: {node: '>= 10'}
     hasBin: true
 
+  '@tauri-apps/plugin-dialog@2.4.2':
+    resolution: {integrity: sha512-lNIn5CZuw8WZOn8zHzmFmDSzg5zfohWoa3mdULP0YFh/VogVdMVWZPcWSHlydsiJhRQYaTNSYKN7RmZKE2lCYQ==}
+
+  '@tauri-apps/plugin-fs@2.4.4':
+    resolution: {integrity: sha512-MTorXxIRmOnOPT1jZ3w96vjSuScER38ryXY88vl5F0uiKdnvTKKTtaEjTEo8uPbl4e3gnUtfsDVwC7h77GQLvQ==}
+
   '@tauri-apps/plugin-opener@2.5.2':
     resolution: {integrity: sha512-ei/yRRoCklWHImwpCcDK3VhNXx+QXM9793aQ64YxpqVF0BDuuIlXhZgiAkc15wnPVav+IbkYhmDJIv5R326Mew==}
+
+  '@tauri-apps/plugin-os@2.3.2':
+    resolution: {integrity: sha512-n+nXWeuSeF9wcEsSPmRnBEGrRgOy6jjkSU+UVCOV8YUGKb2erhDOxis7IqRXiRVHhY8XMKks00BJ0OAdkpf6+A==}
+
+  '@tauri-apps/plugin-shell@2.3.3':
+    resolution: {integrity: sha512-Xod+pRcFxmOWFWEnqH5yZcA7qwAMuaaDkMR1Sply+F8VfBj++CGnj2xf5UoialmjZ2Cvd8qrvSCbU+7GgNVsKQ==}
+
+  '@tauri-apps/plugin-store@2.4.1':
+    resolution: {integrity: sha512-ckGSEzZ5Ii4Hf2D5x25Oqnm2Zf9MfDWAzR+volY0z/OOBz6aucPKEY0F649JvQ0Vupku6UJo7ugpGRDOFOunkA==}
 
   '@types/babel__core@7.20.5':
     resolution: {integrity: sha512-qoQprZvz5wQFJwMDqeseRXWv3rqMvhgpbXFfVyWhbx9X47POIA6i/+dXefEmZKoAgOaTdaIgNSMqMIU61yRyzA==}
@@ -1424,6 +1460,11 @@ packages:
 
   convert-source-map@2.0.0:
     resolution: {integrity: sha512-Kvp459HrV2FEJ1CAsi1Ku+MY3kasH19TFykTz2xWmMeq6bk2NU3XXvfJ+Q61m0xktWwt+1HSYf3JZsTms3aRJg==}
+
+  cross-env@10.1.0:
+    resolution: {integrity: sha512-GsYosgnACZTADcmEyJctkJIoqAhHjttw7RsFrVoJNXbsWWqaq6Ym+7kZjq6mS45O0jij6vtiReppKQEtqWy6Dw==}
+    engines: {node: '>=20'}
+    hasBin: true
 
   cross-spawn@7.0.6:
     resolution: {integrity: sha512-uV2QOWP2nWzsy2aMp8aRibhi9dlzF5Hgh5SHaB9OiTGEyDTiJJyx0uy51QXdyWbtAHNua4XJzUKca3OzKUd3vA==}
@@ -2654,6 +2695,8 @@ snapshots:
       '@babel/helper-string-parser': 7.27.1
       '@babel/helper-validator-identifier': 7.28.5
 
+  '@epic-web/invariant@1.0.0': {}
+
   '@esbuild/aix-ppc64@0.27.2':
     optional: true
 
@@ -3443,7 +3486,27 @@ snapshots:
       '@tauri-apps/cli-win32-ia32-msvc': 2.9.6
       '@tauri-apps/cli-win32-x64-msvc': 2.9.6
 
+  '@tauri-apps/plugin-dialog@2.4.2':
+    dependencies:
+      '@tauri-apps/api': 2.9.1
+
+  '@tauri-apps/plugin-fs@2.4.4':
+    dependencies:
+      '@tauri-apps/api': 2.9.1
+
   '@tauri-apps/plugin-opener@2.5.2':
+    dependencies:
+      '@tauri-apps/api': 2.9.1
+
+  '@tauri-apps/plugin-os@2.3.2':
+    dependencies:
+      '@tauri-apps/api': 2.9.1
+
+  '@tauri-apps/plugin-shell@2.3.3':
+    dependencies:
+      '@tauri-apps/api': 2.9.1
+
+  '@tauri-apps/plugin-store@2.4.1':
     dependencies:
       '@tauri-apps/api': 2.9.1
 
@@ -3748,6 +3811,11 @@ snapshots:
   concat-map@0.0.1: {}
 
   convert-source-map@2.0.0: {}
+
+  cross-env@10.1.0:
+    dependencies:
+      '@epic-web/invariant': 1.0.0
+      cross-spawn: 7.0.6
 
   cross-spawn@7.0.6:
     dependencies:

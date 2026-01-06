@@ -1,16 +1,4 @@
 import { useState, useRef } from "react";
-import { Input } from "@/components/ui/input";
-import { Button } from "@/components/ui/button";
-import { 
-  Select, 
-  SelectContent, 
-  SelectItem, 
-  SelectTrigger, 
-  SelectValue 
-} from "@/components/ui/select";
-import { Badge } from "@/components/ui/badge";
-import { Progress } from "@/components/ui/progress";
-import { useDownloadsStore } from "@/store/downloads";
 import { useVirtualizer } from "@tanstack/react-virtual";
 import { 
   Plus, 
@@ -20,10 +8,25 @@ import {
   FolderOpen,
   Download
 } from "lucide-react";
+import { useDownloadsStore } from "@/store/downloads";
+import { usePresetsStore } from "@/store/presets";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { 
+  Select, 
+  SelectContent, 
+  SelectItem, 
+  SelectTrigger, 
+  SelectValue 
+} from "@/components/ui/select";
+import { Badge } from "@/components/ui/badge";
+import { Progress } from "@/components/ui/progress";
 
 export function DownloadsScreen() {
   const [url, setUrl] = useState("");
+  const [selectedPreset, setSelectedPreset] = useState("default");
   const { jobs, addJob, removeJob } = useDownloadsStore();
+  const { presets } = usePresetsStore();
   const parentRef = useRef<HTMLDivElement>(null);
 
   const virtualizer = useVirtualizer({
@@ -35,7 +38,7 @@ export function DownloadsScreen() {
 
   const handleAdd = () => {
     if (!url.trim()) return;
-    addJob(url, "default");
+    addJob(url, selectedPreset);
     setUrl("");
   };
 
@@ -54,14 +57,16 @@ export function DownloadsScreen() {
               className="pr-10"
             />
           </div>
-          <Select defaultValue="default">
+          <Select value={selectedPreset} onValueChange={setSelectedPreset}>
             <SelectTrigger className="w-[180px]">
               <SelectValue placeholder="Select Preset" />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value="default">Global Default</SelectItem>
-              <SelectItem value="high-quality">High Quality (4K)</SelectItem>
-              <SelectItem value="mp3">Audio Only (MP3)</SelectItem>
+              {presets.map((preset) => (
+                <SelectItem key={preset.id} value={preset.id}>
+                  {preset.name}
+                </SelectItem>
+              ))}
             </SelectContent>
           </Select>
           <Button onClick={handleAdd} disabled={!url.trim()}>
