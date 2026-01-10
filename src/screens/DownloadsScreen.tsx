@@ -2,11 +2,10 @@ import { useState, useRef } from "react";
 import { useVirtualizer } from "@tanstack/react-virtual";
 import { 
   Plus, 
-  Pause, 
-  Play, 
   X, 
   FolderOpen,
-  Download
+  Download,
+  RotateCcw
 } from "lucide-react";
 import { useDownloadsStore } from "@/store/downloads";
 import { usePresetsStore } from "@/store/presets";
@@ -21,6 +20,8 @@ import {
 } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
+import { startDownload } from "@/lib/downloader";
+import { revealInExplorer } from "@/lib/commands";
 
 export function DownloadsScreen() {
   const [url, setUrl] = useState("");
@@ -126,14 +127,23 @@ export function DownloadsScreen() {
                         </div>
                       </div>
                       <div className="flex items-center gap-1">
-                        <Button variant="ghost" size="icon" className="h-8 w-8">
-                          {job.status === "Downloading" ? (
-                            <Pause className="w-4 h-4" />
-                          ) : (
-                            <Play className="w-4 h-4" />
-                          )}
-                        </Button>
-                        <Button variant="ghost" size="icon" className="h-8 w-8">
+                        {job.status === "Failed" && (
+                          <Button 
+                            variant="ghost" 
+                            size="icon" 
+                            className="h-8 w-8 text-blue-500"
+                            onClick={() => startDownload(job.id)}
+                          >
+                            <RotateCcw className="w-4 h-4" />
+                          </Button>
+                        )}
+                        <Button 
+                          variant="ghost" 
+                          size="icon" 
+                          className="h-8 w-8"
+                          disabled={!job.outputPath}
+                          onClick={() => job.outputPath && revealInExplorer(job.outputPath)}
+                        >
                           <FolderOpen className="w-4 h-4" />
                         </Button>
                         <Button 

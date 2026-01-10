@@ -6,13 +6,17 @@ import {
   Zap, 
   FileWarning,
   RotateCcw,
-  Save
+  Save,
+  Folder,
+  Search
 } from "lucide-react";
 import { toast } from "sonner";
 import { useSettingsStore, Theme, FileCollisionAction } from "@/store/settings";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
+import { Input } from "@/components/ui/input";
+import { open } from "@tauri-apps/plugin-dialog";
 import { 
   Select, 
   SelectContent, 
@@ -99,6 +103,45 @@ export function SettingsScreen() {
                   </SelectItem>
                 </SelectContent>
               </Select>
+            </div>
+          </CardContent>
+        </Card>
+
+        {/* Behavior Section */}
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-lg flex items-center gap-2">
+              <Folder className="w-5 h-5" />
+              Storage
+            </CardTitle>
+            <CardDescription>Where your downloads are saved.</CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-6">
+            <div className="space-y-2">
+              <Label>Default Download Directory</Label>
+              <div className="flex gap-2">
+                <Input 
+                  value={settings.defaultDownloadDir || ""} 
+                  readOnly 
+                  placeholder="Select a folder..."
+                  className="bg-muted"
+                />
+                <Button 
+                  variant="outline" 
+                  onClick={async () => {
+                    const selected = await open({
+                      directory: true,
+                      multiple: false,
+                    });
+                    if (selected && !Array.isArray(selected)) {
+                      updateSettings({ defaultDownloadDir: selected });
+                    }
+                  }}
+                >
+                  <Search className="w-4 h-4 mr-2" />
+                  Browse
+                </Button>
+              </div>
             </div>
           </CardContent>
         </Card>

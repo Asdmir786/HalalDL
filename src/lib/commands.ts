@@ -1,9 +1,27 @@
 import { Command } from "@tauri-apps/plugin-shell";
+import { appDataDir, join } from "@tauri-apps/api/path";
+import { exists } from "@tauri-apps/plugin-fs";
+
+async function getToolPath(baseName: string): Promise<string> {
+  // 1. Check local bin folder first
+  try {
+    const dataDir = await appDataDir();
+    const localPath = await join(dataDir, "bin", `${baseName}.exe`);
+    if (await exists(localPath)) {
+      return localPath;
+    }
+  } catch {
+    // Ignore and fallback to system
+  }
+  
+  // 2. Fallback to system PATH
+  return baseName;
+}
 
 export async function checkYtDlpVersion(): Promise<string | null> {
   try {
-    // Try running 'yt-dlp --version'
-    const cmd = Command.create("yt-dlp", ["--version"]);
+    const command = await getToolPath("yt-dlp");
+    const cmd = Command.create(command, ["--version"]);
     const output = await cmd.execute();
     if (output.code === 0) {
       return output.stdout.trim();
@@ -16,11 +34,10 @@ export async function checkYtDlpVersion(): Promise<string | null> {
 
 export async function checkFfmpegVersion(): Promise<string | null> {
   try {
-    // ffmpeg prints version to stderr or stdout depending on version/build, usually just 'ffmpeg -version' works
-    const cmd = Command.create("ffmpeg", ["-version"]);
+    const command = await getToolPath("ffmpeg");
+    const cmd = Command.create(command, ["-version"]);
     const output = await cmd.execute();
     if (output.code === 0) {
-      // Parse first line: "ffmpeg version n.n.n ..."
       const firstLine = output.stdout.split('\n')[0];
       return firstLine || "Detected";
     }
@@ -32,7 +49,8 @@ export async function checkFfmpegVersion(): Promise<string | null> {
 
 export async function checkAria2Version(): Promise<string | null> {
   try {
-    const cmd = Command.create("aria2c", ["--version"]);
+    const command = await getToolPath("aria2c");
+    const cmd = Command.create(command, ["--version"]);
     const output = await cmd.execute();
     if (output.code === 0) {
       const firstLine = output.stdout.split('\n')[0];
@@ -42,4 +60,32 @@ export async function checkAria2Version(): Promise<string | null> {
     console.warn("aria2c check failed:", e);
   }
   return null;
+}
+
+export async function downloadTools(tools: string[]): Promise<string> {
+  const { invoke } = await import("@tauri-apps/api/core");
+  return await invoke("download_tools", { tools });
+}
+
+export async function pickFile(): Promise<string | null> {
+  const { open } = await import("@tauri-apps/plugin-dialog");
+  const selected = await open({
+    multiple: false,
+    filters: [{
+      name: 'Executable',
+      extensions: ['exe']
+    }]
+  });
+  if (Array.isArray(selected)) return selected[0];
+  return selected;
+}
+
+export async function revealInExplorer(path: string) {
+  const { revealItemInDir } = await import("@tauri-apps/plugin-opener");
+  await revealItemInDir(path);
+}
+
+export async function openFolder(path: string) {
+  const { openPath } = await import("@tauri-apps/plugin-opener");
+  await openPath(path);
 }

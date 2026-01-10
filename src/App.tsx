@@ -7,6 +7,7 @@ import { LogsScreen } from "@/screens/LogsScreen";
 import { SettingsScreen } from "@/screens/SettingsScreen";
 import { Toaster } from "@/components/ui/sonner";
 import { PersistenceManager } from "@/components/PersistenceManager";
+import { UpgradePrompt } from "@/components/UpgradePrompt";
 
 export default function App() {
   const currentScreen = useNavigationStore((state) => state.currentScreen);
@@ -30,6 +31,7 @@ export default function App() {
         {renderScreen()}
       </main>
       <Toaster />
+      <UpgradePrompt />
     </div>
   );
 }

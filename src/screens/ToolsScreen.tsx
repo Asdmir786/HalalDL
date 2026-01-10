@@ -24,6 +24,16 @@ import {
   Package
 } from "lucide-react";
 
+import { open as openUrl } from '@tauri-apps/plugin-shell';
+import { pickFile } from "@/lib/commands";
+
+const TOOL_URLS: Record<string, string> = {
+  "yt-dlp": "https://github.com/yt-dlp/yt-dlp",
+  "ffmpeg": "https://ffmpeg.org/",
+  "aria2": "https://aria2.github.io/",
+  "deno": "https://deno.land/"
+};
+
 export function ToolsScreen() {
   const { tools, updateTool } = useToolsStore();
   const isLite = import.meta.env.VITE_APP_MODE !== 'FULL';
@@ -62,11 +72,21 @@ export function ToolsScreen() {
               <span className="text-sm">Auto-detect</span>
             </div>
             {tool.mode === "Manual" && (
-              <Button variant="ghost" size="sm" className="h-7 text-xs">
-                <Search className="w-3 h-3 mr-1" />
-                Browse
-              </Button>
-            )}
+                  <Button 
+                    variant="ghost" 
+                    size="sm" 
+                    className="h-7 text-xs"
+                    onClick={async () => {
+                      const path = await pickFile();
+                      if (path) {
+                        updateTool(tool.id, { path });
+                      }
+                    }}
+                  >
+                    <Search className="w-3 h-3 mr-1" />
+                    Browse
+                  </Button>
+                )}
           </div>
         </div>
 
@@ -93,7 +113,12 @@ export function ToolsScreen() {
           <RefreshCcw className="w-3 h-3 mr-1" />
           Test
         </Button>
-        <Button variant="ghost" size="sm" className="h-8">
+        <Button 
+          variant="ghost" 
+          size="sm" 
+          className="h-8"
+          onClick={() => openUrl(TOOL_URLS[tool.id] || "https://github.com")}
+        >
           <ExternalLink className="w-3 h-3" />
         </Button>
       </CardFooter>

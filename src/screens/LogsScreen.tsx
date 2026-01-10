@@ -15,6 +15,8 @@ import {
 import { toast } from "sonner";
 import { useLogsStore, LogLevel } from "@/store/logs";
 import { Button } from "@/components/ui/button";
+import { save } from "@tauri-apps/plugin-dialog";
+import { writeFile } from "@tauri-apps/plugin-fs";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
@@ -58,10 +60,20 @@ export function LogsScreen() {
     overscan: 5,
   });
 
-  const handleExport = () => {
-    const content = JSON.stringify(logs, null, 2);
-    console.log("Exporting logs:", content);
-    toast.success("Logs exported to console (JSON)");
+  const handleExport = async () => {
+    try {
+      const content = logs.map(l => `[${l.timestamp}] [${l.level.toUpperCase()}] ${l.message}`).join("\n");
+      const path = await save({
+        filters: [{ name: 'Text', extensions: ['txt'] }],
+        defaultPath: 'halaldl_logs.txt'
+      });
+      if (path) {
+        await writeFile(path, new TextEncoder().encode(content));
+        toast.success("Logs exported successfully");
+      }
+    } catch (e) {
+      toast.error(`Export failed: ${e}`);
+    }
   };
 
   const copyToClipboard = (text: string, label: string) => {

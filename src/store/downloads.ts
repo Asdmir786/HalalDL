@@ -11,12 +11,14 @@ export interface DownloadJob {
   eta?: string;
   status: JobStatus;
   presetId: string;
+  outputPath?: string;
 }
 
 interface DownloadsState {
   jobs: DownloadJob[];
   addJob: (url: string, presetId: string) => void;
   removeJob: (id: string) => void;
+  updateJob: (id: string, updates: Partial<DownloadJob>) => void;
 }
 
 export const useDownloadsStore = create<DownloadsState>((set) => ({
@@ -35,5 +37,8 @@ export const useDownloadsStore = create<DownloadsState>((set) => ({
   })),
   removeJob: (id) => set((state) => ({
     jobs: state.jobs.filter((j) => j.id !== id),
+  })),
+  updateJob: (id, updates) => set((state) => ({
+    jobs: state.jobs.map((j) => (j.id === id ? { ...j, ...updates } : j)),
   })),
 }));

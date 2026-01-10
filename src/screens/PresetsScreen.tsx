@@ -20,23 +20,58 @@ import {
   Plus
 } from "lucide-react";
 import { toast } from "sonner";
+import { useState } from "react";
+import { PresetEditor } from "@/components/PresetEditor";
+import { save, open } from "@tauri-apps/plugin-dialog";
+import { writeFile, readTextFile } from "@tauri-apps/plugin-fs";
 
 export function PresetsScreen() {
-  const { presets, duplicatePreset, deletePreset } = usePresetsStore();
+  const { presets, duplicatePreset, deletePreset, updatePreset, addPreset } = usePresetsStore();
+  const [editingPreset, setEditingPreset] = useState<Preset | null>(null);
+  const [isEditorOpen, setIsEditorOpen] = useState(false);
 
   const builtInPresets = presets.filter((p) => p.isBuiltIn);
   const userPresets = presets.filter((p) => !p.isBuiltIn);
 
-  const handleExport = () => {
-    const data = JSON.stringify(userPresets, null, 2);
-    // Logic for actual file saving would go here (Tauri FS)
-    console.log("Exporting:", data);
-    toast.success("User presets exported to JSON");
+  const handleExport = async () => {
+    try {
+      const data = JSON.stringify(userPresets, null, 2);
+      const path = await save({
+        filters: [{ name: 'JSON', extensions: ['json'] }],
+        defaultPath: 'presets.json'
+      });
+      if (path) {
+        await writeFile(path, new TextEncoder().encode(data));
+        toast.success("Presets exported successfully");
+      }
+    } catch (e) {
+      toast.error(`Export failed: ${e}`);
+    }
   };
 
-  const handleImport = () => {
-    // Logic for file picking would go here (Tauri dialog)
-    toast.info("Importing JSON...");
+  const handleImport = async () => {
+    try {
+      const path = await open({
+        filters: [{ name: 'JSON', extensions: ['json'] }],
+        multiple: false
+      });
+      if (path && !Array.isArray(path)) {
+        const content = await readTextFile(path);
+        const imported = JSON.parse(content);
+        if (Array.isArray(imported)) {
+          imported.forEach(p => {
+            addPreset({
+              ...p,
+              id: crypto.randomUUID(),
+              isBuiltIn: false
+            });
+          });
+          toast.success(`Imported ${imported.length} presets`);
+        }
+      }
+    } catch (e) {
+      toast.error(`Import failed: ${e}`);
+    }
   };
 
   const PresetCard = ({ preset }: { preset: Preset }) => (
@@ -74,7 +109,14 @@ export function PresetsScreen() {
         </Button>
         {!preset.isBuiltIn && (
           <>
-            <Button variant="outline" size="sm">
+            <Button 
+              variant="outline" 
+              size="sm"
+              onClick={() => {
+                setEditingPreset(preset);
+                setIsEditorOpen(true);
+              }}
+            >
               <FileEdit className="w-4 h-4 mr-2" />
               Edit
             </Button>
@@ -112,12 +154,35 @@ export function PresetsScreen() {
             <Download className="w-4 h-4 mr-2" />
             Export
           </Button>
-          <Button>
+          <Button onClick={() => {
+            setEditingPreset(null);
+            setIsEditorOpen(true);
+          }}>
             <Plus className="w-4 h-4 mr-2" />
             New Preset
           </Button>
         </div>
       </div>
+
+      <PresetEditor 
+        preset={editingPreset}
+        isOpen={isEditorOpen}
+        onClose={() => setIsEditorOpen(false)}
+        onSave={(data) => {
+          if (editingPreset) {
+            updatePreset(editingPreset.id, data);
+            toast.success("Preset updated");
+          } else {
+            addPreset({
+              name: data.name || "New Preset",
+              description: data.description || "",
+              args: data.args || [],
+              isBuiltIn: false
+            });
+            toast.success("Preset created");
+          }
+        }}
+      />
 
       <Tabs defaultValue="all" className="w-full">
         <TabsList>

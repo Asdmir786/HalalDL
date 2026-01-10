@@ -21,6 +21,16 @@
           "name": "aria2c",
           "cmd": "aria2c",
           "args": true
+        },
+        {
+          "name": "local-yt-dlp",
+          "cmd": "$APPDATA/bin/yt-dlp.exe",
+          "args": true
+        },
+        {
+          "name": "local-ffmpeg",
+          "cmd": "$APPDATA/bin/ffmpeg.exe",
+          "args": true
         }
       ]
     }
