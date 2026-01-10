@@ -12,8 +12,8 @@
     "format": "prettier --write .",
     "typecheck": "tsc --noEmit",
     "check": "pnpm lint && pnpm typecheck && pnpm build",
-    "build:lite": "cross-env VITE_APP_MODE=LITE pnpm tauri build",
-    "build:full": "cross-env VITE_APP_MODE=FULL pnpm tauri build"
+    "build:lite": "cross-env VITE_APP_MODE=LITE pnpm tauri build && node scripts/rename-release.js LITE",
+    "build:full": "cross-env VITE_APP_MODE=FULL pnpm tauri build && node scripts/rename-release.js FULL"
   },
   "dependencies": {
     "@radix-ui/react-checkbox": "^1.3.3",
