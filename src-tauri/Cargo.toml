@@ -33,4 +33,5 @@ futures-util = "0.3"
 tokio = { version = "1", features = ["full"] }
 indicator = "0.3"
 sevenz-rust = "0.6"
+tauri-plugin-process = "2.3.1"
 

@@ -75,61 +75,80 @@ export function PresetsScreen() {
   };
 
   const PresetCard = ({ preset }: { preset: Preset }) => (
-    <Card className="flex flex-col h-full">
-      <CardHeader>
+    <Card className="flex flex-col h-full hover:shadow-md transition-shadow duration-200 border-muted/60 overflow-hidden">
+      <CardHeader className="pb-3">
         <div className="flex justify-between items-start gap-2">
-          <CardTitle className="text-lg">{preset.name}</CardTitle>
+          <div className="space-y-1 min-w-0">
+            <CardTitle className="text-lg truncate">{preset.name}</CardTitle>
+            <CardDescription className="text-xs line-clamp-2 h-8 leading-relaxed">
+              {preset.description}
+            </CardDescription>
+          </div>
           {preset.isBuiltIn ? (
-            <Badge variant="secondary" className="gap-1 shrink-0">
+            <Badge variant="secondary" className="gap-1 shrink-0 bg-secondary/50 text-[10px]">
               <Lock className="w-3 h-3" />
               Built-in
             </Badge>
           ) : (
-            <Badge variant="outline" className="shrink-0">User</Badge>
+            <Badge variant="outline" className="shrink-0 text-[10px]">User</Badge>
           )}
         </div>
-        <CardDescription>{preset.description}</CardDescription>
       </CardHeader>
-      <CardContent className="flex-1">
-        <div className="bg-muted p-3 rounded-md font-mono text-xs overflow-hidden text-ellipsis whitespace-nowrap">
-          yt-dlp {preset.args.join(" ")}
+      <CardContent className="flex-1 space-y-3">
+        <div className="bg-muted/30 p-3 rounded-lg border border-muted/50 font-mono text-[10px] text-muted-foreground break-all relative group">
+           <div className="line-clamp-3">
+              yt-dlp {preset.args.join(" ")}
+           </div>
+           <Button 
+             variant="ghost" 
+             size="icon" 
+             className="absolute top-1 right-1 w-6 h-6 opacity-0 group-hover:opacity-100 transition-opacity"
+             onClick={() => {
+                navigator.clipboard.writeText(`yt-dlp ${preset.args.join(" ")}`);
+                toast.success("Command copied to clipboard");
+             }}
+           >
+              <Copy className="w-3 h-3" />
+           </Button>
         </div>
       </CardContent>
-      <CardFooter className="flex gap-2 justify-end">
+      <CardFooter className="bg-muted/30 border-t p-2 flex gap-2 justify-end">
         <Button 
-          variant="outline" 
+          variant="ghost" 
           size="sm" 
+          className="h-8 text-xs px-2"
           onClick={() => {
             duplicatePreset(preset.id);
             toast.success(`Duplicated ${preset.name}`);
           }}
         >
-          <Copy className="w-4 h-4 mr-2" />
+          <Copy className="w-3.5 h-3.5 mr-1.5" />
           Duplicate
         </Button>
         {!preset.isBuiltIn && (
           <>
             <Button 
-              variant="outline" 
+              variant="ghost" 
               size="sm"
+              className="h-8 text-xs px-2"
               onClick={() => {
                 setEditingPreset(preset);
                 setIsEditorOpen(true);
               }}
             >
-              <FileEdit className="w-4 h-4 mr-2" />
+              <FileEdit className="w-3.5 h-3.5 mr-1.5" />
               Edit
             </Button>
             <Button 
-              variant="outline" 
-              size="sm" 
-              className="text-destructive hover:text-destructive"
+              variant="ghost" 
+              size="sm"
+              className="h-8 text-xs px-2 text-destructive hover:text-destructive hover:bg-destructive/10"
               onClick={() => {
                 deletePreset(preset.id);
                 toast.error(`Deleted ${preset.name}`);
               }}
             >
-              <Trash2 className="w-4 h-4 mr-2" />
+              <Trash2 className="w-3.5 h-3.5 mr-1.5" />
               Delete
             </Button>
           </>
@@ -139,29 +158,70 @@ export function PresetsScreen() {
   );
 
   return (
-    <div className="p-8 space-y-6 max-w-6xl mx-auto h-full overflow-auto">
-      <div className="flex justify-between items-center">
-        <div>
-          <h2 className="text-3xl font-bold tracking-tight">Presets</h2>
-          <p className="text-muted-foreground">Manage your yt-dlp download configurations.</p>
+    <div className="flex flex-col h-full bg-background max-w-6xl mx-auto w-full">
+      <header className="p-8 pb-6 flex flex-col gap-6">
+        <div className="flex items-center justify-between">
+          <div className="space-y-1">
+            <h2 className="text-3xl font-bold tracking-tight">Presets</h2>
+            <p className="text-muted-foreground text-sm">Configure and manage your custom download profiles.</p>
+          </div>
+          <div className="flex items-center gap-2">
+            <Button variant="outline" size="sm" onClick={handleImport} className="h-9">
+              <Upload className="w-4 h-4 mr-2" />
+              Import
+            </Button>
+            <Button variant="outline" size="sm" onClick={handleExport} className="h-9">
+              <Download className="w-4 h-4 mr-2" />
+              Export
+            </Button>
+            <Button size="sm" onClick={() => {
+              setEditingPreset(null);
+              setIsEditorOpen(true);
+            }} className="h-9 shadow-md">
+              <Plus className="w-4 h-4 mr-2" />
+              Create Preset
+            </Button>
+          </div>
         </div>
-        <div className="flex gap-2">
-          <Button variant="outline" onClick={handleImport}>
-            <Upload className="w-4 h-4 mr-2" />
-            Import
-          </Button>
-          <Button variant="outline" onClick={handleExport}>
-            <Download className="w-4 h-4 mr-2" />
-            Export
-          </Button>
-          <Button onClick={() => {
-            setEditingPreset(null);
-            setIsEditorOpen(true);
-          }}>
-            <Plus className="w-4 h-4 mr-2" />
-            New Preset
-          </Button>
-        </div>
+      </header>
+
+      <div className="flex-1 overflow-auto px-8 pb-8">
+        <Tabs defaultValue="all" className="space-y-6">
+          <TabsList className="bg-muted/50 p-1 rounded-xl h-11">
+            <TabsTrigger value="all" className="rounded-lg px-6 h-9">All Presets</TabsTrigger>
+            <TabsTrigger value="built-in" className="rounded-lg px-6 h-9">Built-in</TabsTrigger>
+            <TabsTrigger value="user" className="rounded-lg px-6 h-9">My Presets</TabsTrigger>
+          </TabsList>
+
+          <TabsContent value="all" className="mt-0">
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-2 xl:grid-cols-3 gap-6">
+              {presets.map((p) => <PresetCard key={p.id} preset={p} />)}
+            </div>
+          </TabsContent>
+
+          <TabsContent value="built-in" className="mt-0">
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-2 xl:grid-cols-3 gap-6">
+              {builtInPresets.map((p) => <PresetCard key={p.id} preset={p} />)}
+            </div>
+          </TabsContent>
+
+          <TabsContent value="user" className="mt-0">
+            {userPresets.length === 0 ? (
+              <div className="flex flex-col items-center justify-center p-12 border border-dashed rounded-2xl bg-muted/10">
+                 <div className="w-16 h-16 bg-muted rounded-full flex items-center justify-center mb-4">
+                    <Plus className="w-8 h-8 opacity-20" />
+                 </div>
+                 <h3 className="text-lg font-semibold mb-1">No custom presets yet</h3>
+                 <p className="text-sm text-muted-foreground mb-6">Create your own presets to save specific download settings.</p>
+                 <Button onClick={() => setIsEditorOpen(true)}>Create your first preset</Button>
+              </div>
+            ) : (
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-2 xl:grid-cols-3 gap-6">
+                {userPresets.map((p) => <PresetCard key={p.id} preset={p} />)}
+              </div>
+            )}
+          </TabsContent>
+        </Tabs>
       </div>
 
       <PresetEditor 
@@ -181,31 +241,9 @@ export function PresetsScreen() {
             });
             toast.success("Preset created");
           }
+          setIsEditorOpen(false);
         }}
       />
-
-      <Tabs defaultValue="all" className="w-full">
-        <TabsList>
-          <TabsTrigger value="all">All Presets</TabsTrigger>
-          <TabsTrigger value="built-in">Built-in</TabsTrigger>
-          <TabsTrigger value="user">User Created</TabsTrigger>
-        </TabsList>
-        <TabsContent value="all" className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 pt-4">
-          {presets.map((p) => <PresetCard key={p.id} preset={p} />)}
-        </TabsContent>
-        <TabsContent value="built-in" className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 pt-4">
-          {builtInPresets.map((p) => <PresetCard key={p.id} preset={p} />)}
-        </TabsContent>
-        <TabsContent value="user" className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 pt-4">
-          {userPresets.length === 0 ? (
-            <div className="col-span-full py-12 text-center text-muted-foreground border-2 border-dashed rounded-lg">
-              No user presets found. Duplicate a built-in one to get started!
-            </div>
-          ) : (
-            userPresets.map((p) => <PresetCard key={p.id} preset={p} />)
-          )}
-        </TabsContent>
-      </Tabs>
     </div>
   );
 }

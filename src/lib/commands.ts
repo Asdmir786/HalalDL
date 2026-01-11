@@ -62,6 +62,21 @@ export async function checkAria2Version(): Promise<string | null> {
   return null;
 }
 
+export async function checkDenoVersion(): Promise<string | null> {
+  try {
+    const command = await getToolPath("deno");
+    const cmd = Command.create(command, ["--version"]);
+    const output = await cmd.execute();
+    if (output.code === 0) {
+      const firstLine = output.stdout.split('\n')[0];
+      return firstLine || "Detected";
+    }
+  } catch (e) {
+    console.warn("deno check failed:", e);
+  }
+  return null;
+}
+
 export async function downloadTools(tools: string[]): Promise<string> {
   const { invoke } = await import("@tauri-apps/api/core");
   return await invoke("download_tools", { tools });

@@ -1,5 +1,6 @@
 import { useState, useEffect } from "react";
 import { invoke } from "@tauri-apps/api/core";
+import { relaunch } from "@tauri-apps/plugin-process";
 import { listen } from "@tauri-apps/api/event";
 import { 
   Dialog, 
@@ -22,12 +23,20 @@ interface DownloadProgress {
   status: string;
 }
 
+const TOOL_SIZES: Record<string, number> = {
+  "yt-dlp": 16,
+  "ffmpeg": 35,
+  "aria2": 5,
+  "deno": 31
+};
+
 export function UpgradePrompt() {
   const [open, setOpen] = useState(false);
   const [isDownloading, setIsDownloading] = useState(false);
   const [progress, setProgress] = useState(0);
   const [currentTool, setCurrentTool] = useState("");
   const [statusText, setStatusText] = useState("");
+  const [logs, setLogs] = useState<string[]>([]);
   const [error, setError] = useState<string | null>(null);
   
   // Track which tools are selected for download
@@ -35,6 +44,8 @@ export function UpgradePrompt() {
   
   const { tools } = useToolsStore();
   const isFullMode = import.meta.env.VITE_APP_MODE === 'FULL';
+
+  const totalSize = selectedTools.reduce((acc, id) => acc + (TOOL_SIZES[id] || 0), 0);
 
   useEffect(() => {
     // Show prompt if ANY tool is missing
@@ -58,12 +69,39 @@ export function UpgradePrompt() {
       setCurrentTool(event.payload.tool);
       setProgress(event.payload.percentage);
       setStatusText(event.payload.status);
+      
+      // Add unique status messages to logs
+      if (event.payload.status && event.payload.status !== "Downloading...") {
+        setLogs(prev => {
+          const newLog = `[${event.payload.tool}] ${event.payload.status}`;
+          if (prev[prev.length - 1] === newLog) return prev;
+          return [...prev, newLog];
+        });
+      }
     });
 
     return () => {
       unlisten.then(fn => fn());
     };
   }, []);
+
+  const handleFinish = async () => {
+    try {
+      // 1. Try to add to User PATH
+      try {
+        await invoke("add_to_user_path");
+      } catch (e) {
+        console.error("Failed to add to PATH:", e);
+      }
+      
+      // 2. Restart application
+      await relaunch();
+    } catch (e) {
+      console.error("Failed to relaunch:", e);
+      // Fallback
+      window.location.reload();
+    }
+  };
 
   const handleUpgrade = async () => {
     if (selectedTools.length === 0) {
@@ -81,10 +119,7 @@ export function UpgradePrompt() {
       
       setStatusText("All selected tools ready!");
       setProgress(100);
-      setTimeout(() => {
-        setOpen(false);
-        window.location.reload(); 
-      }, 1500);
+      // Removed auto-close timer to allow user to see logs
     } catch (err) {
       setError(err as string);
       setIsDownloading(false);
@@ -128,18 +163,31 @@ export function UpgradePrompt() {
 
         <div className="space-y-4 py-4">
           {isDownloading ? (
-            <div className="space-y-3">
-              <div className="flex justify-between text-sm">
-                <span className="flex items-center gap-2">
-                  <Download className="w-4 h-4 animate-bounce" />
-                  <span className="capitalize">{currentTool || "Preparing..."}</span>
-                </span>
-                <span className="font-mono">{Math.round(progress)}%</span>
+            <div className="space-y-4">
+              <div className="space-y-3">
+                <div className="flex justify-between text-sm">
+                  <span className="flex items-center gap-2">
+                    <Download className="w-4 h-4 animate-bounce" />
+                    <span className="capitalize">{currentTool || "Preparing..."}</span>
+                  </span>
+                  <span className="font-mono">{Math.round(progress)}%</span>
+                </div>
+                <Progress value={progress} className="h-2" />
+                <p className="text-xs text-muted-foreground text-center italic">
+                  {statusText}
+                </p>
               </div>
-              <Progress value={progress} className="h-2" />
-              <p className="text-xs text-muted-foreground text-center italic">
-                {statusText}
-              </p>
+
+              {logs.length > 0 && (
+                <div className="bg-muted/50 rounded-lg p-3 border border-muted-foreground/10 max-h-32 overflow-auto font-mono text-[10px] space-y-1">
+                  {logs.map((log, i) => (
+                    <div key={i} className="flex gap-2">
+                      <span className="text-primary shrink-0">›</span>
+                      <span className="opacity-80">{log}</span>
+                    </div>
+                  ))}
+                </div>
+              )}
             </div>
           ) : error ? (
             <div className="flex items-start gap-3 p-3 rounded-lg bg-destructive/10 text-destructive text-sm">
@@ -150,7 +198,7 @@ export function UpgradePrompt() {
             <div className="space-y-3">
               <div className="text-sm font-medium text-muted-foreground mb-2 flex justify-between items-center">
                 <span>Available Tools</span>
-                <span className="text-xs bg-muted px-2 py-1 rounded">~50MB Total</span>
+                <span className="text-xs bg-muted px-2 py-1 rounded">~{totalSize}MB Total</span>
               </div>
               
               {tools.map(tool => {
@@ -213,9 +261,9 @@ export function UpgradePrompt() {
             </>
           )}
           {isDownloading && progress === 100 && (
-            <Button disabled className="w-full gap-2">
+            <Button onClick={handleFinish} className="w-full gap-2">
               <CheckCircle2 className="w-4 h-4" />
-              Finishing up...
+              Done - Restart App
             </Button>
           )}
         </DialogFooter>

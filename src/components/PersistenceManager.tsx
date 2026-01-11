@@ -4,7 +4,7 @@ import { useSettingsStore, Settings } from "@/store/settings";
 import { usePresetsStore, BUILT_IN_PRESETS, Preset } from "@/store/presets";
 import { useToolsStore } from "@/store/tools";
 import { storage } from "@/lib/storage";
-import { checkYtDlpVersion, checkFfmpegVersion, checkAria2Version } from "@/lib/commands";
+import { checkYtDlpVersion, checkFfmpegVersion, checkAria2Version, checkDenoVersion } from "@/lib/commands";
 import { toast } from "sonner";
 
 export function PersistenceManager() {
@@ -38,6 +38,13 @@ export function PersistenceManager() {
       updateTool("aria2", {
           status: ariaVer ? "Detected" : "Missing",
           version: ariaVer || undefined
+      });
+
+      // Check deno
+      const denoVer = await checkDenoVersion();
+      updateTool("deno", {
+          status: denoVer ? "Detected" : "Missing",
+          version: denoVer || undefined
       });
     };
 

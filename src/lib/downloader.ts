@@ -45,8 +45,14 @@ export async function startDownload(jobId: string) {
 
   // Use aria2 if available
   if (aria2Path !== "aria2c") {
-    args.push("--external-downloader", "aria2c");
-    args.push("--external-downloader-args", "aria2c:-x 16 -s 16 -k 1M");
+    addLog({ level: "info", message: `Using local aria2c: ${aria2Path}`, jobId });
+    // Use the absolute path for both the executable and the downloader name
+    args.push("--external-downloader", aria2Path);
+    // Remove the aria2c: prefix to ensure args are applied regardless of how yt-dlp identifies the binary
+    args.push("--external-downloader-args", "-x 16 -s 16 -k 1M --summary-interval=0");
+  } else {
+    // Check if aria2c is in system path
+    addLog({ level: "info", message: "Aria2c not found in local bin, checking system PATH...", jobId });
   }
 
   // Add output template
@@ -117,6 +123,13 @@ export async function startDownload(jobId: string) {
 
     cmd.stderr.on("data", (line) => {
       addLog({ level: "error", message: `STDERR: ${line}`, jobId });
+      
+      // Some aria2 errors might come through stderr
+      if (line.includes("aria2c") || line.includes("downloader")) {
+        // Log it as an error but keep status as Failed (compatible with JobStatus type)
+        addLog({ level: "error", message: "Downloader specific error detected", jobId });
+        updateJob(jobId, { status: "Failed" });
+      }
     });
 
     await cmd.spawn();

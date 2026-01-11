@@ -6,7 +6,10 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
 const mode = process.argv[2] || 'FULL'; // LITE or FULL
-const version = '0.1.0'; // We could read this from tauri.conf.json but keeping it simple for now
+
+// Read version from package.json to stay in sync
+const pkg = JSON.parse(fs.readFileSync(path.join(__dirname, '../package.json'), 'utf8'));
+const version = pkg.version;
 
 const bundleDir = path.join(__dirname, '../src-tauri/target/release/bundle');
 const releaseDir = path.join(__dirname, '../out');
