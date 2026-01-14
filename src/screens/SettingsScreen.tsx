@@ -161,10 +161,36 @@ export function SettingsScreen() {
                 <Label>Desktop Notifications</Label>
                 <p className="text-sm text-muted-foreground">Show alerts when downloads complete or fail.</p>
               </div>
-              <Switch 
-                checked={settings.notifications} 
-                onCheckedChange={(v) => updateSettings({ notifications: v })}
+              <Switch
+                checked={settings.notifications}
+                onCheckedChange={(checked) => updateSettings({ notifications: checked })}
               />
+            </div>
+
+            <Separator />
+
+            <div className="flex items-center justify-between">
+              <div className="space-y-0.5">
+                <Label>Max Concurrent Downloads</Label>
+                <p className="text-sm text-muted-foreground">
+                  Limit how many downloads run at the same time.
+                </p>
+              </div>
+              <div className="flex items-center gap-3">
+                <span className="text-sm text-muted-foreground">
+                  {settings.maxConcurrency}
+                </span>
+                <Slider
+                  className="w-40"
+                  min={1}
+                  max={8}
+                  step={1}
+                  value={[settings.maxConcurrency]}
+                  onValueChange={([value]) =>
+                    updateSettings({ maxConcurrency: value })
+                  }
+                />
+              </div>
             </div>
           </CardContent>
         </Card>

@@ -48,6 +48,51 @@
           "args": true
         }
       ]
+    },
+    {
+      "identifier": "shell:allow-spawn",
+      "allow": [
+        {
+          "name": "yt-dlp",
+          "cmd": "yt-dlp",
+          "args": true
+        },
+        {
+          "name": "ffmpeg",
+          "cmd": "ffmpeg",
+          "args": true
+        },
+        {
+          "name": "aria2c",
+          "cmd": "aria2c",
+          "args": true
+        },
+        {
+          "name": "deno",
+          "cmd": "deno",
+          "args": true
+        },
+        {
+          "name": "local-yt-dlp",
+          "cmd": "$APPDATA/bin/yt-dlp.exe",
+          "args": true
+        },
+        {
+          "name": "local-ffmpeg",
+          "cmd": "$APPDATA/bin/ffmpeg.exe",
+          "args": true
+        },
+        {
+          "name": "local-aria2c",
+          "cmd": "$APPDATA/bin/aria2c.exe",
+          "args": true
+        },
+        {
+          "name": "local-deno",
+          "cmd": "$APPDATA/bin/deno.exe",
+          "args": true
+        }
+      ]
     }
   ]
 }

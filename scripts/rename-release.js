@@ -7,9 +7,10 @@ const __dirname = path.dirname(__filename);
 
 const mode = process.argv[2] || 'FULL'; // LITE or FULL
 
-// Read version from package.json to stay in sync
-const pkg = JSON.parse(fs.readFileSync(path.join(__dirname, '../package.json'), 'utf8'));
-const version = pkg.version;
+// Read version from tauri.conf.json to ensure we match the actual build artifact
+const tauriConfig = JSON.parse(fs.readFileSync(path.join(__dirname, '../src-tauri/tauri.conf.json'), 'utf8'));
+const version = tauriConfig.version;
+const productName = tauriConfig.productName;
 
 const bundleDir = path.join(__dirname, '../src-tauri/target/release/bundle');
 const releaseDir = path.join(__dirname, '../out');
@@ -18,16 +19,29 @@ if (!fs.existsSync(releaseDir)) {
     fs.mkdirSync(releaseDir);
 }
 
+const flavor = mode === 'LITE' ? 'Lite' : 'Full';
+const targetSuffix = `v${version}-win10+11-x64`;
+
+const existingReleaseFiles = fs.readdirSync(releaseDir);
+existingReleaseFiles.forEach((entry) => {
+    if (entry.startsWith(`HalalDL-${flavor}-`)) {
+        const target = path.join(releaseDir, entry);
+        fs.rmSync(target, { recursive: true, force: true });
+    }
+});
+
 const filesToRename = [
     {
         dir: 'msi',
-        pattern: /halaldl_.*_x64_en-US\.msi$/,
-        newName: `HalalDL_${version}_x64_${mode}.msi`
+        // Strictly match the current version to avoid copying stale builds (e.g. 0.1.0)
+        pattern: new RegExp(`${productName}_${version}_x64_en-US\\.msi$`, 'i'),
+        newName: `${productName}-${flavor}-${targetSuffix}.msi`
     },
     {
         dir: 'nsis',
-        pattern: /halaldl_.*_x64-setup\.exe$/,
-        newName: `HalalDL_${version}_x64_${mode}_Setup.exe`
+        // Strictly match the current version
+        pattern: new RegExp(`${productName}_${version}_x64-setup\\.exe$`, 'i'),
+        newName: `${productName}-${flavor}-${targetSuffix}-setup.exe`
     }
 ];
 

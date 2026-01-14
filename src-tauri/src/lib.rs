@@ -72,7 +72,7 @@ async fn download_file(
     dest: &PathBuf,
 ) -> Result<(), String> {
     let client = reqwest::Client::builder()
-        .user_agent("HalalDL/0.1.0")
+        .user_agent(format!("HalalDL/{}", app_handle.package_info().version))
         .build()
         .map_err(|e| e.to_string())?;
 
@@ -253,6 +253,45 @@ fn add_to_user_path(app_handle: tauri::AppHandle) -> Result<String, String> {
     }
 }
 
+#[tauri::command]
+async fn show_in_folder(path: String) -> Result<(), String> {
+    #[cfg(target_os = "windows")]
+    {
+        use std::process::Command;
+        use std::path::Path;
+        let path = path.replace("/", "\\");
+        
+        // Verify path exists
+        if !Path::new(&path).exists() {
+             return Err(format!("Path does not exist: {}", path));
+        }
+
+        Command::new("explorer")
+            .args(["/select,", &path])
+            .spawn()
+            .map_err(|e| e.to_string())?;
+    }
+    #[cfg(target_os = "macos")]
+    {
+        use std::process::Command;
+        Command::new("open")
+            .args(["-R", &path])
+            .spawn()
+            .map_err(|e| e.to_string())?;
+    }
+    #[cfg(target_os = "linux")]
+    {
+        use std::process::Command;
+        // Try xdg-open first, might open folder but not select file
+        // Or try nautilus/dolphin/etc if known
+        Command::new("xdg-open")
+            .arg(std::path::Path::new(&path).parent().unwrap_or(std::path::Path::new("/")))
+            .spawn()
+            .map_err(|e| e.to_string())?;
+    }
+    Ok(())
+}
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     tauri::Builder::default()
@@ -263,7 +302,13 @@ pub fn run() {
         .plugin(tauri_plugin_shell::init())
         .plugin(tauri_plugin_store::Builder::new().build())
         .plugin(tauri_plugin_opener::init())
-        .invoke_handler(tauri::generate_handler![greet, download_tools, add_to_user_path])
+        .plugin(tauri_plugin_notification::init())
+        .invoke_handler(tauri::generate_handler![greet, download_tools, add_to_user_path, show_in_folder])
+        .setup(|app| {
+            let win = app.get_webview_window("main").unwrap();
+            win.set_focus().unwrap();
+            Ok(())
+        })
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
 }

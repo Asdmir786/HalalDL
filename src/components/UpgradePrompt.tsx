@@ -16,6 +16,7 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Label } from "@/components/ui/label";
 import { Download, Package, CheckCircle2, AlertCircle } from "lucide-react";
 import { useToolsStore } from "@/store/tools";
+import { useLogsStore } from "@/store/logs";
 
 interface DownloadProgress {
   tool: string;
@@ -30,6 +31,13 @@ const TOOL_SIZES: Record<string, number> = {
   "deno": 31
 };
 
+import { 
+  checkYtDlpVersion, 
+  checkFfmpegVersion, 
+  checkAria2Version, 
+  checkDenoVersion 
+} from "@/lib/commands";
+
 export function UpgradePrompt() {
   const [open, setOpen] = useState(false);
   const [isDownloading, setIsDownloading] = useState(false);
@@ -42,7 +50,8 @@ export function UpgradePrompt() {
   // Track which tools are selected for download
   const [selectedTools, setSelectedTools] = useState<string[]>([]);
   
-  const { tools } = useToolsStore();
+  const { tools, updateTool, setDiscoveredToolId } = useToolsStore();
+  const { addLog } = useLogsStore();
   const isFullMode = import.meta.env.VITE_APP_MODE === 'FULL';
 
   const totalSize = selectedTools.reduce((acc, id) => acc + (TOOL_SIZES[id] || 0), 0);
@@ -70,12 +79,15 @@ export function UpgradePrompt() {
       setProgress(event.payload.percentage);
       setStatusText(event.payload.status);
       
-      // Add unique status messages to logs
       if (event.payload.status && event.payload.status !== "Downloading...") {
         setLogs(prev => {
           const newLog = `[${event.payload.tool}] ${event.payload.status}`;
           if (prev[prev.length - 1] === newLog) return prev;
           return [...prev, newLog];
+        });
+        addLog({
+          level: "info",
+          message: `[${event.payload.tool}] ${event.payload.status}`,
         });
       }
     });
@@ -83,22 +95,54 @@ export function UpgradePrompt() {
     return () => {
       unlisten.then(fn => fn());
     };
-  }, []);
+  }, [addLog]);
 
   const handleFinish = async () => {
     try {
-      // 1. Try to add to User PATH
+      // Final check of tools before finishing
+      const checkTool = async (id: string, checkFn: () => Promise<string | null>) => {
+        const version = await checkFn();
+        if (version) {
+          updateTool(id, { status: "Detected", version });
+          return true;
+        }
+        return false;
+      };
+
+      const results = await Promise.all([
+        checkTool("yt-dlp", checkYtDlpVersion),
+        checkTool("ffmpeg", checkFfmpegVersion),
+        checkTool("aria2", checkAria2Version),
+        checkTool("deno", checkDenoVersion),
+      ]);
+
+      const anyDetected = results.some(r => r);
+      
+      if (anyDetected) {
+        // Find the first tool we just downloaded to show in the success modal
+        const firstDownloaded = selectedTools[0];
+        setDiscoveredToolId(firstDownloaded || "yt-dlp");
+        setOpen(false);
+        
+        // Try to add to PATH in background
+        try {
+          await invoke("add_to_user_path");
+        } catch (e) {
+          console.warn("Failed to add to PATH", e);
+        }
+        
+        return; // Don't relaunch if we want to show the success modal
+      }
+
+      // Fallback to relaunch if something went wrong or no tools detected
       try {
         await invoke("add_to_user_path");
-      } catch (e) {
-        console.error("Failed to add to PATH:", e);
+      } catch (error) {
+        console.error("Failed to add to PATH:", error);
       }
-      
-      // 2. Restart application
       await relaunch();
-    } catch (e) {
-      console.error("Failed to relaunch:", e);
-      // Fallback
+    } catch (error) {
+      console.error("Failed to finish setup:", error);
       window.location.reload();
     }
   };
@@ -116,13 +160,21 @@ export function UpgradePrompt() {
       // Rust expects: "yt-dlp", "ffmpeg", "aria2", "deno"
       // Our store IDs are: "yt-dlp", "ffmpeg", "aria2", "deno" (from src/store/tools.ts)
       await invoke("download_tools", { tools: selectedTools });
-      
       setStatusText("All selected tools ready!");
       setProgress(100);
-      // Removed auto-close timer to allow user to see logs
-    } catch (err) {
-      setError(err as string);
+      addLog({
+        level: "info",
+        message: "All selected tools downloaded and ready",
+      });
+    } catch (error: unknown) {
+      const message =
+        error instanceof Error ? error.message : String(error);
+      setError(message);
       setIsDownloading(false);
+      addLog({
+        level: "error",
+        message: `Tool download failed: ${message}`,
+      });
     }
   };
 

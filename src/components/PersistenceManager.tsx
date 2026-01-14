@@ -3,14 +3,17 @@ import { downloadDir } from "@tauri-apps/api/path";
 import { useSettingsStore, Settings } from "@/store/settings";
 import { usePresetsStore, BUILT_IN_PRESETS, Preset } from "@/store/presets";
 import { useToolsStore } from "@/store/tools";
+import { useLogsStore } from "@/store/logs";
 import { storage } from "@/lib/storage";
 import { checkYtDlpVersion, checkFfmpegVersion, checkAria2Version, checkDenoVersion } from "@/lib/commands";
 import { toast } from "sonner";
+import { isPermissionGranted, requestPermission, sendNotification } from '@tauri-apps/plugin-notification';
 
 export function PersistenceManager() {
   const { settings, setSettings } = useSettingsStore();
   const { presets, setPresets } = usePresetsStore();
-  const { updateTool } = useToolsStore();
+  const { updateTool, setDiscoveredToolId } = useToolsStore();
+  const { logs } = useLogsStore();
   
   const initialized = useRef(false);
 
@@ -19,33 +22,40 @@ export function PersistenceManager() {
     const checkTools = async () => {
       console.log("Checking tools...");
       
-      // Check yt-dlp
-      const ytVer = await checkYtDlpVersion();
-      updateTool("yt-dlp", { 
-          status: ytVer ? "Detected" : "Missing", 
-          version: ytVer || undefined 
-      });
+      const checkAndNotify = async (id: string, checkFn: () => Promise<string | null>) => {
+        const currentTool = useToolsStore.getState().tools.find(t => t.id === id);
+        const version = await checkFn();
+        
+        if (version && currentTool?.status === "Missing") {
+          // Tool was missing but is now detected
+          setDiscoveredToolId(id);
+          
+          // Send notification if app is in background
+          let permissionGranted = await isPermissionGranted();
+          if (!permissionGranted) {
+            const permission = await requestPermission();
+            permissionGranted = permission === 'granted';
+          }
+          
+          if (permissionGranted) {
+            sendNotification({
+              title: 'Tool Discovered!',
+              body: `${currentTool.name} has been detected and is ready to use.`,
+              icon: 'info'
+            });
+          }
+        }
 
-      // Check ffmpeg
-      const ffVer = await checkFfmpegVersion();
-      updateTool("ffmpeg", {
-          status: ffVer ? "Detected" : "Missing",
-          version: ffVer || undefined
-      });
+        updateTool(id, { 
+          status: version ? "Detected" : "Missing", 
+          version: version || undefined 
+        });
+      };
 
-      // Check aria2
-      const ariaVer = await checkAria2Version();
-      updateTool("aria2", {
-          status: ariaVer ? "Detected" : "Missing",
-          version: ariaVer || undefined
-      });
-
-      // Check deno
-      const denoVer = await checkDenoVersion();
-      updateTool("deno", {
-          status: denoVer ? "Detected" : "Missing",
-          version: denoVer || undefined
-      });
+      await checkAndNotify("yt-dlp", checkYtDlpVersion);
+      await checkAndNotify("ffmpeg", checkFfmpegVersion);
+      await checkAndNotify("aria2", checkAria2Version);
+      await checkAndNotify("deno", checkDenoVersion);
     };
 
     const init = async () => {
@@ -54,6 +64,7 @@ export function PersistenceManager() {
 
       try {
         await storage.init();
+        await useLogsStore.getState().loadLogs();
 
         // Load Settings
         const savedSettings = await storage.getSettings<Settings>();
@@ -100,7 +111,7 @@ export function PersistenceManager() {
     };
 
     init();
-  }, [setSettings, setPresets, updateTool]);
+  }, [setSettings, setPresets, updateTool, setDiscoveredToolId]);
 
   // Auto-Save Settings
   useEffect(() => {
@@ -135,6 +146,17 @@ export function PersistenceManager() {
     }, 500);
     return () => clearTimeout(timer);
   }, [presets]);
+
+  useEffect(() => {
+    if (!initialized.current) return;
+    const timer = setTimeout(() => {
+      console.debug("[logs] saveLogs");
+      storage.saveLogs(logs).catch((e) => {
+        console.error("[logs] saveLogs:error", e);
+      });
+    }, 500);
+    return () => clearTimeout(timer);
+  }, [logs]);
 
   return null; // Logic only component
 }

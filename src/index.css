@@ -82,6 +82,14 @@
   --radius-lg: var(--radius);
   --radius-md: calc(var(--radius) - 2px);
   --radius-sm: calc(var(--radius) - 4px);
+
+  @keyframes gradient-slow {
+    0% { background-position: 0% 50%; }
+    50% { background-position: 100% 50%; }
+    100% { background-position: 0% 50%; }
+  }
+  --animate-gradient-slow: gradient-slow 8s ease infinite;
+  --background-size-gradient: 200% 200%;
 }
 
 @layer base {
@@ -91,4 +99,43 @@
   body {
     @apply bg-background text-foreground;
   }
+}
+
+/* Custom Scrollbar */
+::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+
+::-webkit-scrollbar-track {
+  @apply bg-transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  @apply bg-muted-foreground/20 rounded-full border-[3px] border-solid border-transparent bg-clip-content hover:bg-muted-foreground/40 transition-colors;
+}
+
+::-webkit-scrollbar-corner {
+  @apply bg-transparent;
+}
+
+/* Screen Transitions */
+.screen-enter {
+  opacity: 0;
+  transform: translateY(4px);
+}
+
+.screen-enter-active {
+  opacity: 1;
+  transform: translateY(0);
+  transition: opacity 200ms ease-out, transform 200ms ease-out;
+}
+
+.screen-exit {
+  opacity: 1;
+}
+
+.screen-exit-active {
+  opacity: 0;
+  transition: opacity 150ms ease-in;
 }

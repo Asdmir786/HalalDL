@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import { 
   Dialog, 
   DialogContent, 
@@ -20,21 +20,9 @@ interface PresetEditorProps {
 }
 
 export function PresetEditor({ preset, isOpen, onClose, onSave }: PresetEditorProps) {
-  const [name, setName] = useState("");
-  const [description, setDescription] = useState("");
-  const [args, setArgs] = useState("");
-
-  useEffect(() => {
-    if (preset) {
-      setName(preset.name);
-      setDescription(preset.description);
-      setArgs(preset.args.join(" "));
-    } else {
-      setName("");
-      setDescription("");
-      setArgs("");
-    }
-  }, [preset, isOpen]);
+  const [name, setName] = useState(preset?.name ?? "");
+  const [description, setDescription] = useState(preset?.description ?? "");
+  const [args, setArgs] = useState(preset ? preset.args.join(" ") : "");
 
   const handleSave = () => {
     onSave({

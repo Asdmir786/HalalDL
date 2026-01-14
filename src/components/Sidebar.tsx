@@ -11,6 +11,8 @@ import {
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
+import { getVersion } from "@tauri-apps/api/app";
+import { useEffect, useState } from "react";
 
 const NAV_ITEMS: { id: Screen; label: string; icon: LucideIcon }[] = [
   { id: "downloads", label: "Downloads", icon: Download },
@@ -22,6 +24,11 @@ const NAV_ITEMS: { id: Screen; label: string; icon: LucideIcon }[] = [
 
 export function Sidebar() {
   const { currentScreen, setScreen, sidebarCollapsed, toggleSidebar } = useNavigationStore();
+  const [version, setVersion] = useState("...");
+
+  useEffect(() => {
+    getVersion().then(setVersion).catch(() => setVersion("0.2.0"));
+  }, []);
 
   return (
     <aside className={cn(
@@ -87,7 +94,7 @@ export function Sidebar() {
 
       {!sidebarCollapsed && (
         <div className="p-4 text-[10px] text-muted-foreground/60 text-center font-mono tracking-widest uppercase">
-          v0.1.0 Lite
+          v{version} Lite
         </div>
       )}
     </aside>

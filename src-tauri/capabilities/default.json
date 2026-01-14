@@ -12,6 +12,7 @@
     "shell:default",
     "dialog:default",
     "fs:default",
-    "os:default"
+    "os:default",
+    "notification:default"
   ]
 }

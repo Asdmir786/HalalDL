@@ -37,40 +37,44 @@ export function PresetsScreen() {
     try {
       const data = JSON.stringify(userPresets, null, 2);
       const path = await save({
-        filters: [{ name: 'JSON', extensions: ['json'] }],
-        defaultPath: 'presets.json'
+        filters: [{ name: "JSON", extensions: ["json"] }],
+        defaultPath: "presets.json",
       });
       if (path) {
         await writeFile(path, new TextEncoder().encode(data));
         toast.success("Presets exported successfully");
       }
-    } catch (e) {
-      toast.error(`Export failed: ${e}`);
+    } catch (error: unknown) {
+      const message =
+        error instanceof Error ? error.message : String(error);
+      toast.error(`Export failed: ${message}`);
     }
   };
 
   const handleImport = async () => {
     try {
       const path = await open({
-        filters: [{ name: 'JSON', extensions: ['json'] }],
-        multiple: false
+        filters: [{ name: "JSON", extensions: ["json"] }],
+        multiple: false,
       });
       if (path && !Array.isArray(path)) {
         const content = await readTextFile(path);
         const imported = JSON.parse(content);
         if (Array.isArray(imported)) {
-          imported.forEach(p => {
+          imported.forEach((p) => {
             addPreset({
               ...p,
               id: crypto.randomUUID(),
-              isBuiltIn: false
+              isBuiltIn: false,
             });
           });
           toast.success(`Imported ${imported.length} presets`);
         }
       }
-    } catch (e) {
-      toast.error(`Import failed: ${e}`);
+    } catch (error: unknown) {
+      const message =
+        error instanceof Error ? error.message : String(error);
+      toast.error(`Import failed: ${message}`);
     }
   };
 
@@ -224,26 +228,28 @@ export function PresetsScreen() {
         </Tabs>
       </div>
 
-      <PresetEditor 
-        preset={editingPreset}
-        isOpen={isEditorOpen}
-        onClose={() => setIsEditorOpen(false)}
-        onSave={(data) => {
-          if (editingPreset) {
-            updatePreset(editingPreset.id, data);
-            toast.success("Preset updated");
-          } else {
-            addPreset({
-              name: data.name || "New Preset",
-              description: data.description || "",
-              args: data.args || [],
-              isBuiltIn: false
-            });
-            toast.success("Preset created");
-          }
-          setIsEditorOpen(false);
-        }}
-      />
+      {isEditorOpen && (
+        <PresetEditor
+          preset={editingPreset}
+          isOpen={isEditorOpen}
+          onClose={() => setIsEditorOpen(false)}
+          onSave={(data) => {
+            if (editingPreset) {
+              updatePreset(editingPreset.id, data);
+              toast.success("Preset updated");
+            } else {
+              addPreset({
+                name: data.name || "New Preset",
+                description: data.description || "",
+                args: data.args || [],
+                isBuiltIn: false,
+              });
+              toast.success("Preset created");
+            }
+            setIsEditorOpen(false);
+          }}
+        />
+      )}
     </div>
   );
 }

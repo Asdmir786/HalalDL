@@ -3,13 +3,15 @@ import { load, Store } from "@tauri-apps/plugin-store";
 class StorageManager {
   private settingsStore: Store | null = null;
   private presetsStore: Store | null = null;
+  private logsStore: Store | null = null;
 
   async init() {
-    if (this.settingsStore && this.presetsStore) return;
+    if (this.settingsStore && this.presetsStore && this.logsStore) return;
 
     try {
       this.settingsStore = await load("settings.json", { autoSave: true, defaults: {} });
       this.presetsStore = await load("presets.json", { autoSave: true, defaults: {} });
+      this.logsStore = await load("logs.json", { autoSave: true, defaults: {} });
       console.log("Storage initialized successfully");
     } catch (error) {
       console.error("Failed to initialize storage:", error);
@@ -36,6 +38,17 @@ class StorageManager {
     if (!this.presetsStore) await this.init();
     await this.presetsStore?.set("data", data);
     await this.presetsStore?.save();
+  }
+
+  async getLogs<T>(): Promise<T | null> {
+    if (!this.logsStore) await this.init();
+    return (await this.logsStore?.get<T>("data")) || null;
+  }
+
+  async saveLogs<T>(data: T) {
+    if (!this.logsStore) await this.init();
+    await this.logsStore?.set("data", data);
+    await this.logsStore?.save();
   }
 }
 

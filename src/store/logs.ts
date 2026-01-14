@@ -1,6 +1,8 @@
 import { create } from "zustand";
+import { storage } from "@/lib/storage";
 
 export type LogLevel = "info" | "warn" | "error" | "debug" | "command";
+export type LogsLoadStatus = "idle" | "loading" | "ready" | "error";
 
 export interface LogEntry {
   id: string;
@@ -11,9 +13,15 @@ export interface LogEntry {
   command?: string;
 }
 
-interface LogsState {
+export interface LogsState {
   logs: LogEntry[];
+  loadStatus: LogsLoadStatus;
+  loadError?: string;
+  activeJobId?: string;
   addLog: (log: Omit<LogEntry, "id" | "timestamp">) => void;
+  setActiveJobId: (jobId: string | undefined) => void;
+  setLogs: (logs: LogEntry[]) => void;
+  loadLogs: () => Promise<void>;
   clearLogs: () => void;
 }
 
@@ -39,6 +47,9 @@ export const useLogsStore = create<LogsState>((set) => ({
       message: "yt-dlp version 2025.01.15 detected at C:\\Users\\halal\\AppData\\Local\\yt-dlp.exe",
     },
   ],
+  loadStatus: "idle",
+  loadError: undefined,
+  activeJobId: undefined,
   addLog: (log) =>
     set((state) => ({
       logs: [
@@ -48,7 +59,26 @@ export const useLogsStore = create<LogsState>((set) => ({
           id: Math.random().toString(36).substring(7),
           timestamp: new Date().toISOString(),
         },
-      ].slice(-1000), // Keep last 1000 logs for performance
+      ].slice(-1000),
     })),
+  setActiveJobId: (jobId) => set({ activeJobId: jobId }),
+  setLogs: (logs) => set({ logs }),
+  loadLogs: async () => {
+    set({ loadStatus: "loading", loadError: undefined });
+    try {
+      console.debug("[logs] loadLogs:start");
+      const savedLogs = await storage.getLogs<LogEntry[]>();
+      if (savedLogs && Array.isArray(savedLogs)) {
+        set({ logs: savedLogs.slice(-1000), loadStatus: "ready" });
+      } else {
+        set({ loadStatus: "ready" });
+      }
+      console.debug("[logs] loadLogs:done");
+    } catch (error: unknown) {
+      const message = error instanceof Error ? error.message : String(error);
+      console.error("[logs] loadLogs:error", error);
+      set({ loadStatus: "error", loadError: message });
+    }
+  },
   clearLogs: () => set({ logs: [] }),
 }));

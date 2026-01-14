@@ -32,10 +32,35 @@ export async function startDownload(jobId: string) {
   const ytDlpPath = await getToolPath("yt-dlp");
   const ffmpegPath = await getToolPath("ffmpeg");
   const aria2Path = await getToolPath("aria2c");
-  const dataDir = await appDataDir();
-  const binDir = await join(dataDir, "bin");
 
   const args = [...preset.args];
+
+  // Apply Format Override if present
+  if (job.overrides?.format) {
+    // Remove existing format args if any
+    const formatIndex = args.indexOf("-f");
+    if (formatIndex !== -1) {
+        args.splice(formatIndex, 2);
+    }
+    
+    switch (job.overrides.format) {
+        case "best":
+            args.push("-f", "bestvideo+bestaudio/best");
+            break;
+        case "mp4":
+            args.push("-f", "bestvideo[ext=mp4]+bestaudio[ext=m4a]/best[ext=mp4]/best");
+            break;
+        case "mp3":
+            args.push("-x", "--audio-format", "mp3");
+            break;
+        case "mkv":
+            args.push("--merge-output-format", "mkv");
+            break;
+        default:
+            // Custom format string
+            args.push("-f", job.overrides.format);
+    }
+  }
 
   // Add ffmpeg path if it exists
   if (ffmpegPath !== "ffmpeg") {
@@ -56,23 +81,27 @@ export async function startDownload(jobId: string) {
   }
 
   // Add output template
-  const downloadDir = settings.defaultDownloadDir;
+  const downloadDir = job.overrides?.downloadDir || settings.defaultDownloadDir;
+  const filenameTemplate = job.overrides?.filenameTemplate || "%(title)s.%(ext)s";
+
   if (downloadDir) {
-    args.push("-o", await join(downloadDir, "%(title)s.%(ext)s"));
+    args.push("-o", await join(downloadDir, filenameTemplate));
+  } else {
+    // If no dir set, just use template (current working dir)
+    args.push("-o", filenameTemplate);
   }
+
+  // Ensure consistent behavior: ignore global config and force newline output for logs
+  args.push("--ignore-config", "--newline", "--no-playlist");
 
   args.push(job.url);
 
-  addLog({ level: "info", message: `Starting download: ${ytDlpPath} ${args.join(" ")}`, jobId });
+  const quotedArgs = args.map(arg => arg.includes(' ') ? `"${arg}"` : arg).join(" ");
+  addLog({ level: "info", message: `Executing Command:\n${ytDlpPath} ${quotedArgs}`, jobId });
   updateJob(jobId, { status: "Downloading", progress: 0 });
 
   try {
-    // Merge local bin dir into PATH so yt-dlp can find deno, etc.
-    const cmd = Command.create(ytDlpPath, args, {
-        env: {
-            PATH: `${binDir};${process.env.PATH || ""}`
-        }
-    });
+    const cmd = Command.create(ytDlpPath, args);
 
     cmd.on("close", (data) => {
       addLog({ level: "info", message: `Process finished with code ${data.code}`, jobId });
@@ -113,6 +142,13 @@ export async function startDownload(jobId: string) {
         const path = line.replace("[download] Destination:", "").trim();
         const title = path.split(/[\\/]/).pop() || path;
         updateJob(jobId, { title, outputPath: path });
+      }
+
+      const mergerMatch = line.match(/^\[Merger\] Merging formats into "(.*)"\s*$/);
+      if (mergerMatch?.[1]) {
+        const path = mergerMatch[1].trim();
+        const title = path.split(/[\\/]/).pop() || path;
+        updateJob(jobId, { title, outputPath: path, status: "Post-processing" });
       }
 
       // Post-processing detection

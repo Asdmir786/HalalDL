@@ -60,7 +60,7 @@ export function ToolsScreen() {
       } else {
         toast.error(`${id} not found`);
       }
-    } catch (e) {
+    } catch {
       updateTool(id, { status: "Missing" });
       toast.error(`Error testing ${id}`);
     }
