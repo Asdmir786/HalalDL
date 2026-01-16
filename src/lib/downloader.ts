@@ -5,6 +5,7 @@ import { usePresetsStore } from "@/store/presets";
 import { useSettingsStore } from "@/store/settings";
 import { appDataDir, join } from "@tauri-apps/api/path";
 import { exists } from "@tauri-apps/plugin-fs";
+import { OutputParser } from "@/lib/output-parser";
 
 async function getToolPath(baseName: string): Promise<string> {
   try {
@@ -20,7 +21,8 @@ async function getToolPath(baseName: string): Promise<string> {
 }
 
 export async function startDownload(jobId: string) {
-  const { jobs, updateJob } = useDownloadsStore.getState();
+  const { jobs, updateJob, removeJob } = useDownloadsStore.getState();
+
   const { addLog } = useLogsStore.getState();
   const { presets } = usePresetsStore.getState();
   const { settings } = useSettingsStore.getState();
@@ -107,6 +109,14 @@ export async function startDownload(jobId: string) {
       addLog({ level: "info", message: `Process finished with code ${data.code}`, jobId });
       if (data.code === 0) {
         updateJob(jobId, { status: "Done", progress: 100 });
+        
+        // Auto-clear if enabled
+        const { settings } = useSettingsStore.getState();
+        if (settings.autoClearFinished) {
+           setTimeout(() => {
+             removeJob(jobId);
+           }, 2000); 
+        }
       } else {
         updateJob(jobId, { status: "Failed" });
       }
@@ -117,43 +127,29 @@ export async function startDownload(jobId: string) {
       updateJob(jobId, { status: "Failed" });
     });
 
+    const outputParser = new OutputParser();
+    let lastUpdate = 0;
+    const UPDATE_INTERVAL = 500;
+
     cmd.stdout.on("data", (line) => {
       addLog({ level: "info", message: line, jobId });
       
-      // Parse progress: [download]  12.3% of 45.67MiB at 8.90MiB/s ETA 00:01
-      const progressMatch = line.match(/\[download\]\s+(\d+\.\d+)%/);
-      if (progressMatch) {
-        const progress = parseFloat(progressMatch[1]);
-        updateJob(jobId, { progress });
-      }
+      const now = Date.now();
+      const shouldUpdate = now - lastUpdate > UPDATE_INTERVAL;
 
-      const speedMatch = line.match(/at\s+([\d.]+\w+\/s)/);
-      if (speedMatch) {
-        updateJob(jobId, { speed: speedMatch[1] });
-      }
-
-      const etaMatch = line.match(/ETA\s+(\d+:\d+)/);
-      if (etaMatch) {
-        updateJob(jobId, { eta: etaMatch[1] });
-      }
-
-      // Title detection
-      if (line.startsWith("[download] Destination:")) {
-        const path = line.replace("[download] Destination:", "").trim();
-        const title = path.split(/[\\/]/).pop() || path;
-        updateJob(jobId, { title, outputPath: path });
-      }
-
-      const mergerMatch = line.match(/^\[Merger\] Merging formats into "(.*)"\s*$/);
-      if (mergerMatch?.[1]) {
-        const path = mergerMatch[1].trim();
-        const title = path.split(/[\\/]/).pop() || path;
-        updateJob(jobId, { title, outputPath: path, status: "Post-processing" });
-      }
-
-      // Post-processing detection
-      if (line.startsWith("[ffmpeg]") || line.startsWith("[VideoConvertor]")) {
-        updateJob(jobId, { status: "Post-processing" });
+      const update = outputParser.parse(line);
+      
+      if (update) {
+        // If it's just progress/speed/eta, throttle it
+        if (update.progress || update.speed || update.eta) {
+           if (shouldUpdate) {
+             updateJob(jobId, update);
+             lastUpdate = now;
+           }
+        } else {
+           // Important updates (status, title, path) - apply immediately
+           updateJob(jobId, update);
+        }
       }
     });
 
@@ -164,7 +160,8 @@ export async function startDownload(jobId: string) {
       if (line.includes("aria2c") || line.includes("downloader")) {
         // Log it as an error but keep status as Failed (compatible with JobStatus type)
         addLog({ level: "error", message: "Downloader specific error detected", jobId });
-        updateJob(jobId, { status: "Failed" });
+        // Don't set failed immediately, let the process exit code decide unless it's a critical error
+        // updateJob(jobId, { status: "Failed" });
       }
     });
 

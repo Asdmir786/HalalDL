@@ -10,7 +10,7 @@ import {
   type LucideIcon
 } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { Button } from "@/components/ui/button";
+import { MotionButton } from "@/components/motion/MotionButton";
 import { getVersion } from "@tauri-apps/api/app";
 import { useEffect, useState } from "react";
 
@@ -22,17 +22,19 @@ const NAV_ITEMS: { id: Screen; label: string; icon: LucideIcon }[] = [
   { id: "settings", label: "Settings", icon: Settings },
 ];
 
+import { motion } from "framer-motion";
+
 export function Sidebar() {
   const { currentScreen, setScreen, sidebarCollapsed, toggleSidebar } = useNavigationStore();
   const [version, setVersion] = useState("...");
 
   useEffect(() => {
-    getVersion().then(setVersion).catch(() => setVersion("0.2.0"));
+    getVersion().then(setVersion).catch(() => setVersion("0.3.0"));
   }, []);
 
   return (
     <aside className={cn(
-      "border-r bg-card flex flex-col h-full transition-all duration-300 ease-in-out relative",
+      "border-r border-white/10 glass flex flex-col h-full transition-all duration-300 ease-in-out relative",
       sidebarCollapsed ? "w-16" : "w-64"
     )}>
       <div className={cn(
@@ -54,30 +56,45 @@ export function Sidebar() {
           const Icon = item.icon;
           const isActive = currentScreen === item.id;
           return (
-            <button
+            <MotionButton
               key={item.id}
+              type="button"
+              variant="ghost"
+              size="sm"
               onClick={() => setScreen(item.id)}
               className={cn(
-                "w-full flex items-center rounded-lg transition-all duration-200 cursor-pointer group h-10",
-                sidebarCollapsed ? "justify-center px-0" : "gap-3 px-3",
+                "w-full h-10 rounded-lg transition-all duration-200 cursor-pointer group relative overflow-hidden",
+                sidebarCollapsed ? "justify-center px-0" : "justify-start gap-3 px-3",
                 isActive 
-                  ? "bg-primary/10 text-primary font-medium shadow-sm" 
-                  : "text-muted-foreground hover:bg-accent hover:text-accent-foreground"
+                  ? "text-foreground font-semibold" 
+                  : "text-muted-foreground hover:text-foreground"
               )}
               title={sidebarCollapsed ? item.label : undefined}
             >
+              {isActive && (
+                <motion.div
+                  layoutId="sidebar-active"
+                  className="absolute inset-0 bg-primary/10 rounded-lg"
+                  transition={{ type: "spring", stiffness: 300, damping: 30 }}
+                />
+              )}
+              
               <Icon className={cn(
-                "w-5 h-5 flex-shrink-0 transition-transform duration-200",
-                !isActive && "group-hover:scale-110"
+                "w-5 h-5 flex-shrink-0 z-10 relative",
+                !isActive && "group-hover:scale-110 transition-transform duration-200"
               )} />
-              {!sidebarCollapsed && <span className="truncate">{item.label}</span>}
-            </button>
+              
+              {!sidebarCollapsed && (
+                <span className="truncate z-10 relative">{item.label}</span>
+              )}
+            </MotionButton>
           );
         })}
       </nav>
 
       <div className="p-3 border-t">
-        <Button
+        <MotionButton
+          type="button"
           variant="ghost"
           size="icon"
           className="w-full flex items-center justify-center hover:bg-accent h-10"
@@ -89,7 +106,7 @@ export function Sidebar() {
               <span className="text-xs font-medium">Collapse Sidebar</span>
             </div>
           )}
-        </Button>
+        </MotionButton>
       </div>
 
       {!sidebarCollapsed && (

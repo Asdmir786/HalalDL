@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.3.0 - 2026-01-16
+- Modernized UI across all screens with glassmorphism, staggered animations, and motion buttons.
+- Updated sidebar styling and alignment for consistent navigation visuals.
+- Improved tool/setup dialogs with glass styling and consistent card surfaces.
+- Fixed motion container typing/return issues to ensure animations render correctly.
+
 ## 0.2.0 - 2026-01-14
 - Fixed Windows test runner stability by switching Vitest to threads pool.
 - Fixed logs screen/tests issues found by project checks.

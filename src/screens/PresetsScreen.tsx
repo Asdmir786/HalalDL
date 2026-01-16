@@ -1,3 +1,5 @@
+import { FadeInStagger, FadeInItem } from "@/components/motion/StaggerContainer";
+import { MotionButton } from "@/components/motion/MotionButton";
 import { 
   Card, 
   CardContent, 
@@ -6,7 +8,6 @@ import {
   CardTitle,
   CardFooter
 } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Badge } from "@/components/ui/badge";
 import { usePresetsStore, type Preset } from "@/store/presets";
@@ -79,7 +80,7 @@ export function PresetsScreen() {
   };
 
   const PresetCard = ({ preset }: { preset: Preset }) => (
-    <Card className="flex flex-col h-full hover:shadow-md transition-shadow duration-200 border-muted/60 overflow-hidden">
+    <Card className="flex flex-col h-full hover:shadow-md transition-shadow duration-200 border-muted/60 overflow-hidden glass-card">
       <CardHeader className="pb-3">
         <div className="flex justify-between items-start gap-2">
           <div className="space-y-1 min-w-0">
@@ -103,7 +104,7 @@ export function PresetsScreen() {
            <div className="line-clamp-3">
               yt-dlp {preset.args.join(" ")}
            </div>
-           <Button 
+           <MotionButton 
              variant="ghost" 
              size="icon" 
              className="absolute top-1 right-1 w-6 h-6 opacity-0 group-hover:opacity-100 transition-opacity"
@@ -113,11 +114,11 @@ export function PresetsScreen() {
              }}
            >
               <Copy className="w-3 h-3" />
-           </Button>
+           </MotionButton>
         </div>
       </CardContent>
       <CardFooter className="bg-muted/30 border-t p-2 flex gap-2 justify-end">
-        <Button 
+        <MotionButton 
           variant="ghost" 
           size="sm" 
           className="h-8 text-xs px-2"
@@ -128,10 +129,10 @@ export function PresetsScreen() {
         >
           <Copy className="w-3.5 h-3.5 mr-1.5" />
           Duplicate
-        </Button>
+        </MotionButton>
         {!preset.isBuiltIn && (
           <>
-            <Button 
+            <MotionButton 
               variant="ghost" 
               size="sm"
               className="h-8 text-xs px-2"
@@ -142,8 +143,8 @@ export function PresetsScreen() {
             >
               <FileEdit className="w-3.5 h-3.5 mr-1.5" />
               Edit
-            </Button>
-            <Button 
+            </MotionButton>
+            <MotionButton 
               variant="ghost" 
               size="sm"
               className="h-8 text-xs px-2 text-destructive hover:text-destructive hover:bg-destructive/10"
@@ -154,7 +155,7 @@ export function PresetsScreen() {
             >
               <Trash2 className="w-3.5 h-3.5 mr-1.5" />
               Delete
-            </Button>
+            </MotionButton>
           </>
         )}
       </CardFooter>
@@ -162,35 +163,54 @@ export function PresetsScreen() {
   );
 
   return (
-    <div className="flex flex-col h-full bg-background max-w-6xl mx-auto w-full">
-      <header className="p-8 pb-6 flex flex-col gap-6">
-        <div className="flex items-center justify-between">
-          <div className="space-y-1">
-            <h2 className="text-3xl font-bold tracking-tight">Presets</h2>
-            <p className="text-muted-foreground text-sm">Configure and manage your custom download profiles.</p>
-          </div>
-          <div className="flex items-center gap-2">
-            <Button variant="outline" size="sm" onClick={handleImport} className="h-9">
-              <Upload className="w-4 h-4 mr-2" />
-              Import
-            </Button>
-            <Button variant="outline" size="sm" onClick={handleExport} className="h-9">
-              <Download className="w-4 h-4 mr-2" />
-              Export
-            </Button>
-            <Button size="sm" onClick={() => {
-              setEditingPreset(null);
-              setIsEditorOpen(true);
-            }} className="h-9 shadow-md">
-              <Plus className="w-4 h-4 mr-2" />
-              Create Preset
-            </Button>
-          </div>
-        </div>
-      </header>
+    <div className="flex flex-col h-full bg-background max-w-6xl mx-auto w-full" role="main">
+      <FadeInStagger className="flex flex-col h-full">
+        <FadeInItem>
+          <header className="p-8 pb-6 flex flex-col gap-6">
+            <div className="flex items-center justify-between">
+              <div className="space-y-1">
+                <h2 className="text-3xl font-bold tracking-tight">Presets</h2>
+                <p className="text-muted-foreground text-sm">
+                  Configure and manage your custom download profiles.
+                </p>
+              </div>
+              <div className="flex items-center gap-2">
+                <MotionButton
+                  variant="outline"
+                  size="sm"
+                  onClick={handleImport}
+                  className="h-9"
+                >
+                  <Upload className="w-4 h-4 mr-2" />
+                  Import
+                </MotionButton>
+                <MotionButton
+                  variant="outline"
+                  size="sm"
+                  onClick={handleExport}
+                  className="h-9"
+                >
+                  <Download className="w-4 h-4 mr-2" />
+                  Export
+                </MotionButton>
+                <MotionButton
+                  size="sm"
+                  onClick={() => {
+                    setEditingPreset(null);
+                    setIsEditorOpen(true);
+                  }}
+                  className="h-9 shadow-md"
+                >
+                  <Plus className="w-4 h-4 mr-2" />
+                  Create Preset
+                </MotionButton>
+              </div>
+            </div>
+          </header>
+        </FadeInItem>
 
-      <div className="flex-1 overflow-auto px-8 pb-8">
-        <Tabs defaultValue="all" className="space-y-6">
+        <FadeInItem className="flex-1 overflow-auto px-8 pb-8">
+          <Tabs defaultValue="all" className="space-y-6">
           <TabsList className="bg-muted/50 p-1 rounded-xl h-11">
             <TabsTrigger value="all" className="rounded-lg px-6 h-9">All Presets</TabsTrigger>
             <TabsTrigger value="built-in" className="rounded-lg px-6 h-9">Built-in</TabsTrigger>
@@ -217,7 +237,9 @@ export function PresetsScreen() {
                  </div>
                  <h3 className="text-lg font-semibold mb-1">No custom presets yet</h3>
                  <p className="text-sm text-muted-foreground mb-6">Create your own presets to save specific download settings.</p>
-                 <Button onClick={() => setIsEditorOpen(true)}>Create your first preset</Button>
+                 <MotionButton onClick={() => setIsEditorOpen(true)}>
+                   Create your first preset
+                 </MotionButton>
               </div>
             ) : (
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-2 xl:grid-cols-3 gap-6">
@@ -225,31 +247,32 @@ export function PresetsScreen() {
               </div>
             )}
           </TabsContent>
-        </Tabs>
-      </div>
+          </Tabs>
+        </FadeInItem>
 
-      {isEditorOpen && (
-        <PresetEditor
-          preset={editingPreset}
-          isOpen={isEditorOpen}
-          onClose={() => setIsEditorOpen(false)}
-          onSave={(data) => {
-            if (editingPreset) {
-              updatePreset(editingPreset.id, data);
-              toast.success("Preset updated");
-            } else {
-              addPreset({
-                name: data.name || "New Preset",
-                description: data.description || "",
-                args: data.args || [],
-                isBuiltIn: false,
-              });
-              toast.success("Preset created");
-            }
-            setIsEditorOpen(false);
-          }}
-        />
-      )}
+        {isEditorOpen && (
+          <PresetEditor
+            preset={editingPreset}
+            isOpen={isEditorOpen}
+            onClose={() => setIsEditorOpen(false)}
+            onSave={(data) => {
+              if (editingPreset) {
+                updatePreset(editingPreset.id, data);
+                toast.success("Preset updated");
+              } else {
+                addPreset({
+                  name: data.name || "New Preset",
+                  description: data.description || "",
+                  args: data.args || [],
+                  isBuiltIn: false,
+                });
+                toast.success("Preset created");
+              }
+              setIsEditorOpen(false);
+            }}
+          />
+        )}
+      </FadeInStagger>
     </div>
   );
 }

@@ -12,7 +12,8 @@ import {
 } from "lucide-react";
 import { toast } from "sonner";
 import { useSettingsStore, Theme, FileCollisionAction } from "@/store/settings";
-import { Button } from "@/components/ui/button";
+import { MotionButton } from "@/components/motion/MotionButton";
+import { FadeInStagger, FadeInItem } from "@/components/motion/StaggerContainer";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import { Input } from "@/components/ui/input";
@@ -42,7 +43,8 @@ export function SettingsScreen() {
 
   return (
     <div className="p-8 space-y-8 max-w-4xl mx-auto h-full overflow-auto pb-20">
-      <div className="flex justify-between items-center">
+      <FadeInStagger className="space-y-8">
+        <FadeInItem className="flex justify-between items-center">
         <div>
           <h2 className="text-3xl font-bold tracking-tight flex items-center gap-2">
             <SettingsIcon className="w-8 h-8 text-primary" />
@@ -51,20 +53,30 @@ export function SettingsScreen() {
           <p className="text-muted-foreground">Configure HalalDL behavior and appearance.</p>
         </div>
         <div className="flex gap-2">
-          <Button variant="outline" onClick={handleReset}>
+          <MotionButton 
+            variant="outline" 
+            onClick={handleReset}
+            whileHover={{ scale: 1.05 }}
+            whileTap={{ scale: 0.95 }}
+          >
             <RotateCcw className="w-4 h-4 mr-2" />
             Reset Defaults
-          </Button>
-          <Button onClick={handleSave}>
+          </MotionButton>
+          <MotionButton 
+            onClick={handleSave}
+            whileHover={{ scale: 1.05 }}
+            whileTap={{ scale: 0.95 }}
+          >
             <Save className="w-4 h-4 mr-2" />
             Save Changes
-          </Button>
+          </MotionButton>
         </div>
-      </div>
+        </FadeInItem>
 
-      <div className="grid gap-6">
+        <div className="grid gap-6">
         {/* Appearance Section */}
-        <Card>
+          <FadeInItem>
+            <Card className="glass-card">
           <CardHeader>
             <CardTitle className="text-lg flex items-center gap-2">
               <Monitor className="w-5 h-5" />
@@ -106,9 +118,11 @@ export function SettingsScreen() {
             </div>
           </CardContent>
         </Card>
+          </FadeInItem>
 
-        {/* Behavior Section */}
-        <Card>
+          {/* Behavior Section */}
+          <FadeInItem>
+            <Card className="glass-card">
           <CardHeader>
             <CardTitle className="text-lg flex items-center gap-2">
               <Folder className="w-5 h-5" />
@@ -126,8 +140,10 @@ export function SettingsScreen() {
                   placeholder="Select a folder..."
                   className="bg-muted"
                 />
-                <Button 
+                <MotionButton 
                   variant="outline" 
+                  whileHover={{ scale: 1.05 }}
+                  whileTap={{ scale: 0.95 }}
                   onClick={async () => {
                     const selected = await open({
                       directory: true,
@@ -140,17 +156,19 @@ export function SettingsScreen() {
                 >
                   <Search className="w-4 h-4 mr-2" />
                   Browse
-                </Button>
+                </MotionButton>
               </div>
             </div>
           </CardContent>
         </Card>
+        </FadeInItem>
 
         {/* Behavior Section */}
-        <Card>
-          <CardHeader>
-            <CardTitle className="text-lg flex items-center gap-2">
-              <Zap className="w-5 h-5" />
+        <FadeInItem>
+          <Card className="glass-card">
+            <CardHeader>
+              <CardTitle className="text-lg flex items-center gap-2">
+                <Zap className="w-5 h-5" />
               Behavior
             </CardTitle>
             <CardDescription>App notifications and background tasks.</CardDescription>
@@ -164,6 +182,19 @@ export function SettingsScreen() {
               <Switch
                 checked={settings.notifications}
                 onCheckedChange={(checked) => updateSettings({ notifications: checked })}
+              />
+            </div>
+
+            <Separator />
+
+            <div className="flex items-center justify-between">
+              <div className="space-y-0.5">
+                <Label>Auto-Clear Completed</Label>
+                <p className="text-sm text-muted-foreground">Automatically remove finished downloads from the list.</p>
+              </div>
+              <Switch
+                checked={settings.autoClearFinished}
+                onCheckedChange={(checked) => updateSettings({ autoClearFinished: checked })}
               />
             </div>
 
@@ -194,13 +225,15 @@ export function SettingsScreen() {
             </div>
           </CardContent>
         </Card>
+        </FadeInItem>
 
         {/* Download Engine Section */}
-        <Card>
-          <CardHeader>
-            <CardTitle className="text-lg flex items-center gap-2">
-              <Zap className="w-5 h-5" />
-              Download Engine
+        <FadeInItem>
+          <Card className="glass-card">
+            <CardHeader>
+              <CardTitle className="text-lg flex items-center gap-2">
+                <Zap className="w-5 h-5" />
+                Download Engine
             </CardTitle>
             <CardDescription>Control concurrency and retry logic for yt-dlp.</CardDescription>
           </CardHeader>
@@ -267,7 +300,9 @@ export function SettingsScreen() {
             </div>
           </CardContent>
         </Card>
+        </FadeInItem>
       </div>
+      </FadeInStagger>
     </div>
   );
 }

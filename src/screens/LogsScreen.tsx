@@ -16,7 +16,8 @@ import {
 } from "lucide-react";
 import { toast } from "sonner";
 import { useLogsStore, LogLevel } from "@/store/logs";
-import { Button } from "@/components/ui/button";
+import { MotionButton } from "@/components/motion/MotionButton";
+import { FadeInStagger, FadeInItem } from "@/components/motion/StaggerContainer";
 import { save } from "@tauri-apps/plugin-dialog";
 import { writeFile } from "@tauri-apps/plugin-fs";
 import { Input } from "@/components/ui/input";
@@ -204,128 +205,144 @@ export function LogsScreen() {
 
   return (
     <div className="flex flex-col h-full bg-background max-w-6xl mx-auto w-full" role="main">
-      {/* Header */}
-      <header className="p-8 pb-6 space-y-6" aria-label="Logs Control Panel">
-        <div className="flex flex-col gap-4 sm:flex-row sm:justify-between sm:items-center">
-          <div className="space-y-1">
-            <h2 className="text-3xl font-bold tracking-tight flex items-center gap-2">
-              <Terminal className="w-8 h-8 text-primary" />
-              Logs & Diagnostics
-            </h2>
-            <p className="text-muted-foreground text-sm">
-              Raw output from yt-dlp and application events.
-            </p>
-          </div>
-          <div className="flex flex-wrap gap-2">
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={handleExport}
-              className="h-9 flex-1 sm:flex-none"
-              disabled={loadStatus !== "ready"}
-            >
-              <Download className="w-4 h-4 mr-2" />
-              Export
-            </Button>
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={handleCopyVisible}
-              className="h-9 flex-1 sm:flex-none"
-              disabled={loadStatus !== "ready"}
-            >
-              <Copy className="w-4 h-4 mr-2" />
-              Copy
-            </Button>
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={handleClear}
-              className="h-9 flex-1 sm:flex-none text-destructive hover:text-destructive hover:bg-destructive/10"
-              disabled={loadStatus !== "ready"}
-            >
-              <Trash2 className="w-4 h-4 mr-2" />
-              Clear
-            </Button>
-          </div>
-        </div>
-
-        <div className="flex flex-col gap-3 bg-muted/30 p-2 rounded-xl border border-muted/50 lg:flex-row lg:items-center lg:gap-4">
-          <div className="relative flex-1 min-w-[200px]">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-            <Input 
-              placeholder="Search logs..." 
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-              className="pl-9 pr-9 bg-background border-none shadow-none focus-visible:ring-1"
-            />
-            {search && (
-              <button
-                onClick={() => setSearch("")}
-                className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors"
-                aria-label="Clear search"
-              >
-                <X className="w-3.5 h-3.5" />
-              </button>
-            )}
-          </div>
-          <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between lg:justify-end">
-            <div className="flex flex-wrap gap-1 bg-background p-1 rounded-lg border shadow-sm">
-              {["all", "info", "warn", "error", "command", "debug"].map((l) => (
-                <Button
-                  key={l}
-                  variant={filter === l ? "secondary" : "ghost"}
+      <FadeInStagger className="flex flex-col h-full">
+        {/* Header */}
+        <FadeInItem>
+          <header className="p-8 pb-6 space-y-6" aria-label="Logs Control Panel">
+            <div className="flex flex-col gap-4 sm:flex-row sm:justify-between sm:items-center">
+              <div className="space-y-1">
+                <h2 className="text-3xl font-bold tracking-tight flex items-center gap-2">
+                  <Terminal className="w-8 h-8 text-primary" />
+                  Logs & Diagnostics
+                </h2>
+                <p className="text-muted-foreground text-sm">
+                  Raw output from yt-dlp and application events.
+                </p>
+              </div>
+              <div className="flex flex-wrap gap-2">
+                <MotionButton
+                  variant="outline"
                   size="sm"
-                  className={cn(
-                    "h-7 px-3 text-[10px] uppercase font-bold tracking-wider rounded-md",
-                    filter === l && "bg-muted shadow-sm"
-                  )}
-                  onClick={() =>
-                    setFilter(l === "all" ? "all" : (l as LogLevel))
-                  }
+                  onClick={handleExport}
+                  className="h-9 flex-1 sm:flex-none"
+                  disabled={loadStatus !== "ready"}
+                  whileHover={{ scale: 1.02 }}
+                  whileTap={{ scale: 0.98 }}
                 >
-                  {l}
-                </Button>
-              ))}
+                  <Download className="w-4 h-4 mr-2" />
+                  Export
+                </MotionButton>
+                <MotionButton
+                  variant="outline"
+                  size="sm"
+                  onClick={handleCopyVisible}
+                  className="h-9 flex-1 sm:flex-none"
+                  disabled={loadStatus !== "ready"}
+                  whileHover={{ scale: 1.02 }}
+                  whileTap={{ scale: 0.98 }}
+                >
+                  <Copy className="w-4 h-4 mr-2" />
+                  Copy
+                </MotionButton>
+                <MotionButton
+                  variant="outline"
+                  size="sm"
+                  onClick={handleClear}
+                  className="h-9 flex-1 sm:flex-none text-destructive hover:text-destructive hover:bg-destructive/10"
+                  disabled={loadStatus !== "ready"}
+                  whileHover={{ scale: 1.02 }}
+                  whileTap={{ scale: 0.98 }}
+                >
+                  <Trash2 className="w-4 h-4 mr-2" />
+                  Clear
+                </MotionButton>
+              </div>
             </div>
-            <div className="flex items-center gap-2">
-              <span className="text-[10px] uppercase text-muted-foreground font-bold tracking-wider">
-                Job
-              </span>
-              <Select
-                value={jobFilter}
-                onValueChange={(value) =>
-                  setJobFilter(value === "all" ? "all" : value)
-                }
-              >
-                <SelectTrigger className="h-7 w-[200px] bg-background text-[10px] font-mono">
-                  <SelectValue placeholder="All" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">All</SelectItem>
-                  {availableJobs.map((id) => (
-                    <SelectItem key={id} value={id}>
-                      {id}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-            <Button
-              variant={autoScroll ? "secondary" : "ghost"}
-              size="sm"
-              className="h-7 px-3 text-[10px] uppercase font-bold tracking-wider rounded-md"
-              onClick={() => setAutoScroll((prev) => !prev)}
-            >
-              <ArrowDown className="w-3 h-3 mr-1" />
-              {autoScroll ? "Following" : "Follow tail"}
-            </Button>
-          </div>
-        </div>
-      </header>
 
-      {/* Logs View */}
-      <div className="flex-1 overflow-hidden px-8 pb-8">
+            <div className="flex flex-col gap-3 bg-muted/30 p-2 rounded-xl border border-muted/50 lg:flex-row lg:items-center lg:gap-4 glass-card">
+              <div className="relative flex-1 min-w-[200px]">
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+                <Input
+                  placeholder="Search logs..."
+                  value={search}
+                  onChange={(e) => setSearch(e.target.value)}
+                  className="pl-9 pr-9 bg-background border-none shadow-none focus-visible:ring-1"
+                />
+                {search && (
+                  <MotionButton
+                    type="button"
+                    variant="ghost"
+                    size="icon"
+                    onClick={() => setSearch("")}
+                    className="absolute right-2 top-1/2 -translate-y-1/2 h-7 w-7 text-muted-foreground hover:text-foreground"
+                    aria-label="Clear search"
+                  >
+                    <X className="w-3.5 h-3.5" />
+                  </MotionButton>
+                )}
+              </div>
+              <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between lg:justify-end">
+                <div className="flex flex-wrap gap-1 bg-background p-1 rounded-lg border shadow-sm">
+                  {["all", "info", "warn", "error", "command", "debug"].map((l) => (
+                    <MotionButton
+                      key={l}
+                      variant={filter === l ? "secondary" : "ghost"}
+                      size="sm"
+                      className={cn(
+                        "h-7 px-3 text-[10px] uppercase font-bold tracking-wider rounded-md",
+                        filter === l && "bg-muted shadow-sm"
+                      )}
+                      onClick={() =>
+                        setFilter(l === "all" ? "all" : (l as LogLevel))
+                      }
+                      whileHover={{ scale: 1.05 }}
+                      whileTap={{ scale: 0.95 }}
+                    >
+                      {l}
+                    </MotionButton>
+                  ))}
+                </div>
+                <div className="flex items-center gap-2">
+                  <span className="text-[10px] uppercase text-muted-foreground font-bold tracking-wider">
+                    Job
+                  </span>
+                  <Select
+                    value={jobFilter}
+                    onValueChange={(value) =>
+                      setJobFilter(value === "all" ? "all" : value)
+                    }
+                  >
+                    <SelectTrigger className="h-7 w-[200px] bg-background text-[10px] font-mono">
+                      <SelectValue placeholder="All" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">All</SelectItem>
+                      {availableJobs.map((id) => (
+                        <SelectItem key={id} value={id}>
+                          {id}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+                <MotionButton
+                  variant={autoScroll ? "secondary" : "ghost"}
+                  size="sm"
+                  className="h-7 px-3 text-[10px] uppercase font-bold tracking-wider rounded-md"
+                  onClick={() => setAutoScroll((prev) => !prev)}
+                  whileHover={{ scale: 1.05 }}
+                  whileTap={{ scale: 0.95 }}
+                >
+                  <ArrowDown className="w-3 h-3 mr-1" />
+                  {autoScroll ? "Following" : "Follow tail"}
+                </MotionButton>
+              </div>
+            </div>
+          </header>
+        </FadeInItem>
+
+        {/* Logs View */}
+        <FadeInItem className="flex-1 overflow-hidden px-8 pb-8">
         <div className="bg-gradient-to-br from-slate-950 via-slate-950 to-black dark:from-black dark:via-slate-950 dark:to-black rounded-2xl border border-white/10 flex-1 flex flex-col overflow-hidden shadow-2xl relative">
           <div className="absolute top-0 left-0 right-0 h-9 bg-white/5 border-b border-white/10 flex items-center px-4 justify-between z-10 backdrop-blur-sm">
             <div className="flex gap-1.5">
@@ -359,15 +376,17 @@ export function LogsScreen() {
                     {loadError}
                   </div>
                 )}
-                <Button
+                <MotionButton
                   variant="secondary"
                   size="sm"
                   className="h-8"
                   onClick={() => loadLogs()}
+                  whileHover={{ scale: 1.05 }}
+                  whileTap={{ scale: 0.95 }}
                 >
                   <X className="w-4 h-4 mr-2" />
                   Retry
-                </Button>
+                </MotionButton>
               </div>
             )}
             {loadStatus === "ready" && (
@@ -428,20 +447,22 @@ export function LogsScreen() {
                               <code className="text-emerald-300 text-[10px] min-w-0 whitespace-pre-wrap break-words flex-1">
                                 {log.command}
                               </code>
-                              <Button
+                              <MotionButton
                                 variant="ghost"
                                 size="icon"
                                 className="h-6 w-6 opacity-0 group-hover/cmd:opacity-100 transition-opacity self-end sm:self-auto"
                                 onClick={() =>
                                   copyToClipboard(log.command!, "Command")
                                 }
+                                whileHover={{ scale: 1.1 }}
+                                whileTap={{ scale: 0.9 }}
                               >
                                 <Copy className="w-3 h-3 text-white/50" />
-                              </Button>
+                              </MotionButton>
                             </div>
                           )}
                         </span>
-                        <Button
+                        <MotionButton
                           variant="ghost"
                           size="icon"
                           className="h-6 w-6 ml-2 opacity-0 group-hover:opacity-100 transition-opacity"
@@ -454,9 +475,11 @@ export function LogsScreen() {
                               "Log line"
                             );
                           }}
+                          whileHover={{ scale: 1.1 }}
+                          whileTap={{ scale: 0.9 }}
                         >
                           <Copy className="w-3 h-3 text-white/40" />
-                        </Button>
+                        </MotionButton>
                       </div>
                     );
                   })}
@@ -471,7 +494,8 @@ export function LogsScreen() {
             )}
           </div>
         </div>
-      </div>
+      </FadeInItem>
+      </FadeInStagger>
     </div>
   );
 }

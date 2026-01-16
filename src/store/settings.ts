@@ -16,6 +16,9 @@ export interface Settings {
   // Paths
   defaultDownloadDir: string;
   tempDir: string;
+
+  // Behavior
+  autoClearFinished: boolean;
 }
 
 interface SettingsState {
@@ -33,6 +36,7 @@ const DEFAULT_SETTINGS: Settings = {
   fileCollision: "rename",
   defaultDownloadDir: "", 
   tempDir: "",
+  autoClearFinished: false,
 };
 
 export const useSettingsStore = create<SettingsState>((set) => ({

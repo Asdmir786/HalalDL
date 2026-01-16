@@ -1,3 +1,4 @@
+import { AnimatePresence, motion } from "framer-motion";
 import { useEffect, useMemo, useState, useRef } from "react";
 import { useVirtualizer } from "@tanstack/react-virtual";
 import { open as openDialog } from "@tauri-apps/plugin-dialog";
@@ -14,7 +15,8 @@ import {
 import { cn } from "@/lib/utils";
 import { useDownloadsStore } from "@/store/downloads";
 import { usePresetsStore } from "@/store/presets";
-import { Button } from "@/components/ui/button";
+import { MotionButton } from "@/components/motion/MotionButton";
+import { FadeInStagger, FadeInItem } from "@/components/motion/StaggerContainer";
 import { Input } from "@/components/ui/input";
 import { 
   Select, 
@@ -87,6 +89,14 @@ export function DownloadsScreen() {
       downloadsStatusFilter: statusFilter,
     } as unknown as Partial<typeof settings>);
   }, [addMode, statusFilter, updateSettings]);
+
+  // Framer Motion Variants for List Items
+  const itemVariants = {
+    initial: { opacity: 0, x: -10, scale: 0.98 },
+    animate: { opacity: 1, x: 0, scale: 1 },
+    exit: { opacity: 0, scale: 0.95, transition: { duration: 0.2 } },
+    hover: { scale: 1.01, backgroundColor: "var(--accent)", transition: { duration: 0.2 } }
+  };
 
   const filteredJobs = useMemo(() => {
     if (statusFilter === "all") return jobs;
@@ -208,7 +218,7 @@ export function DownloadsScreen() {
   };
 
   const handleClearCompleted = () => {
-    const completed = jobs.filter((job) => job.status === "Done");
+    const completed = jobs.filter((job) => job.status === "Done" || job.status === "Failed");
     if (!completed.length) return;
     completed.forEach((job) => removeJob(job.id));
     setSelectedIds((prev) =>
@@ -222,84 +232,94 @@ export function DownloadsScreen() {
   };
 
   return (
-    <div className="flex flex-col h-full bg-background max-w-6xl mx-auto w-full">
-      {/* Top Section */}
-      <header className="p-6 pb-4 space-y-4">
-        <div className="flex flex-col gap-1">
-          <h2 className="text-2xl font-bold tracking-tight">Downloads</h2>
-          <p className="text-muted-foreground text-sm">Add URLs to start downloading your media.</p>
-        </div>
-        
-        <div className="flex flex-col gap-3 bg-muted/30 p-3 rounded-xl border border-muted/50 shadow-sm">
-          {/* Input and Main Actions */}
-          <div className="flex flex-col lg:flex-row gap-3">
-            <div className="flex-1 relative">
-              <Input
-                placeholder="Paste video or playlist URL here..."
-                value={url}
-                onChange={(e) => setUrl(e.target.value)}
-                onKeyDown={(e) => e.key === "Enter" && handleAdd()}
-                className="bg-background border-muted shadow-sm focus-visible:ring-1 h-10"
-              />
+    <div className="flex flex-col h-full bg-background max-w-6xl mx-auto w-full" role="main">
+      <FadeInStagger className="flex flex-col h-full">
+        <FadeInItem>
+          <header className="p-6 pb-4 space-y-4">
+            <div className="flex flex-col gap-1">
+              <h2 className="text-2xl font-bold tracking-tight">Downloads</h2>
+              <p className="text-muted-foreground text-sm">
+                Add URLs to start downloading your media.
+              </p>
             </div>
             
-            <div className="flex flex-wrap gap-2 items-center justify-end">
-              <Select value={selectedPreset} onValueChange={setSelectedPreset}>
-                <SelectTrigger className="w-[140px] bg-background border-muted shadow-sm focus:ring-1 h-10">
-                  <SelectValue placeholder="Preset" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="custom" className="font-semibold text-primary">
-                    ✨ Custom Configuration
-                  </SelectItem>
-                  {presets.map((preset) => (
-                    <SelectItem key={preset.id} value={preset.id}>
-                      {preset.name}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+            <div className="flex flex-col gap-3 bg-muted/30 p-3 rounded-xl border border-muted/50 shadow-sm glass-card">
+              <div className="flex flex-col lg:flex-row gap-3">
+                <div className="flex-1 relative">
+                  <Input
+                    placeholder="Paste video or playlist URL here..."
+                    value={url}
+                    onChange={(e) => setUrl(e.target.value)}
+                    onKeyDown={(e) => e.key === "Enter" && handleAdd()}
+                    className="bg-background border-muted shadow-sm focus-visible:ring-1 h-10"
+                  />
+                </div>
+                
+                <div className="flex flex-wrap gap-2 items-center justify-end">
+                  <Select value={selectedPreset} onValueChange={setSelectedPreset}>
+                    <SelectTrigger className="w-[140px] bg-background border-muted shadow-sm focus:ring-1 h-10">
+                      <SelectValue placeholder="Preset" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="custom" className="font-semibold text-primary">
+                        ✨ Custom Configuration
+                      </SelectItem>
+                      {presets.map((preset) => (
+                        <SelectItem key={preset.id} value={preset.id}>
+                          {preset.name}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
 
-              <div className="flex rounded-lg border border-muted bg-background p-0.5 gap-0.5 h-10 items-center">
-                <Button
-                  type="button"
-                  variant={addMode === "queue" ? "secondary" : "ghost"}
-                  size="sm"
-                  className="h-8 px-3 text-[10px] uppercase font-bold tracking-wider rounded-md"
-                  onClick={() => setAddMode("queue")}
-                >
-                  Queue
-                </Button>
-                <Button
-                  type="button"
-                  variant={addMode === "start" ? "secondary" : "ghost"}
-                  size="sm"
-                  className="h-8 px-3 text-[10px] uppercase font-bold tracking-wider rounded-md"
-                  onClick={() => setAddMode("start")}
-                >
-                  Start now
-                </Button>
+                  <div className="flex rounded-lg border border-muted bg-background p-0.5 gap-0.5 h-10 items-center">
+                    <MotionButton
+                      type="button"
+                      variant={addMode === "queue" ? "secondary" : "ghost"}
+                      size="sm"
+                      className="h-8 px-3 text-[10px] uppercase font-bold tracking-wider rounded-md"
+                      onClick={() => setAddMode("queue")}
+                    >
+                      Queue
+                    </MotionButton>
+                    <MotionButton
+                      type="button"
+                      variant={addMode === "start" ? "secondary" : "ghost"}
+                      size="sm"
+                      className="h-8 px-3 text-[10px] uppercase font-bold tracking-wider rounded-md"
+                      onClick={() => setAddMode("start")}
+                    >
+                      Start now
+                    </MotionButton>
+                  </div>
+
+                  <MotionButton
+                    onClick={handleAdd}
+                    disabled={!url.trim()}
+                    className="shadow-sm h-10 px-4"
+                  >
+                    <Plus className="w-4 h-4 mr-2" />
+                    Add
+                  </MotionButton>
+                </div>
               </div>
 
-              <Button onClick={handleAdd} disabled={!url.trim()} className="shadow-sm h-10 px-4">
-                <Plus className="w-4 h-4 mr-2" />
-                Add
-              </Button>
-            </div>
-          </div>
-
-          <div className="flex justify-center -mt-1">
-             <Button
-                variant="ghost" 
-                size="sm"
-                className="h-6 text-[10px] text-muted-foreground hover:text-foreground flex items-center gap-1 opacity-80 hover:opacity-100 transition-all"
-                onClick={() => setShowOutputConfig(!showOutputConfig)}
-             >
-               <Settings2 className="w-3 h-3" />
-               {showOutputConfig ? "Hide Output Options" : "Show Output Options"}
-               {showOutputConfig ? <ChevronUp className="w-3 h-3" /> : <ChevronDown className="w-3 h-3" />}
-             </Button>
-          </div>
+              <div className="flex justify-center -mt-1">
+                <MotionButton
+                  variant="ghost"
+                  size="sm"
+                  className="h-6 text-[10px] text-muted-foreground hover:text-foreground flex items-center gap-1 opacity-80 hover:opacity-100 transition-all"
+                  onClick={() => setShowOutputConfig(!showOutputConfig)}
+                >
+                  <Settings2 className="w-3 h-3" />
+                  {showOutputConfig ? "Hide Output Options" : "Show Output Options"}
+                  {showOutputConfig ? (
+                    <ChevronUp className="w-3 h-3" />
+                  ) : (
+                    <ChevronDown className="w-3 h-3" />
+                  )}
+                </MotionButton>
+              </div>
 
           {showOutputConfig && (
             <div className="pt-2 border-t border-muted/50 grid gap-4 animate-in fade-in slide-in-from-top-2 duration-200">
@@ -334,15 +354,18 @@ export function DownloadsScreen() {
                        { label: "Title", val: "%(title)s" },
                        { label: "Date", val: "%(upload_date)s" },
                        { label: "ID", val: "%(id)s" }
-                     ].map(chip => (
-                       <button
+                     ].map((chip) => (
+                       <MotionButton
                          key={chip.val}
+                         type="button"
+                         variant="outline"
+                         size="sm"
                          onClick={() => insertPlaceholder(chip.val)}
-                         className="px-2 h-9 rounded-md bg-muted/50 hover:bg-muted border border-muted text-[10px] font-medium transition-colors"
+                         className="h-9 px-2 text-[10px] font-medium bg-muted/50 hover:bg-muted border-muted"
                          title={`Insert ${chip.val}`}
                        >
                          {chip.label}
-                       </button>
+                       </MotionButton>
                      ))}
                    </div>
                  </div>
@@ -392,9 +415,9 @@ export function DownloadsScreen() {
                           !customDownloadDir && !settings.defaultDownloadDir && "text-destructive/80 border-destructive/30"
                         )}
                       />
-                      <Button variant="outline" size="sm" onClick={handleBrowseDir} className="h-9 px-3">
+                      <MotionButton variant="outline" size="sm" onClick={handleBrowseDir} className="h-9 px-3">
                         <FolderOpen className="w-3.5 h-3.5" />
-                      </Button>
+                      </MotionButton>
                     </div>
                   </div>
                </div>
@@ -418,7 +441,7 @@ export function DownloadsScreen() {
               </div>
             </div>
 
-            <Button
+            <MotionButton
               type="button"
               variant="ghost"
               size="sm"
@@ -428,13 +451,14 @@ export function DownloadsScreen() {
             >
               <Download className="w-3.5 h-3.5 mr-2" />
               Start All Pending
-            </Button>
+            </MotionButton>
           </div>
-        </div>
-      </header>
+            </div>
+          </header>
+        </FadeInItem>
 
       {/* Queue Section */}
-      <div className="flex-1 overflow-hidden flex flex-col px-8 pb-8">
+      <FadeInItem className="flex-1 overflow-hidden flex flex-col px-8 pb-8">
         <div className="bg-muted/10 rounded-2xl border border-muted/50 flex-1 flex flex-col overflow-hidden shadow-inner">
           {jobs.length === 0 ? (
             <div className="flex-1 flex flex-col items-center justify-center text-muted-foreground p-8 text-center">
@@ -457,7 +481,7 @@ export function DownloadsScreen() {
                     { id: "done", label: "Done" },
                     { id: "failed", label: "Failed" },
                   ].map((item) => (
-                    <Button
+                    <MotionButton
                       key={item.id}
                       type="button"
                       variant={statusFilter === item.id ? "secondary" : "ghost"}
@@ -468,11 +492,11 @@ export function DownloadsScreen() {
                       }
                     >
                       {item.label}
-                    </Button>
+                    </MotionButton>
                   ))}
                 </div>
                 <div className="flex flex-wrap items-center gap-2">
-                  <Button
+                  <MotionButton
                     type="button"
                     variant="outline"
                     size="sm"
@@ -481,8 +505,8 @@ export function DownloadsScreen() {
                     onClick={handleStartSelected}
                   >
                     Start selected
-                  </Button>
-                  <Button
+                  </MotionButton>
+                  <MotionButton
                     type="button"
                     variant="outline"
                     size="sm"
@@ -491,8 +515,8 @@ export function DownloadsScreen() {
                     onClick={handleRemoveSelected}
                   >
                     Remove selected
-                  </Button>
-                  <Button
+                  </MotionButton>
+                  <MotionButton
                     type="button"
                     variant="ghost"
                     size="sm"
@@ -501,7 +525,7 @@ export function DownloadsScreen() {
                     onClick={handleClearCompleted}
                   >
                     Clear completed
-                  </Button>
+                  </MotionButton>
                 </div>
               </div>
               <div 
@@ -515,27 +539,47 @@ export function DownloadsScreen() {
                     position: "relative",
                   }}
                 >
-                  {virtualizer.getVirtualItems().map((virtualRow) => {
-                    const job = filteredJobs[virtualRow.index];
-                    return (
-                      <div
-                        key={job.id}
-                        className="absolute top-0 left-0 w-full p-2"
-                        style={{
-                          height: `${virtualizer.getVirtualItems()[virtualRow.index].size}px`,
-                          transform: `translateY(${virtualRow.start}px)`,
-                        }}
-                      >
-                        <div
-                          className={`bg-background rounded-xl border p-4 shadow-sm hover:shadow-md transition-shadow flex items-center gap-4 group ${
-                            job.status === "Done" ? "opacity-60" : ""
-                          }`}
+                  <AnimatePresence mode="popLayout">
+                    {virtualizer.getVirtualItems().map((virtualRow) => {
+                      const job = filteredJobs[virtualRow.index];
+                      return (
+                        <motion.div
+                          key={job.id}
+                          layout
+                          initial="initial"
+                          animate="animate"
+                          exit="exit"
+                          whileHover="hover"
+                          variants={itemVariants}
+                          className="absolute top-0 left-0 w-full p-2"
+                          style={{
+                            height: `${virtualRow.size}px`,
+                            transform: `translateY(${virtualRow.start}px)`,
+                          }}
                         >
-                          <Checkbox
-                            checked={selectedIds.includes(job.id)}
-                            onCheckedChange={() => handleToggleSelection(job.id)}
-                            className="mt-0.5"
-                          />
+                        {/* Inner Card Content */}
+                        <div className={cn(
+                          "glass-card rounded-xl p-4 flex gap-4 h-full relative group overflow-hidden border-l-4",
+                          job.status === "Failed" ? "border-l-destructive/50" : 
+                          job.status === "Done" ? "border-l-green-500/50" : 
+                          job.status === "Downloading" ? "border-l-blue-500/50" : "border-l-transparent"
+                        )}>
+                          {/* Animated Background Gradient for Active Downloads */}
+                          {job.status === "Downloading" && (
+                            <motion.div 
+                              className="absolute inset-0 bg-gradient-to-r from-blue-500/5 via-transparent to-blue-500/5"
+                              animate={{ x: ["-100%", "100%"] }}
+                              transition={{ repeat: Infinity, duration: 2, ease: "linear" }}
+                            />
+                          )}
+                          
+                          <div className="flex-shrink-0 pt-1 z-10">
+                            <Checkbox
+                              checked={selectedIds.includes(job.id)}
+                              onCheckedChange={() => handleToggleSelection(job.id)}
+                              className="mt-0.5"
+                            />
+                          </div>
                           <div className="flex-1 min-w-0">
                             <div className="flex items-center justify-between mb-2">
                               <h4 className="font-medium truncate pr-4 text-sm">
@@ -556,26 +600,29 @@ export function DownloadsScreen() {
                                 >
                                   {job.status}
                                 </Badge>
-                                <Button
+                                <MotionButton
                                   type="button"
                                   variant="ghost"
                                   size="icon"
-                                  className="w-7 h-7 text-muted-foreground hover:text-primary opacity-0 group-hover:opacity-100 transition-opacity"
-                                  disabled={job.status === "Downloading"}
+                                  className={cn(
+                                    "w-7 h-7 text-muted-foreground hover:text-primary transition-opacity",
+                                    job.status === "Done" ? "opacity-0 pointer-events-none" : "opacity-0 group-hover:opacity-100"
+                                  )}
+                                  disabled={job.status === "Downloading" || job.status === "Done"}
                                   onClick={() => startDownload(job.id)}
                                 >
                                   <Download className="w-4 h-4" />
-                                </Button>
-                                <Button
+                                </MotionButton>
+                                <MotionButton
                                   variant="ghost"
                                   size="icon"
                                   className="w-7 h-7 text-muted-foreground hover:text-destructive opacity-0 group-hover:opacity-100 transition-opacity"
                                   onClick={() => removeJob(job.id)}
                                 >
                                   <X className="w-4 h-4" />
-                                </Button>
+                                </MotionButton>
                                 {job.status === "Failed" && (
-                                  <Button
+                                  <MotionButton
                                     type="button"
                                     variant="ghost"
                                     size="icon"
@@ -583,7 +630,7 @@ export function DownloadsScreen() {
                                     onClick={() => handleViewLogs(job.id)}
                                   >
                                     <Terminal className="w-4 h-4" />
-                                  </Button>
+                                  </MotionButton>
                                 )}
                               </div>
                             </div>
@@ -603,7 +650,7 @@ export function DownloadsScreen() {
                                 {job.presetId}
                               </span>
                               {job.status === "Done" && (
-                                <Button
+                                <MotionButton
                                   variant="link"
                                   className="h-auto p-0 text-[10px] text-primary flex items-center gap-1"
                                   onClick={() =>
@@ -612,20 +659,22 @@ export function DownloadsScreen() {
                                 >
                                   <FolderOpen className="w-3 h-3" />
                                   Show in Explorer
-                                </Button>
+                                </MotionButton>
                               )}
                             </div>
                           </div>
                         </div>
-                      </div>
+                      </motion.div>
                     );
                   })}
-                </div>
+                </AnimatePresence>
+              </div>
               </div>
             </>
           )}
         </div>
-      </div>
+      </FadeInItem>
+      </FadeInStagger>
     </div>
   );
 }

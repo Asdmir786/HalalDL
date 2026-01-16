@@ -5,7 +5,7 @@ import {
   DialogTitle,
   DialogDescription,
 } from "@/components/ui/dialog";
-import { Button } from "@/components/ui/button";
+import { MotionButton } from "@/components/motion/MotionButton";
 import { CheckCircle2, Sparkles, PartyPopper, ArrowRight } from "lucide-react";
 
 export function ToolSuccessModal() {
@@ -55,13 +55,14 @@ export function ToolSuccessModal() {
               </div>
             </div>
 
-            <Button 
+            <MotionButton 
+              type="button"
               onClick={() => setDiscoveredToolId(null)}
               className="w-full h-12 text-base font-bold group"
             >
               Start Downloading
               <ArrowRight className="w-5 h-5 ml-2 group-hover:translate-x-1 transition-transform" />
-            </Button>
+            </MotionButton>
 
             <p className="text-[10px] text-muted-foreground uppercase tracking-tighter opacity-50">
               Your environment is now fully optimized

@@ -51,16 +51,21 @@ export const useLogsStore = create<LogsState>((set) => ({
   loadError: undefined,
   activeJobId: undefined,
   addLog: (log) =>
-    set((state) => ({
-      logs: [
-        ...state.logs,
-        {
-          ...log,
-          id: Math.random().toString(36).substring(7),
-          timestamp: new Date().toISOString(),
-        },
-      ].slice(-1000),
-    })),
+    set((state) => {
+      const newLog = {
+        ...log,
+        id: Math.random().toString(36).substring(7),
+        timestamp: new Date().toISOString(),
+      };
+      // Optimization: Avoid full array copy if possible, but for Zustand immutability we need a new reference.
+      // However, we can optimize by slicing first if needed.
+      const currentLogs = state.logs;
+      const nextLogs = currentLogs.length >= 1000 
+        ? [...currentLogs.slice(1), newLog]
+        : [...currentLogs, newLog];
+      
+      return { logs: nextLogs };
+    }),
   setActiveJobId: (jobId) => set({ activeJobId: jobId }),
   setLogs: (logs) => set({ logs }),
   loadLogs: async () => {

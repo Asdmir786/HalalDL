@@ -10,7 +10,7 @@ import {
   DialogTitle,
   DialogFooter
 } from "@/components/ui/dialog";
-import { Button } from "@/components/ui/button";
+import { MotionButton } from "@/components/motion/MotionButton";
 import { Progress } from "@/components/ui/progress";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Label } from "@/components/ui/label";
@@ -194,7 +194,7 @@ export function UpgradePrompt() {
         setOpen(val);
       }}
     >
-      <DialogContent className="sm:max-w-md" onInteractOutside={(e) => {
+      <DialogContent className="sm:max-w-md glass border border-white/10" onInteractOutside={(e) => {
         if (isFullMode || isDownloading) e.preventDefault();
       }} onEscapeKeyDown={(e) => {
         if (isFullMode || isDownloading) e.preventDefault();
@@ -260,8 +260,8 @@ export function UpgradePrompt() {
                 return (
                   <div 
                     key={tool.id} 
-                    className={`flex items-start space-x-3 p-3 rounded-lg border transition-colors ${
-                      isSelected ? "bg-accent/50 border-primary/50" : "bg-card"
+                    className={`flex items-start space-x-3 p-3 rounded-lg border transition-colors glass-card ${
+                      isSelected ? "bg-accent/50 border-primary/50" : ""
                     } ${!isMissing ? "opacity-70" : ""}`}
                   >
                     <Checkbox 
@@ -302,21 +302,21 @@ export function UpgradePrompt() {
           {!isDownloading && (
             <>
               {!isFullMode && (
-                <Button variant="ghost" onClick={() => setOpen(false)} className="flex-1">
+                <MotionButton type="button" variant="ghost" onClick={() => setOpen(false)} className="flex-1">
                   Skip for Now
-                </Button>
+                </MotionButton>
               )}
-              <Button onClick={handleUpgrade} disabled={selectedTools.length === 0} className="flex-1 gap-2">
+              <MotionButton type="button" onClick={handleUpgrade} disabled={selectedTools.length === 0} className="flex-1 gap-2">
                 <Download className="w-4 h-4" />
                 {isFullMode ? "Setup Tools" : "Download Selected"}
-              </Button>
+              </MotionButton>
             </>
           )}
           {isDownloading && progress === 100 && (
-            <Button onClick={handleFinish} className="w-full gap-2">
+            <MotionButton type="button" onClick={handleFinish} className="w-full gap-2">
               <CheckCircle2 className="w-4 h-4" />
               Done - Restart App
-            </Button>
+            </MotionButton>
           )}
         </DialogFooter>
       </DialogContent>

@@ -7,7 +7,7 @@ import {
   DialogHeader, 
   DialogTitle 
 } from "@/components/ui/dialog";
-import { Button } from "@/components/ui/button";
+import { MotionButton } from "@/components/motion/MotionButton";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { type Preset } from "@/store/presets";
@@ -35,7 +35,7 @@ export function PresetEditor({ preset, isOpen, onClose, onSave }: PresetEditorPr
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent className="sm:max-w-[500px]">
+      <DialogContent className="sm:max-w-[500px] glass border border-white/10">
         <DialogHeader>
           <DialogTitle>{preset?.id ? "Edit Preset" : "New Preset"}</DialogTitle>
           <DialogDescription>
@@ -73,8 +73,12 @@ export function PresetEditor({ preset, isOpen, onClose, onSave }: PresetEditorPr
           </div>
         </div>
         <DialogFooter>
-          <Button variant="outline" onClick={onClose}>Cancel</Button>
-          <Button onClick={handleSave}>Save Changes</Button>
+          <MotionButton type="button" variant="outline" onClick={onClose}>
+            Cancel
+          </MotionButton>
+          <MotionButton type="button" onClick={handleSave}>
+            Save Changes
+          </MotionButton>
         </DialogFooter>
       </DialogContent>
     </Dialog>

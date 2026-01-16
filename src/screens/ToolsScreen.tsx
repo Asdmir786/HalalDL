@@ -7,7 +7,8 @@ import {
   CardTitle,
   CardFooter
 } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
+import { MotionButton } from "@/components/motion/MotionButton";
+import { FadeInStagger, FadeInItem } from "@/components/motion/StaggerContainer";
 import { Badge } from "@/components/ui/badge";
 import { Switch } from "@/components/ui/switch";
 import { Input } from "@/components/ui/input";
@@ -23,7 +24,7 @@ import {
   Package
 } from "lucide-react";
 
-import { open as openUrl } from '@tauri-apps/plugin-shell';
+import { open as openUrl } from "@tauri-apps/plugin-shell";
 import { pickFile, checkYtDlpVersion, checkFfmpegVersion, checkAria2Version, checkDenoVersion } from "@/lib/commands";
 import { toast } from "sonner";
 
@@ -36,7 +37,7 @@ const TOOL_URLS: Record<string, string> = {
 
 export function ToolsScreen() {
   const { tools, updateTool } = useToolsStore();
-  const isLite = import.meta.env.VITE_APP_MODE !== 'FULL';
+  const isLite = import.meta.env.VITE_APP_MODE !== "FULL";
 
   const testTool = async (id: string) => {
     updateTool(id, { status: "Checking" });
@@ -67,7 +68,7 @@ export function ToolsScreen() {
   };
 
   const ToolCard = ({ tool }: { tool: Tool }) => (
-    <Card className="flex flex-col h-full overflow-hidden hover:shadow-md transition-shadow duration-200 border-muted/60">
+    <Card className="flex flex-col h-full overflow-hidden hover:shadow-md transition-shadow duration-200 border-muted/60 glass-card">
       <CardHeader className="pb-3">
         <div className="flex justify-between items-start gap-2">
           <div className="space-y-1 min-w-0">
@@ -104,7 +105,7 @@ export function ToolsScreen() {
               <span className="text-xs font-medium">Auto-detect</span>
             </div>
             {tool.mode === "Manual" && (
-                  <Button 
+                  <MotionButton 
                     variant="ghost" 
                     size="sm" 
                     className="h-6 text-[10px] px-2"
@@ -117,7 +118,7 @@ export function ToolsScreen() {
                   >
                     <Search className="w-3 h-3 mr-1" />
                     Browse
-                  </Button>
+                  </MotionButton>
                 )}
           </div>
         </div>
@@ -144,7 +145,7 @@ export function ToolsScreen() {
         </div>
       </CardContent>
       <CardFooter className="bg-muted/30 border-t p-2 flex gap-2">
-        <Button 
+        <MotionButton 
           variant="outline" 
           size="sm" 
           className="flex-1 h-8 text-xs"
@@ -153,43 +154,50 @@ export function ToolsScreen() {
         >
           <RefreshCcw className={`w-3 h-3 mr-1 ${tool.status === "Checking" ? "animate-spin" : ""}`} />
           Test
-        </Button>
-        <Button 
+        </MotionButton>
+        <MotionButton 
           variant="ghost" 
           size="sm" 
           className="h-8 w-8 p-0"
           onClick={() => openUrl(TOOL_URLS[tool.id] || "https://github.com")}
         >
           <ExternalLink className="w-3 h-3" />
-        </Button>
+        </MotionButton>
       </CardFooter>
     </Card>
   );
 
   return (
-    <div className="flex flex-col h-full bg-background max-w-6xl mx-auto">
-      <header className="p-8 pb-6 flex flex-col gap-2">
-        <div className="flex items-center justify-between">
-          <div className="space-y-1">
-            <h2 className="text-3xl font-bold tracking-tight">Tools Manager</h2>
-            <p className="text-muted-foreground text-sm">
-              Manage external binaries required for media downloading and processing.
-            </p>
-          </div>
-          <div className="bg-primary/5 border border-primary/10 rounded-xl p-3 flex items-center gap-3">
-             <div className="p-2 bg-primary/10 rounded-lg text-primary">
-                <ShieldCheck className="w-5 h-5" />
-             </div>
-             <div className="flex flex-col">
-                <span className="text-xs font-bold text-primary uppercase tracking-widest">Environment</span>
-                <span className="text-sm font-semibold">{isLite ? "Lite Mode" : "Full Mode"}</span>
-             </div>
-          </div>
-        </div>
-      </header>
+    <div className="flex flex-col h-full bg-background max-w-6xl mx-auto" role="main">
+      <FadeInStagger className="flex flex-col h-full">
+        <FadeInItem>
+          <header className="p-8 pb-6 flex flex-col gap-2">
+            <div className="flex items-center justify-between">
+              <div className="space-y-1">
+                <h2 className="text-3xl font-bold tracking-tight">Tools Manager</h2>
+                <p className="text-muted-foreground text-sm">
+                  Manage external binaries required for media downloading and processing.
+                </p>
+              </div>
+              <div className="bg-primary/5 border border-primary/10 rounded-xl p-3 flex items-center gap-3 glass-card">
+                <div className="p-2 bg-primary/10 rounded-lg text-primary">
+                  <ShieldCheck className="w-5 h-5" />
+                </div>
+                <div className="flex flex-col">
+                  <span className="text-xs font-bold text-primary uppercase tracking-widest">
+                    Environment
+                  </span>
+                  <span className="text-sm font-semibold">
+                    {isLite ? "Lite Mode" : "Full Mode"}
+                  </span>
+                </div>
+              </div>
+            </div>
+          </header>
+        </FadeInItem>
 
-      <div className="flex-1 overflow-auto px-8 pb-8">
-        <div className="space-y-8">
+        <FadeInItem className="flex-1 overflow-auto px-8 pb-8">
+          <div className="space-y-8">
           {isLite && ( 
             <Alert className="bg-amber-500/5 border-amber-500/20 text-amber-600 dark:text-amber-500">
               <Info className="w-4 h-4" />
@@ -231,7 +239,8 @@ export function ToolsScreen() {
             </Card>
           </div>
         </div>
-      </div>
+        </FadeInItem>
+      </FadeInStagger>
     </div>
   );
 }
