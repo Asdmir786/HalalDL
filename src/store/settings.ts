@@ -28,7 +28,7 @@ interface SettingsState {
   resetSettings: () => void;
 }
 
-const DEFAULT_SETTINGS: Settings = {
+export const DEFAULT_SETTINGS: Settings = {
   theme: "system",
   notifications: true,
   maxConcurrency: 2,
@@ -38,6 +38,8 @@ const DEFAULT_SETTINGS: Settings = {
   tempDir: "",
   autoClearFinished: false,
 };
+
+export const SETTINGS_KEYS = Object.keys(DEFAULT_SETTINGS) as (keyof Settings)[];
 
 export const useSettingsStore = create<SettingsState>((set) => ({
   settings: DEFAULT_SETTINGS,

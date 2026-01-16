@@ -6,13 +6,11 @@ import { UpgradePrompt } from "@/components/UpgradePrompt";
 import { ToolSuccessModal } from "@/components/ToolSuccessModal";
 import { AnimatePresence } from "framer-motion";
 import { PageTransition } from "@/components/motion/PageTransition";
-import { lazy, Suspense } from "react";
-
-const DownloadsScreen = lazy(() => import("@/screens/DownloadsScreen").then(module => ({ default: module.DownloadsScreen })));
-const PresetsScreen = lazy(() => import("@/screens/PresetsScreen").then(module => ({ default: module.PresetsScreen })));
-const ToolsScreen = lazy(() => import("@/screens/ToolsScreen").then(module => ({ default: module.ToolsScreen })));
-const LogsScreen = lazy(() => import("@/screens/LogsScreen").then(module => ({ default: module.LogsScreen })));
-const SettingsScreen = lazy(() => import("@/screens/SettingsScreen").then(module => ({ default: module.SettingsScreen })));
+import { DownloadsScreen } from "@/screens/DownloadsScreen";
+import { PresetsScreen } from "@/screens/PresetsScreen";
+import { ToolsScreen } from "@/screens/ToolsScreen";
+import { LogsScreen } from "@/screens/LogsScreen";
+import { SettingsScreen } from "@/screens/SettingsScreen";
 
 export default function App() {
   const currentScreen = useNavigationStore((state) => state.currentScreen);
@@ -35,9 +33,7 @@ export default function App() {
       <main className="flex-1 overflow-hidden relative bg-gradient-to-br from-background via-background to-secondary/20">
         <AnimatePresence mode="wait">
           <PageTransition key={currentScreen} className="h-full w-full overflow-hidden">
-             <Suspense fallback={<div className="flex items-center justify-center h-full text-muted-foreground">Loading...</div>}>
-               {renderScreen()}
-             </Suspense>
+            {renderScreen()}
           </PageTransition>
         </AnimatePresence>
       </main>

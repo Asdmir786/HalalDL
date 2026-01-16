@@ -12,7 +12,6 @@ import { FadeInStagger, FadeInItem } from "@/components/motion/StaggerContainer"
 import { Badge } from "@/components/ui/badge";
 import { Switch } from "@/components/ui/switch";
 import { Input } from "@/components/ui/input";
-import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { 
   CheckCircle2, 
   XCircle, 
@@ -179,12 +178,12 @@ export function ToolsScreen() {
                   Manage external binaries required for media downloading and processing.
                 </p>
               </div>
-              <div className="bg-primary/5 border border-primary/10 rounded-xl p-3 flex items-center gap-3 glass-card">
+              <div className="bg-muted/20 border border-muted/30 rounded-xl p-3 flex items-center gap-3 glass-card">
                 <div className="p-2 bg-primary/10 rounded-lg text-primary">
                   <ShieldCheck className="w-5 h-5" />
                 </div>
                 <div className="flex flex-col">
-                  <span className="text-xs font-bold text-primary uppercase tracking-widest">
+                  <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest">
                     Environment
                   </span>
                   <span className="text-sm font-semibold">
@@ -198,14 +197,20 @@ export function ToolsScreen() {
 
         <FadeInItem className="flex-1 overflow-auto px-8 pb-8">
           <div className="space-y-8">
-          {isLite && ( 
-            <Alert className="bg-amber-500/5 border-amber-500/20 text-amber-600 dark:text-amber-500">
-              <Info className="w-4 h-4" />
-              <AlertTitle className="text-sm font-bold uppercase tracking-wider">Lite Mode Active</AlertTitle>
-              <AlertDescription className="text-xs opacity-90">
-                Tools are not bundled in Lite mode. Please ensure they are installed on your system PATH or provide custom paths manually below.
-              </AlertDescription>
-            </Alert>
+          {isLite && (
+            <div className="rounded-xl border border-muted/40 bg-muted/20 p-3 flex items-start gap-3">
+              <div className="p-2 rounded-lg bg-primary/10 text-primary">
+                <Info className="w-4 h-4" />
+              </div>
+              <div className="flex-1">
+                <div className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+                  Lite Mode
+                </div>
+                <div className="text-xs text-muted-foreground">
+                  Tools aren’t bundled in Lite mode. Use system PATH or set custom paths below.
+                </div>
+              </div>
+            </div>
           )}
 
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-2 xl:grid-cols-2 gap-6">

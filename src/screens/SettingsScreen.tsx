@@ -10,8 +10,17 @@ import {
   Folder,
   Search
 } from "lucide-react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
-import { useSettingsStore, Theme, FileCollisionAction } from "@/store/settings";
+import { downloadDir } from "@tauri-apps/api/path";
+import {
+  DEFAULT_SETTINGS,
+  SETTINGS_KEYS,
+  type Settings,
+  useSettingsStore,
+  Theme,
+  FileCollisionAction,
+} from "@/store/settings";
 import { MotionButton } from "@/components/motion/MotionButton";
 import { FadeInStagger, FadeInItem } from "@/components/motion/StaggerContainer";
 import { Label } from "@/components/ui/label";
@@ -28,23 +37,172 @@ import {
 import { Slider } from "@/components/ui/slider";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Separator } from "@/components/ui/separator";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+
+const SETTINGS_KEY_SET = new Set(SETTINGS_KEYS as unknown as string[]);
+
+const pickKnownSettings = (value: unknown): Settings => {
+  const source = (value ?? {}) as Record<string, unknown>;
+  const next: Record<string, unknown> = { ...DEFAULT_SETTINGS };
+  for (const key of SETTINGS_KEYS) {
+    const v = source[key as string];
+    if (typeof v !== "undefined") next[key as string] = v;
+  }
+  return next as unknown as Settings;
+};
+
+const resolveDefaultSettings = async (): Promise<Settings> => {
+  const next: Settings = { ...DEFAULT_SETTINGS };
+  try {
+    next.defaultDownloadDir = await downloadDir();
+  } catch {
+    next.defaultDownloadDir = DEFAULT_SETTINGS.defaultDownloadDir;
+  }
+  return next;
+};
 
 export function SettingsScreen() {
-  const { settings, updateSettings, resetSettings } = useSettingsStore();
+  const { settings, setSettings } = useSettingsStore();
 
-  const handleSave = () => {
+  const savedSettings = useMemo(() => pickKnownSettings(settings), [settings]);
+  const [edits, setEdits] = useState<Partial<Settings>>({});
+  const draftSettings = useMemo(
+    () => ({ ...savedSettings, ...edits }),
+    [edits, savedSettings]
+  );
+
+  const [resolvedDefaults, setResolvedDefaults] = useState<Settings | null>(null);
+
+  useEffect(() => {
+    let mounted = true;
+    resolveDefaultSettings()
+      .then((defaults) => {
+        if (mounted) setResolvedDefaults(defaults);
+      })
+      .catch(() => {
+        if (mounted) setResolvedDefaults(DEFAULT_SETTINGS);
+      });
+    return () => {
+      mounted = false;
+    };
+  }, []);
+
+  const hasExtraSavedKeys = useMemo(() => {
+    const raw = settings as unknown as Record<string, unknown>;
+    return Object.keys(raw).some((k) => !SETTINGS_KEY_SET.has(k));
+  }, [settings]);
+
+  const isDirty = useMemo(() => {
+    return SETTINGS_KEYS.some((k) => !Object.is(draftSettings[k], savedSettings[k]));
+  }, [draftSettings, savedSettings]);
+
+  const isGlobalDirty = useMemo(() => {
+    if (hasExtraSavedKeys) return true;
+    if (!resolvedDefaults) return false;
+    return SETTINGS_KEYS.some((k) => !Object.is(savedSettings[k], resolvedDefaults[k]));
+  }, [hasExtraSavedKeys, resolvedDefaults, savedSettings]);
+
+  const setDraftValue = useCallback(
+    <K extends keyof Settings>(key: K, value: Settings[K]) => {
+      setEdits((prev) => {
+        const next = { ...prev } as Partial<Settings>;
+        if (Object.is(value, savedSettings[key])) {
+          delete (next as Record<string, unknown>)[key as string];
+        } else {
+          (next as Record<string, unknown>)[key as string] = value;
+        }
+        return next;
+      });
+    },
+    [savedSettings]
+  );
+
+  const applyTheme = useCallback((theme: Theme) => {
+    const root = window.document.documentElement;
+    root.classList.remove("light", "dark");
+
+    if (theme === "system") {
+      const systemTheme = window.matchMedia("(prefers-color-scheme: dark)").matches
+        ? "dark"
+        : "light";
+      root.classList.add(systemTheme);
+    } else {
+      root.classList.add(theme);
+    }
+  }, []);
+
+  useEffect(() => {
+    applyTheme(draftSettings.theme);
+    return () => applyTheme(savedSettings.theme);
+  }, [applyTheme, draftSettings.theme, savedSettings.theme]);
+
+  const handleSave = useCallback(() => {
+    if (!isDirty) return;
+    setSettings({ ...(settings as unknown as Record<string, unknown>), ...draftSettings } as unknown as Settings);
+    setEdits({});
     toast.success("Settings saved successfully");
-  };
+  }, [draftSettings, isDirty, setSettings, settings]);
 
-  const handleReset = () => {
-    resetSettings();
+  const handleGlobalReset = useCallback(async () => {
+    const defaults = resolvedDefaults ?? (await resolveDefaultSettings());
+    setSettings(defaults);
+    setEdits({});
+    toast.info("Settings restored to defaults");
+  }, [resolvedDefaults, setSettings]);
+
+  const setDraftFromSettings = useCallback(
+    (nextDraft: Settings) => {
+      setEdits(() => {
+        const next: Partial<Settings> = {};
+        for (const k of SETTINGS_KEYS) {
+          if (!Object.is(nextDraft[k], savedSettings[k])) {
+            (next as Record<string, unknown>)[k as string] = nextDraft[k];
+          }
+        }
+        return next;
+      });
+    },
+    [savedSettings]
+  );
+
+  const resetAllDraft = useCallback(async () => {
+    const defaults = await resolveDefaultSettings();
+    setDraftFromSettings(defaults);
     toast.info("Settings reset to defaults");
-  };
+  }, [setDraftFromSettings]);
+
+  const resetGroupDraft = useCallback(
+    async (group: "appearance" | "storage" | "behavior" | "downloadEngine") => {
+      const defaults = group === "storage" ? await resolveDefaultSettings() : DEFAULT_SETTINGS;
+      const partial: Partial<Settings> =
+        group === "appearance"
+          ? { theme: defaults.theme }
+          : group === "storage"
+          ? { defaultDownloadDir: defaults.defaultDownloadDir, tempDir: defaults.tempDir }
+          : group === "behavior"
+          ? { notifications: defaults.notifications, autoClearFinished: defaults.autoClearFinished }
+          : {
+              maxConcurrency: defaults.maxConcurrency,
+              maxRetries: defaults.maxRetries,
+              fileCollision: defaults.fileCollision,
+            };
+
+      setDraftFromSettings({ ...draftSettings, ...partial });
+      toast.info("Settings reset to defaults");
+    },
+    [draftSettings, setDraftFromSettings]
+  );
 
   return (
     <div className="p-8 space-y-8 max-w-4xl mx-auto h-full overflow-auto pb-20">
       <FadeInStagger className="space-y-8">
-        <FadeInItem className="flex justify-between items-center">
+        <FadeInItem className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <div>
           <h2 className="text-3xl font-bold tracking-tight flex items-center gap-2">
             <SettingsIcon className="w-8 h-8 text-primary" />
@@ -52,18 +210,44 @@ export function SettingsScreen() {
           </h2>
           <p className="text-muted-foreground">Configure HalalDL behavior and appearance.</p>
         </div>
-        <div className="flex gap-2">
-          <MotionButton 
-            variant="outline" 
-            onClick={handleReset}
+        <div className="flex flex-wrap items-center justify-end gap-2 sm:gap-3">
+          <MotionButton
+            variant="outline"
+            size="sm"
+            disabled={!isGlobalDirty}
+            onClick={handleGlobalReset}
             whileHover={{ scale: 1.05 }}
             whileTap={{ scale: 0.95 }}
           >
             <RotateCcw className="w-4 h-4 mr-2" />
-            Reset Defaults
+            Restore Defaults
           </MotionButton>
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild disabled={!isDirty}>
+              <MotionButton 
+                variant="outline" 
+                size="sm"
+                disabled={!isDirty}
+                whileHover={{ scale: 1.05 }}
+                whileTap={{ scale: 0.95 }}
+              >
+                <RotateCcw className="w-4 h-4 mr-2" />
+                Reset
+              </MotionButton>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end">
+              <DropdownMenuItem onClick={resetAllDraft}>Reset all</DropdownMenuItem>
+              <DropdownMenuSeparator />
+              <DropdownMenuItem onClick={() => resetGroupDraft("appearance")}>Reset appearance</DropdownMenuItem>
+              <DropdownMenuItem onClick={() => resetGroupDraft("storage")}>Reset storage</DropdownMenuItem>
+              <DropdownMenuItem onClick={() => resetGroupDraft("behavior")}>Reset behavior</DropdownMenuItem>
+              <DropdownMenuItem onClick={() => resetGroupDraft("downloadEngine")}>Reset download engine</DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
           <MotionButton 
             onClick={handleSave}
+            size="sm"
+            disabled={!isDirty}
             whileHover={{ scale: 1.05 }}
             whileTap={{ scale: 0.95 }}
           >
@@ -91,8 +275,8 @@ export function SettingsScreen() {
                 <p className="text-sm text-muted-foreground">Choose your preferred color theme.</p>
               </div>
               <Select 
-                value={settings.theme} 
-                onValueChange={(v) => updateSettings({ theme: v as Theme })}
+                value={draftSettings.theme} 
+                onValueChange={(v) => setDraftValue("theme", v as Theme)}
               >
                 <SelectTrigger className="w-[180px]">
                   <SelectValue placeholder="Select theme" />
@@ -135,7 +319,7 @@ export function SettingsScreen() {
               <Label>Default Download Directory</Label>
               <div className="flex gap-2">
                 <Input 
-                  value={settings.defaultDownloadDir || ""} 
+                  value={draftSettings.defaultDownloadDir || ""} 
                   readOnly 
                   placeholder="Select a folder..."
                   className="bg-muted"
@@ -150,7 +334,7 @@ export function SettingsScreen() {
                       multiple: false,
                     });
                     if (selected && !Array.isArray(selected)) {
-                      updateSettings({ defaultDownloadDir: selected });
+                      setDraftValue("defaultDownloadDir", selected);
                     }
                   }}
                 >
@@ -180,8 +364,8 @@ export function SettingsScreen() {
                 <p className="text-sm text-muted-foreground">Show alerts when downloads complete or fail.</p>
               </div>
               <Switch
-                checked={settings.notifications}
-                onCheckedChange={(checked) => updateSettings({ notifications: checked })}
+                checked={draftSettings.notifications}
+                onCheckedChange={(checked) => setDraftValue("notifications", checked)}
               />
             </div>
 
@@ -193,8 +377,8 @@ export function SettingsScreen() {
                 <p className="text-sm text-muted-foreground">Automatically remove finished downloads from the list.</p>
               </div>
               <Switch
-                checked={settings.autoClearFinished}
-                onCheckedChange={(checked) => updateSettings({ autoClearFinished: checked })}
+                checked={draftSettings.autoClearFinished}
+                onCheckedChange={(checked) => setDraftValue("autoClearFinished", checked)}
               />
             </div>
 
@@ -209,16 +393,16 @@ export function SettingsScreen() {
               </div>
               <div className="flex items-center gap-3">
                 <span className="text-sm text-muted-foreground">
-                  {settings.maxConcurrency}
+                  {draftSettings.maxConcurrency}
                 </span>
                 <Slider
                   className="w-40"
                   min={1}
                   max={8}
                   step={1}
-                  value={[settings.maxConcurrency]}
+                  value={[draftSettings.maxConcurrency]}
                   onValueChange={([value]) =>
-                    updateSettings({ maxConcurrency: value })
+                    setDraftValue("maxConcurrency", value)
                   }
                 />
               </div>
@@ -244,14 +428,14 @@ export function SettingsScreen() {
                   <Label>Max Concurrent Downloads</Label>
                   <p className="text-sm text-muted-foreground">Number of videos to download at once.</p>
                 </div>
-                <span className="font-mono font-bold text-primary">{settings.maxConcurrency}</span>
+                <span className="font-mono font-bold text-primary">{draftSettings.maxConcurrency}</span>
               </div>
               <Slider 
-                value={[settings.maxConcurrency]} 
+                value={[draftSettings.maxConcurrency]} 
                 min={1} 
                 max={10} 
                 step={1}
-                onValueChange={([v]: number[]) => updateSettings({ maxConcurrency: v })}
+                onValueChange={([v]: number[]) => setDraftValue("maxConcurrency", v)}
               />
             </div>
 
@@ -263,14 +447,14 @@ export function SettingsScreen() {
                   <Label>Max Retries</Label>
                   <p className="text-sm text-muted-foreground">Number of attempts if a download fails.</p>
                 </div>
-                <span className="font-mono font-bold text-primary">{settings.maxRetries}</span>
+                <span className="font-mono font-bold text-primary">{draftSettings.maxRetries}</span>
               </div>
               <Slider 
-                value={[settings.maxRetries]} 
+                value={[draftSettings.maxRetries]} 
                 min={0} 
                 max={5} 
                 step={1}
-                onValueChange={([v]: number[]) => updateSettings({ maxRetries: v })}
+                onValueChange={([v]: number[]) => setDraftValue("maxRetries", v)}
               />
             </div>
 
@@ -285,8 +469,8 @@ export function SettingsScreen() {
                 <p className="text-sm text-muted-foreground">What to do if a file already exists.</p>
               </div>
               <Select 
-                value={settings.fileCollision} 
-                onValueChange={(v) => updateSettings({ fileCollision: v as FileCollisionAction })}
+                value={draftSettings.fileCollision} 
+                onValueChange={(v) => setDraftValue("fileCollision", v as FileCollisionAction)}
               >
                 <SelectTrigger className="w-[180px]">
                   <SelectValue placeholder="Select action" />

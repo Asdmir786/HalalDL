@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.3.1 - 2026-01-17
+- **Settings**: Added persistent "Restore Defaults" and granular "Reset" options for appearance, storage, behavior, and download engine.
+- **Settings**: Improved header layout with responsive buttons (prevented cramping on smaller screens).
+- **Sidebar**: Added active downloads badge and progress indicator that auto-hides when idle.
+- **Logs**: Revamped UI with a modern dark terminal theme, syntax highlighting for commands, and a status bar.
+- **Logs**: Fixed scrolling behavior (removed scroll-smooth interference, improved stick-to-bottom logic) and added an auto-scroll toggle.
+- **Tools**: Restyled Lite Mode notice to be a subtle note instead of a warning.
+
 ## 0.3.0 - 2026-01-16
 - Modernized UI across all screens with glassmorphism, staggered animations, and motion buttons.
 - Updated sidebar styling and alignment for consistent navigation visuals.
