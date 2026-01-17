@@ -45,6 +45,13 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 
+const SPEED_UNITS = [
+  { label: "KB/s", value: 1, suffix: "K" },
+  { label: "MB/s", value: 1024, suffix: "M" },
+  { label: "GB/s", value: 1024 * 1024, suffix: "G" },
+  { label: "Bytes/s", value: 1 / 1024, suffix: "" }, // Special handling
+];
+
 const SETTINGS_KEY_SET = new Set(SETTINGS_KEYS as unknown as string[]);
 
 const pickKnownSettings = (value: unknown): Settings => {
@@ -78,6 +85,35 @@ export function SettingsScreen() {
   );
 
   const [resolvedDefaults, setResolvedDefaults] = useState<Settings | null>(null);
+
+  // Speed Limit Local State (to handle units)
+  const [speedUnit, setSpeedUnit] = useState<number>(1); // Default to KB/s (multiplier)
+  const [localSpeedValue, setLocalSpeedValue] = useState<number>(0);
+
+  // Sync local speed state with draftSettings.maxSpeed on mount or change
+  useEffect(() => {
+    const rawKb = draftSettings.maxSpeed || 0;
+    
+    // Use setTimeout to avoid synchronous state update warning during render
+    const timer = setTimeout(() => {
+      if (rawKb === 0) {
+         setLocalSpeedValue(0);
+         return;
+      }
+  
+      const val = rawKb / speedUnit;
+      setLocalSpeedValue(parseFloat(val.toFixed(2)));
+    }, 0);
+
+    return () => clearTimeout(timer);
+  }, [draftSettings.maxSpeed, speedUnit]);
+
+  const updateSpeed = (val: number, unitMult: number) => {
+     // Convert to KB for storage
+     // val * unitMult = KB
+     const kb = val * unitMult;
+     setDraftValue("maxSpeed", Math.round(kb)); // yt-dlp likes integers usually, but float K is okay? stick to int KB
+  };
 
   useEffect(() => {
     let mounted = true;
@@ -190,6 +226,7 @@ export function SettingsScreen() {
           : {
               maxConcurrency: defaults.maxConcurrency,
               maxRetries: defaults.maxRetries,
+              maxSpeed: defaults.maxSpeed,
               fileCollision: defaults.fileCollision,
             };
 
@@ -386,6 +423,22 @@ export function SettingsScreen() {
 
             <div className="flex items-center justify-between">
               <div className="space-y-0.5">
+                <Label className="flex items-center gap-2">
+                  <Save className="w-4 h-4 text-green-500" />
+                  Paranoid Backup Mode
+                </Label>
+                <p className="text-sm text-muted-foreground">Automatically backup download history to Documents/HalalDL/backups.</p>
+              </div>
+              <Switch
+                checked={draftSettings.paranoidMode}
+                onCheckedChange={(checked) => setDraftValue("paranoidMode", checked)}
+              />
+            </div>
+
+            <Separator />
+
+            <div className="flex items-center justify-between">
+              <div className="space-y-0.5">
                 <Label>Max Concurrent Downloads</Label>
                 <p className="text-sm text-muted-foreground">
                   Limit how many downloads run at the same time.
@@ -456,6 +509,56 @@ export function SettingsScreen() {
                 step={1}
                 onValueChange={([v]: number[]) => setDraftValue("maxRetries", v)}
               />
+            </div>
+
+            <Separator />
+
+            <div className="space-y-4">
+              <div className="flex justify-between">
+                <div className="space-y-0.5">
+                  <Label>Speed Limit</Label>
+                  <p className="text-sm text-muted-foreground">Limit download speed (0 = unlimited).</p>
+                </div>
+                <span className="font-mono font-bold text-primary">
+                  {draftSettings.maxSpeed === 0 ? "Unlimited" : `${localSpeedValue} ${SPEED_UNITS.find(u => u.value === speedUnit)?.label}`}
+                </span>
+              </div>
+              <div className="flex gap-4">
+                <div className="flex-1 flex gap-2">
+                   <Input
+                      type="number"
+                      min={0}
+                      value={localSpeedValue}
+                      onChange={(e) => updateSpeed(parseFloat(e.target.value) || 0, speedUnit)}
+                      className="flex-1"
+                   />
+                   <Select 
+                      value={speedUnit.toString()} 
+                      onValueChange={(v) => {
+                        const newUnit = parseFloat(v);
+                        setSpeedUnit(newUnit);
+                        // Recalculate local value immediately not needed as effect will run, 
+                        // BUT effect runs on draftSettings.maxSpeed change.
+                        // If we just change unit, maxSpeed doesn't change, so localValue must update.
+                        // Actually, if we change unit, we usually want to KEEP the maxSpeed (KB) constant and show different number?
+                        // OR keep the number constant and change maxSpeed?
+                        // Usually "Convert this value to new unit" -> keep maxSpeed constant.
+                        // The effect handles this: rawKb / newUnit
+                      }}
+                   >
+                    <SelectTrigger className="w-[100px]">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {SPEED_UNITS.map((u) => (
+                        <SelectItem key={u.label} value={u.value.toString()}>
+                          {u.label}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                   </Select>
+                </div>
+              </div>
             </div>
 
             <Separator />

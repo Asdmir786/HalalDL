@@ -10,7 +10,11 @@ import {
   Terminal,
   Settings2,
   ChevronDown,
-  ChevronUp
+  ChevronUp,
+  Link,
+  Copy,
+  RotateCcw,
+  Play
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useDownloadsStore } from "@/store/downloads";
@@ -27,12 +31,20 @@ import {
 } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
-import { revealInExplorer } from "@/lib/commands";
-import { startDownload } from "@/lib/downloader";
+import { revealInExplorer, deleteFile, openFile } from "@/lib/commands";
+import { startDownload, fetchMetadata } from "@/lib/downloader";
 import { Checkbox } from "@/components/ui/checkbox";
 import { useSettingsStore } from "@/store/settings";
 import { useLogsStore } from "@/store/logs";
 import { useNavigationStore } from "@/store/navigation";
+import {
+  ContextMenu,
+  ContextMenuContent,
+  ContextMenuItem,
+  ContextMenuTrigger,
+  ContextMenuSeparator,
+} from "@/components/ui/context-menu";
+import { toast } from "sonner";
 
 export function DownloadsScreen() {
   const [url, setUrl] = useState("");
@@ -65,11 +77,19 @@ export function DownloadsScreen() {
   const [statusFilter, setStatusFilter] = useState<StatusFilter>("all");
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
   const { settings, updateSettings } = useSettingsStore();
-  const { jobs, addJob, removeJob } = useDownloadsStore();
+  const { jobs, addJob, removeJob, pendingUrl, setPendingUrl } = useDownloadsStore();
   const { presets } = usePresetsStore();
   const parentRef = useRef<HTMLDivElement>(null);
   const { setActiveJobId } = useLogsStore();
   const { setScreen } = useNavigationStore();
+
+  // Handle Drag & Drop Pending URL
+  useEffect(() => {
+    if (pendingUrl) {
+      setUrl(pendingUrl);
+      setPendingUrl(undefined);
+    }
+  }, [pendingUrl, setPendingUrl]);
 
   useEffect(() => {
     const savedAddMode =
@@ -99,20 +119,19 @@ export function DownloadsScreen() {
   };
 
   const filteredJobs = useMemo(() => {
-    if (statusFilter === "all") return jobs;
+    let result = jobs;
     if (statusFilter === "active") {
-      return jobs.filter((job) => job.status === "Downloading" || job.status === "Post-processing");
+      result = jobs.filter((job) => job.status === "Downloading" || job.status === "Post-processing");
+    } else if (statusFilter === "queued") {
+      result = jobs.filter((job) => job.status === "Queued");
+    } else if (statusFilter === "done") {
+      result = jobs.filter((job) => job.status === "Done");
+    } else if (statusFilter === "failed") {
+      result = jobs.filter((job) => job.status === "Failed");
     }
-    if (statusFilter === "queued") {
-      return jobs.filter((job) => job.status === "Queued");
-    }
-    if (statusFilter === "done") {
-      return jobs.filter((job) => job.status === "Done");
-    }
-    if (statusFilter === "failed") {
-      return jobs.filter((job) => job.status === "Failed");
-    }
-    return jobs;
+    
+    // Sort by createdAt desc (newest first)
+    return [...result].sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0));
   }, [jobs, statusFilter]);
 
   const queuedCount = useMemo(
@@ -156,7 +175,19 @@ export function DownloadsScreen() {
     const presetIdToUse = isCustomPreset ? "default" : selectedPreset;
 
     const id = addJob(url, presetIdToUse, overrides);
-    if (addMode === "start") {
+    
+    // Fetch metadata (thumbnail/title) asynchronously
+    fetchMetadata(id);
+
+    // Switch filter if needed to show the new job
+    if (addMode === "queue") {
+      if (statusFilter === "active" || statusFilter === "done" || statusFilter === "failed") {
+        setStatusFilter("queued");
+      }
+    } else if (addMode === "start") {
+      if (statusFilter === "queued" || statusFilter === "done" || statusFilter === "failed") {
+        setStatusFilter("active");
+      }
       startDownload(id);
     }
     setUrl("");
@@ -229,6 +260,24 @@ export function DownloadsScreen() {
   const handleViewLogs = (jobId: string) => {
     setActiveJobId(jobId);
     setScreen("logs");
+  };
+
+  const handleCopyLink = (url: string) => {
+    navigator.clipboard.writeText(url);
+    toast.success("Link copied to clipboard");
+  };
+
+  const handleDeleteFile = async (jobId: string, path?: string) => {
+    if (path) {
+      try {
+        await deleteFile(path);
+        toast.success("File deleted from disk");
+      } catch (e) {
+        toast.error("Failed to delete file");
+        console.error(e);
+      }
+    }
+    removeJob(jobId);
   };
 
   return (
@@ -542,6 +591,7 @@ export function DownloadsScreen() {
                   <AnimatePresence mode="popLayout">
                     {virtualizer.getVirtualItems().map((virtualRow) => {
                       const job = filteredJobs[virtualRow.index];
+                      if (!job) return null;
                       return (
                         <motion.div
                           key={job.id}
@@ -557,6 +607,8 @@ export function DownloadsScreen() {
                             transform: `translateY(${virtualRow.start}px)`,
                           }}
                         >
+                        <ContextMenu>
+                          <ContextMenuTrigger>
                         {/* Inner Card Content */}
                         <div className={cn(
                           "glass-card rounded-xl p-4 flex gap-4 h-full relative group overflow-hidden border-l-4",
@@ -581,11 +633,26 @@ export function DownloadsScreen() {
                             />
                           </div>
                           <div className="flex-1 min-w-0">
-                            <div className="flex items-center justify-between mb-2">
-                              <h4 className="font-medium truncate pr-4 text-sm">
-                                {job.title || job.url}
-                              </h4>
-                              <div className="flex items-center gap-2">
+                            <div className="flex gap-4">
+                              {job.thumbnail && (
+                                <div className="relative w-24 h-16 rounded-md overflow-hidden bg-muted/50 flex-shrink-0 border border-muted/50">
+                                  <img 
+                                    src={job.thumbnail} 
+                                    alt="Thumbnail" 
+                                    className="w-full h-full object-cover"
+                                    onError={(e) => {
+                                      // Hide image on error
+                                      (e.target as HTMLImageElement).style.display = 'none';
+                                    }}
+                                  />
+                                </div>
+                              )}
+                              <div className="flex-1 min-w-0">
+                                <div className="flex items-center justify-between mb-2">
+                                  <h4 className="font-medium truncate pr-4 text-sm select-text">
+                                    {job.title || job.url}
+                                  </h4>
+                                  <div className="flex items-center gap-2">
                                 <Badge
                                   variant={
                                     job.status === "Done"
@@ -662,10 +729,70 @@ export function DownloadsScreen() {
                                 </MotionButton>
                               )}
                             </div>
+                            </div>
+                            </div>
                           </div>
                         </div>
-                      </motion.div>
-                    );
+                        </ContextMenuTrigger>
+                        <ContextMenuContent className="w-48">
+                          {job.status === "Done" && job.outputPath && (
+                            <>
+                              <ContextMenuItem onClick={() => openFile(job.outputPath!)}>
+                                <Play className="mr-2 h-3.5 w-3.5" />
+                                Open File
+                              </ContextMenuItem>
+                              <ContextMenuItem onClick={() => revealInExplorer(job.outputPath!)}>
+                                <FolderOpen className="mr-2 h-3.5 w-3.5" />
+                                Show in Explorer
+                              </ContextMenuItem>
+                              <ContextMenuSeparator />
+                            </>
+                          )}
+                          <ContextMenuItem onClick={() => handleCopyLink(job.url)}>
+                            <Link className="mr-2 h-3.5 w-3.5" />
+                            Copy Link
+                          </ContextMenuItem>
+                          {job.status === "Failed" && (
+                            <ContextMenuItem onClick={() => startDownload(job.id)}>
+                              <RotateCcw className="mr-2 h-3.5 w-3.5" />
+                              Retry
+                            </ContextMenuItem>
+                          )}
+                          <ContextMenuSeparator />
+                          <ContextMenuItem onClick={() => handleViewLogs(job.id)}>
+                            <Terminal className="mr-2 h-3.5 w-3.5" />
+                            View Logs
+                          </ContextMenuItem>
+                          <ContextMenuItem 
+                            onClick={() => {
+                              navigator.clipboard.writeText(JSON.stringify(job, null, 2));
+                              toast.success("Job details copied");
+                            }}
+                          >
+                            <Copy className="mr-2 h-3.5 w-3.5" />
+                            Copy Debug Info
+                          </ContextMenuItem>
+                          <ContextMenuSeparator />
+                          {job.status === "Done" && job.outputPath && (
+                            <ContextMenuItem 
+                              className="text-destructive focus:text-destructive"
+                              onClick={() => handleDeleteFile(job.id, job.outputPath)}
+                            >
+                              <X className="mr-2 h-3.5 w-3.5" />
+                              Delete File
+                            </ContextMenuItem>
+                          )}
+                          <ContextMenuItem 
+                            className={cn(!job.outputPath && "text-destructive focus:text-destructive")}
+                            onClick={() => removeJob(job.id)}
+                          >
+                            <X className="mr-2 h-3.5 w-3.5" />
+                            Remove from List
+                          </ContextMenuItem>
+                        </ContextMenuContent>
+                        </ContextMenu>
+                        </motion.div>
+                      );
                   })}
                 </AnimatePresence>
               </div>

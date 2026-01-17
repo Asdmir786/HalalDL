@@ -134,3 +134,11 @@ export async function revealInExplorer(path: string) {
 export async function openFolder(path: string) {
   await openPath(path);
 }
+
+export async function openFile(path: string) {
+  await openPath(path);
+}
+
+export async function deleteFile(path: string) {
+  await invoke("delete_file", { path });
+}

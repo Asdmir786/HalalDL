@@ -1,5 +1,16 @@
 # Changelog
 
+## 0.3.2 - 2026-01-18
+- **Power Features**: Added "Paranoid Backup Mode" to auto-save download history.
+- **Power Features**: Implemented Global Drag & Drop support for adding links from anywhere.
+- **Power Features**: Added advanced Context Menu to downloads (Copy Link, View Logs, Show in Explorer, etc.).
+- **UI/UX**: Added Taskbar Progress integration (green progress bar on app icon).
+- **UI/UX**: Added Rich Thumbnail previews for downloads.
+- **Settings**: Added enhanced Speed Limiter with unit selection (MB/s, KB/s, etc.).
+- **Fixes**: Fixed "Show in Explorer" not selecting the file on Windows.
+- **Fixes**: Fixed blank screen crashes when navigating between Logs/Downloads during updates.
+- **Fixes**: Fixed background color glitch when navigating from Logs.
+
 ## 0.3.1 - 2026-01-17
 - **Settings**: Added persistent "Restore Defaults" and granular "Reset" options for appearance, storage, behavior, and download engine.
 - **Settings**: Improved header layout with responsive buttons (prevented cramping on smaller screens).

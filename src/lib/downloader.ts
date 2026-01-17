@@ -7,6 +7,27 @@ import { appDataDir, join } from "@tauri-apps/api/path";
 import { exists } from "@tauri-apps/plugin-fs";
 import { OutputParser } from "@/lib/output-parser";
 
+import { sendNotification, requestPermission, isPermissionGranted } from '@tauri-apps/plugin-notification';
+
+async function sendDownloadCompleteNotification(title: string, body: string) {
+  try {
+    let permissionGranted = await isPermissionGranted();
+    if (!permissionGranted) {
+      const permission = await requestPermission();
+      permissionGranted = permission === 'granted';
+    }
+    
+    if (permissionGranted) {
+      sendNotification({
+        title,
+        body,
+      });
+    }
+  } catch (error) {
+    console.error("Failed to send notification:", error);
+  }
+}
+
 async function getToolPath(baseName: string): Promise<string> {
   try {
     const dataDir = await appDataDir();
@@ -96,6 +117,11 @@ export async function startDownload(jobId: string) {
   // Ensure consistent behavior: ignore global config and force newline output for logs
   args.push("--ignore-config", "--newline", "--no-playlist");
 
+  // Speed Limit
+  if (settings.maxSpeed && settings.maxSpeed > 0) {
+    args.push("--limit-rate", `${settings.maxSpeed}K`);
+  }
+
   args.push(job.url);
 
   const quotedArgs = args.map(arg => arg.includes(' ') ? `"${arg}"` : arg).join(" ");
@@ -110,8 +136,17 @@ export async function startDownload(jobId: string) {
       if (data.code === 0) {
         updateJob(jobId, { status: "Done", progress: 100 });
         
-        // Auto-clear if enabled
+        // Send Notification
         const { settings } = useSettingsStore.getState();
+        if (settings.notifications) {
+           const finalJob = useDownloadsStore.getState().jobs.find(j => j.id === jobId);
+           if (finalJob) {
+             const title = finalJob.title || "Download Complete";
+             sendDownloadCompleteNotification("Download Finished", `${title} has been downloaded successfully.`);
+           }
+        }
+
+        // Auto-clear if enabled
         if (settings.autoClearFinished) {
            setTimeout(() => {
              removeJob(jobId);
@@ -169,5 +204,43 @@ export async function startDownload(jobId: string) {
   } catch (e) {
     addLog({ level: "error", message: `Failed to spawn process: ${e}`, jobId });
     updateJob(jobId, { status: "Failed" });
+  }
+}
+
+export async function fetchMetadata(jobId: string) {
+  const { jobs, updateJob } = useDownloadsStore.getState();
+  const job = jobs.find((j) => j.id === jobId);
+  if (!job) return;
+
+  try {
+    const ytDlpPath = await getToolPath("yt-dlp");
+    
+    // Use --print to get metadata without downloading
+    // We get title and thumbnail
+    const cmd = Command.create(ytDlpPath, [
+      "--print",
+      "%(title)s:::%(thumbnail)s",
+      "--skip-download",
+      "--no-warnings",
+      "--flat-playlist",
+      job.url
+    ]);
+
+    const output = await cmd.execute();
+    
+    if (output.code === 0) {
+      const parts = output.stdout.trim().split(":::");
+      if (parts.length >= 2) {
+        const title = parts[0].trim();
+        const thumbnail = parts[1].trim();
+        
+        updateJob(jobId, { 
+          title: title || job.title, 
+          thumbnail: thumbnail 
+        });
+      }
+    }
+  } catch (e) {
+    console.error("Failed to fetch metadata:", e);
   }
 }

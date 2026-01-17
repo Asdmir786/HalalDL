@@ -266,6 +266,10 @@ async fn show_in_folder(path: String) -> Result<(), String> {
              return Err(format!("Path does not exist: {}", path));
         }
 
+        // Using "explorer /select,path" works, but sometimes quoting matters
+        // Command::new("explorer") .arg("/select,") .arg(&path) ...
+        // Let's try to be robust about it
+        
         Command::new("explorer")
             .args(["/select,", &path])
             .spawn()
@@ -292,6 +296,22 @@ async fn show_in_folder(path: String) -> Result<(), String> {
     Ok(())
 }
 
+#[tauri::command]
+async fn delete_file(path: String) -> Result<(), String> {
+    use std::fs;
+    use std::path::Path;
+    
+    let p = Path::new(&path);
+    if p.exists() {
+        if p.is_dir() {
+            fs::remove_dir_all(p).map_err(|e| e.to_string())?;
+        } else {
+            fs::remove_file(p).map_err(|e| e.to_string())?;
+        }
+    }
+    Ok(())
+}
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     tauri::Builder::default()
@@ -303,7 +323,7 @@ pub fn run() {
         .plugin(tauri_plugin_store::Builder::new().build())
         .plugin(tauri_plugin_opener::init())
         .plugin(tauri_plugin_notification::init())
-        .invoke_handler(tauri::generate_handler![greet, download_tools, add_to_user_path, show_in_folder])
+        .invoke_handler(tauri::generate_handler![greet, download_tools, add_to_user_path, show_in_folder, delete_file])
         .setup(|app| {
             let win = app.get_webview_window("main").unwrap();
             win.set_focus().unwrap();

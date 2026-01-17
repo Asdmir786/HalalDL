@@ -166,8 +166,12 @@ export function LogsScreen() {
     if (!autoScroll || !filteredLogs.length) return;
     const lastIndex = filteredLogs.length - 1;
     if (lastScrollIndex.current !== lastIndex) {
-      rowVirtualizer.scrollToIndex(lastIndex, { align: "end", behavior: "auto" });
-      lastScrollIndex.current = lastIndex;
+      try {
+        rowVirtualizer.scrollToIndex(lastIndex, { align: "end", behavior: "auto" });
+        lastScrollIndex.current = lastIndex;
+      } catch {
+        // Ignore scroll errors during rapid updates
+      }
     }
   }, [filteredLogs.length, autoScroll, rowVirtualizer]);
 
@@ -423,8 +427,7 @@ export function LogsScreen() {
                 >
                   {rowVirtualizer.getVirtualItems().map((virtualRow) => {
                     const log = filteredLogs[virtualRow.index];
-                    const line = log.message; // Keep raw formatting
-                    
+                    if (!log) return null;
                     return (
                       <div
                         key={virtualRow.key}
@@ -435,28 +438,33 @@ export function LogsScreen() {
                           log.level === "error" && "bg-red-500/5"
                         )}
                         style={{
+                          height: `${virtualRow.size}px`,
                           transform: `translateY(${virtualRow.start}px)`,
                         }}
                       >
-                         {/* Line Number / Timestamp */}
-                        <div className="shrink-0 flex flex-col items-end gap-0.5 select-none w-[85px] text-[10px] font-mono opacity-30 group-hover/line:opacity-50 transition-opacity text-right border-r border-white/5 pr-3 mr-1">
-                           <span className="text-white/60">{formatTimestamp(log.timestamp)}</span>
-                        </div>
-
-                        {/* Content */}
-                        <div className="flex-1 min-w-0 break-all whitespace-pre-wrap leading-relaxed">
-                          {log.command && (
-                             <div className="mb-1 text-[10px] text-emerald-500/80 font-bold bg-emerald-500/5 inline-block px-1.5 rounded border border-emerald-500/10 select-all">
-                                $ {log.command}
-                             </div>
-                          )}
-                          <span className={cn(
-                             LEVEL_STYLES[log.level],
-                             "selection:bg-white/20"
-                          )}>
-                             {line}
-                          </span>
-                        </div>
+                        {log ? (
+                          <>
+                            <div className="w-[140px] flex-shrink-0 text-muted-foreground/60 font-mono text-[10px] tabular-nums select-text flex flex-col justify-center">
+                              <span>{formatTimestamp(log.timestamp)}</span>
+                              {log.jobId && (
+                                <span className="text-[9px] opacity-50 truncate max-w-full" title={jobTitleById.get(log.jobId) || log.jobId}>
+                                  {jobTitleById.get(log.jobId) || log.jobId.substring(0, 8)}
+                                </span>
+                              )}
+                            </div>
+                            <div className={cn("w-16 flex-shrink-0 text-[10px] font-bold uppercase tracking-wider select-none flex items-center", LEVEL_STYLES[log.level])}>
+                              {log.level}
+                            </div>
+                            <div className="flex-1 min-w-0 font-mono text-[11px] leading-relaxed break-all whitespace-pre-wrap select-text text-foreground/90">
+                              {log.message}
+                              {log.command && (
+                                <div className="mt-1 p-2 rounded bg-background/50 border border-border/40 text-[10px] text-muted-foreground font-mono overflow-x-auto">
+                                  $ {log.command}
+                                </div>
+                              )}
+                            </div>
+                          </>
+                        ) : null}
                       </div>
                     );
                   })}

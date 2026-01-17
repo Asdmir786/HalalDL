@@ -4,14 +4,16 @@ class StorageManager {
   private settingsStore: Store | null = null;
   private presetsStore: Store | null = null;
   private logsStore: Store | null = null;
+  private downloadsStore: Store | null = null;
 
   async init() {
-    if (this.settingsStore && this.presetsStore && this.logsStore) return;
+    if (this.settingsStore && this.presetsStore && this.logsStore && this.downloadsStore) return;
 
     try {
       this.settingsStore = await load("settings.json", { autoSave: true, defaults: {} });
       this.presetsStore = await load("presets.json", { autoSave: true, defaults: {} });
       this.logsStore = await load("logs.json", { autoSave: true, defaults: {} });
+      this.downloadsStore = await load("downloads.json", { autoSave: true, defaults: {} });
       console.log("Storage initialized successfully");
     } catch (error) {
       console.error("Failed to initialize storage:", error);
@@ -49,6 +51,17 @@ class StorageManager {
     if (!this.logsStore) await this.init();
     await this.logsStore?.set("data", data);
     await this.logsStore?.save();
+  }
+
+  async getDownloads<T>(): Promise<T | null> {
+    if (!this.downloadsStore) await this.init();
+    return (await this.downloadsStore?.get<T>("data")) || null;
+  }
+
+  async saveDownloads<T>(data: T) {
+    if (!this.downloadsStore) await this.init();
+    await this.downloadsStore?.set("data", data);
+    await this.downloadsStore?.save();
   }
 }
 

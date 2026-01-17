@@ -6,12 +6,14 @@ export interface DownloadJob {
   id: string;
   url: string;
   title?: string;
+  thumbnail?: string;
   progress: number;
   speed?: string;
   eta?: string;
   status: JobStatus;
   presetId: string;
   outputPath?: string;
+  createdAt: number;
   overrides?: {
     filenameTemplate?: string;
     format?: string;
@@ -21,6 +23,8 @@ export interface DownloadJob {
 
 interface DownloadsState {
   jobs: DownloadJob[];
+  pendingUrl?: string;
+  setPendingUrl: (url: string | undefined) => void;
   addJob: (url: string, presetId: string, overrides?: DownloadJob["overrides"]) => string;
   removeJob: (id: string) => void;
   updateJob: (id: string, updates: Partial<DownloadJob>) => void;
@@ -28,6 +32,8 @@ interface DownloadsState {
 
 export const useDownloadsStore = create<DownloadsState>((set) => ({
   jobs: [], // Start empty for skeleton review
+  pendingUrl: undefined,
+  setPendingUrl: (url) => set({ pendingUrl: url }),
   addJob: (url, presetId, overrides) => {
     const id = Math.random().toString(36).substring(7);
     set((state) => ({
@@ -39,6 +45,7 @@ export const useDownloadsStore = create<DownloadsState>((set) => ({
           progress: 0,
           presetId,
           overrides,
+          createdAt: Date.now(),
         },
         ...state.jobs,
       ],

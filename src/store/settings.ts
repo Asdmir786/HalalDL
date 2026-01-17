@@ -11,6 +11,7 @@ export interface Settings {
   // Download Logic
   maxConcurrency: number;
   maxRetries: number;
+  maxSpeed: number; // in KB/s, 0 = unlimited
   fileCollision: FileCollisionAction;
   
   // Paths
@@ -19,6 +20,7 @@ export interface Settings {
 
   // Behavior
   autoClearFinished: boolean;
+  paranoidMode: boolean; // Auto-export history to backups folder
 }
 
 interface SettingsState {
@@ -33,10 +35,12 @@ export const DEFAULT_SETTINGS: Settings = {
   notifications: true,
   maxConcurrency: 2,
   maxRetries: 3,
+  maxSpeed: 0,
   fileCollision: "rename",
   defaultDownloadDir: "", 
   tempDir: "",
   autoClearFinished: false,
+  paranoidMode: false,
 };
 
 export const SETTINGS_KEYS = Object.keys(DEFAULT_SETTINGS) as (keyof Settings)[];

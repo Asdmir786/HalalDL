@@ -4,16 +4,20 @@ import { useSettingsStore, Settings } from "@/store/settings";
 import { usePresetsStore, BUILT_IN_PRESETS, Preset } from "@/store/presets";
 import { useToolsStore } from "@/store/tools";
 import { useLogsStore } from "@/store/logs";
+import { useDownloadsStore, DownloadJob } from "@/store/downloads";
 import { storage } from "@/lib/storage";
 import { checkYtDlpVersion, checkFfmpegVersion, checkAria2Version, checkDenoVersion } from "@/lib/commands";
 import { toast } from "sonner";
 import { isPermissionGranted, requestPermission, sendNotification } from '@tauri-apps/plugin-notification';
+import { documentDir, join } from "@tauri-apps/api/path";
+import { writeTextFile, mkdir, exists } from "@tauri-apps/plugin-fs";
 
 export function PersistenceManager() {
   const { settings, setSettings } = useSettingsStore();
   const { presets, setPresets } = usePresetsStore();
   const { updateTool, setDiscoveredToolId } = useToolsStore();
   const { logs } = useLogsStore();
+  const { jobs } = useDownloadsStore();
   
   const initialized = useRef(false);
 
@@ -101,6 +105,13 @@ export function PersistenceManager() {
           console.log("Presets loaded", merged.length);
         }
 
+        // Load Downloads
+        const savedDownloads = await storage.getDownloads<DownloadJob[]>();
+        if (savedDownloads && Array.isArray(savedDownloads)) {
+          useDownloadsStore.setState({ jobs: savedDownloads });
+          console.log("Downloads loaded", savedDownloads.length);
+        }
+
         // Check Tools
         await checkTools();
 
@@ -157,6 +168,43 @@ export function PersistenceManager() {
     }, 500);
     return () => clearTimeout(timer);
   }, [logs]);
+
+  // Auto-Save Downloads
+  useEffect(() => {
+    if (!initialized.current) return;
+    const timer = setTimeout(async () => {
+      try {
+        await storage.saveDownloads(jobs);
+        
+        // Paranoid Backup Mode
+        if (settings.paranoidMode) {
+          try {
+            const docs = await documentDir();
+            const backupDir = await join(docs, "HalalDL", "backups");
+            if (!(await exists(backupDir))) {
+              await mkdir(backupDir, { recursive: true });
+            }
+            
+            // We use a single rolling history file for now, or timestamped?
+            // "Paranoid" implies losing nothing. Let's do timestamped but throttled?
+            // Or just a single history.json that is guaranteed to be user accessible.
+            // Let's do a daily backup file + latest.json
+            
+            const dateStr = new Date().toISOString().split('T')[0]; // YYYY-MM-DD
+            const backupPath = await join(backupDir, `history-${dateStr}.json`);
+            
+            await writeTextFile(backupPath, JSON.stringify(jobs, null, 2));
+            console.log("Paranoid backup saved to", backupPath);
+          } catch (e) {
+            console.error("Paranoid backup failed:", e);
+          }
+        }
+      } catch (e) {
+        console.error("Failed to save downloads:", e);
+      }
+    }, 1000); // Debounce 1s
+    return () => clearTimeout(timer);
+  }, [jobs, settings.paranoidMode]);
 
   return null; // Logic only component
 }

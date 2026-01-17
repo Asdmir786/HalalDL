@@ -11,8 +11,11 @@ import { PresetsScreen } from "@/screens/PresetsScreen";
 import { ToolsScreen } from "@/screens/ToolsScreen";
 import { LogsScreen } from "@/screens/LogsScreen";
 import { SettingsScreen } from "@/screens/SettingsScreen";
+import { useTaskbarProgress } from "@/hooks/useTaskbarProgress";
+import { GlobalDragDrop } from "@/components/GlobalDragDrop";
 
 export default function App() {
+  useTaskbarProgress();
   const currentScreen = useNavigationStore((state) => state.currentScreen);
 
   const renderScreen = () => {
@@ -28,6 +31,7 @@ export default function App() {
 
   return (
     <div className="flex h-screen bg-background text-foreground overflow-hidden">
+      <GlobalDragDrop />
       <PersistenceManager />
       <Sidebar />
       <main className="flex-1 overflow-hidden relative bg-gradient-to-br from-background via-background to-secondary/20">
