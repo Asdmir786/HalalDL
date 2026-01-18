@@ -14,6 +14,7 @@ export interface DownloadJob {
   presetId: string;
   outputPath?: string;
   createdAt: number;
+  statusChangedAt?: number;
   overrides?: {
     filenameTemplate?: string;
     format?: string;
@@ -36,6 +37,7 @@ export const useDownloadsStore = create<DownloadsState>((set) => ({
   setPendingUrl: (url) => set({ pendingUrl: url }),
   addJob: (url, presetId, overrides) => {
     const id = Math.random().toString(36).substring(7);
+    const now = Date.now();
     set((state) => ({
       jobs: [
         {
@@ -45,7 +47,8 @@ export const useDownloadsStore = create<DownloadsState>((set) => ({
           progress: 0,
           presetId,
           overrides,
-          createdAt: Date.now(),
+          createdAt: now,
+          statusChangedAt: now,
         },
         ...state.jobs,
       ],
@@ -56,6 +59,16 @@ export const useDownloadsStore = create<DownloadsState>((set) => ({
     jobs: state.jobs.filter((j) => j.id !== id),
   })),
   updateJob: (id, updates) => set((state) => ({
-    jobs: state.jobs.map((j) => (j.id === id ? { ...j, ...updates } : j)),
+    jobs: state.jobs.map((j) => {
+      if (j.id !== id) return j;
+      const statusWillChange = typeof updates.status !== "undefined" && updates.status !== j.status;
+      return {
+        ...j,
+        ...updates,
+        ...(statusWillChange
+          ? { statusChangedAt: typeof updates.statusChangedAt === "number" ? updates.statusChangedAt : Date.now() }
+          : {}),
+      };
+    }),
   })),
 }));

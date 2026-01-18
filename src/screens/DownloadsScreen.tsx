@@ -1,6 +1,5 @@
-import { AnimatePresence, motion } from "framer-motion";
+import { AnimatePresence, motion, Variants } from "framer-motion";
 import { useEffect, useMemo, useState, useRef } from "react";
-import { useVirtualizer } from "@tanstack/react-virtual";
 import { open as openDialog } from "@tauri-apps/plugin-dialog";
 import { 
   Plus, 
@@ -14,7 +13,10 @@ import {
   Link,
   Copy,
   RotateCcw,
-  Play
+  Play,
+  Clock,
+  CheckCircle2,
+  AlertTriangle
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useDownloadsStore } from "@/store/downloads";
@@ -29,8 +31,6 @@ import {
   SelectTrigger, 
   SelectValue 
 } from "@/components/ui/select";
-import { Badge } from "@/components/ui/badge";
-import { Progress } from "@/components/ui/progress";
 import { revealInExplorer, deleteFile, openFile } from "@/lib/commands";
 import { startDownload, fetchMetadata } from "@/lib/downloader";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -46,10 +46,22 @@ import {
 } from "@/components/ui/context-menu";
 import { toast } from "sonner";
 
+type JobWithTimestamp = { createdAt: number; statusChangedAt?: number };
+
+function getJobTs(job: JobWithTimestamp) {
+  return (typeof job.statusChangedAt === "number" ? job.statusChangedAt : job.createdAt) || 0;
+}
+
 export function DownloadsScreen() {
+  const { settings, updateSettings } = useSettingsStore();
   const [url, setUrl] = useState("");
   const [selectedPreset, setSelectedPreset] = useState("default");
-  const [addMode, setAddMode] = useState<"queue" | "start">("queue");
+  
+  // Derived state for addMode from settings
+  const addMode = (settings as unknown as { downloadsAddMode?: "queue" | "start" }).downloadsAddMode ?? "queue";
+  const setAddMode = (mode: "queue" | "start") => {
+    updateSettings({ downloadsAddMode: mode } as unknown as Partial<typeof settings>);
+  };
   
   // Advanced Output Config State
   const [showOutputConfig, setShowOutputConfig] = useState(false);
@@ -59,80 +71,80 @@ export function DownloadsScreen() {
 
   const isCustomPreset = selectedPreset === "custom";
 
-  // Determine effective format based on preset for display/logic
-  useEffect(() => {
-    if (isCustomPreset) return;
-    
-    // Map known presets to formats for UI consistency
-    // This is a heuristic mapping for the UI
-    if (selectedPreset === "mp3") setOutputFormat("mp3");
-    else if (selectedPreset.includes("mp4")) setOutputFormat("mp4");
-    else if (selectedPreset.includes("webm")) setOutputFormat("webm");
-    else if (selectedPreset === "audio-only") setOutputFormat("best"); // Or specific audio
-    else setOutputFormat("best");
-  }, [selectedPreset, isCustomPreset]);
+  const handlePresetChange = (val: string) => {
+    setSelectedPreset(val);
+    const isCustom = val === "custom";
+    if (!isCustom) {
+      if (val === "mp3") setOutputFormat("mp3");
+      else if (val.includes("mp4")) setOutputFormat("mp4");
+      else if (val.includes("webm")) setOutputFormat("webm");
+      else if (val === "audio-only") setOutputFormat("best");
+      else setOutputFormat("best");
+    }
+  };
 
-  type StatusFilter = "all" | "active" | "queued" | "done" | "failed";
-
-  const [statusFilter, setStatusFilter] = useState<StatusFilter>("all");
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
-  const { settings, updateSettings } = useSettingsStore();
   const { jobs, addJob, removeJob, pendingUrl, setPendingUrl } = useDownloadsStore();
   const { presets } = usePresetsStore();
-  const parentRef = useRef<HTMLDivElement>(null);
   const { setActiveJobId } = useLogsStore();
   const { setScreen } = useNavigationStore();
 
   // Handle Drag & Drop Pending URL
   useEffect(() => {
     if (pendingUrl) {
-      setUrl(pendingUrl);
-      setPendingUrl(undefined);
+      setTimeout(() => {
+        setUrl(pendingUrl);
+        setPendingUrl(undefined);
+      }, 0);
     }
   }, [pendingUrl, setPendingUrl]);
 
+  const prevJobsCountRef = useRef(jobs.length);
+  // Auto-scroll logic is handled by virtualization naturally when sorted by newest
+  // We remove forced scroll-to-top to respect user scroll position
   useEffect(() => {
-    const savedAddMode =
-      (settings as unknown as { downloadsAddMode?: "queue" | "start" })
-        .downloadsAddMode;
-    const savedFilter =
-      (settings as unknown as { downloadsStatusFilter?: StatusFilter })
-        .downloadsStatusFilter;
-
-    setAddMode(savedAddMode ?? "queue");
-    setStatusFilter(savedFilter ?? "all");
-  }, [settings]);
-
-  useEffect(() => {
-    updateSettings({
-      downloadsAddMode: addMode,
-      downloadsStatusFilter: statusFilter,
-    } as unknown as Partial<typeof settings>);
-  }, [addMode, statusFilter, updateSettings]);
+    prevJobsCountRef.current = jobs.length;
+  }, [jobs.length]);
 
   // Framer Motion Variants for List Items
-  const itemVariants = {
-    initial: { opacity: 0, x: -10, scale: 0.98 },
-    animate: { opacity: 1, x: 0, scale: 1 },
+  const itemVariants: Variants = {
+    initial: { opacity: 0, y: 10, scale: 0.98 },
+    animate: { opacity: 1, y: 0, scale: 1, transition: { type: "spring", stiffness: 400, damping: 25 } },
     exit: { opacity: 0, scale: 0.95, transition: { duration: 0.2 } },
-    hover: { scale: 1.01, backgroundColor: "var(--accent)", transition: { duration: 0.2 } }
+    hover: { scale: 1.005, transition: { duration: 0.2 } }
   };
 
-  const filteredJobs = useMemo(() => {
-    let result = jobs;
-    if (statusFilter === "active") {
-      result = jobs.filter((job) => job.status === "Downloading" || job.status === "Post-processing");
-    } else if (statusFilter === "queued") {
-      result = jobs.filter((job) => job.status === "Queued");
-    } else if (statusFilter === "done") {
-      result = jobs.filter((job) => job.status === "Done");
-    } else if (statusFilter === "failed") {
-      result = jobs.filter((job) => job.status === "Failed");
-    }
-    
-    // Sort by createdAt desc (newest first)
-    return [...result].sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0));
-  }, [jobs, statusFilter]);
+  const [now, setNow] = useState(() => Date.now());
+
+  useEffect(() => {
+    const interval = setInterval(() => setNow(Date.now()), 60000);
+    return () => clearInterval(interval);
+  }, []);
+
+  const formatRelativeTime = (ts: number) => {
+    const diffMs = now - ts;
+    const diffSec = Math.floor(diffMs / 1000);
+    if (diffSec < 10) return "just now";
+    if (diffSec < 60) return `${diffSec}s ago`;
+    const diffMin = Math.floor(diffSec / 60);
+    if (diffMin < 60) return `${diffMin}m ago`;
+    const diffHr = Math.floor(diffMin / 60);
+    if (diffHr < 24) return `${diffHr}h ago`;
+    const diffDay = Math.floor(diffHr / 24);
+    if (diffDay < 7) return `${diffDay}d ago`;
+    return new Date(ts).toLocaleDateString();
+  };
+
+  const sortedJobs = useMemo(
+    () =>
+      [...jobs].sort((a, b) => {
+        const tsA = getJobTs(a);
+        const tsB = getJobTs(b);
+        return tsB - tsA; // Newest first
+      }),
+    [jobs]
+  );
+
 
   const queuedCount = useMemo(
     () => jobs.filter((job) => job.status === "Queued").length,
@@ -150,13 +162,10 @@ export function DownloadsScreen() {
     () => jobs.filter((job) => job.status === "Done").length,
     [jobs]
   );
-
-  const virtualizer = useVirtualizer({
-    count: filteredJobs.length,
-    getScrollElement: () => parentRef.current,
-    estimateSize: () => 100,
-    overscan: 5,
-  });
+  const failedCount = useMemo(
+    () => jobs.filter((job) => job.status === "Failed").length,
+    [jobs]
+  );
 
   const handleAdd = () => {
     if (!url.trim()) return;
@@ -179,15 +188,7 @@ export function DownloadsScreen() {
     // Fetch metadata (thumbnail/title) asynchronously
     fetchMetadata(id);
 
-    // Switch filter if needed to show the new job
-    if (addMode === "queue") {
-      if (statusFilter === "active" || statusFilter === "done" || statusFilter === "failed") {
-        setStatusFilter("queued");
-      }
-    } else if (addMode === "start") {
-      if (statusFilter === "queued" || statusFilter === "done" || statusFilter === "failed") {
-        setStatusFilter("active");
-      }
+    if (addMode === "start") {
       startDownload(id);
     }
     setUrl("");
@@ -305,7 +306,7 @@ export function DownloadsScreen() {
                 </div>
                 
                 <div className="flex flex-wrap gap-2 items-center justify-end">
-                  <Select value={selectedPreset} onValueChange={setSelectedPreset}>
+                  <Select value={selectedPreset} onValueChange={handlePresetChange}>
                     <SelectTrigger className="w-[140px] bg-background border-muted shadow-sm focus:ring-1 h-10">
                       <SelectValue placeholder="Preset" />
                     </SelectTrigger>
@@ -477,12 +478,16 @@ export function DownloadsScreen() {
           <div className="flex items-center justify-between pt-2 border-t border-muted/50">
             <div className="flex items-center gap-4 text-[11px] text-muted-foreground font-medium">
               <div className="flex items-center gap-1.5">
-                <div className="w-1.5 h-1.5 rounded-full bg-blue-500/50" />
+                <div className="w-1.5 h-1.5 rounded-full bg-yellow-500/60" />
                 {queuedCount} queued
               </div>
               <div className="flex items-center gap-1.5">
-                <div className="w-1.5 h-1.5 rounded-full bg-yellow-500/50" />
+                <div className="w-1.5 h-1.5 rounded-full bg-blue-500/60" />
                 {activeCount} active
+              </div>
+              <div className="flex items-center gap-1.5">
+                <div className="w-1.5 h-1.5 rounded-full bg-destructive/70" />
+                {failedCount} failed
               </div>
               <div className="flex items-center gap-1.5">
                 <div className="w-1.5 h-1.5 rounded-full bg-green-500/50" />
@@ -508,293 +513,300 @@ export function DownloadsScreen() {
 
       {/* Queue Section */}
       <FadeInItem className="flex-1 overflow-hidden flex flex-col px-8 pb-8">
-        <div className="bg-muted/10 rounded-2xl border border-muted/50 flex-1 flex flex-col overflow-hidden shadow-inner">
+        <div className="bg-black/5 rounded-2xl border border-white/5 flex-1 flex flex-col overflow-hidden shadow-inner backdrop-blur-sm">
           {jobs.length === 0 ? (
             <div className="flex-1 flex flex-col items-center justify-center text-muted-foreground p-8 text-center">
-              <div className="w-20 h-20 bg-muted/50 rounded-full flex items-center justify-center mb-6 shadow-sm border border-muted/20">
-                <Download className="w-10 h-10 opacity-20" />
-              </div>
-              <p className="text-xl font-semibold text-foreground/80 mb-2">Queue is empty</p>
-              <p className="text-sm max-w-[280px] opacity-70">
-                Media you add will appear here. We support YouTube, X, Instagram, and 1000+ more.
+              <motion.div 
+                initial={{ scale: 0.9, opacity: 0 }}
+                animate={{ scale: 1, opacity: 1 }}
+                transition={{ duration: 0.5 }}
+                className="w-24 h-24 bg-gradient-to-tr from-primary/20 to-secondary/20 rounded-full flex items-center justify-center mb-6 shadow-lg border border-white/10 backdrop-blur-md"
+              >
+                <Download className="w-10 h-10 text-primary/50" />
+              </motion.div>
+              <h3 className="text-xl font-bold text-foreground/90 mb-2 tracking-tight">Your Queue is Empty</h3>
+              <p className="text-sm max-w-[280px] text-muted-foreground/80 leading-relaxed">
+                Paste a URL above to start downloading. We support YouTube, Twitch, TikTok, and thousands more.
               </p>
             </div>
           ) : (
             <>
-              <div className="flex items-center justify-between px-4 pt-4 pb-2 gap-3">
-                <div className="flex flex-wrap items-center gap-1.5">
-                  {[
-                    { id: "all", label: "All" },
-                    { id: "active", label: "Active" },
-                    { id: "queued", label: "Queued" },
-                    { id: "done", label: "Done" },
-                    { id: "failed", label: "Failed" },
-                  ].map((item) => (
-                    <MotionButton
-                      key={item.id}
-                      type="button"
-                      variant={statusFilter === item.id ? "secondary" : "ghost"}
-                      size="sm"
-                      className="h-7 px-3 text-[10px] uppercase font-bold tracking-wider"
-                      onClick={() =>
-                        setStatusFilter(item.id as typeof statusFilter)
-                      }
-                    >
-                      {item.label}
-                    </MotionButton>
-                  ))}
-                </div>
-                <div className="flex flex-wrap items-center gap-2">
-                  <MotionButton
-                    type="button"
-                    variant="outline"
-                    size="sm"
-                    className="h-7 px-3 text-[10px] uppercase font-bold tracking-wider"
-                    disabled={!selectedIds.length}
-                    onClick={handleStartSelected}
-                  >
-                    Start selected
-                  </MotionButton>
-                  <MotionButton
-                    type="button"
-                    variant="outline"
-                    size="sm"
-                    className="h-7 px-3 text-[10px] uppercase font-bold tracking-wider"
-                    disabled={!selectedIds.length}
-                    onClick={handleRemoveSelected}
-                  >
-                    Remove selected
-                  </MotionButton>
+              <div className="flex items-center justify-end px-4 pt-4 pb-2 gap-2">
+                  <AnimatePresence>
+                    {selectedIds.length > 0 && (
+                        <motion.div
+                            initial={{ opacity: 0, x: 20 }}
+                            animate={{ opacity: 1, x: 0 }}
+                            exit={{ opacity: 0, x: 20 }}
+                            className="flex gap-2"
+                        >
+                            <MotionButton
+                                type="button"
+                                variant="secondary"
+                                size="sm"
+                                className="h-7 px-3 text-xs rounded-full shadow-sm"
+                                onClick={handleStartSelected}
+                            >
+                                Start Selected
+                            </MotionButton>
+                            <MotionButton
+                                type="button"
+                                variant="ghost"
+                                size="sm"
+                                className="h-7 px-3 text-xs rounded-full hover:bg-destructive/10 hover:text-destructive"
+                                onClick={handleRemoveSelected}
+                            >
+                                Remove
+                            </MotionButton>
+                        </motion.div>
+                    )}
+                  </AnimatePresence>
+                  
+                  <div className="flex-1" />
+
                   <MotionButton
                     type="button"
                     variant="ghost"
                     size="sm"
-                    className="h-7 px-3 text-[10px] uppercase font-bold tracking-wider text-destructive"
-                    disabled={!jobs.some((job) => job.status === "Done")}
+                    className="h-7 px-3 text-xs rounded-full text-muted-foreground hover:text-destructive hover:bg-destructive/10 transition-colors"
+                    disabled={!jobs.some((job) => job.status === "Done" || job.status === "Failed")}
                     onClick={handleClearCompleted}
                   >
-                    Clear completed
+                    Clear Completed
                   </MotionButton>
-                </div>
               </div>
-              <div 
-                ref={parentRef}
-                className="flex-1 overflow-auto p-4 pt-0"
-              >
-                <div
-                  style={{
-                    height: `${virtualizer.getTotalSize()}px`,
-                    width: "100%",
-                    position: "relative",
-                  }}
-                >
-                  <AnimatePresence mode="popLayout">
-                    {virtualizer.getVirtualItems().map((virtualRow) => {
-                      const job = filteredJobs[virtualRow.index];
-                      if (!job) return null;
+              <div className="flex-1 overflow-auto p-4 pt-0">
+                <div className="flex flex-col gap-2 relative">
+                  <AnimatePresence mode="popLayout" initial={false}>
+                    {sortedJobs.map((job) => {
+                      const ts = getJobTs(job);
+                      const relative = formatRelativeTime(ts);
+                      const absolute = new Date(ts).toLocaleString();
+
+                      const statusIcon =
+                        job.status === "Queued"
+                          ? Clock
+                          : job.status === "Failed"
+                            ? AlertTriangle
+                          : job.status === "Done"
+                            ? CheckCircle2
+                            : Download;
+
+                      const statusColor =
+                        job.status === "Queued"
+                          ? "text-yellow-500 border-yellow-500/20 bg-yellow-500/10"
+                          : job.status === "Failed"
+                            ? "text-destructive border-destructive/20 bg-destructive/10"
+                          : job.status === "Done"
+                            ? "text-emerald-500 border-emerald-500/20 bg-emerald-500/10"
+                            : "text-blue-500 border-blue-500/20 bg-blue-500/10";
+
+                      const StatusIcon = statusIcon;
+
                       return (
                         <motion.div
-                          key={job.id}
                           layout
+                          key={job.id}
                           initial="initial"
                           animate="animate"
                           exit="exit"
                           whileHover="hover"
                           variants={itemVariants}
-                          className="absolute top-0 left-0 w-full p-2"
-                          style={{
-                            height: `${virtualRow.size}px`,
-                            transform: `translateY(${virtualRow.start}px)`,
-                          }}
+                          className="w-full"
                         >
-                        <ContextMenu>
-                          <ContextMenuTrigger>
-                        {/* Inner Card Content */}
-                        <div className={cn(
-                          "glass-card rounded-xl p-4 flex gap-4 h-full relative group overflow-hidden border-l-4",
-                          job.status === "Failed" ? "border-l-destructive/50" : 
-                          job.status === "Done" ? "border-l-green-500/50" : 
-                          job.status === "Downloading" ? "border-l-blue-500/50" : "border-l-transparent"
-                        )}>
-                          {/* Animated Background Gradient for Active Downloads */}
-                          {job.status === "Downloading" && (
-                            <motion.div 
-                              className="absolute inset-0 bg-gradient-to-r from-blue-500/5 via-transparent to-blue-500/5"
-                              animate={{ x: ["-100%", "100%"] }}
-                              transition={{ repeat: Infinity, duration: 2, ease: "linear" }}
-                            />
-                          )}
-                          
-                          <div className="flex-shrink-0 pt-1 z-10">
-                            <Checkbox
-                              checked={selectedIds.includes(job.id)}
-                              onCheckedChange={() => handleToggleSelection(job.id)}
-                              className="mt-0.5"
-                            />
-                          </div>
-                          <div className="flex-1 min-w-0">
-                            <div className="flex gap-4">
-                              {job.thumbnail && (
-                                <div className="relative w-24 h-16 rounded-md overflow-hidden bg-muted/50 flex-shrink-0 border border-muted/50">
-                                  <img 
-                                    src={job.thumbnail} 
-                                    alt="Thumbnail" 
-                                    className="w-full h-full object-cover"
-                                    onError={(e) => {
-                                      // Hide image on error
-                                      (e.target as HTMLImageElement).style.display = 'none';
-                                    }}
-                                  />
-                                </div>
-                              )}
-                              <div className="flex-1 min-w-0">
-                                <div className="flex items-center justify-between mb-2">
-                                  <h4 className="font-medium truncate pr-4 text-sm select-text">
-                                    {job.title || job.url}
-                                  </h4>
-                                  <div className="flex items-center gap-2">
-                                <Badge
-                                  variant={
-                                    job.status === "Done"
-                                      ? "default"
-                                      : job.status === "Downloading"
-                                      ? "secondary"
-                                      : job.status === "Failed"
-                                      ? "destructive"
-                                      : "outline"
-                                  }
-                                  className="text-[10px] px-1.5 h-5"
-                                >
-                                  {job.status}
-                                </Badge>
-                                <MotionButton
-                                  type="button"
-                                  variant="ghost"
-                                  size="icon"
-                                  className={cn(
-                                    "w-7 h-7 text-muted-foreground hover:text-primary transition-opacity",
-                                    job.status === "Done" ? "opacity-0 pointer-events-none" : "opacity-0 group-hover:opacity-100"
-                                  )}
-                                  disabled={job.status === "Downloading" || job.status === "Done"}
-                                  onClick={() => startDownload(job.id)}
-                                >
-                                  <Download className="w-4 h-4" />
-                                </MotionButton>
-                                <MotionButton
-                                  variant="ghost"
-                                  size="icon"
-                                  className="w-7 h-7 text-muted-foreground hover:text-destructive opacity-0 group-hover:opacity-100 transition-opacity"
-                                  onClick={() => removeJob(job.id)}
-                                >
-                                  <X className="w-4 h-4" />
-                                </MotionButton>
-                                {job.status === "Failed" && (
-                                  <MotionButton
-                                    type="button"
-                                    variant="ghost"
-                                    size="icon"
-                                    className="w-7 h-7 text-muted-foreground hover:text-primary opacity-0 group-hover:opacity-100 transition-opacity"
-                                    onClick={() => handleViewLogs(job.id)}
-                                  >
-                                    <Terminal className="w-4 h-4" />
-                                  </MotionButton>
-                                )}
-                              </div>
-                            </div>
+                          <ContextMenu>
+                            <ContextMenuTrigger>
+                              <div className="group relative flex gap-4 p-3 rounded-xl border border-white/5 bg-background/40 hover:bg-background/60 hover:border-white/10 backdrop-blur-md shadow-sm transition-all duration-300">
+                                {/* Selection & Thumbnail Column */}
+                                <div className="flex items-start gap-3">
+                                  <div className="pt-1">
+                                    <Checkbox
+                                      checked={selectedIds.includes(job.id)}
+                                      onCheckedChange={() => handleToggleSelection(job.id)}
+                                      className="border-white/20 data-[state=checked]:bg-primary data-[state=checked]:border-primary"
+                                    />
+                                  </div>
 
-                            {job.status === "Downloading" && (
-                              <div className="space-y-1.5">
-                                <Progress value={job.progress} className="h-1.5" />
-                                <div className="flex justify-between text-[10px] text-muted-foreground font-medium">
-                                  <span>{job.progress}% downloaded</span>
-                                  <span>{job.speed || "0 KB/s"}</span>
+                                  <div className="relative w-28 aspect-video rounded-lg overflow-hidden bg-black/20 ring-1 ring-white/10 shadow-inner group-hover:shadow-md transition-all">
+                                    {job.thumbnail ? (
+                                      <img
+                                        src={job.thumbnail}
+                                        alt="Thumbnail"
+                                        className="w-full h-full object-cover opacity-90 group-hover:opacity-100 transition-opacity"
+                                        onError={(e) => {
+                                          (e.target as HTMLImageElement).style.display = "none";
+                                        }}
+                                      />
+                                    ) : (
+                                      <div className="w-full h-full flex items-center justify-center text-muted-foreground/20">
+                                        <Play className="w-6 h-6" />
+                                      </div>
+                                    )}
+                                    {/* Type Badge Overlay Removed */}
+                                  </div>
+                                </div>
+
+                                {/* Content Column */}
+                                <div className="flex-1 min-w-0 flex flex-col justify-between py-0.5">
+                                  {/* Header */}
+                                  <div className="flex items-start justify-between gap-4">
+                                    <div className="flex flex-col gap-0.5 min-w-0">
+                                        <h4 className="font-semibold text-sm leading-tight text-foreground/90 truncate pr-2 group-hover:text-primary transition-colors">
+                                        {job.title || job.url}
+                                        </h4>
+                                        <div className="flex items-center gap-2 text-[10px] text-muted-foreground font-medium">
+                                            <span className="flex items-center gap-1" title={absolute}>
+                                                <Clock className="w-3 h-3 opacity-70" /> {relative}
+                                            </span>
+                                            {job.outputPath && <span className="w-0.5 h-0.5 rounded-full bg-muted-foreground/50" />}
+                                            {job.outputPath && (
+                                                <span className="truncate max-w-[200px] opacity-70" title={job.outputPath}>
+                                                    {job.outputPath.split(/[/\\]/).pop()}
+                                                </span>
+                                            )}
+                                        </div>
+                                    </div>
+
+                                    <div className={cn("flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[10px] font-semibold border shadow-sm backdrop-blur-sm transition-colors", statusColor)}>
+                                        <StatusIcon className="w-3 h-3" />
+                                        <span>{job.status}</span>
+                                    </div>
+                                  </div>
+
+                                  {/* Footer: Progress or Actions */}
+                                  <div className="flex items-end justify-between gap-4 mt-2">
+                                    {/* Left Side of Footer (Empty for now, could hold tags) */}
+                                    <div className="flex-1"></div>
+
+                                    {/* Right Side: Actions / Progress */}
+                                    <div className="flex items-center gap-3">
+                                        {job.status === "Downloading" || job.status === "Post-processing" ? (
+                                        <div className="flex flex-col items-end gap-1.5 w-48">
+                                            <div className="flex items-center justify-between w-full text-[10px] font-mono font-medium text-muted-foreground">
+                                                <span className="text-foreground">{job.speed || "0 KB/s"}</span>
+                                                <span className="opacity-70">{job.eta || "--:--"}</span>
+                                            </div>
+                                            <div className="w-full h-1.5 bg-muted/50 rounded-full overflow-hidden">
+                                                <motion.div 
+                                                    className="h-full bg-gradient-to-r from-primary/80 to-primary rounded-full"
+                                                    initial={{ width: 0 }}
+                                                    animate={{ width: `${job.progress}%` }}
+                                                    transition={{ duration: 0.5, ease: "easeOut" }}
+                                                />
+                                            </div>
+                                        </div>
+                                        ) : (
+                                        <div className="flex items-center gap-1">
+                                            <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-all duration-300 transform translate-x-4 group-hover:translate-x-0">
+                                                {job.status === "Done" && (
+                                                    <MotionButton
+                                                    variant="ghost"
+                                                    size="icon"
+                                                    className="w-8 h-8 rounded-full hover:bg-primary/10 hover:text-primary transition-colors"
+                                                    onClick={(e) => {
+                                                        e.stopPropagation();
+                                                        revealInExplorer(job.outputPath || "");
+                                                    }}
+                                                    title="Show in Explorer"
+                                                    >
+                                                    <FolderOpen className="w-4 h-4" />
+                                                    </MotionButton>
+                                                )}
+
+                                                {(job.status === "Queued" || job.status === "Failed") && (
+                                                    <MotionButton
+                                                    variant="ghost"
+                                                    size="icon"
+                                                    className="w-8 h-8 rounded-full hover:bg-primary/10 hover:text-primary transition-colors"
+                                                    onClick={(e) => {
+                                                        e.stopPropagation();
+                                                        startDownload(job.id);
+                                                    }}
+                                                    title="Start Download"
+                                                    >
+                                                    <Download className="w-4 h-4" />
+                                                    </MotionButton>
+                                                )}
+
+                                                <MotionButton
+                                                    variant="ghost"
+                                                    size="icon"
+                                                    className="w-8 h-8 rounded-full hover:bg-destructive/10 hover:text-destructive transition-colors"
+                                                    onClick={(e) => {
+                                                    e.stopPropagation();
+                                                    removeJob(job.id);
+                                                    }}
+                                                    title="Remove"
+                                                >
+                                                    <X className="w-4 h-4" />
+                                                </MotionButton>
+                                            </div>
+                                        </div>
+                                        )}
+                                    </div>
+                                  </div>
                                 </div>
                               </div>
-                            )}
+                            </ContextMenuTrigger>
 
-                            <div className="flex items-center gap-3 mt-1">
-                              <span className="text-[10px] text-muted-foreground bg-muted px-1.5 py-0.5 rounded uppercase font-bold tracking-wider">
-                                {job.presetId}
-                              </span>
-                              {job.status === "Done" && (
-                                <MotionButton
-                                  variant="link"
-                                  className="h-auto p-0 text-[10px] text-primary flex items-center gap-1"
-                                  onClick={() =>
-                                    revealInExplorer(job.outputPath || "")
-                                  }
-                                >
-                                  <FolderOpen className="w-3 h-3" />
-                                  Show in Explorer
-                                </MotionButton>
+                            <ContextMenuContent className="w-48">
+                              {job.status === "Done" && job.outputPath && (
+                                <>
+                                  <ContextMenuItem onClick={() => openFile(job.outputPath!)}>
+                                    <Play className="mr-2 h-3.5 w-3.5" />
+                                    Open File
+                                  </ContextMenuItem>
+                                  <ContextMenuItem onClick={() => revealInExplorer(job.outputPath!)}>
+                                    <FolderOpen className="mr-2 h-3.5 w-3.5" />
+                                    Show in Explorer
+                                  </ContextMenuItem>
+                                  <ContextMenuSeparator />
+                                </>
                               )}
-                            </div>
-                            </div>
-                            </div>
-                          </div>
-                        </div>
-                        </ContextMenuTrigger>
-                        <ContextMenuContent className="w-48">
-                          {job.status === "Done" && job.outputPath && (
-                            <>
-                              <ContextMenuItem onClick={() => openFile(job.outputPath!)}>
-                                <Play className="mr-2 h-3.5 w-3.5" />
-                                Open File
+                              <ContextMenuItem onClick={() => handleCopyLink(job.url)}>
+                                <Link className="mr-2 h-3.5 w-3.5" />
+                                Copy Link
                               </ContextMenuItem>
-                              <ContextMenuItem onClick={() => revealInExplorer(job.outputPath!)}>
-                                <FolderOpen className="mr-2 h-3.5 w-3.5" />
-                                Show in Explorer
+                              {job.status === "Failed" && (
+                                <ContextMenuItem onClick={() => startDownload(job.id)}>
+                                  <RotateCcw className="mr-2 h-3.5 w-3.5" />
+                                  Retry
+                                </ContextMenuItem>
+                              )}
+                              <ContextMenuSeparator />
+                              <ContextMenuItem onClick={() => handleViewLogs(job.id)}>
+                                <Terminal className="mr-2 h-3.5 w-3.5" />
+                                View Logs
+                              </ContextMenuItem>
+                              <ContextMenuItem
+                                onClick={() => {
+                                  navigator.clipboard.writeText(JSON.stringify(job, null, 2));
+                                  toast.success("Job details copied");
+                                }}
+                              >
+                                <Copy className="mr-2 h-3.5 w-3.5" />
+                                Copy Debug Info
                               </ContextMenuItem>
                               <ContextMenuSeparator />
-                            </>
-                          )}
-                          <ContextMenuItem onClick={() => handleCopyLink(job.url)}>
-                            <Link className="mr-2 h-3.5 w-3.5" />
-                            Copy Link
-                          </ContextMenuItem>
-                          {job.status === "Failed" && (
-                            <ContextMenuItem onClick={() => startDownload(job.id)}>
-                              <RotateCcw className="mr-2 h-3.5 w-3.5" />
-                              Retry
-                            </ContextMenuItem>
-                          )}
-                          <ContextMenuSeparator />
-                          <ContextMenuItem onClick={() => handleViewLogs(job.id)}>
-                            <Terminal className="mr-2 h-3.5 w-3.5" />
-                            View Logs
-                          </ContextMenuItem>
-                          <ContextMenuItem 
-                            onClick={() => {
-                              navigator.clipboard.writeText(JSON.stringify(job, null, 2));
-                              toast.success("Job details copied");
-                            }}
-                          >
-                            <Copy className="mr-2 h-3.5 w-3.5" />
-                            Copy Debug Info
-                          </ContextMenuItem>
-                          <ContextMenuSeparator />
-                          {job.status === "Done" && job.outputPath && (
-                            <ContextMenuItem 
-                              className="text-destructive focus:text-destructive"
-                              onClick={() => handleDeleteFile(job.id, job.outputPath)}
-                            >
-                              <X className="mr-2 h-3.5 w-3.5" />
-                              Delete File
-                            </ContextMenuItem>
-                          )}
-                          <ContextMenuItem 
-                            className={cn(!job.outputPath && "text-destructive focus:text-destructive")}
-                            onClick={() => removeJob(job.id)}
-                          >
-                            <X className="mr-2 h-3.5 w-3.5" />
-                            Remove from List
-                          </ContextMenuItem>
-                        </ContextMenuContent>
-                        </ContextMenu>
+                              {job.status === "Done" && job.outputPath && (
+                                <ContextMenuItem
+                                  className="text-destructive focus:text-destructive"
+                                  onClick={() => handleDeleteFile(job.id, job.outputPath)}
+                                >
+                                  <X className="mr-2 h-3.5 w-3.5" />
+                                  Delete File
+                                </ContextMenuItem>
+                              )}
+                              <ContextMenuItem onClick={() => removeJob(job.id)}>
+                                <X className="mr-2 h-3.5 w-3.5" />
+                                Remove from List
+                              </ContextMenuItem>
+                            </ContextMenuContent>
+                          </ContextMenu>
                         </motion.div>
                       );
-                  })}
-                </AnimatePresence>
+                    })}
+                  </AnimatePresence>
               </div>
               </div>
             </>

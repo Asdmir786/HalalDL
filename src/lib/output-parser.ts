@@ -43,7 +43,7 @@ export class OutputParser {
     // Destination / Title
     // Standard Destination
     if (line.startsWith("[download] Destination:")) {
-      const path = line.replace("[download] Destination:", "").trim();
+      const path = this.cleanPath(line.replace("[download] Destination:", ""));
       update.outputPath = path;
       update.title = this.extractTitle(path);
       hasUpdate = true;
@@ -52,7 +52,7 @@ export class OutputParser {
     // Already Downloaded / Merged
     const destMatch = line.match(OutputParser.DESTINATION_REGEX);
     if (destMatch?.[1]) {
-      const path = destMatch[1].trim();
+      const path = this.cleanPath(destMatch[1]);
       update.outputPath = path;
       update.title = this.extractTitle(path);
       hasUpdate = true;
@@ -61,7 +61,7 @@ export class OutputParser {
     // Merger
     const mergerMatch = line.match(OutputParser.MERGER_REGEX);
     if (mergerMatch?.[1]) {
-      const path = mergerMatch[1].trim();
+      const path = this.cleanPath(mergerMatch[1]);
       update.outputPath = path;
       update.title = this.extractTitle(path);
       update.status = "Post-processing";
@@ -75,6 +75,24 @@ export class OutputParser {
     }
 
     return hasUpdate ? update : null;
+  }
+
+  private cleanPath(raw: string): string {
+    const trimmed = this.stripAnsiSimple(raw).trim().replace(/\r/g, "");
+    return trimmed.replace(/^file:\/\//i, "").replace(/^"(.*)"$/, "$1");
+  }
+
+  private stripAnsiSimple(input: string): string {
+    let out = "";
+    for (let i = 0; i < input.length; i++) {
+      if (input.charCodeAt(i) === 27 && input[i + 1] === "[") {
+        i += 2;
+        while (i < input.length && input[i] !== "m") i++;
+        continue;
+      }
+      out += input[i];
+    }
+    return out;
   }
 
   private extractTitle(path: string): string {

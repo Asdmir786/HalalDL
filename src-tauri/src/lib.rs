@@ -259,21 +259,34 @@ async fn show_in_folder(path: String) -> Result<(), String> {
     {
         use std::process::Command;
         use std::path::Path;
+        use std::os::windows::process::CommandExt;
         let path = path.replace("/", "\\");
         
-        // Verify path exists
-        if !Path::new(&path).exists() {
-             return Err(format!("Path does not exist: {}", path));
+        let p = Path::new(&path);
+        if p.exists() {
+            if p.is_dir() {
+                Command::new("explorer")
+                    .arg(&path)
+                    .spawn()
+                    .map_err(|e| e.to_string())?;
+            } else {
+                // Use raw_arg to pass the argument exactly as explorer expects it: /select,"path"
+                // This prevents Rust from quoting the entire "/select,path" string which causes explorer to fail
+                Command::new("explorer")
+                    .raw_arg(format!("/select,\"{}\"", path))
+                    .spawn()
+                    .map_err(|e| e.to_string())?;
+            }
+        } else {
+            if let Some(parent) = p.parent() {
+                Command::new("explorer")
+                    .arg(parent)
+                    .spawn()
+                    .map_err(|e| e.to_string())?;
+            } else {
+                return Err(format!("Path does not exist: {}", path));
+            }
         }
-
-        // Using "explorer /select,path" works, but sometimes quoting matters
-        // Command::new("explorer") .arg("/select,") .arg(&path) ...
-        // Let's try to be robust about it
-        
-        Command::new("explorer")
-            .args(["/select,", &path])
-            .spawn()
-            .map_err(|e| e.to_string())?;
     }
     #[cfg(target_os = "macos")]
     {
@@ -290,6 +303,45 @@ async fn show_in_folder(path: String) -> Result<(), String> {
         // Or try nautilus/dolphin/etc if known
         Command::new("xdg-open")
             .arg(std::path::Path::new(&path).parent().unwrap_or(std::path::Path::new("/")))
+            .spawn()
+            .map_err(|e| e.to_string())?;
+    }
+    Ok(())
+}
+
+#[tauri::command]
+async fn open_path(path: String) -> Result<(), String> {
+    #[cfg(target_os = "windows")]
+    {
+        use std::process::Command;
+        use std::os::windows::process::CommandExt;
+
+        fn escape_ps_single_quoted(s: &str) -> String {
+            s.replace("'", "''")
+        }
+
+        let normalized = path.replace("/", "\\");
+        let cmd = format!("Start-Process -FilePath '{}'", escape_ps_single_quoted(&normalized));
+
+        Command::new("powershell")
+            .args(["-NoProfile", "-Command", &cmd])
+            .creation_flags(0x08000000)
+            .spawn()
+            .map_err(|e| e.to_string())?;
+    }
+    #[cfg(target_os = "macos")]
+    {
+        use std::process::Command;
+        Command::new("open")
+            .arg(&path)
+            .spawn()
+            .map_err(|e| e.to_string())?;
+    }
+    #[cfg(target_os = "linux")]
+    {
+        use std::process::Command;
+        Command::new("xdg-open")
+            .arg(&path)
             .spawn()
             .map_err(|e| e.to_string())?;
     }
@@ -323,7 +375,7 @@ pub fn run() {
         .plugin(tauri_plugin_store::Builder::new().build())
         .plugin(tauri_plugin_opener::init())
         .plugin(tauri_plugin_notification::init())
-        .invoke_handler(tauri::generate_handler![greet, download_tools, add_to_user_path, show_in_folder, delete_file])
+        .invoke_handler(tauri::generate_handler![greet, download_tools, add_to_user_path, show_in_folder, open_path, delete_file])
         .setup(|app| {
             let win = app.get_webview_window("main").unwrap();
             win.set_focus().unwrap();

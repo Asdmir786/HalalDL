@@ -5,6 +5,7 @@ import { invoke } from "@tauri-apps/api/core";
 import { open as openDialog } from "@tauri-apps/plugin-dialog";
 import { revealItemInDir, openPath } from "@tauri-apps/plugin-opener";
 import { useLogsStore } from "@/store/logs";
+import { toast } from "sonner";
 
 async function getToolPath(baseName: string): Promise<string> {
   // 1. Check local bin folder first
@@ -99,7 +100,7 @@ export async function pickFile(): Promise<string | null> {
 
 export async function revealInExplorer(path: string) {
   if (!path) return;
-  const resolved = path.trim();
+  const resolved = normalizeFsPath(path);
   const { addLog } = useLogsStore.getState();
 
   addLog({ 
@@ -108,37 +109,100 @@ export async function revealInExplorer(path: string) {
     command: `invoke("show_in_folder", { path: "${resolved}" })`
   });
 
-  if (await exists(resolved)) {
-    try {
-      addLog({ level: "debug", message: "Path exists, calling Rust command..." });
-      await invoke("show_in_folder", { path: resolved });
-      addLog({ level: "info", message: "Successfully executed show_in_folder" });
-    } catch (e) {
-      const errorMessage = e instanceof Error ? e.message : String(e);
-      addLog({ 
-        level: "warn", 
-        message: `show_in_folder failed: ${errorMessage}. Falling back to revealItemInDir`,
-        command: `revealItemInDir("${resolved}")`
-      });
-      console.warn("show_in_folder failed, falling back to revealItemInDir", e);
-      await revealItemInDir(resolved);
-    }
+  try {
+    await invoke("show_in_folder", { path: resolved });
+    addLog({ level: "info", message: "Successfully executed show_in_folder" });
     return;
+  } catch (e) {
+    const errorMessage = e instanceof Error ? e.message : String(e);
+    addLog({ 
+      level: "warn", 
+      message: `show_in_folder failed: ${errorMessage}. Falling back to revealItemInDir`,
+      command: `revealItemInDir("${resolved}")`
+    });
   }
-  
-  addLog({ level: "warn", message: "Path does not exist, opening parent directory", command: `openPath("${await dirname(resolved)}")` });
-  const dir = await dirname(resolved);
-  await openPath(dir);
+
+  try {
+    await revealItemInDir(resolved);
+    addLog({ level: "info", message: "Successfully executed revealItemInDir" });
+    return;
+  } catch (e) {
+    const errorMessage = e instanceof Error ? e.message : String(e);
+    addLog({ level: "warn", message: `revealItemInDir failed: ${errorMessage}. Falling back to openPath(parent)` });
+  }
+
+  try {
+    const dir = await dirname(resolved);
+    await openPath(dir);
+    addLog({ level: "info", message: "Successfully opened parent directory" });
+  } catch (e) {
+    const errorMessage = e instanceof Error ? e.message : String(e);
+    addLog({ level: "error", message: `Failed to reveal path: ${errorMessage}` });
+    toast.error(`Failed to show in Explorer: ${errorMessage}`);
+  }
 }
 
 export async function openFolder(path: string) {
-  await openPath(path);
+  if (!path) return;
+  const resolved = normalizeFsPath(path);
+  const { addLog } = useLogsStore.getState();
+  try {
+    await openPath(resolved);
+    addLog({ level: "info", message: `Opened folder: ${resolved}` });
+  } catch (e) {
+    const errorMessage = e instanceof Error ? e.message : String(e);
+    addLog({ level: "error", message: `openPath failed: ${errorMessage}`, command: `invoke("open_path", { path: "${resolved}" })` });
+    try {
+      await invoke("open_path", { path: resolved });
+    } catch (e2) {
+      const msg2 = e2 instanceof Error ? e2.message : String(e2);
+      toast.error(`Failed to open folder: ${msg2}`);
+    }
+  }
 }
 
 export async function openFile(path: string) {
-  await openPath(path);
+  if (!path) return;
+  const resolved = normalizeFsPath(path);
+  const { addLog } = useLogsStore.getState();
+  try {
+    await openPath(resolved);
+    addLog({ level: "info", message: `Opened file: ${resolved}` });
+  } catch (e) {
+    const errorMessage = e instanceof Error ? e.message : String(e);
+    addLog({ level: "error", message: `openPath failed: ${errorMessage}`, command: `invoke("open_path", { path: "${resolved}" })` });
+    try {
+      await invoke("open_path", { path: resolved });
+    } catch (e2) {
+      const msg2 = e2 instanceof Error ? e2.message : String(e2);
+      toast.error(`Failed to open file: ${msg2}`);
+    }
+  }
 }
 
 export async function deleteFile(path: string) {
   await invoke("delete_file", { path });
+}
+
+function normalizeFsPath(path: string): string {
+  const trimmed = path.trim();
+  const unquoted =
+    (trimmed.startsWith('"') && trimmed.endsWith('"')) ||
+    (trimmed.startsWith("'") && trimmed.endsWith("'"))
+      ? trimmed.slice(1, -1)
+      : trimmed;
+  return stripAnsiSimple(unquoted).replace(/\r/g, "").replace(/^file:\/\//i, "");
+}
+
+function stripAnsiSimple(input: string): string {
+  let out = "";
+  for (let i = 0; i < input.length; i++) {
+    if (input.charCodeAt(i) === 27 && input[i + 1] === "[") {
+      i += 2;
+      while (i < input.length && input[i] !== "m") i++;
+      continue;
+    }
+    out += input[i];
+  }
+  return out;
 }

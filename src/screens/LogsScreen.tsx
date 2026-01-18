@@ -438,7 +438,6 @@ export function LogsScreen() {
                           log.level === "error" && "bg-red-500/5"
                         )}
                         style={{
-                          height: `${virtualRow.size}px`,
                           transform: `translateY(${virtualRow.start}px)`,
                         }}
                       >

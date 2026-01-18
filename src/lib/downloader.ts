@@ -115,7 +115,7 @@ export async function startDownload(jobId: string) {
   }
 
   // Ensure consistent behavior: ignore global config and force newline output for logs
-  args.push("--ignore-config", "--newline", "--no-playlist");
+  args.push("--ignore-config", "--newline", "--no-colors", "--no-playlist");
 
   // Speed Limit
   if (settings.maxSpeed && settings.maxSpeed > 0) {
@@ -223,6 +223,7 @@ export async function fetchMetadata(jobId: string) {
       "--skip-download",
       "--no-warnings",
       "--flat-playlist",
+      "--referer", job.url, // Helps with some sites like Instagram
       job.url
     ]);
 
