@@ -135,6 +135,7 @@ export async function startDownload(jobId: string) {
       addLog({ level: "info", message: `Process finished with code ${data.code}`, jobId });
       if (data.code === 0) {
         updateJob(jobId, { status: "Done", progress: 100 });
+        fetchMetadata(jobId);
         
         // Send Notification
         const { settings } = useSettingsStore.getState();
@@ -214,16 +215,13 @@ export async function fetchMetadata(jobId: string) {
 
   try {
     const ytDlpPath = await getToolPath("yt-dlp");
-    
-    // Use --print to get metadata without downloading
-    // We get title and thumbnail
     const cmd = Command.create(ytDlpPath, [
       "--print",
       "%(title)s:::%(thumbnail)s",
       "--skip-download",
       "--no-warnings",
       "--flat-playlist",
-      "--referer", job.url, // Helps with some sites like Instagram
+      "--referer", job.url,
       job.url
     ]);
 
@@ -233,15 +231,15 @@ export async function fetchMetadata(jobId: string) {
       const parts = output.stdout.trim().split(":::");
       if (parts.length >= 2) {
         const title = parts[0].trim();
-        const thumbnail = parts[1].trim();
-        
+        const thumbnailUrl = parts[1].trim();
+
         updateJob(jobId, { 
           title: title || job.title, 
-          thumbnail: thumbnail 
+          thumbnail: thumbnailUrl || undefined,
         });
       }
     }
   } catch (e) {
-    console.error("Failed to fetch metadata:", e);
+    useLogsStore.getState().addLog({ level: "error", message: `[meta] Failed to fetch metadata: ${e}`, jobId });
   }
 }

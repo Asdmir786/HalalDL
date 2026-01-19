@@ -674,76 +674,70 @@ export function DownloadsScreen() {
                                   </div>
 
                                   {/* Footer: Progress or Actions */}
-                                  <div className="flex items-end justify-between gap-4 mt-2">
-                                    {/* Left Side of Footer (Empty for now, could hold tags) */}
-                                    <div className="flex-1"></div>
-
-                                    {/* Right Side: Actions / Progress */}
-                                    <div className="flex items-center gap-3">
-                                        {job.status === "Downloading" || job.status === "Post-processing" ? (
-                                        <div className="flex flex-col items-end gap-1.5 w-48">
-                                            <div className="flex items-center justify-between w-full text-[10px] font-mono font-medium text-muted-foreground">
-                                                <span className="text-foreground">{job.speed || "0 KB/s"}</span>
-                                                <span className="opacity-70">{job.eta || "--:--"}</span>
-                                            </div>
-                                            <div className="w-full h-1.5 bg-muted/50 rounded-full overflow-hidden">
-                                                <motion.div 
-                                                    className="h-full bg-gradient-to-r from-primary/80 to-primary rounded-full"
-                                                    initial={{ width: 0 }}
-                                                    animate={{ width: `${job.progress}%` }}
-                                                    transition={{ duration: 0.5, ease: "easeOut" }}
-                                                />
-                                            </div>
+                                  <div className="mt-2">
+                                    {job.status === "Downloading" || job.status === "Post-processing" ? (
+                                      <div className="flex flex-col gap-1.5 w-full">
+                                        <div className="flex items-center justify-between w-full text-[10px] font-mono font-medium text-muted-foreground">
+                                          <span className="text-foreground">{job.speed || "0 KB/s"}</span>
+                                          <span className="opacity-70">{job.eta || "--:--"}</span>
                                         </div>
-                                        ) : (
-                                        <div className="flex items-center gap-1">
-                                            <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-all duration-300 transform translate-x-4 group-hover:translate-x-0">
-                                                {job.status === "Done" && (
-                                                    <MotionButton
-                                                    variant="ghost"
-                                                    size="icon"
-                                                    className="w-8 h-8 rounded-full hover:bg-primary/10 hover:text-primary transition-colors"
-                                                    onClick={(e) => {
-                                                        e.stopPropagation();
-                                                        revealInExplorer(job.outputPath || "");
-                                                    }}
-                                                    title="Show in Explorer"
-                                                    >
-                                                    <FolderOpen className="w-4 h-4" />
-                                                    </MotionButton>
-                                                )}
-
-                                                {(job.status === "Queued" || job.status === "Failed") && (
-                                                    <MotionButton
-                                                    variant="ghost"
-                                                    size="icon"
-                                                    className="w-8 h-8 rounded-full hover:bg-primary/10 hover:text-primary transition-colors"
-                                                    onClick={(e) => {
-                                                        e.stopPropagation();
-                                                        startDownload(job.id);
-                                                    }}
-                                                    title="Start Download"
-                                                    >
-                                                    <Download className="w-4 h-4" />
-                                                    </MotionButton>
-                                                )}
-
-                                                <MotionButton
-                                                    variant="ghost"
-                                                    size="icon"
-                                                    className="w-8 h-8 rounded-full hover:bg-destructive/10 hover:text-destructive transition-colors"
-                                                    onClick={(e) => {
-                                                    e.stopPropagation();
-                                                    removeJob(job.id);
-                                                    }}
-                                                    title="Remove"
-                                                >
-                                                    <X className="w-4 h-4" />
-                                                </MotionButton>
-                                            </div>
+                                        <div className="w-full h-1.5 bg-muted/50 rounded-full overflow-hidden">
+                                          <motion.div 
+                                            className="h-full bg-gradient-to-r from-primary/80 to-primary rounded-full"
+                                            initial={{ width: 0 }}
+                                            animate={{ width: `${job.progress}%` }}
+                                            transition={{ duration: 0.5, ease: "easeOut" }}
+                                          />
                                         </div>
-                                        )}
-                                    </div>
+                                      </div>
+                                    ) : (
+                                      <div className="flex items-center justify-end gap-1">
+                                        <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-all duration-300 transform translate-x-4 group-hover:translate-x-0">
+                                          {job.status === "Done" && (
+                                            <MotionButton
+                                              variant="ghost"
+                                              size="icon"
+                                              className="w-8 h-8 rounded-full hover:bg-primary/10 hover:text-primary transition-colors"
+                                              onClick={(e) => {
+                                                e.stopPropagation();
+                                                revealInExplorer(job.outputPath || "");
+                                              }}
+                                              title="Show in Explorer"
+                                            >
+                                              <FolderOpen className="w-4 h-4" />
+                                            </MotionButton>
+                                          )}
+
+                                          {(job.status === "Queued" || job.status === "Failed") && (
+                                            <MotionButton
+                                              variant="ghost"
+                                              size="icon"
+                                              className="w-8 h-8 rounded-full hover:bg-primary/10 hover:text-primary transition-colors"
+                                              onClick={(e) => {
+                                                e.stopPropagation();
+                                                startDownload(job.id);
+                                              }}
+                                              title="Start Download"
+                                            >
+                                              <Download className="w-4 h-4" />
+                                            </MotionButton>
+                                          )}
+
+                                          <MotionButton
+                                            variant="ghost"
+                                            size="icon"
+                                            className="w-8 h-8 rounded-full hover:bg-destructive/10 hover:text-destructive transition-colors"
+                                            onClick={(e) => {
+                                              e.stopPropagation();
+                                              removeJob(job.id);
+                                            }}
+                                            title="Remove"
+                                          >
+                                            <X className="w-4 h-4" />
+                                          </MotionButton>
+                                        </div>
+                                      </div>
+                                    )}
                                   </div>
                                 </div>
                               </div>

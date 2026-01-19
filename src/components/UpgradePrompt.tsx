@@ -56,9 +56,23 @@ export function UpgradePrompt() {
 
   const totalSize = selectedTools.reduce((acc, id) => acc + (TOOL_SIZES[id] || 0), 0);
 
+  // Reset state when dialog closes
   useEffect(() => {
-    // Show prompt if ANY tool is missing
-    const missingTools = tools.filter(t => t.status === "Missing");
+    if (!open) {
+      const timer = setTimeout(() => {
+        setIsDownloading(false);
+        setProgress(0);
+        setCurrentTool("");
+        setStatusText("");
+        setLogs([]);
+        setError(null);
+      }, 300); // Wait for exit animation
+      return () => clearTimeout(timer);
+    }
+  }, [open]);
+
+  useEffect(() => {
+    const missingTools = tools.filter((t) => t.status === "Missing" && t.required);
     
     if (missingTools.length > 0) {
        // In Full Mode, we force open. In Lite, we also auto-open but allow closing.
@@ -99,7 +113,6 @@ export function UpgradePrompt() {
 
   const handleFinish = async () => {
     try {
-      // Final check of tools before finishing
       const checkTool = async (id: string, checkFn: () => Promise<string | null>) => {
         const version = await checkFn();
         if (version) {
@@ -115,31 +128,16 @@ export function UpgradePrompt() {
         checkTool("aria2", checkAria2Version),
         checkTool("deno", checkDenoVersion),
       ]);
-
-      const anyDetected = results.some(r => r);
-      
-      if (anyDetected) {
-        // Find the first tool we just downloaded to show in the success modal
-        const firstDownloaded = selectedTools[0];
-        setDiscoveredToolId(firstDownloaded || "yt-dlp");
-        setOpen(false);
-        
-        // Try to add to PATH in background
-        try {
-          await invoke("add_to_user_path");
-        } catch (e) {
-          console.warn("Failed to add to PATH", e);
-        }
-        
-        return; // Don't relaunch if we want to show the success modal
-      }
-
-      // Fallback to relaunch if something went wrong or no tools detected
       try {
         await invoke("add_to_user_path");
       } catch (error) {
         console.error("Failed to add to PATH:", error);
       }
+      if (results.some(Boolean)) {
+        const firstDownloaded = selectedTools[0];
+        setDiscoveredToolId(firstDownloaded || "yt-dlp");
+      }
+      setOpen(false);
       await relaunch();
     } catch (error) {
       console.error("Failed to finish setup:", error);
