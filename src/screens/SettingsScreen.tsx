@@ -187,10 +187,30 @@ export function SettingsScreen() {
 
   const handleGlobalReset = useCallback(async () => {
     const defaults = resolvedDefaults ?? (await resolveDefaultSettings());
+    
+    // Calculate what changed
+    const changedKeys: string[] = [];
+    for (const key of SETTINGS_KEYS) {
+        if (!Object.is(settings[key], defaults[key])) {
+            // Convert camelCase to readable format
+            const readable = key.replace(/([A-Z])/g, ' $1').replace(/^./, str => str.toUpperCase());
+            changedKeys.push(readable);
+        }
+    }
+
     setSettings(defaults);
     setEdits({});
-    toast.info("Settings restored to defaults");
-  }, [resolvedDefaults, setSettings]);
+    
+    if (changedKeys.length > 0) {
+        toast.info("Settings restored to defaults", {
+            description: `Reset: ${changedKeys.join(", ")}`
+        });
+    } else {
+        toast.info("Settings restored to defaults", {
+            description: "No changes were needed."
+        });
+    }
+  }, [resolvedDefaults, setSettings, settings]);
 
   const setDraftFromSettings = useCallback(
     (nextDraft: Settings) => {
@@ -416,6 +436,19 @@ export function SettingsScreen() {
               <Switch
                 checked={draftSettings.autoClearFinished}
                 onCheckedChange={(checked) => setDraftValue("autoClearFinished", checked)}
+              />
+            </div>
+
+            <Separator />
+
+            <div className="flex items-center justify-between">
+              <div className="space-y-0.5">
+                <Label>Auto-Copy File</Label>
+                <p className="text-sm text-muted-foreground">Automatically copy the downloaded file to clipboard.</p>
+              </div>
+              <Switch
+                checked={draftSettings.autoCopyFile}
+                onCheckedChange={(checked) => setDraftValue("autoCopyFile", checked)}
               />
             </div>
 

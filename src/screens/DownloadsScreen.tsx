@@ -31,7 +31,7 @@ import {
   SelectTrigger, 
   SelectValue 
 } from "@/components/ui/select";
-import { revealInExplorer, deleteFile, openFile } from "@/lib/commands";
+import { revealInExplorer, deleteFile, openFile, copyFilesToClipboard } from "@/lib/commands";
 import { startDownload, fetchMetadata } from "@/lib/downloader";
 import { Checkbox } from "@/components/ui/checkbox";
 import { useSettingsStore } from "@/store/settings";
@@ -266,6 +266,16 @@ export function DownloadsScreen() {
   const handleCopyLink = (url: string) => {
     navigator.clipboard.writeText(url);
     toast.success("Link copied to clipboard");
+  };
+
+  const handleCopyFile = async (path: string) => {
+    try {
+      await copyFilesToClipboard([path]);
+      toast.success("File copied to clipboard");
+    } catch (e) {
+      const message = e instanceof Error ? e.message : String(e);
+      toast.error(`Failed to copy file: ${message}`);
+    }
   };
 
   const handleDeleteFile = async (jobId: string, path?: string) => {
@@ -753,6 +763,10 @@ export function DownloadsScreen() {
                                   <ContextMenuItem onClick={() => revealInExplorer(job.outputPath!)}>
                                     <FolderOpen className="mr-2 h-3.5 w-3.5" />
                                     Show in Explorer
+                                  </ContextMenuItem>
+                                  <ContextMenuItem onClick={() => handleCopyFile(job.outputPath!)}>
+                                    <Copy className="mr-2 h-3.5 w-3.5" />
+                                    Copy File
                                   </ContextMenuItem>
                                   <ContextMenuSeparator />
                                 </>

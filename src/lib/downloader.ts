@@ -6,6 +6,7 @@ import { useSettingsStore } from "@/store/settings";
 import { appDataDir, join } from "@tauri-apps/api/path";
 import { exists } from "@tauri-apps/plugin-fs";
 import { OutputParser } from "@/lib/output-parser";
+import { copyFilesToClipboard } from "@/lib/commands";
 
 import { sendNotification, requestPermission, isPermissionGranted } from '@tauri-apps/plugin-notification';
 
@@ -139,12 +140,18 @@ export async function startDownload(jobId: string) {
         
         // Send Notification
         const { settings } = useSettingsStore.getState();
-        if (settings.notifications) {
-           const finalJob = useDownloadsStore.getState().jobs.find(j => j.id === jobId);
-           if (finalJob) {
+        const finalJob = useDownloadsStore.getState().jobs.find(j => j.id === jobId);
+        
+        if (settings.notifications && finalJob) {
              const title = finalJob.title || "Download Complete";
              sendDownloadCompleteNotification("Download Finished", `${title} has been downloaded successfully.`);
-           }
+        }
+
+        // Auto-Copy File
+        if (settings.autoCopyFile && finalJob?.outputPath) {
+            copyFilesToClipboard([finalJob.outputPath]).catch(e => {
+                addLog({ level: "error", message: `Auto-copy failed: ${e}`, jobId });
+            });
         }
 
         // Auto-clear if enabled

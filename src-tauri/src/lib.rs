@@ -364,6 +364,142 @@ async fn delete_file(path: String) -> Result<(), String> {
     Ok(())
 }
 
+#[tauri::command]
+fn copy_files_to_clipboard(paths: Vec<String>) -> Result<(), String> {
+    #[cfg(target_os = "windows")]
+    {
+        use std::ffi::OsStr;
+        use std::mem::{size_of, MaybeUninit};
+        use std::os::windows::ffi::OsStrExt;
+        use std::ptr;
+        use windows_sys::Win32::Foundation::GetLastError;
+        use windows_sys::Win32::System::DataExchange::{CloseClipboard, EmptyClipboard, OpenClipboard, RegisterClipboardFormatW, SetClipboardData};
+        use windows_sys::Win32::System::Memory::{GlobalAlloc, GlobalLock, GlobalUnlock, GMEM_MOVEABLE, GMEM_ZEROINIT};
+
+        extern "system" {
+            fn GlobalFree(hMem: *mut core::ffi::c_void) -> *mut core::ffi::c_void;
+        }
+
+        const CF_HDROP: u32 = 0x000F;
+
+        if paths.is_empty() {
+            return Err("No files provided".to_string());
+        }
+
+        #[repr(C)]
+        struct Point {
+            x: i32,
+            y: i32,
+        }
+
+        #[repr(C)]
+        struct DropFiles {
+            p_files: u32,
+            pt: Point,
+            f_nc: i32,
+            f_wide: i32,
+        }
+
+        let mut wide_list: Vec<u16> = Vec::new();
+        for path in &paths {
+            let normalized = path.trim().replace('/', "\\");
+            if normalized.is_empty() {
+                continue;
+            }
+            wide_list.extend(OsStr::new(&normalized).encode_wide());
+            wide_list.push(0);
+        }
+        wide_list.push(0);
+
+        if wide_list.len() <= 1 {
+            return Err("No valid files provided".to_string());
+        }
+
+        let dropfiles_size = size_of::<DropFiles>();
+        let bytes_size = dropfiles_size + (wide_list.len() * size_of::<u16>());
+
+        unsafe {
+            let hglobal = GlobalAlloc((GMEM_MOVEABLE | GMEM_ZEROINIT) as u32, bytes_size);
+            if hglobal == std::ptr::null_mut() {
+                return Err(format!("GlobalAlloc failed: {}", GetLastError()));
+            }
+
+            let locked = GlobalLock(hglobal) as *mut u8;
+            if locked.is_null() {
+                GlobalFree(hglobal);
+                return Err(format!("GlobalLock failed: {}", GetLastError()));
+            }
+
+            let mut header = MaybeUninit::<DropFiles>::zeroed();
+            header.write(DropFiles {
+                p_files: dropfiles_size as u32,
+                pt: Point { x: 0, y: 0 },
+                f_nc: 0,
+                f_wide: 1,
+            });
+            ptr::copy_nonoverlapping(
+                header.as_ptr() as *const u8,
+                locked,
+                dropfiles_size,
+            );
+
+            let dest = locked.add(dropfiles_size) as *mut u16;
+            ptr::copy_nonoverlapping(wide_list.as_ptr(), dest, wide_list.len());
+
+            GlobalUnlock(hglobal);
+
+            if OpenClipboard(std::ptr::null_mut()) == 0 {
+                GlobalFree(hglobal);
+                return Err(format!("OpenClipboard failed: {}", GetLastError()));
+            }
+
+            if EmptyClipboard() == 0 {
+                CloseClipboard();
+                GlobalFree(hglobal);
+                return Err(format!("EmptyClipboard failed: {}", GetLastError()));
+            }
+
+            if SetClipboardData(CF_HDROP, hglobal) == std::ptr::null_mut() {
+                CloseClipboard();
+                GlobalFree(hglobal);
+                return Err(format!("SetClipboardData(CF_HDROP) failed: {}", GetLastError()));
+            }
+
+            let format_name: Vec<u16> = OsStr::new("Preferred DropEffect")
+                .encode_wide()
+                .chain(std::iter::once(0))
+                .collect();
+            let format_id = RegisterClipboardFormatW(format_name.as_ptr());
+            if format_id != 0 {
+                let effect_bytes_size = size_of::<u32>();
+                let hglobal_effect = GlobalAlloc((GMEM_MOVEABLE | GMEM_ZEROINIT) as u32, effect_bytes_size);
+                if !hglobal_effect.is_null() {
+                    let effect_locked = GlobalLock(hglobal_effect) as *mut u32;
+                    if !effect_locked.is_null() {
+                        *effect_locked = 1;
+                        GlobalUnlock(hglobal_effect);
+                        if SetClipboardData(format_id, hglobal_effect) == std::ptr::null_mut() {
+                            GlobalFree(hglobal_effect);
+                        }
+                    } else {
+                        GlobalFree(hglobal_effect);
+                    }
+                }
+            }
+
+            CloseClipboard();
+        }
+
+        Ok(())
+    }
+
+    #[cfg(not(target_os = "windows"))]
+    {
+        let _ = paths;
+        Err("copy_files_to_clipboard is only supported on Windows".to_string())
+    }
+}
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     tauri::Builder::default()
@@ -375,7 +511,7 @@ pub fn run() {
         .plugin(tauri_plugin_store::Builder::new().build())
         .plugin(tauri_plugin_opener::init())
         .plugin(tauri_plugin_notification::init())
-        .invoke_handler(tauri::generate_handler![greet, download_tools, add_to_user_path, show_in_folder, open_path, delete_file])
+        .invoke_handler(tauri::generate_handler![greet, download_tools, add_to_user_path, show_in_folder, open_path, delete_file, copy_files_to_clipboard])
         .setup(|app| {
             let win = app.get_webview_window("main").unwrap();
             win.set_focus().unwrap();

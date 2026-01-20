@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.3.3 - 2026-01-20
+- **Power Features**: Added "Auto-Copy File" to settings. Automatically copies the downloaded file to the clipboard upon completion.
+- **Power Features**: Added "Copy File" context menu item to copy the downloaded file directly to the clipboard (like Windows Explorer).
+- **Settings**: Improved "Restore Defaults" to show a detailed summary of what settings were reset.
+- **Fixes**: Fixed missing "Copy File" and "Show in Explorer" context menu options by improving output parsing to reliably capture file paths.
+- **Fixes**: Fixed Rust compiler warnings related to Windows clipboard integration.
+
 ## 0.3.2 - 2026-01-19
 - **UI/UX**: Enhanced Downloads screen with a "Cinematic" glassmorphism design, smoother animations, and refined typography.
 - **UI/UX**: Cleaned up download list items (removed redundant badges, improved layout).

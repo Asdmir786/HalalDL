@@ -180,6 +180,12 @@ export async function openFile(path: string) {
   }
 }
 
+export async function copyFilesToClipboard(paths: string[]) {
+  const resolved = paths.map(normalizeFsPath).filter(Boolean);
+  if (!resolved.length) return;
+  await invoke("copy_files_to_clipboard", { paths: resolved });
+}
+
 export async function deleteFile(path: string) {
   await invoke("delete_file", { path });
 }

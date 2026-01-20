@@ -20,6 +20,7 @@ export interface Settings {
 
   // Behavior
   autoClearFinished: boolean;
+  autoCopyFile: boolean;
   paranoidMode: boolean; // Auto-export history to backups folder
 }
 
@@ -40,6 +41,7 @@ export const DEFAULT_SETTINGS: Settings = {
   defaultDownloadDir: "", 
   tempDir: "",
   autoClearFinished: false,
+  autoCopyFile: false,
   paranoidMode: false,
 };
 

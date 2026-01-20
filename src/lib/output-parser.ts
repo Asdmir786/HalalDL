@@ -12,7 +12,8 @@ export class OutputParser {
   private static PROGRESS_REGEX = /\[download\]\s+(\d+\.\d+)%/;
   private static SPEED_REGEX = /at\s+([\d.]+\w+\/s)/;
   private static ETA_REGEX = /ETA\s+(\d+:\d+)/;
-  private static DESTINATION_REGEX = /\[download\]\s+(?:Destination:|.*has already been downloaded and merged into)\s+(.*)$/;
+  private static DESTINATION_REGEX = /\[download\]\s+(?:Destination:|.*has already been downloaded(?: and merged into)?)\s+(.*)$/;
+  private static ALREADY_DOWNLOADED_REGEX = /\[download\]\s+(.*?)\s+has already been downloaded$/;
   private static MERGER_REGEX = /^\[Merger\] Merging formats into "(.*)"\s*$/;
 
   parse(line: string): DownloadUpdate | null {
@@ -53,6 +54,15 @@ export class OutputParser {
     const destMatch = line.match(OutputParser.DESTINATION_REGEX);
     if (destMatch?.[1]) {
       const path = this.cleanPath(destMatch[1]);
+      update.outputPath = path;
+      update.title = this.extractTitle(path);
+      hasUpdate = true;
+    }
+
+    // Explicit "has already been downloaded"
+    const alreadyMatch = line.match(OutputParser.ALREADY_DOWNLOADED_REGEX);
+    if (alreadyMatch?.[1]) {
+      const path = this.cleanPath(alreadyMatch[1]);
       update.outputPath = path;
       update.title = this.extractTitle(path);
       hasUpdate = true;
