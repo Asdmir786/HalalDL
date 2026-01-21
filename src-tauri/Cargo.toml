@@ -36,3 +36,9 @@ indicator = "0.3"
 sevenz-rust = "0.6"
 tauri-plugin-process = "2.3.1"
 windows-sys = { version = "0.59", features = ["Win32_Foundation", "Win32_System_DataExchange", "Win32_System_Memory", "Win32_UI_WindowsAndMessaging"] }
+
+[profile.release]
+lto = "thin"        # Fast Link Time Optimization (huge speedup vs true)
+codegen-units = 16  # Maximize parallelism (uses all threads)
+panic = "abort"     # Remove stack unwinding (smaller binary, faster build)
+strip = true        # Strip symbols (smaller binary)

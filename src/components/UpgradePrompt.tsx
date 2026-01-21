@@ -53,6 +53,11 @@ export function UpgradePrompt() {
   const { tools, updateTool, setDiscoveredToolId } = useToolsStore();
   const { addLog } = useLogsStore();
   const isFullMode = import.meta.env.VITE_APP_MODE === 'FULL';
+  
+  // Check if we have strictly required tools missing (yt-dlp)
+  const hasMissingRequired = tools.some((t) => t.status === "Missing" && t.required);
+  // If we have required missing tools, or we are in Full Mode, the dialog is mandatory.
+  const isMandatory = isFullMode || hasMissingRequired;
 
   const totalSize = selectedTools.reduce((acc, id) => acc + (TOOL_SIZES[id] || 0), 0);
 
@@ -72,17 +77,16 @@ export function UpgradePrompt() {
   }, [open]);
 
   useEffect(() => {
-    const missingTools = tools.filter((t) => t.status === "Missing" && t.required);
+    const missingTools = tools.filter((t) => t.status === "Missing");
     
     if (missingTools.length > 0) {
-       // In Full Mode, we force open. In Lite, we also auto-open but allow closing.
        const timer = setTimeout(() => {
          setSelectedTools(prev => {
            if (prev.length === 0) return missingTools.map(t => t.id);
            return prev;
          });
          setOpen(true);
-       }, 1000);
+       }, 2500);
        return () => clearTimeout(timer);
     }
   }, [tools]);
@@ -186,28 +190,36 @@ export function UpgradePrompt() {
     <Dialog 
       open={open} 
       onOpenChange={(val) => {
-        // In Full Mode, prevent closing if tools are missing (unless we are just closing it programmatically)
-        // If isDownloading is true, we also block closing.
-        if (isFullMode || isDownloading) return;
+        // Prevent closing if mandatory or downloading
+        if ((isMandatory || isDownloading) && !val) return;
         setOpen(val);
       }}
     >
-      <DialogContent className="sm:max-w-md glass border border-white/10" onInteractOutside={(e) => {
-        if (isFullMode || isDownloading) e.preventDefault();
-      }} onEscapeKeyDown={(e) => {
-        if (isFullMode || isDownloading) e.preventDefault();
-      }}>
+      <DialogContent 
+        className="sm:max-w-md border border-white/10 shadow-2xl backdrop-blur-xl bg-background/80" 
+        onInteractOutside={(e) => {
+          if (isMandatory || isDownloading) e.preventDefault();
+        }} 
+        onEscapeKeyDown={(e) => {
+          if (isMandatory || isDownloading) e.preventDefault();
+        }}
+      >
         <DialogHeader>
-          <div className="flex items-center gap-2 mb-2">
-            <div className="p-2 bg-primary/10 rounded-full">
-              <Package className="w-6 h-6 text-primary" />
+          <div className="flex items-center gap-3 mb-2">
+            <div className="p-3 bg-primary/20 rounded-xl border border-primary/20 shadow-[0_0_15px_rgba(var(--primary),0.3)]">
+              <Package className="w-6 h-6 text-primary animate-pulse" />
             </div>
-            <DialogTitle>{isFullMode ? "Complete Setup" : "Setup External Tools"}</DialogTitle>
+            <div>
+              <DialogTitle className="text-xl">{isFullMode ? "Complete Setup" : "Missing Tools Detected"}</DialogTitle>
+              <DialogDescription className="text-xs font-mono opacity-80 pt-1">
+                SYSTEM INTEGRITY CHECK: INCOMPLETE
+              </DialogDescription>
+            </div>
           </div>
-          <DialogDescription>
-            {isFullMode 
-              ? "To finish setting up HalalDL Full, please download the required tools below." 
-              : "HalalDL needs external tools to function correctly. We detected some are missing."}
+          <DialogDescription className="text-base text-foreground/80">
+            {isMandatory 
+              ? "Critical system components are missing. HalalDL cannot function without them." 
+              : "Some recommended tools are missing. Installing them enables advanced features like faster downloads (aria2) and media merging (ffmpeg)."}
           </DialogDescription>
         </DialogHeader>
 
@@ -299,14 +311,14 @@ export function UpgradePrompt() {
         <DialogFooter className="flex-col sm:flex-row gap-2">
           {!isDownloading && (
             <>
-              {!isFullMode && (
+              {!isMandatory && (
                 <MotionButton type="button" variant="ghost" onClick={() => setOpen(false)} className="flex-1">
                   Skip for Now
                 </MotionButton>
               )}
               <MotionButton type="button" onClick={handleUpgrade} disabled={selectedTools.length === 0} className="flex-1 gap-2">
                 <Download className="w-4 h-4" />
-                {isFullMode ? "Setup Tools" : "Download Selected"}
+                {isMandatory ? "Install Critical Tools" : "Install Selected"}
               </MotionButton>
             </>
           )}

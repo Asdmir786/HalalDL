@@ -41,7 +41,7 @@ export const DEFAULT_SETTINGS: Settings = {
   defaultDownloadDir: "", 
   tempDir: "",
   autoClearFinished: false,
-  autoCopyFile: false,
+  autoCopyFile: true,
   paranoidMode: false,
 };
 
