@@ -65,7 +65,7 @@ export function DownloadsScreen() {
   
   // Advanced Output Config State
   const [showOutputConfig, setShowOutputConfig] = useState(false);
-  const [filenameBase, setFilenameBase] = useState("%(title)s");
+  const [filenameBase, setFilenameBase] = useState("%(title)s [%(id)s]");
   const [outputFormat, setOutputFormat] = useState<string>("best");
   const [customDownloadDir, setCustomDownloadDir] = useState<string>("");
 
@@ -402,7 +402,7 @@ export function DownloadsScreen() {
                      <Input 
                         value={filenameBase}
                         onChange={(e) => setFilenameBase(e.target.value)}
-                        placeholder="%(title)s"
+                        placeholder="%(title)s [%(id)s]"
                         className="font-mono text-xs h-9 bg-background/50 rounded-r-none border-r-0"
                      />
                      <div className="h-9 px-3 flex items-center bg-muted/50 border border-l-0 rounded-r-md text-xs font-mono text-muted-foreground select-none">
