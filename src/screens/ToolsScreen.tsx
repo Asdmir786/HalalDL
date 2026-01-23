@@ -20,12 +20,14 @@ import {
   Info,
   ExternalLink,
   ShieldCheck,
-  Package
+  Package,
+  Loader2
 } from "lucide-react";
 
 import { open as openUrl } from "@tauri-apps/plugin-shell";
 import { pickFile, checkYtDlpVersion, checkFfmpegVersion, checkAria2Version, checkDenoVersion } from "@/lib/commands";
 import { toast } from "sonner";
+import { useState } from "react";
 
 const TOOL_URLS: Record<string, string> = {
   "yt-dlp": "https://github.com/yt-dlp/yt-dlp",
@@ -37,8 +39,10 @@ const TOOL_URLS: Record<string, string> = {
 export function ToolsScreen() {
   const { tools, updateTool } = useToolsStore();
   const isLite = import.meta.env.VITE_APP_MODE !== "FULL";
+  const [checkingTools, setCheckingTools] = useState<Record<string, boolean>>({});
 
   const testTool = async (id: string) => {
+    setCheckingTools(prev => ({ ...prev, [id]: true }));
     updateTool(id, { status: "Checking" });
     let version: string | null = null;
     
@@ -63,6 +67,8 @@ export function ToolsScreen() {
     } catch {
       updateTool(id, { status: "Missing" });
       toast.error(`Error testing ${id}`);
+    } finally {
+      setCheckingTools(prev => ({ ...prev, [id]: false }));
     }
   };
 
@@ -149,18 +155,23 @@ export function ToolsScreen() {
           size="sm" 
           className="flex-1 h-8 text-xs"
           onClick={() => testTool(tool.id)}
-          disabled={tool.status === "Checking"}
+          disabled={checkingTools[tool.id]}
         >
-          <RefreshCcw className={`w-3 h-3 mr-1 ${tool.status === "Checking" ? "animate-spin" : ""}`} />
-          Test
+          {checkingTools[tool.id] ? (
+            <Loader2 className="w-3.5 h-3.5 mr-2 animate-spin" />
+          ) : (
+            <RefreshCcw className="w-3.5 h-3.5 mr-2" />
+          )}
+          {checkingTools[tool.id] ? "Checking..." : "Check Status"}
         </MotionButton>
         <MotionButton 
           variant="ghost" 
-          size="sm" 
-          className="h-8 w-8 p-0"
-          onClick={() => openUrl(TOOL_URLS[tool.id] || "https://github.com")}
+          size="icon" 
+          className="h-8 w-8"
+          onClick={() => openUrl(TOOL_URLS[tool.id])}
+          title="Visit Website"
         >
-          <ExternalLink className="w-3 h-3" />
+          <ExternalLink className="w-3.5 h-3.5" />
         </MotionButton>
       </CardFooter>
     </Card>

@@ -20,6 +20,7 @@ export function PersistenceManager() {
   const { jobs } = useDownloadsStore();
   
   const initialized = useRef(false);
+  const pendingCongratsKey = "halaldl:pendingToolCongrats";
 
   // Initial Load
   useEffect(() => {
@@ -29,10 +30,41 @@ export function PersistenceManager() {
       const checkAndNotify = async (id: string, checkFn: () => Promise<string | null>) => {
         const currentTool = useToolsStore.getState().tools.find(t => t.id === id);
         const version = await checkFn();
+        const discoveredAlready = useToolsStore.getState().discoveredToolId;
+
+        const readPending = (): string[] => {
+          try {
+            const raw = localStorage.getItem(pendingCongratsKey);
+            if (!raw) return [];
+            const parsed = JSON.parse(raw);
+            return Array.isArray(parsed) ? parsed.filter((x) => typeof x === "string") : [];
+          } catch {
+            return [];
+          }
+        };
+
+        const writePending = (next: string[]) => {
+          try {
+            if (next.length === 0) localStorage.removeItem(pendingCongratsKey);
+            else localStorage.setItem(pendingCongratsKey, JSON.stringify(next));
+          } catch (e) {
+            console.warn("Failed to persist pending tool congrats:", e);
+          }
+        };
+
+        const pending = readPending();
+        const isPending = pending.includes(id);
+        const shouldOpenForPending = Boolean(version) && isPending && !discoveredAlready;
         
-        if (version && currentTool?.status === "Missing") {
-          // Tool was missing but is now detected
+        if (shouldOpenForPending) {
           setDiscoveredToolId(id);
+          writePending(pending.filter((x) => x !== id));
+        } else if (version && currentTool?.status === "Missing") {
+          if (!discoveredAlready) {
+            setDiscoveredToolId(id);
+          } else if (!isPending) {
+            writePending([...pending, id]);
+          }
           
           // Send notification if app is in background
           let permissionGranted = await isPermissionGranted();

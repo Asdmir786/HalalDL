@@ -11,11 +11,38 @@ import { CheckCircle2, Sparkles, PartyPopper, ArrowRight } from "lucide-react";
 export function ToolSuccessModal() {
   const { tools, discoveredToolId, setDiscoveredToolId } = useToolsStore();
   const tool = tools.find((t) => t.id === discoveredToolId);
+  const pendingCongratsKey = "halaldl:pendingToolCongrats";
 
   if (!tool) return null;
 
+  const popNextToolId = (): string | null => {
+    try {
+      const raw = localStorage.getItem(pendingCongratsKey);
+      if (!raw) return null;
+      const parsed = JSON.parse(raw);
+      const queue: string[] = Array.isArray(parsed) ? parsed.filter((x) => typeof x === "string") : [];
+      const remaining: string[] = [];
+      let next: string | null = null;
+      for (const id of queue) {
+        if (!next && tools.some((t) => t.id === id)) next = id;
+        else remaining.push(id);
+      }
+      if (remaining.length === 0) localStorage.removeItem(pendingCongratsKey);
+      else localStorage.setItem(pendingCongratsKey, JSON.stringify(remaining));
+      return next;
+    } catch {
+      return null;
+    }
+  };
+
+  const closeAndMaybeShowNext = () => {
+    setDiscoveredToolId(null);
+    const next = popNextToolId();
+    if (next) setTimeout(() => setDiscoveredToolId(next), 50);
+  };
+
   return (
-    <Dialog open={!!discoveredToolId} onOpenChange={() => setDiscoveredToolId(null)}>
+    <Dialog open={!!discoveredToolId} onOpenChange={() => closeAndMaybeShowNext()}>
       <DialogContent className="sm:max-w-[400px] p-0 overflow-hidden border-none bg-transparent shadow-2xl">
         <div className="relative">
           {/* Animated Background Gradient */}
@@ -44,12 +71,15 @@ export function ToolSuccessModal() {
             <div className="w-full bg-muted/30 rounded-xl p-4 border border-muted/50 space-y-3">
               <div className="flex justify-between items-center text-sm">
                 <span className="text-muted-foreground uppercase font-bold text-[10px] tracking-widest">Version</span>
-                <span className="font-mono text-primary font-bold">{tool.version || "Latest"}</span>
+                <span className="font-mono font-medium">{tool.version || "Unknown"}</span>
               </div>
               <div className="flex justify-between items-center text-sm">
                 <span className="text-muted-foreground uppercase font-bold text-[10px] tracking-widest">Status</span>
-                <span className="flex items-center gap-1.5 text-green-500 font-bold">
-                  <div className="w-2 h-2 rounded-full bg-green-500 animate-pulse" />
+                <span className="flex items-center gap-2 text-green-500 font-medium">
+                  <span className="relative flex h-2 w-2">
+                    <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-green-400 opacity-75"></span>
+                    <span className="relative inline-flex rounded-full h-2 w-2 bg-green-500"></span>
+                  </span>
                   Ready to go
                 </span>
               </div>
@@ -57,15 +87,15 @@ export function ToolSuccessModal() {
 
             <MotionButton 
               type="button"
-              onClick={() => setDiscoveredToolId(null)}
-              className="w-full h-12 text-base font-bold group"
+              onClick={() => closeAndMaybeShowNext()}
+              className="w-full h-12 text-base font-bold group bg-primary text-primary-foreground hover:bg-primary/90 shadow-lg shadow-primary/20"
             >
               Start Downloading
               <ArrowRight className="w-5 h-5 ml-2 group-hover:translate-x-1 transition-transform" />
             </MotionButton>
-
-            <p className="text-[10px] text-muted-foreground uppercase tracking-tighter opacity-50">
-              Your environment is now fully optimized
+            
+            <p className="text-[10px] text-muted-foreground uppercase tracking-widest">
+              Your environment is fully optimized
             </p>
           </div>
         </div>

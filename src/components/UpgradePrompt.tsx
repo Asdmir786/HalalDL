@@ -1,11 +1,10 @@
 import { useState, useEffect } from "react";
 import { invoke } from "@tauri-apps/api/core";
-import { relaunch } from "@tauri-apps/plugin-process";
 import { listen } from "@tauri-apps/api/event";
+import { relaunch } from "@tauri-apps/plugin-process";
 import { 
   Dialog, 
   DialogContent, 
-  DialogDescription, 
   DialogHeader, 
   DialogTitle,
   DialogFooter
@@ -13,10 +12,10 @@ import {
 import { MotionButton } from "@/components/motion/MotionButton";
 import { Progress } from "@/components/ui/progress";
 import { Checkbox } from "@/components/ui/checkbox";
-import { Label } from "@/components/ui/label";
-import { Download, Package, CheckCircle2, AlertCircle } from "lucide-react";
+import { Download, CheckCircle2, AlertCircle, Terminal, Sparkles, ChevronRight, Loader2 } from "lucide-react";
 import { useToolsStore } from "@/store/tools";
 import { useLogsStore } from "@/store/logs";
+import { AnimatePresence, motion } from "framer-motion";
 
 interface DownloadProgress {
   tool: string;
@@ -41,16 +40,15 @@ import {
 export function UpgradePrompt() {
   const [open, setOpen] = useState(false);
   const [isDownloading, setIsDownloading] = useState(false);
+  const [isFinishing, setIsFinishing] = useState(false);
   const [progress, setProgress] = useState(0);
-  const [currentTool, setCurrentTool] = useState("");
-  const [statusText, setStatusText] = useState("");
   const [logs, setLogs] = useState<string[]>([]);
   const [error, setError] = useState<string | null>(null);
   
   // Track which tools are selected for download
   const [selectedTools, setSelectedTools] = useState<string[]>([]);
   
-  const { tools, updateTool, setDiscoveredToolId } = useToolsStore();
+  const { tools, updateTool } = useToolsStore();
   const { addLog } = useLogsStore();
   const isFullMode = import.meta.env.VITE_APP_MODE === 'FULL';
   
@@ -67,8 +65,6 @@ export function UpgradePrompt() {
       const timer = setTimeout(() => {
         setIsDownloading(false);
         setProgress(0);
-        setCurrentTool("");
-        setStatusText("");
         setLogs([]);
         setError(null);
       }, 300); // Wait for exit animation
@@ -93,9 +89,7 @@ export function UpgradePrompt() {
 
   useEffect(() => {
     const unlisten = listen<DownloadProgress>("download-progress", (event) => {
-      setCurrentTool(event.payload.tool);
       setProgress(event.payload.percentage);
-      setStatusText(event.payload.status);
       
       if (event.payload.status && event.payload.status !== "Downloading...") {
         setLogs(prev => {
@@ -116,6 +110,7 @@ export function UpgradePrompt() {
   }, [addLog]);
 
   const handleFinish = async () => {
+    setIsFinishing(true);
     try {
       const checkTool = async (id: string, checkFn: () => Promise<string | null>) => {
         const version = await checkFn();
@@ -138,14 +133,19 @@ export function UpgradePrompt() {
         console.error("Failed to add to PATH:", error);
       }
       if (results.some(Boolean)) {
-        const firstDownloaded = selectedTools[0];
-        setDiscoveredToolId(firstDownloaded || "yt-dlp");
+        try {
+          localStorage.setItem("halaldl:pendingToolCongrats", JSON.stringify(selectedTools));
+        } catch (e) {
+          console.warn("Failed to persist pending tool congrats:", e);
+        }
       }
       setOpen(false);
       await relaunch();
     } catch (error) {
       console.error("Failed to finish setup:", error);
       window.location.reload();
+    } finally {
+      setIsFinishing(false);
     }
   };
 
@@ -158,11 +158,7 @@ export function UpgradePrompt() {
     setIsDownloading(true);
     setError(null);
     try {
-      // Map tool IDs to the names expected by Rust backend
-      // Rust expects: "yt-dlp", "ffmpeg", "aria2", "deno"
-      // Our store IDs are: "yt-dlp", "ffmpeg", "aria2", "deno" (from src/store/tools.ts)
       await invoke("download_tools", { tools: selectedTools });
-      setStatusText("All selected tools ready!");
       setProgress(100);
       addLog({
         level: "info",
@@ -196,7 +192,7 @@ export function UpgradePrompt() {
       }}
     >
       <DialogContent 
-        className="sm:max-w-md border border-white/10 shadow-2xl backdrop-blur-xl bg-background/80" 
+        className="sm:max-w-[440px] border-none bg-transparent shadow-2xl p-0 overflow-hidden" 
         onInteractOutside={(e) => {
           if (isMandatory || isDownloading) e.preventDefault();
         }} 
@@ -204,131 +200,164 @@ export function UpgradePrompt() {
           if (isMandatory || isDownloading) e.preventDefault();
         }}
       >
-        <DialogHeader>
-          <div className="flex items-center gap-3 mb-2">
-            <div className="p-3 bg-primary/20 rounded-xl border border-primary/20 shadow-[0_0_15px_rgba(var(--primary),0.3)]">
-              <Package className="w-6 h-6 text-primary animate-pulse" />
-            </div>
-            <div>
-              <DialogTitle className="text-xl">{isFullMode ? "Complete Setup" : "Missing Tools Detected"}</DialogTitle>
-              <DialogDescription className="text-xs font-mono opacity-80 pt-1">
-                SYSTEM INTEGRITY CHECK: INCOMPLETE
-              </DialogDescription>
-            </div>
-          </div>
-          <DialogDescription className="text-base text-foreground/80">
-            {isMandatory 
-              ? "Critical system components are missing. HalalDL cannot function without them." 
-              : "Some recommended tools are missing. Installing them enables advanced features like faster downloads (aria2) and media merging (ffmpeg)."}
-          </DialogDescription>
-        </DialogHeader>
-
-        <div className="space-y-4 py-4">
-          {isDownloading ? (
-            <div className="space-y-4">
-              <div className="space-y-3">
-                <div className="flex justify-between text-sm">
-                  <span className="flex items-center gap-2">
-                    <Download className="w-4 h-4 animate-bounce" />
-                    <span className="capitalize">{currentTool || "Preparing..."}</span>
-                  </span>
-                  <span className="font-mono">{Math.round(progress)}%</span>
-                </div>
-                <Progress value={progress} className="h-2" />
-                <p className="text-xs text-muted-foreground text-center italic">
-                  {statusText}
-                </p>
-              </div>
-
-              {logs.length > 0 && (
-                <div className="bg-muted/50 rounded-lg p-3 border border-muted-foreground/10 max-h-32 overflow-auto font-mono text-[10px] space-y-1">
-                  {logs.map((log, i) => (
-                    <div key={i} className="flex gap-2">
-                      <span className="text-primary shrink-0">›</span>
-                      <span className="opacity-80">{log}</span>
-                    </div>
-                  ))}
-                </div>
-              )}
-            </div>
-          ) : error ? (
-            <div className="flex items-start gap-3 p-3 rounded-lg bg-destructive/10 text-destructive text-sm">
-              <AlertCircle className="w-5 h-5 shrink-0" />
-              <p>{error}</p>
-            </div>
-          ) : (
-            <div className="space-y-3">
-              <div className="text-sm font-medium text-muted-foreground mb-2 flex justify-between items-center">
-                <span>Available Tools</span>
-                <span className="text-xs bg-muted px-2 py-1 rounded">~{totalSize}MB Total</span>
-              </div>
-              
-              {tools.map(tool => {
-                const isMissing = tool.status === "Missing";
-                const isSelected = selectedTools.includes(tool.id);
-                
-                return (
-                  <div 
-                    key={tool.id} 
-                    className={`flex items-start space-x-3 p-3 rounded-lg border transition-colors glass-card ${
-                      isSelected ? "bg-accent/50 border-primary/50" : ""
-                    } ${!isMissing ? "opacity-70" : ""}`}
-                  >
-                    <Checkbox 
-                      id={tool.id} 
-                      checked={!isMissing ? true : isSelected}
-                      disabled={!isMissing}
-                      onCheckedChange={() => toggleTool(tool.id)}
-                    />
-                    <div className="grid gap-1.5 leading-none flex-1">
-                      <div className="flex justify-between">
-                        <Label 
-                          htmlFor={tool.id} 
-                          className="font-semibold cursor-pointer flex items-center gap-2"
-                        >
-                          {tool.name}
-                          {!isMissing && (
-                            <span className="text-[10px] bg-green-500/10 text-green-600 px-1.5 py-0.5 rounded flex items-center gap-1">
-                              <CheckCircle2 className="w-3 h-3" /> Installed
-                            </span>
-                          )}
-                        </Label>
-                      </div>
-                      <p className="text-xs text-muted-foreground">
-                        {tool.id === "yt-dlp" && "Required for downloading videos."}
-                        {tool.id === "ffmpeg" && "Required for merging video & audio."}
-                        {tool.id === "aria2" && "High-speed download accelerator."}
-                        {tool.id === "deno" && "Required for some complex sites."}
-                      </p>
-                    </div>
+        <div className="relative bg-background/90 backdrop-blur-2xl border border-white/10 rounded-xl overflow-hidden">
+          {/* Animated Gradient Border Top */}
+          <div className="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-primary via-purple-500 to-primary animate-gradient-x" />
+          
+          <div className="p-6 pb-2">
+            <DialogHeader className="mb-4">
+              <div className="flex items-center gap-3">
+                <div className="relative">
+                  <div className="absolute inset-0 bg-primary/20 blur-lg rounded-full animate-pulse" />
+                  <div className="relative p-2.5 bg-primary/10 rounded-xl border border-primary/20">
+                    <Sparkles className="w-5 h-5 text-primary" />
                   </div>
-                );
-              })}
-            </div>
-          )}
-        </div>
+                </div>
+                <div>
+                  <DialogTitle className="text-lg font-bold tracking-tight">
+                    {isDownloading ? "Installing Components" : "Setup Required"}
+                  </DialogTitle>
+                  <p className="text-xs text-muted-foreground font-medium mt-0.5">
+                    {isDownloading ? "Optimizing your environment..." : "Missing dependencies detected"}
+                  </p>
+                </div>
+              </div>
+            </DialogHeader>
 
-        <DialogFooter className="flex-col sm:flex-row gap-2">
-          {!isDownloading && (
-            <>
-              {!isMandatory && (
-                <MotionButton type="button" variant="ghost" onClick={() => setOpen(false)} className="flex-1">
-                  Skip for Now
-                </MotionButton>
+            <AnimatePresence mode="wait">
+              {isDownloading ? (
+                <motion.div
+                  initial={{ opacity: 0, y: 10 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  exit={{ opacity: 0, y: -10 }}
+                  className="space-y-6 py-2"
+                >
+                  <div className="relative pt-2">
+                     <div className="flex justify-between items-end mb-2">
+                        <span className="text-xs font-mono text-muted-foreground uppercase tracking-wider">Progress</span>
+                        <span className="text-2xl font-bold tabular-nums tracking-tight">{Math.round(progress)}%</span>
+                     </div>
+                     <Progress value={progress} className="h-1.5 bg-muted/50" />
+                  </div>
+
+                  <div className="bg-black/40 rounded-lg border border-white/5 p-4 font-mono text-[10px] space-y-2 h-[120px] overflow-hidden relative">
+                    <div className="absolute top-2 right-2 opacity-50">
+                      <Terminal className="w-3 h-3" />
+                    </div>
+                    <div className="space-y-1.5 opacity-80">
+                      {logs.slice(-4).map((log, i) => (
+                        <motion.div 
+                          key={i}
+                          initial={{ opacity: 0, x: -5 }}
+                          animate={{ opacity: 1, x: 0 }}
+                          className="flex gap-2 items-center"
+                        >
+                          <ChevronRight className="w-2.5 h-2.5 text-primary shrink-0" />
+                          <span className="truncate">{log}</span>
+                        </motion.div>
+                      ))}
+                      {logs.length === 0 && (
+                        <span className="text-muted-foreground italic">Initializing downloader...</span>
+                      )}
+                    </div>
+                    {/* Fade out bottom */}
+                    <div className="absolute bottom-0 left-0 right-0 h-8 bg-gradient-to-t from-black/40 to-transparent" />
+                  </div>
+                </motion.div>
+              ) : error ? (
+                <motion.div 
+                  initial={{ opacity: 0 }}
+                  animate={{ opacity: 1 }}
+                  className="flex items-start gap-3 p-4 rounded-xl bg-destructive/5 border border-destructive/20 text-destructive text-sm"
+                >
+                  <AlertCircle className="w-5 h-5 shrink-0" />
+                  <p>{error}</p>
+                </motion.div>
+              ) : (
+                <motion.div 
+                  initial={{ opacity: 0 }}
+                  animate={{ opacity: 1 }}
+                  className="space-y-4"
+                >
+                  <div className="grid grid-cols-1 gap-2">
+                    {tools.map(tool => {
+                      const isMissing = tool.status === "Missing";
+                      const isSelected = selectedTools.includes(tool.id);
+                      
+                      return (
+                        <div 
+                          key={tool.id} 
+                          className={`group flex items-center justify-between p-3 rounded-xl border transition-all duration-300 ${
+                            isSelected 
+                              ? "bg-primary/5 border-primary/20 shadow-[0_0_10px_rgba(var(--primary),0.05)]" 
+                              : "bg-muted/20 border-white/5 opacity-60"
+                          } ${!isMissing ? "opacity-50 pointer-events-none grayscale" : "cursor-pointer hover:bg-muted/40"}`}
+                          onClick={() => isMissing && toggleTool(tool.id)}
+                        >
+                          <div className="flex items-center gap-3">
+                            <Checkbox 
+                              checked={!isMissing ? true : isSelected}
+                              className="border-white/20 data-[state=checked]:bg-primary data-[state=checked]:border-primary"
+                            />
+                            <div className="flex flex-col">
+                              <span className="font-semibold text-sm flex items-center gap-2">
+                                {tool.name}
+                                {!isMissing && <CheckCircle2 className="w-3 h-3 text-green-500" />}
+                              </span>
+                              <span className="text-[10px] text-muted-foreground">
+                                {TOOL_SIZES[tool.id]}MB • {tool.id === "yt-dlp" ? "Core" : "Extension"}
+                              </span>
+                            </div>
+                          </div>
+                          
+                          {isMissing && (
+                             <div className={`w-2 h-2 rounded-full ${isSelected ? "bg-primary shadow-[0_0_8px_rgba(var(--primary),0.8)]" : "bg-muted-foreground/30"}`} />
+                          )}
+                        </div>
+                      );
+                    })}
+                  </div>
+                </motion.div>
               )}
-              <MotionButton type="button" onClick={handleUpgrade} disabled={selectedTools.length === 0} className="flex-1 gap-2">
-                <Download className="w-4 h-4" />
-                {isMandatory ? "Install Critical Tools" : "Install Selected"}
+            </AnimatePresence>
+          </div>
+
+          <DialogFooter className="p-6 pt-2 flex-col sm:flex-row gap-2 bg-muted/5">
+            {!isDownloading && (
+              <>
+                {!isMandatory && (
+                  <MotionButton type="button" variant="ghost" onClick={() => setOpen(false)} className="flex-1 h-11 rounded-xl text-muted-foreground hover:text-foreground">
+                    Skip
+                  </MotionButton>
+                )}
+                <MotionButton 
+                  type="button" 
+                  onClick={handleUpgrade} 
+                  disabled={selectedTools.length === 0} 
+                  className="flex-1 gap-2 h-11 rounded-xl bg-primary text-primary-foreground hover:bg-primary/90 shadow-lg shadow-primary/20"
+                >
+                  <Download className="w-4 h-4" />
+                  Install ({totalSize}MB)
+                </MotionButton>
+              </>
+            )}
+            {isDownloading && progress === 100 && (
+              <MotionButton 
+                type="button" 
+                onClick={handleFinish} 
+                disabled={isFinishing}
+                className="w-full gap-2 h-12 rounded-xl bg-green-600 hover:bg-green-700 text-white shadow-lg shadow-green-500/20"
+              >
+                {isFinishing ? (
+                  <Loader2 className="w-4 h-4 animate-spin" />
+                ) : (
+                  <CheckCircle2 className="w-4 h-4" />
+                )}
+                {isFinishing ? "Finalizing Setup..." : "Complete Setup"}
               </MotionButton>
-            </>
-          )}
-          {isDownloading && progress === 100 && (
-            <MotionButton type="button" onClick={handleFinish} className="w-full gap-2">
-              <CheckCircle2 className="w-4 h-4" />
-              Done - Restart App
-            </MotionButton>
-          )}
-        </DialogFooter>
+            )}
+          </DialogFooter>
+        </div>
       </DialogContent>
     </Dialog>
   );

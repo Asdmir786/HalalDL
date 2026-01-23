@@ -5,7 +5,8 @@ import { usePresetsStore, type Preset } from "@/store/presets";
 import { 
   Download, 
   Upload, 
-  Plus
+  Plus,
+  Loader2
 } from "lucide-react";
 import { toast } from "sonner";
 import { useState } from "react";
@@ -18,11 +19,14 @@ export function PresetsScreen() {
   const { presets, duplicatePreset, deletePreset, updatePreset, addPreset } = usePresetsStore();
   const [editingPreset, setEditingPreset] = useState<Preset | null>(null);
   const [isEditorOpen, setIsEditorOpen] = useState(false);
+  const [isExporting, setIsExporting] = useState(false);
+  const [isImporting, setIsImporting] = useState(false);
 
   const builtInPresets = presets.filter((p) => p.isBuiltIn);
   const userPresets = presets.filter((p) => !p.isBuiltIn);
 
   const handleExport = async () => {
+    setIsExporting(true);
     try {
       const data = JSON.stringify(userPresets, null, 2);
       const path = await save({
@@ -37,10 +41,13 @@ export function PresetsScreen() {
       const message =
         error instanceof Error ? error.message : String(error);
       toast.error(`Export failed: ${message}`);
+    } finally {
+      setIsExporting(false);
     }
   };
 
   const handleImport = async () => {
+    setIsImporting(true);
     try {
       const path = await open({
         filters: [{ name: "JSON", extensions: ["json"] }],
@@ -64,6 +71,8 @@ export function PresetsScreen() {
       const message =
         error instanceof Error ? error.message : String(error);
       toast.error(`Import failed: ${message}`);
+    } finally {
+      setIsImporting(false);
     }
   };
 
@@ -84,19 +93,29 @@ export function PresetsScreen() {
                   variant="outline"
                   size="sm"
                   onClick={handleImport}
+                  disabled={isImporting}
                   className="h-9"
                 >
-                  <Upload className="w-4 h-4 mr-2" />
-                  Import
+                  {isImporting ? (
+                    <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                  ) : (
+                    <Upload className="w-4 h-4 mr-2" />
+                  )}
+                  {isImporting ? "Importing..." : "Import"}
                 </MotionButton>
                 <MotionButton
                   variant="outline"
                   size="sm"
                   onClick={handleExport}
+                  disabled={isExporting}
                   className="h-9"
                 >
-                  <Download className="w-4 h-4 mr-2" />
-                  Export
+                  {isExporting ? (
+                    <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                  ) : (
+                    <Download className="w-4 h-4 mr-2" />
+                  )}
+                  {isExporting ? "Exporting..." : "Export"}
                 </MotionButton>
                 <MotionButton
                   size="sm"

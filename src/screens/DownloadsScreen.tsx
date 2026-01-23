@@ -33,25 +33,49 @@ export function DownloadsScreen() {
   const [outputFormat, setOutputFormat] = useState<string>("best");
   const [customDownloadDir, setCustomDownloadDir] = useState<string>("");
 
+  const { presets } = usePresetsStore();
+  const { jobs, addJob, removeJob, pendingUrl, setPendingUrl } = useDownloadsStore();
+  const { setActiveJobId } = useLogsStore();
+  const { setScreen } = useNavigationStore();
+
   const isCustomPreset = selectedPreset === "custom";
+
+  const inferOutputFormat = (presetId: string): string => {
+    const preset = presets.find((p) => p.id === presetId);
+    if (!preset) return "best";
+
+    const audioFormatIndex = preset.args.indexOf("--audio-format");
+    if (audioFormatIndex !== -1) {
+      const next = preset.args[audioFormatIndex + 1];
+      if (next === "mp3") return "mp3";
+      if (next === "m4a") return "m4a";
+    }
+
+    const mergeIndex = preset.args.indexOf("--merge-output-format");
+    if (mergeIndex !== -1) {
+      const next = preset.args[mergeIndex + 1];
+      if (next === "mp4" || next === "mkv" || next === "webm") return next;
+    }
+
+    const formatIndex = preset.args.indexOf("-f");
+    if (formatIndex !== -1) {
+      const fmt = preset.args[formatIndex + 1] ?? "";
+      if (fmt.includes("ext=mp4") || fmt.includes("[ext=mp4]")) return "mp4";
+      if (fmt.includes("ext=webm") || fmt.includes("[ext=webm]")) return "webm";
+    }
+
+    return "best";
+  };
 
   const handlePresetChange = (val: string) => {
     setSelectedPreset(val);
     const isCustom = val === "custom";
     if (!isCustom) {
-      if (val === "mp3") setOutputFormat("mp3");
-      else if (val.includes("mp4")) setOutputFormat("mp4");
-      else if (val.includes("webm")) setOutputFormat("webm");
-      else if (val === "audio-only") setOutputFormat("best");
-      else setOutputFormat("best");
+      setOutputFormat(inferOutputFormat(val));
     }
   };
 
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
-  const { jobs, addJob, removeJob, pendingUrl, setPendingUrl } = useDownloadsStore();
-  const { presets } = usePresetsStore();
-  const { setActiveJobId } = useLogsStore();
-  const { setScreen } = useNavigationStore();
 
   // Handle Drag & Drop Pending URL
   useEffect(() => {

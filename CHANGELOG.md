@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.3.4 - 2026-01-24
+- **UI/UX**: Revamped "Empty Queue" screen with a modern hero section, animated particles, and quick action cards.
+- **UI/UX**: Modernized "Tool Setup" dialog (UpgradePrompt) with glassmorphism, smoother animations, and a cleaner aesthetic.
+- **UX**: Added loading states to critical actions (Tool Setup, Presets Import/Export, Tools Status Check) for better responsiveness.
+- **Fixes**: Fixed "Congratulations" popup not showing by implementing persistence for tool installation success across restarts.
+- **Fixes**: Resolved ESLint errors in persistence and upgrade modules.
+
 ## 0.3.3 - 2026-01-20
 - **Power Features**: Added "Auto-Copy File" to settings. Automatically copies the downloaded file to the clipboard upon completion.
 - **Power Features**: Added "Copy File" context menu item to copy the downloaded file directly to the clipboard (like Windows Explorer).

@@ -2,8 +2,9 @@ import { AnimatePresence, motion, Variants } from "framer-motion";
 import { DownloadItem } from "./DownloadItem";
 import { DownloadJob } from "@/store/downloads";
 import { MotionButton } from "@/components/motion/MotionButton";
-import { Download } from "lucide-react";
+import { Download, Layers, Sparkles, Plus, Settings } from "lucide-react";
 import { FadeInItem } from "@/components/motion/StaggerContainer";
+import { useNavigationStore } from "@/store/navigation";
 
 interface DownloadListProps {
   jobs: DownloadJob[];
@@ -31,24 +32,87 @@ export function DownloadList({
   formatRelativeTime
 }: DownloadListProps) {
   const hasCompleted = jobs.some((job) => job.status === "Done" || job.status === "Failed");
+  const { setScreen } = useNavigationStore();
 
   return (
     <FadeInItem className="flex-1 overflow-hidden flex flex-col px-8 pb-8">
-      <div className="bg-black/5 rounded-2xl border border-white/5 flex-1 flex flex-col overflow-hidden shadow-inner backdrop-blur-sm">
+      <div className="bg-black/5 rounded-2xl border border-white/5 flex-1 flex flex-col overflow-hidden shadow-inner backdrop-blur-sm relative">
         {jobs.length === 0 ? (
-          <div className="flex-1 flex flex-col items-center justify-center text-muted-foreground p-8 text-center">
-            <motion.div 
-              initial={{ scale: 0.9, opacity: 0 }}
-              animate={{ scale: 1, opacity: 1 }}
-              transition={{ duration: 0.5 }}
-              className="w-24 h-24 bg-gradient-to-tr from-primary/20 to-secondary/20 rounded-full flex items-center justify-center mb-6 shadow-lg border border-white/10 backdrop-blur-md"
-            >
-              <Download className="w-10 h-10 text-primary/50" />
-            </motion.div>
-            <h3 className="text-xl font-bold text-foreground/90 mb-2 tracking-tight">Your Queue is Empty</h3>
-            <p className="text-sm max-w-[280px] text-muted-foreground/80 leading-relaxed">
-              Paste a URL above to start downloading. We support YouTube, Twitch, TikTok, and thousands more.
-            </p>
+          <div className="flex-1 flex flex-col items-center justify-center p-8 relative overflow-hidden min-h-[400px]">
+              {/* Background Effects */}
+              <div className="absolute inset-0 bg-gradient-to-b from-transparent via-background/50 to-background z-10" />
+              <div className="absolute inset-0 bg-[radial-gradient(circle_at_center,_var(--tw-gradient-stops))] from-primary/5 via-transparent to-transparent opacity-40 blur-3xl" />
+          
+              {/* Content */}
+              <motion.div 
+                  initial={{ opacity: 0, y: 20 }} 
+                  animate={{ opacity: 1, y: 0 }} 
+                  className="relative z-20 flex flex-col items-center text-center max-w-md"
+              >
+                  {/* Icon Cluster */}
+                  <div className="relative mb-8 group cursor-default">
+                      <div className="absolute -inset-4 bg-primary/20 rounded-full blur-xl opacity-0 group-hover:opacity-100 transition-opacity duration-700" />
+                      <div className="relative w-20 h-20 bg-background/50 backdrop-blur-xl border border-white/10 rounded-2xl flex items-center justify-center shadow-2xl transform group-hover:scale-105 transition-all duration-500">
+                          <Download className="w-8 h-8 text-primary/80" />
+                      </div>
+                      {/* Floating decorative icons */}
+                      <div className="absolute -top-2 -right-2 w-8 h-8 bg-background/50 backdrop-blur-md border border-white/10 rounded-lg flex items-center justify-center shadow-lg animate-bounce delay-75">
+                          <Sparkles className="w-4 h-4 text-yellow-500/80" />
+                      </div>
+                       <div className="absolute -bottom-2 -left-2 w-8 h-8 bg-background/50 backdrop-blur-md border border-white/10 rounded-lg flex items-center justify-center shadow-lg animate-bounce delay-150">
+                          <Layers className="w-4 h-4 text-blue-500/80" />
+                      </div>
+                  </div>
+          
+                  <h3 className="text-2xl font-bold tracking-tight mb-2 bg-clip-text text-transparent bg-gradient-to-br from-foreground to-muted-foreground">
+                      Ready to Download
+                  </h3>
+                  <p className="text-muted-foreground text-sm mb-8 leading-relaxed">
+                      Your queue is currently empty. Add a URL above to start downloading instantly.
+                  </p>
+          
+                  {/* Quick Actions Grid */}
+                  <div className="grid grid-cols-2 gap-3 w-full">
+                       <div 
+                         className="col-span-2 p-3 rounded-xl border border-white/5 bg-white/5 hover:bg-white/10 transition-colors cursor-pointer flex items-center gap-3 group active:scale-[0.98]" 
+                         onClick={() => document.querySelector('input')?.focus()}
+                       >
+                          <div className="w-8 h-8 rounded-lg bg-primary/10 flex items-center justify-center group-hover:bg-primary/20 transition-colors">
+                              <Plus className="w-4 h-4 text-primary" />
+                          </div>
+                          <div className="text-left">
+                              <div className="text-xs font-semibold">New Download</div>
+                              <div className="text-[10px] text-muted-foreground">Paste a URL to begin</div>
+                          </div>
+                       </div>
+                       
+                       <div 
+                         className="p-3 rounded-xl border border-white/5 bg-white/5 hover:bg-white/10 transition-colors cursor-pointer flex items-center gap-3 group active:scale-[0.98]"
+                         onClick={() => setScreen("presets")}
+                       >
+                          <div className="w-8 h-8 rounded-lg bg-purple-500/10 flex items-center justify-center group-hover:bg-purple-500/20 transition-colors">
+                              <Layers className="w-4 h-4 text-purple-400" />
+                          </div>
+                          <div className="text-left">
+                              <div className="text-xs font-semibold">Presets</div>
+                              <div className="text-[10px] text-muted-foreground">Manage formats</div>
+                          </div>
+                       </div>
+
+                       <div 
+                         className="p-3 rounded-xl border border-white/5 bg-white/5 hover:bg-white/10 transition-colors cursor-pointer flex items-center gap-3 group active:scale-[0.98]"
+                         onClick={() => setScreen("tools")}
+                       >
+                          <div className="w-8 h-8 rounded-lg bg-blue-500/10 flex items-center justify-center group-hover:bg-blue-500/20 transition-colors">
+                              <Settings className="w-4 h-4 text-blue-400" />
+                          </div>
+                          <div className="text-left">
+                              <div className="text-xs font-semibold">Tools</div>
+                              <div className="text-[10px] text-muted-foreground">Check status</div>
+                          </div>
+                       </div>
+                  </div>
+              </motion.div>
           </div>
         ) : (
           <>

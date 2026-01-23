@@ -1,7 +1,7 @@
 import { Plus, Settings2, ChevronDown, ChevronUp } from "lucide-react";
 import { MotionButton } from "@/components/motion/MotionButton";
 import { Input } from "@/components/ui/input";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Select, SelectContent, SelectGroup, SelectItem, SelectLabel, SelectSeparator, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { DownloadOutputOptions } from "./DownloadOutputOptions";
 import { Preset } from "@/store/presets";
 
@@ -39,6 +39,26 @@ export function DownloadInputSection({
   isCustomPreset,
   defaultDownloadDir
 }: DownloadInputSectionProps) {
+  const groupOrder = ["Recommended", "Compatibility", "Editors", "Editors Pro", "Web", "Video", "Audio", "Other", "Custom"];
+
+  const getGroupAndLabel = (preset: Preset): { group: string; label: string } => {
+    const parts = preset.name.split(" — ");
+    if (parts.length >= 2) return { group: parts[0], label: parts.slice(1).join(" — ") };
+    return { group: preset.isBuiltIn ? "Other" : "Custom", label: preset.name };
+  };
+
+  const grouped = presets.reduce<Record<string, Array<{ preset: Preset; label: string }>>>((acc, preset) => {
+    const { group, label } = getGroupAndLabel(preset);
+    acc[group] = acc[group] ?? [];
+    acc[group].push({ preset, label });
+    return acc;
+  }, {});
+
+  const orderedGroups = [
+    ...groupOrder.filter((g) => (grouped[g]?.length ?? 0) > 0),
+    ...Object.keys(grouped).filter((g) => !groupOrder.includes(g)).sort(),
+  ];
+
   return (
     <div className="flex flex-col gap-3 bg-muted/30 p-3 rounded-xl border border-muted/50 shadow-sm glass-card">
       <div className="flex flex-col lg:flex-row gap-3">
@@ -61,10 +81,19 @@ export function DownloadInputSection({
               <SelectItem value="custom" className="font-semibold text-primary">
                 ✨ Custom Configuration
               </SelectItem>
-              {presets.map((preset) => (
-                <SelectItem key={preset.id} value={preset.id}>
-                  {preset.name}
-                </SelectItem>
+              <SelectSeparator />
+              {orderedGroups.map((group) => (
+                <SelectGroup key={group}>
+                  <SelectLabel className="text-[10px] uppercase tracking-wider text-muted-foreground/80">
+                    {group}
+                  </SelectLabel>
+                  {(grouped[group] ?? []).map(({ preset, label }) => (
+                    <SelectItem key={preset.id} value={preset.id} title={preset.description}>
+                      {label}
+                    </SelectItem>
+                  ))}
+                  <SelectSeparator />
+                </SelectGroup>
               ))}
             </SelectContent>
           </Select>
