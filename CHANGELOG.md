@@ -4,9 +4,11 @@
 - **UI/UX**: Revamped "Empty Queue" screen with a modern hero section, animated particles, and quick action cards.
 - **UI/UX**: Modernized "Tool Setup" dialog (UpgradePrompt) with glassmorphism, smoother animations, and a cleaner aesthetic.
 - **UX**: Added loading states to critical actions (Tool Setup, Presets Import/Export, Tools Status Check) for better responsiveness.
-- **Presets**: Added "WhatsApp Optimized" preset (1080p, H.264, 64MB limit) for easy social sharing.
+- **Presets**: Added "WhatsApp Optimized" preset (1080p, H.264) for easy social sharing.
 - **Fixes**: Fixed "Congratulations" popup not showing by implementing persistence for tool installation success across restarts.
 - **Fixes**: Fixed "Copy File" reliability by improving Windows clipboard integration and path handling.
+- **Fixes**: Improved final output path detection and file URI decoding for copying.
+- **Fixes**: Improved stdout/stderr handling for chunked output to avoid missing lines.
 - **Fixes**: Fixed scrolling issues in the Preset selection menu.
 - **Fixes**: Resolved ESLint errors in persistence and upgrade modules.
 
