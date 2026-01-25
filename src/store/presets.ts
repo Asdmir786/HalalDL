@@ -37,7 +37,26 @@ export const BUILT_IN_PRESETS: Preset[] = [
     name: "Compatibility — MP4 (H.264 + AAC)",
     description: "Most compatible choice for phones, social apps, and editors",
     isBuiltIn: true,
-    args: ["-f", "bv[ext=mp4][vcodec^=avc1]+ba[ext=m4a]/b[ext=mp4]", "--merge-output-format", "mp4"],
+    args: [
+      "-f",
+      "bv[ext=mp4][vcodec^=avc1]+ba[ext=m4a]/bv[vcodec^=avc1]+ba/b[ext=mp4][vcodec^=avc1]/b",
+      "--merge-output-format",
+      "mp4"
+    ],
+  },
+  {
+    id: "whatsapp-optimized",
+    name: "Compatibility — WhatsApp Optimized (H.264 + AAC)",
+    description: "Optimized for WhatsApp (1080p, compatible codecs, fast start)",
+    isBuiltIn: true,
+    args: [
+      "-f",
+      "bv[height<=1080][ext=mp4][vcodec^=avc1]+ba[ext=m4a]/bv[height<=1080][vcodec^=avc1]+ba/b[height<=1080][ext=mp4][vcodec^=avc1]/b[height<=1080]",
+      "--merge-output-format",
+      "mp4",
+      "--postprocessor-args",
+      "VideoConvertor:-c:v libx264 -pix_fmt yuv420p -c:a aac -b:a 128k -crf 23 -preset slow -movflags +faststart"
+    ],
   },
   {
     id: "mp4-best",

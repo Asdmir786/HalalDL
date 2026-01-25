@@ -126,30 +126,37 @@ export function SettingsScreen() {
     toast.success("Settings saved successfully");
   }, [draftSettings, isDirty, setSettings, settings]);
 
-  const handleGlobalReset = useCallback(async () => {
-    const defaults = resolvedDefaults ?? (await resolveDefaultSettings());
-    
-    // Calculate what changed
-    const changedKeys: string[] = [];
-    for (const key of SETTINGS_KEYS) {
-        if (!Object.is(settings[key], defaults[key])) {
-            // Convert camelCase to readable format
-            const readable = key.replace(/([A-Z])/g, ' $1').replace(/^./, str => str.toUpperCase());
-            changedKeys.push(readable);
-        }
-    }
+  const [isResetting, setIsResetting] = useState(false);
 
-    setSettings(defaults);
-    setEdits({});
-    
-    if (changedKeys.length > 0) {
-        toast.info("Settings restored to defaults", {
-            description: `Reset: ${changedKeys.join(", ")}`
-        });
-    } else {
-        toast.info("Settings restored to defaults", {
-            description: "No changes were needed."
-        });
+  const handleGlobalReset = useCallback(async () => {
+    setIsResetting(true);
+    try {
+      const defaults = resolvedDefaults ?? (await resolveDefaultSettings());
+      
+      // Calculate what changed
+      const changedKeys: string[] = [];
+      for (const key of SETTINGS_KEYS) {
+          if (!Object.is(settings[key], defaults[key])) {
+              // Convert camelCase to readable format
+              const readable = key.replace(/([A-Z])/g, ' $1').replace(/^./, str => str.toUpperCase());
+              changedKeys.push(readable);
+          }
+      }
+
+      setSettings(defaults);
+      setEdits({});
+      
+      if (changedKeys.length > 0) {
+          toast.info("Settings restored to defaults", {
+              description: `Reset: ${changedKeys.join(", ")}`
+          });
+      } else {
+          toast.info("Settings restored to defaults", {
+              description: "No changes were needed."
+          });
+      }
+    } finally {
+      setIsResetting(false);
     }
   }, [resolvedDefaults, setSettings, settings]);
 
@@ -204,6 +211,7 @@ export function SettingsScreen() {
         <SettingsHeader 
           isGlobalDirty={isGlobalDirty}
           isDirty={isDirty}
+          isResetting={isResetting}
           onGlobalReset={handleGlobalReset}
           onResetAll={resetAllDraft}
           onResetGroup={resetGroupDraft}

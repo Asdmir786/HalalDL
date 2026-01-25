@@ -15,10 +15,19 @@ export class OutputParser {
   private static DESTINATION_REGEX = /\[download\]\s+(?:Destination:|.*has already been downloaded(?: and merged into)?)\s+(.*)$/;
   private static ALREADY_DOWNLOADED_REGEX = /\[download\]\s+(.*?)\s+has already been downloaded$/;
   private static MERGER_REGEX = /^\[Merger\] Merging formats into "(.*)"\s*$/;
+  private static HALALDL_OUTPUT_REGEX = /^__HALALDL_OUTPUT__:(.*)$/;
 
   parse(line: string): DownloadUpdate | null {
     const update: DownloadUpdate = {};
     let hasUpdate = false;
+
+    const halalDlOutputMatch = line.match(OutputParser.HALALDL_OUTPUT_REGEX);
+    if (halalDlOutputMatch?.[1]) {
+      const path = this.cleanPath(halalDlOutputMatch[1]);
+      update.outputPath = path;
+      update.title = this.extractTitle(path);
+      hasUpdate = true;
+    }
 
     // Progress
     const progressMatch = line.match(OutputParser.PROGRESS_REGEX);
@@ -88,8 +97,27 @@ export class OutputParser {
   }
 
   private cleanPath(raw: string): string {
-    const trimmed = this.stripAnsiSimple(raw).trim().replace(/\r/g, "");
-    return trimmed.replace(/^file:\/\//i, "").replace(/^"(.*)"$/, "$1");
+    let trimmed = this.stripAnsiSimple(raw).trim().replace(/[\r\n]/g, "");
+    trimmed = trimmed.replace(/^"(.*)"$/, "$1");
+    trimmed = this.stripFileUriPrefix(trimmed);
+    return trimmed;
+  }
+
+  private stripFileUriPrefix(path: string): string {
+    const lower = path.toLowerCase();
+    if (!lower.startsWith("file:")) return path;
+
+    let out = path.replace(/^file:\/\//i, "").replace(/^file:\//i, "");
+    out = out.replace(/^localhost\//i, "");
+    if (/^\/[a-zA-Z]:\//.test(out)) out = out.slice(1);
+
+    try {
+      out = decodeURIComponent(out);
+    } catch {
+      void 0;
+    }
+
+    return out;
   }
 
   private stripAnsiSimple(input: string): string {

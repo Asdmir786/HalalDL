@@ -175,7 +175,14 @@ export function LogsScreen() {
     }
   }, [filteredLogs.length, autoScroll, rowVirtualizer]);
 
+  const [isExporting, setIsExporting] = React.useState(false);
+
   const handleExport = React.useCallback(async () => {
+    if (!filteredLogs.length) {
+      toast.info("No logs to export");
+      return;
+    }
+    setIsExporting(true);
     try {
       const content = filteredLogs
         .map(
@@ -196,6 +203,8 @@ export function LogsScreen() {
     } catch (error: unknown) {
       const message = error instanceof Error ? error.message : String(error);
       toast.error(`Export failed: ${message}`);
+    } finally {
+      setIsExporting(false);
     }
   }, [filteredLogs]);
 
@@ -260,11 +269,15 @@ export function LogsScreen() {
                   variant="outline"
                   size="sm"
                   onClick={handleExport}
-                  disabled={loadStatus !== "ready"}
+                  disabled={loadStatus !== "ready" || isExporting}
                   whileHover={{ scale: 1.02 }}
                   whileTap={{ scale: 0.98 }}
                 >
-                  <Download className="w-3.5 h-3.5 mr-2" />
+                  {isExporting ? (
+                    <LoaderCircle className="w-3.5 h-3.5 mr-2 animate-spin" />
+                  ) : (
+                    <Download className="w-3.5 h-3.5 mr-2" />
+                  )}
                   Export
                 </MotionButton>
                 <MotionButton

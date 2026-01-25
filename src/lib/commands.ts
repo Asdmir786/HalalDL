@@ -197,7 +197,25 @@ function normalizeFsPath(path: string): string {
     (trimmed.startsWith("'") && trimmed.endsWith("'"))
       ? trimmed.slice(1, -1)
       : trimmed;
-  return stripAnsiSimple(unquoted).replace(/\r/g, "").replace(/^file:\/\//i, "");
+  const cleaned = stripAnsiSimple(unquoted).trim().replace(/[\r\n]/g, "");
+  return stripFileUriPrefix(cleaned);
+}
+
+function stripFileUriPrefix(path: string): string {
+  const lower = path.toLowerCase();
+  if (!lower.startsWith("file:")) return path;
+
+  let out = path.replace(/^file:\/\//i, "").replace(/^file:\//i, "");
+  out = out.replace(/^localhost\//i, "");
+  if (/^\/[a-zA-Z]:\//.test(out)) out = out.slice(1);
+
+  try {
+    out = decodeURIComponent(out);
+  } catch {
+    void 0;
+  }
+
+  return out;
 }
 
 function stripAnsiSimple(input: string): string {

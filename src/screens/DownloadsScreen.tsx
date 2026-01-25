@@ -158,11 +158,15 @@ export function DownloadsScreen() {
     // Construct final template: NamePart + .%(ext)s
     const finalTemplate = `${filenameBase.trim() || "%(title)s"}.%(ext)s`;
 
-    const overrides = showOutputConfig || isCustomPreset ? {
-      filenameTemplate: finalTemplate,
-      format: isCustomPreset ? outputFormat : undefined,
-      downloadDir: customDownloadDir || undefined
-    } : undefined;
+    const customDirTrimmed = customDownloadDir.trim();
+    const overrides =
+      showOutputConfig || isCustomPreset || Boolean(customDirTrimmed)
+        ? {
+            ...(showOutputConfig || isCustomPreset ? { filenameTemplate: finalTemplate } : {}),
+            ...(isCustomPreset ? { format: outputFormat } : {}),
+            ...(customDirTrimmed ? { downloadDir: customDirTrimmed } : {}),
+          }
+        : undefined;
 
     const presetIdToUse = isCustomPreset ? "default" : selectedPreset;
 

@@ -118,6 +118,8 @@ export async function startDownload(jobId: string) {
   // Ensure consistent behavior: ignore global config and force newline output for logs
   args.push("--ignore-config", "--newline", "--no-colors", "--no-playlist");
 
+  args.push("--print", "after_move:__HALALDL_OUTPUT__:%(filepath)s");
+
   // Speed Limit
   if (settings.maxSpeed && settings.maxSpeed > 0) {
     args.push("--limit-rate", `${settings.maxSpeed}K`);
@@ -131,28 +133,94 @@ export async function startDownload(jobId: string) {
 
   try {
     const cmd = Command.create(ytDlpPath, args);
+    let lastKnownOutputPath: string | undefined;
+
+    const outputParser = new OutputParser();
+    let lastUpdate = 0;
+    const UPDATE_INTERVAL = 500;
+    let stdoutBuffer = "";
+    let stderrBuffer = "";
+
+    const flushStdoutLine = (line: string) => {
+      const trimmedLine = line.replace(/\r/g, "");
+      if (!trimmedLine) return;
+
+      addLog({ level: "info", message: trimmedLine, jobId });
+
+      const now = Date.now();
+      const shouldUpdate = now - lastUpdate > UPDATE_INTERVAL;
+      const update = outputParser.parse(trimmedLine);
+
+      if (!update) return;
+
+      if (update.outputPath) {
+        lastKnownOutputPath = update.outputPath;
+      }
+
+      if (update.progress || update.speed || update.eta) {
+        if (shouldUpdate) {
+          updateJob(jobId, update);
+          lastUpdate = now;
+        }
+      } else {
+        updateJob(jobId, update);
+      }
+    };
+
+    const flushStderrLine = (line: string) => {
+      const trimmedLine = line.replace(/\r/g, "");
+      if (!trimmedLine) return;
+
+      addLog({ level: "error", message: `STDERR: ${trimmedLine}`, jobId });
+
+      if (trimmedLine.includes("aria2c") || trimmedLine.includes("downloader")) {
+        addLog({ level: "error", message: "Downloader specific error detected", jobId });
+      }
+    };
+
+    cmd.stdout.on("data", (chunk) => {
+      stdoutBuffer += chunk;
+      const parts = stdoutBuffer.split(/\n/);
+      stdoutBuffer = parts.pop() ?? "";
+      for (const part of parts) flushStdoutLine(part);
+    });
+
+    cmd.stderr.on("data", (chunk) => {
+      stderrBuffer += chunk;
+      const parts = stderrBuffer.split(/\n/);
+      stderrBuffer = parts.pop() ?? "";
+      for (const part of parts) flushStderrLine(part);
+    });
 
     cmd.on("close", (data) => {
+      flushStdoutLine(stdoutBuffer);
+      flushStderrLine(stderrBuffer);
+
       addLog({ level: "info", message: `Process finished with code ${data.code}`, jobId });
       if (data.code === 0) {
         updateJob(jobId, { status: "Done", progress: 100 });
         fetchMetadata(jobId);
         
-        // Send Notification
-        const { settings } = useSettingsStore.getState();
-        const finalJob = useDownloadsStore.getState().jobs.find(j => j.id === jobId);
-        
-        if (settings.notifications && finalJob) {
-             const title = finalJob.title || "Download Complete";
-             sendDownloadCompleteNotification("Download Finished", `${title} has been downloaded successfully.`);
-        }
+        setTimeout(() => {
+          const { settings } = useSettingsStore.getState();
+          const finalJob = useDownloadsStore.getState().jobs.find((j) => j.id === jobId);
+          const outputPathToUse = lastKnownOutputPath || finalJob?.outputPath;
 
-        // Auto-Copy File
-        if (settings.autoCopyFile && finalJob?.outputPath) {
-            copyFilesToClipboard([finalJob.outputPath]).catch(e => {
-                addLog({ level: "error", message: `Auto-copy failed: ${e}`, jobId });
+          if (lastKnownOutputPath && finalJob?.outputPath !== lastKnownOutputPath) {
+            updateJob(jobId, { outputPath: lastKnownOutputPath });
+          }
+
+          if (settings.notifications && finalJob) {
+            const title = finalJob.title || "Download Complete";
+            sendDownloadCompleteNotification("Download Finished", `${title} has been downloaded successfully.`);
+          }
+
+          if (settings.autoCopyFile && outputPathToUse) {
+            copyFilesToClipboard([outputPathToUse]).catch((e) => {
+              addLog({ level: "error", message: `Auto-copy failed: ${e}`, jobId });
             });
-        }
+          }
+        }, 50);
 
         // Auto-clear if enabled
         if (settings.autoClearFinished) {
@@ -168,44 +236,6 @@ export async function startDownload(jobId: string) {
     cmd.on("error", (error) => {
       addLog({ level: "error", message: `Process error: ${error}`, jobId });
       updateJob(jobId, { status: "Failed" });
-    });
-
-    const outputParser = new OutputParser();
-    let lastUpdate = 0;
-    const UPDATE_INTERVAL = 500;
-
-    cmd.stdout.on("data", (line) => {
-      addLog({ level: "info", message: line, jobId });
-      
-      const now = Date.now();
-      const shouldUpdate = now - lastUpdate > UPDATE_INTERVAL;
-
-      const update = outputParser.parse(line);
-      
-      if (update) {
-        // If it's just progress/speed/eta, throttle it
-        if (update.progress || update.speed || update.eta) {
-           if (shouldUpdate) {
-             updateJob(jobId, update);
-             lastUpdate = now;
-           }
-        } else {
-           // Important updates (status, title, path) - apply immediately
-           updateJob(jobId, update);
-        }
-      }
-    });
-
-    cmd.stderr.on("data", (line) => {
-      addLog({ level: "error", message: `STDERR: ${line}`, jobId });
-      
-      // Some aria2 errors might come through stderr
-      if (line.includes("aria2c") || line.includes("downloader")) {
-        // Log it as an error but keep status as Failed (compatible with JobStatus type)
-        addLog({ level: "error", message: "Downloader specific error detected", jobId });
-        // Don't set failed immediately, let the process exit code decide unless it's a critical error
-        // updateJob(jobId, { status: "Failed" });
-      }
     });
 
     await cmd.spawn();

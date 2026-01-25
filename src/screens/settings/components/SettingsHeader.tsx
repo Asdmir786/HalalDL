@@ -1,7 +1,8 @@
 import { 
   Settings as SettingsIcon, 
   RotateCcw,
-  Save
+  Save,
+  Loader2
 } from "lucide-react";
 import { MotionButton } from "@/components/motion/MotionButton";
 import { FadeInItem } from "@/components/motion/StaggerContainer";
@@ -16,6 +17,7 @@ import {
 interface SettingsHeaderProps {
   isGlobalDirty: boolean;
   isDirty: boolean;
+  isResetting?: boolean;
   onGlobalReset: () => void;
   onResetAll: () => void;
   onResetGroup: (group: "appearance" | "storage" | "behavior" | "downloadEngine") => void;
@@ -25,6 +27,7 @@ interface SettingsHeaderProps {
 export function SettingsHeader({
   isGlobalDirty,
   isDirty,
+  isResetting = false,
   onGlobalReset,
   onResetAll,
   onResetGroup,
@@ -43,12 +46,16 @@ export function SettingsHeader({
         <MotionButton
           variant="outline"
           size="sm"
-          disabled={!isGlobalDirty}
+          disabled={!isGlobalDirty || isResetting}
           onClick={onGlobalReset}
           whileHover={{ scale: 1.05 }}
           whileTap={{ scale: 0.95 }}
         >
-          <RotateCcw className="w-4 h-4 mr-2" />
+          {isResetting ? (
+            <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+          ) : (
+            <RotateCcw className="w-4 h-4 mr-2" />
+          )}
           Restore Defaults
         </MotionButton>
         <DropdownMenu>

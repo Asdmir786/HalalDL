@@ -77,14 +77,14 @@ export function DownloadInputSection({
             <SelectTrigger className="w-[140px] bg-background border-muted shadow-sm focus:ring-1 h-10">
               <SelectValue placeholder="Preset" />
             </SelectTrigger>
-            <SelectContent>
+            <SelectContent className="max-h-[300px] overflow-y-auto">
               <SelectItem value="custom" className="font-semibold text-primary">
                 ✨ Custom Configuration
               </SelectItem>
               <SelectSeparator />
               {orderedGroups.map((group) => (
                 <SelectGroup key={group}>
-                  <SelectLabel className="text-[10px] uppercase tracking-wider text-muted-foreground/80">
+                  <SelectLabel className="text-[10px] uppercase tracking-wider text-muted-foreground/80 sticky top-0 bg-popover z-10 py-1.5">
                     {group}
                   </SelectLabel>
                   {(grouped[group] ?? []).map(({ preset, label }) => (
