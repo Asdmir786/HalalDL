@@ -17,6 +17,13 @@ class StorageManager {
       console.log("Storage initialized successfully");
     } catch (error) {
       console.error("Failed to initialize storage:", error);
+      try {
+        const { useLogsStore } = await import("@/store/logs");
+        const message = error instanceof Error ? error.message : String(error);
+        useLogsStore.getState().addLog({ level: "error", message: `Failed to initialize storage: ${message}` });
+      } catch {
+        void 0;
+      }
     }
   }
 

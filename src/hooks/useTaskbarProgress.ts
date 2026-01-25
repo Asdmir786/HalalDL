@@ -1,9 +1,11 @@
-import { useEffect } from "react";
+import { useEffect, useRef } from "react";
 import { getCurrentWindow, ProgressBarStatus } from "@tauri-apps/api/window";
 import { useDownloadsStore } from "@/store/downloads";
+import { useLogsStore } from "@/store/logs";
 
 export function useTaskbarProgress() {
   const jobs = useDownloadsStore((state) => state.jobs);
+  const loggedErrorRef = useRef(false);
 
   useEffect(() => {
     const activeJobs = jobs.filter(
@@ -33,7 +35,10 @@ export function useTaskbarProgress() {
           progress: avgProgress,
         });
       } catch (err) {
-        console.error("Failed to update taskbar progress:", err);
+        if (!loggedErrorRef.current) {
+          loggedErrorRef.current = true;
+          useLogsStore.getState().addLog({ level: "warn", message: `Failed to update taskbar progress: ${String(err)}` });
+        }
       }
     };
 

@@ -104,6 +104,58 @@ async fn download_tools(app_handle: tauri::AppHandle, tools: Vec<String>) -> Res
     Ok("Selected tools downloaded successfully".to_string())
 }
 
+#[tauri::command]
+fn stage_manual_tool(app_handle: tauri::AppHandle, tool: String, source: String) -> Result<String, String> {
+    let bin_dir = app_handle
+        .path()
+        .app_data_dir()
+        .map_err(|e: tauri::Error| e.to_string())?
+        .join("bin");
+
+    if !bin_dir.exists() {
+        fs::create_dir_all(&bin_dir).map_err(|e| e.to_string())?;
+    }
+
+    let normalized_source = source.replace("/", "\\");
+    let source_path = PathBuf::from(normalized_source);
+
+    if !source_path.exists() {
+        return Err("Source path does not exist".to_string());
+    }
+    if !source_path.is_file() {
+        return Err("Source path is not a file".to_string());
+    }
+
+    let (dest_name, extra_sidecar) = match tool.as_str() {
+        "yt-dlp" => ("yt-dlp.exe", None),
+        "ffmpeg" => ("ffmpeg.exe", Some("ffprobe.exe")),
+        "aria2" => ("aria2c.exe", None),
+        "deno" => ("deno.exe", None),
+        _ => return Err("Unsupported tool id".to_string()),
+    };
+
+    let dest_path = bin_dir.join(dest_name);
+    fs::copy(&source_path, &dest_path).map_err(|e| format!("Failed to copy file: {}", e))?;
+
+    let metadata = fs::metadata(&dest_path).map_err(|e| format!("Failed to read copied file: {}", e))?;
+    if metadata.len() == 0 {
+        let _ = fs::remove_file(&dest_path);
+        return Err("Copied file is empty".to_string());
+    }
+
+    if let Some(sidecar_name) = extra_sidecar {
+        if let Some(parent) = source_path.parent() {
+            let sidecar_source = parent.join(sidecar_name);
+            if sidecar_source.exists() && sidecar_source.is_file() {
+                let sidecar_dest = bin_dir.join(sidecar_name);
+                let _ = fs::copy(sidecar_source, sidecar_dest);
+            }
+        }
+    }
+
+    Ok(dest_path.to_string_lossy().to_string())
+}
+
 use std::io::Write;
 
 async fn download_file(
@@ -292,6 +344,151 @@ fn add_to_user_path(app_handle: tauri::AppHandle) -> Result<String, String> {
     {
         Ok("Not supported on non-Windows".to_string())
     }
+}
+
+#[tauri::command]
+fn write_text_file(path: String, contents: String) -> Result<(), String> {
+    let normalized = if cfg!(target_os = "windows") {
+        path.replace("/", "\\")
+    } else {
+        path
+    };
+
+    if normalized.trim().is_empty() {
+        return Err("Path is empty".to_string());
+    }
+
+    let p = PathBuf::from(normalized);
+    if let Some(parent) = p.parent() {
+        if !parent.as_os_str().is_empty() {
+            fs::create_dir_all(parent).map_err(|e| format!("Failed to create parent directory: {}", e))?;
+        }
+    }
+
+    fs::write(&p, contents.as_bytes()).map_err(|e| format!("Failed to write file: {}", e))?;
+    Ok(())
+}
+
+#[tauri::command]
+async fn fetch_latest_ytdlp_version(app_handle: tauri::AppHandle) -> Result<String, String> {
+    let client = reqwest::Client::builder()
+        .user_agent(format!("HalalDL/{}", app_handle.package_info().version))
+        .build()
+        .map_err(|e| e.to_string())?;
+
+    let res = client
+        .get("https://api.github.com/repos/yt-dlp/yt-dlp/releases/latest")
+        .header("Accept", "application/vnd.github+json")
+        .send()
+        .await
+        .map_err(|e| e.to_string())?;
+
+    if !res.status().is_success() {
+        return Err(format!("HTTP {}", res.status()));
+    }
+
+    let json: serde_json::Value = res.json().await.map_err(|e| e.to_string())?;
+    let tag = json
+        .get("tag_name")
+        .and_then(|v| v.as_str())
+        .unwrap_or("")
+        .trim()
+        .to_string();
+
+    if tag.is_empty() {
+        return Err("Missing tag_name".to_string());
+    }
+
+    Ok(tag.trim_start_matches('v').trim().to_string())
+}
+
+#[tauri::command]
+async fn fetch_latest_aria2_version(app_handle: tauri::AppHandle) -> Result<String, String> {
+    let client = reqwest::Client::builder()
+        .user_agent(format!("HalalDL/{}", app_handle.package_info().version))
+        .build()
+        .map_err(|e| e.to_string())?;
+
+    let res = client
+        .get("https://api.github.com/repos/aria2/aria2/releases/latest")
+        .header("Accept", "application/vnd.github+json")
+        .send()
+        .await
+        .map_err(|e| e.to_string())?;
+
+    if !res.status().is_success() {
+        return Err(format!("HTTP {}", res.status()));
+    }
+
+    let json: serde_json::Value = res.json().await.map_err(|e| e.to_string())?;
+    let tag = json
+        .get("tag_name")
+        .and_then(|v| v.as_str())
+        .unwrap_or("")
+        .trim()
+        .to_string();
+
+    if tag.is_empty() {
+        return Err("Missing tag_name".to_string());
+    }
+
+    Ok(tag
+        .trim_start_matches("release-")
+        .trim_start_matches('v')
+        .trim()
+        .to_string())
+}
+
+#[tauri::command]
+async fn fetch_latest_deno_version(app_handle: tauri::AppHandle) -> Result<String, String> {
+    let client = reqwest::Client::builder()
+        .user_agent(format!("HalalDL/{}", app_handle.package_info().version))
+        .build()
+        .map_err(|e| e.to_string())?;
+
+    let res = client
+        .get("https://dl.deno.land/release-latest.txt")
+        .header("Accept", "text/plain,*/*")
+        .send()
+        .await
+        .map_err(|e| e.to_string())?;
+
+    if !res.status().is_success() {
+        return Err(format!("HTTP {}", res.status()));
+    }
+
+    let text = res.text().await.map_err(|e| e.to_string())?;
+    let version = text.trim().split_whitespace().next().unwrap_or("").trim();
+    if version.is_empty() {
+        return Err("Empty response".to_string());
+    }
+    Ok(version.trim_start_matches('v').trim().to_string())
+}
+
+#[tauri::command]
+async fn fetch_latest_ffmpeg_version(app_handle: tauri::AppHandle) -> Result<String, String> {
+    let client = reqwest::Client::builder()
+        .user_agent(format!("HalalDL/{}", app_handle.package_info().version))
+        .build()
+        .map_err(|e| e.to_string())?;
+
+    let res = client
+        .get("https://www.gyan.dev/ffmpeg/builds/release-version")
+        .header("Accept", "text/plain,*/*")
+        .send()
+        .await
+        .map_err(|e| e.to_string())?;
+
+    if !res.status().is_success() {
+        return Err(format!("HTTP {}", res.status()));
+    }
+
+    let text = res.text().await.map_err(|e| e.to_string())?;
+    let version = text.trim().split_whitespace().next().unwrap_or("").trim();
+    if version.is_empty() {
+        return Err("Empty response".to_string());
+    }
+    Ok(version.to_string())
 }
 
 #[tauri::command]
@@ -692,7 +889,21 @@ pub fn run() {
         .plugin(tauri_plugin_store::Builder::new().build())
         .plugin(tauri_plugin_opener::init())
         .plugin(tauri_plugin_notification::init())
-        .invoke_handler(tauri::generate_handler![greet, download_tools, add_to_user_path, show_in_folder, open_path, delete_file, copy_files_to_clipboard])
+        .invoke_handler(tauri::generate_handler![
+            greet,
+            download_tools,
+            stage_manual_tool,
+            add_to_user_path,
+            write_text_file,
+            fetch_latest_ytdlp_version,
+            fetch_latest_aria2_version,
+            fetch_latest_deno_version,
+            fetch_latest_ffmpeg_version,
+            show_in_folder,
+            open_path,
+            delete_file,
+            copy_files_to_clipboard
+        ])
         .setup(|app| {
             let win = app.get_webview_window("main").unwrap();
             win.set_focus().unwrap();

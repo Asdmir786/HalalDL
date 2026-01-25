@@ -25,9 +25,10 @@ import {
 } from "lucide-react";
 
 import { open as openUrl } from "@tauri-apps/plugin-shell";
-import { downloadTools, fetchLatestAria2Version, fetchLatestDenoVersion, fetchLatestFfmpegVersion, fetchLatestYtDlpVersion, isUpdateAvailable, pickFile, checkYtDlpVersion, checkFfmpegVersion, checkAria2Version, checkDenoVersion } from "@/lib/commands";
+import { downloadTools, fetchLatestAria2Version, fetchLatestDenoVersion, fetchLatestFfmpegVersion, fetchLatestYtDlpVersion, isUpdateAvailable, pickFile, checkYtDlpVersion, checkFfmpegVersion, checkAria2Version, checkDenoVersion, stageManualTool } from "@/lib/commands";
 import { toast } from "sonner";
 import { useState } from "react";
+import { useLogsStore } from "@/store/logs";
 
 const TOOL_URLS: Record<string, string> = {
   "yt-dlp": "https://github.com/yt-dlp/yt-dlp",
@@ -38,6 +39,7 @@ const TOOL_URLS: Record<string, string> = {
 
 export function ToolsScreen() {
   const { tools, updateTool } = useToolsStore();
+  const addLog = useLogsStore((state) => state.addLog);
   const isLite = import.meta.env.VITE_APP_MODE !== "FULL";
   const [checkingTools, setCheckingTools] = useState<Record<string, boolean>>({});
   const [checkingLatest, setCheckingLatest] = useState<Record<string, boolean>>({});
@@ -62,11 +64,14 @@ export function ToolsScreen() {
       });
       
       if (version) {
+        addLog({ level: "info", message: `${id} detected: ${version}` });
         toast.success(`${id} detected: ${version}`);
       } else {
+        addLog({ level: "warn", message: `${id} not found` });
         toast.error(`${id} not found`);
       }
-    } catch {
+    } catch (e: unknown) {
+      addLog({ level: "error", message: `Tool test failed (${id}): ${e instanceof Error ? e.message : String(e)}` });
       updateTool(id, { status: "Missing" });
       toast.error(`Error testing ${id}`);
     } finally {
@@ -92,11 +97,14 @@ export function ToolsScreen() {
       });
 
       if (latest) {
+        addLog({ level: "info", message: `${tool.id} latest: ${latest}` });
         toast.success(`${tool.id} latest: ${latest}`);
       } else {
+        addLog({ level: "warn", message: `Could not fetch latest for ${tool.id}` });
         toast.error(`Could not fetch latest for ${tool.id}`);
       }
-    } catch {
+    } catch (e: unknown) {
+      addLog({ level: "error", message: `Latest check failed (${tool.id}): ${e instanceof Error ? e.message : String(e)}` });
       toast.error(`Error checking latest for ${tool.id}`);
     } finally {
       setCheckingLatest((prev) => ({ ...prev, [tool.id]: false }));
@@ -118,18 +126,23 @@ export function ToolsScreen() {
     setIsUpdatingTools((prev) => ({ ...prev, [tool.id]: true }));
     try {
       await downloadTools([tool.id]);
+      addLog({ level: "info", message: `${tool.id} updated` });
       toast.success(`${tool.id} updated`);
       await testTool(tool.id);
       await checkLatestForTool({ ...tool, version: useToolsStore.getState().tools.find((t) => t.id === tool.id)?.version });
     } catch (e: unknown) {
       const message = e instanceof Error ? e.message : String(e);
+      addLog({ level: "error", message: `Tool update failed (${tool.id}): ${message}` });
       toast.error(`Update failed: ${message}`);
     } finally {
       setIsUpdatingTools((prev) => ({ ...prev, [tool.id]: false }));
     }
   };
 
-  const ToolCard = ({ tool }: { tool: Tool }) => (
+  const ToolCard = ({ tool }: { tool: Tool }) => {
+    const canInstallOrUpdate = isLite || tool.status === "Missing" || tool.updateAvailable === true;
+
+    return (
     <Card className="flex flex-col h-full overflow-hidden hover:shadow-md transition-shadow duration-200 border-muted/60 glass-card">
       <CardHeader className="pb-3">
         <div className="flex justify-between items-start gap-2">
@@ -183,7 +196,16 @@ export function ToolsScreen() {
                     onClick={async () => {
                       const path = await pickFile();
                       if (path) {
-                        updateTool(tool.id, { path });
+                        try {
+                          const stagedPath = await stageManualTool(tool.id, path);
+                          updateTool(tool.id, { path: stagedPath });
+                          addLog({ level: "info", message: `${tool.id} path set (Browse)` });
+                          toast.success(`${tool.id} path set`);
+                        } catch (e) {
+                          const message = e instanceof Error ? e.message : String(e);
+                          addLog({ level: "error", message: `Failed to set ${tool.id} path (Browse): ${message}` });
+                          toast.error(`Failed to set path: ${message}`);
+                        }
                       }
                     }}
                   >
@@ -202,6 +224,21 @@ export function ToolsScreen() {
               placeholder="C:\\path\\to\\tool.exe" 
               className="h-8 text-xs bg-background"
               onChange={(e) => updateTool(tool.id, { path: e.target.value })}
+              onKeyDown={async (e) => {
+                if (e.key !== "Enter") return;
+                const raw = (e.currentTarget.value || "").trim();
+                if (!raw) return;
+                try {
+                  const stagedPath = await stageManualTool(tool.id, raw);
+                  updateTool(tool.id, { path: stagedPath });
+                  addLog({ level: "info", message: `${tool.id} path set (Manual input)` });
+                  toast.success(`${tool.id} path set`);
+                } catch (err) {
+                  const message = err instanceof Error ? err.message : String(err);
+                  addLog({ level: "error", message: `Failed to set ${tool.id} path (Manual input): ${message}` });
+                  toast.error(`Failed to set path: ${message}`);
+                }
+              }}
             />
           </div>
         )}
@@ -248,14 +285,14 @@ export function ToolsScreen() {
           variant={tool.updateAvailable ? "default" : "outline"}
           size="sm"
           className="h-8 px-3 text-xs"
-          disabled={!tool.updateAvailable || isUpdatingTools[tool.id]}
+          disabled={!canInstallOrUpdate || isUpdatingTools[tool.id]}
           onClick={() => updateToolNow(tool)}
           title={isLite ? "Lite Mode: open download page" : "Download and replace tool"}
         >
           {isUpdatingTools[tool.id] ? (
             <Loader2 className="w-3.5 h-3.5 animate-spin" />
           ) : (
-            <span>{isLite ? "Get" : "Update"}</span>
+            <span>{isLite ? "Get" : tool.status === "Missing" ? "Install" : "Update"}</span>
           )}
         </MotionButton>
         <MotionButton 
@@ -269,7 +306,8 @@ export function ToolsScreen() {
         </MotionButton>
       </CardFooter>
     </Card>
-  );
+    );
+  };
 
   return (
     <div className="flex flex-col h-full bg-background max-w-6xl mx-auto w-full" role="main">

@@ -16,7 +16,7 @@ export function PersistenceManager() {
   const { settings, setSettings } = useSettingsStore();
   const { presets, setPresets } = usePresetsStore();
   const { updateTool, setDiscoveredToolId } = useToolsStore();
-  const { logs } = useLogsStore();
+  const { logs, addLog } = useLogsStore();
   const { jobs } = useDownloadsStore();
   
   const initialized = useRef(false);
@@ -25,7 +25,7 @@ export function PersistenceManager() {
   // Initial Load
   useEffect(() => {
     const checkTools = async () => {
-      console.log("Checking tools...");
+      addLog({ level: "debug", message: "Checking tools..." });
       
       const checkAndNotify = async (id: string, checkFn: () => Promise<string | null>) => {
         const currentTool = useToolsStore.getState().tools.find(t => t.id === id);
@@ -48,7 +48,7 @@ export function PersistenceManager() {
             if (next.length === 0) localStorage.removeItem(pendingCongratsKey);
             else localStorage.setItem(pendingCongratsKey, JSON.stringify(next));
           } catch (e) {
-            console.warn("Failed to persist pending tool congrats:", e);
+            addLog({ level: "warn", message: `Failed to persist pending tool congrats: ${String(e)}` });
           }
         };
 
@@ -100,6 +100,7 @@ export function PersistenceManager() {
 
       try {
         await storage.init();
+        addLog({ level: "debug", message: "Storage initialized" });
         await useLogsStore.getState().loadLogs();
 
         // Load Settings
@@ -110,11 +111,11 @@ export function PersistenceManager() {
             try {
               savedSettings.defaultDownloadDir = await downloadDir();
             } catch (e) {
-              console.warn("Could not resolve download dir", e);
+              addLog({ level: "warn", message: `Could not resolve download dir: ${String(e)}` });
             }
           }
           setSettings(savedSettings);
-          console.log("Settings loaded");
+          addLog({ level: "info", message: "Settings loaded" });
         } else {
           // No settings found (first run), set default download dir
           try {
@@ -122,7 +123,7 @@ export function PersistenceManager() {
             const currentSettings = useSettingsStore.getState().settings;
             setSettings({ ...currentSettings, defaultDownloadDir: defaultDir });
           } catch (e) {
-            console.warn("Could not resolve download dir", e);
+            addLog({ level: "warn", message: `Could not resolve download dir: ${String(e)}` });
           }
         }
 
@@ -134,33 +135,35 @@ export function PersistenceManager() {
           const userOnly = savedUserPresets.filter(p => !p.isBuiltIn);
           const merged = [...BUILT_IN_PRESETS, ...userOnly];
           setPresets(merged);
-          console.log("Presets loaded", merged.length);
+          addLog({ level: "info", message: `Presets loaded (${merged.length})` });
         }
 
         // Load Downloads
         const savedDownloads = await storage.getDownloads<DownloadJob[]>();
         if (savedDownloads && Array.isArray(savedDownloads)) {
           useDownloadsStore.setState({ jobs: savedDownloads });
-          console.log("Downloads loaded", savedDownloads.length);
+          addLog({ level: "info", message: `Downloads loaded (${savedDownloads.length})` });
         }
 
         // Check Tools
         await checkTools();
 
       } catch (e) {
-        console.error("Failed to load persistence:", e);
+        addLog({ level: "error", message: `Failed to load persistence: ${String(e)}` });
         toast.error("Failed to load settings");
       }
     };
 
     init();
-  }, [setSettings, setPresets, updateTool, setDiscoveredToolId]);
+  }, [setSettings, setPresets, updateTool, setDiscoveredToolId, addLog]);
 
   // Auto-Save Settings
   useEffect(() => {
     if (!initialized.current) return;
     const timer = setTimeout(() => {
-      storage.saveSettings(settings).catch(console.error);
+      storage.saveSettings(settings).catch((e) => {
+        useLogsStore.getState().addLog({ level: "error", message: `Failed to save settings: ${String(e)}` });
+      });
     }, 500); // Debounce 500ms
     return () => clearTimeout(timer);
   }, [settings]);
@@ -185,7 +188,9 @@ export function PersistenceManager() {
     if (!initialized.current) return;
     const timer = setTimeout(() => {
       const userPresets = presets.filter((p) => !p.isBuiltIn);
-      storage.savePresets(userPresets).catch(console.error);
+      storage.savePresets(userPresets).catch((e) => {
+        useLogsStore.getState().addLog({ level: "error", message: `Failed to save presets: ${String(e)}` });
+      });
     }, 500);
     return () => clearTimeout(timer);
   }, [presets]);
@@ -193,9 +198,8 @@ export function PersistenceManager() {
   useEffect(() => {
     if (!initialized.current) return;
     const timer = setTimeout(() => {
-      console.debug("[logs] saveLogs");
       storage.saveLogs(logs).catch((e) => {
-        console.error("[logs] saveLogs:error", e);
+        useLogsStore.getState().addLog({ level: "error", message: `Failed to save logs: ${String(e)}` });
       });
     }, 500);
     return () => clearTimeout(timer);
@@ -226,13 +230,13 @@ export function PersistenceManager() {
             const backupPath = await join(backupDir, `history-${dateStr}.json`);
             
             await writeTextFile(backupPath, JSON.stringify(jobs, null, 2));
-            console.log("Paranoid backup saved to", backupPath);
+            useLogsStore.getState().addLog({ level: "debug", message: `Paranoid backup saved to ${backupPath}` });
           } catch (e) {
-            console.error("Paranoid backup failed:", e);
+            useLogsStore.getState().addLog({ level: "error", message: `Paranoid backup failed: ${String(e)}` });
           }
         }
       } catch (e) {
-        console.error("Failed to save downloads:", e);
+        useLogsStore.getState().addLog({ level: "error", message: `Failed to save downloads: ${String(e)}` });
       }
     }, 1000); // Debounce 1s
     return () => clearTimeout(timer);

@@ -18,7 +18,7 @@ import { useDownloadsStore } from "@/store/downloads";
 import { MotionButton } from "@/components/motion/MotionButton";
 import { FadeInStagger, FadeInItem } from "@/components/motion/StaggerContainer";
 import { save } from "@tauri-apps/plugin-dialog";
-import { writeFile } from "@tauri-apps/plugin-fs";
+import { invoke } from "@tauri-apps/api/core";
 import { Input } from "@/components/ui/input";
 import {
   Select,
@@ -184,6 +184,9 @@ export function LogsScreen() {
     }
     setIsExporting(true);
     try {
+      const now = new Date();
+      const pad2 = (n: number) => String(n).padStart(2, "0");
+      const stamp = `${now.getFullYear()}-${pad2(now.getMonth() + 1)}-${pad2(now.getDate())}_${pad2(now.getHours())}-${pad2(now.getMinutes())}-${pad2(now.getSeconds())}`;
       const content = filteredLogs
         .map(
           (l) =>
@@ -194,14 +197,15 @@ export function LogsScreen() {
         .join("\n");
       const path = await save({
         filters: [{ name: "Text", extensions: ["txt"] }],
-        defaultPath: "HalalDL-logs.txt",
+        defaultPath: `HalalDL-logs-${stamp}.txt`,
       });
       if (path) {
-        await writeFile(path, new TextEncoder().encode(content));
+        await invoke("write_text_file", { path, contents: content });
         toast.success("Logs exported successfully");
       }
     } catch (error: unknown) {
       const message = error instanceof Error ? error.message : String(error);
+      useLogsStore.getState().addLog({ level: "error", message: `Logs export failed: ${message}` });
       toast.error(`Export failed: ${message}`);
     } finally {
       setIsExporting(false);

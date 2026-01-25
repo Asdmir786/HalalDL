@@ -14,9 +14,11 @@ import { PresetEditor } from "@/components/PresetEditor";
 import { save, open } from "@tauri-apps/plugin-dialog";
 import { writeFile, readTextFile } from "@tauri-apps/plugin-fs";
 import { PresetCard } from "./presets/components/PresetCard";
+import { useLogsStore } from "@/store/logs";
 
 export function PresetsScreen() {
   const { presets, duplicatePreset, deletePreset, updatePreset, addPreset } = usePresetsStore();
+  const addLog = useLogsStore((state) => state.addLog);
   const [editingPreset, setEditingPreset] = useState<Preset | null>(null);
   const [isEditorOpen, setIsEditorOpen] = useState(false);
   const [isExporting, setIsExporting] = useState(false);
@@ -40,6 +42,7 @@ export function PresetsScreen() {
     } catch (error: unknown) {
       const message =
         error instanceof Error ? error.message : String(error);
+      addLog({ level: "error", message: `Presets export failed: ${message}` });
       toast.error(`Export failed: ${message}`);
     } finally {
       setIsExporting(false);
@@ -70,6 +73,7 @@ export function PresetsScreen() {
     } catch (error: unknown) {
       const message =
         error instanceof Error ? error.message : String(error);
+      addLog({ level: "error", message: `Presets import failed: ${message}` });
       toast.error(`Import failed: ${message}`);
     } finally {
       setIsImporting(false);

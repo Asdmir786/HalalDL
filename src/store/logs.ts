@@ -82,7 +82,19 @@ export const useLogsStore = create<LogsState>((set) => ({
     } catch (error: unknown) {
       const message = error instanceof Error ? error.message : String(error);
       console.error("[logs] loadLogs:error", error);
-      set({ loadStatus: "error", loadError: message });
+      set((state) => ({
+        logs: [
+          ...state.logs.slice(-999),
+          {
+            id: Math.random().toString(36).substring(7),
+            timestamp: new Date().toISOString(),
+            level: "error",
+            message: `Failed to load logs: ${message}`,
+          },
+        ],
+        loadStatus: "error",
+        loadError: message,
+      }));
     }
   },
   clearLogs: () => set({ logs: [] }),

@@ -130,19 +130,19 @@ export function UpgradePrompt() {
       try {
         await invoke("add_to_user_path");
       } catch (error) {
-        console.error("Failed to add to PATH:", error);
+        addLog({ level: "warn", message: `Failed to add to PATH: ${String(error)}` });
       }
       if (results.some(Boolean)) {
         try {
           localStorage.setItem("halaldl:pendingToolCongrats", JSON.stringify(selectedTools));
         } catch (e) {
-          console.warn("Failed to persist pending tool congrats:", e);
+          addLog({ level: "warn", message: `Failed to persist pending tool congrats: ${String(e)}` });
         }
       }
       setOpen(false);
       await relaunch();
     } catch (error) {
-      console.error("Failed to finish setup:", error);
+      addLog({ level: "error", message: `Failed to finish setup: ${String(error)}` });
       window.location.reload();
     } finally {
       setIsFinishing(false);

@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.3.5 - 2026-01-26
+- **Logs**: Fixed log export/write failures caused by Windows ACL restrictions by writing via the Tauri backend.
+- **Logs**: Added timestamped log export filenames for easier sharing and no overwrites.
+- **Logs**: Hardened downloader output handling to avoid invalid UTF-8 sequence errors.
+- **Logs**: Mirrored UI toast errors and background failures into the in-app logs for easier troubleshooting.
+- **Tools**: Improved version/update logging and error visibility during tool checks, installs, and manual path staging.
+- **Fixes**: Improved open/show-in-folder fallback logging and error reporting.
+
 ## 0.3.4 - 2026-01-24
 - **UI/UX**: Revamped "Empty Queue" screen with a modern hero section, animated particles, and quick action cards.
 - **UI/UX**: Modernized "Tool Setup" dialog (UpgradePrompt) with glassmorphism, smoother animations, and a cleaner aesthetic.

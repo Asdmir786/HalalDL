@@ -1,7 +1,7 @@
 {
   "name": "halaldl",
   "private": true,
-  "version": "0.3.4",
+  "version": "0.3.5",
   "type": "module",
   "scripts": {
     "dev": "vite",
@@ -11,7 +11,8 @@
     "lint": "eslint .",
     "format": "prettier --write .",
     "typecheck": "tsc --noEmit",
-    "check": "pnpm lint && pnpm typecheck && pnpm build",
+    "cargo:check": "cargo check --manifest-path src-tauri/Cargo.toml",
+    "check": "pnpm lint && pnpm typecheck && pnpm build && pnpm cargo:check",
     "build:lite": "cross-env VITE_APP_MODE=LITE pnpm tauri build && node scripts/rename-release.js LITE",
     "build:full": "cross-env VITE_APP_MODE=FULL pnpm tauri build && node scripts/rename-release.js FULL",
     "build:all": "pnpm build:lite && pnpm build:full"

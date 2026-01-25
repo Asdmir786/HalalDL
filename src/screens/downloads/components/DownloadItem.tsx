@@ -6,6 +6,7 @@ import {
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { DownloadJob } from "@/store/downloads";
+import { useLogsStore } from "@/store/logs";
 import { MotionButton } from "@/components/motion/MotionButton";
 import { revealInExplorer, deleteFile, openFile, copyFilesToClipboard } from "@/lib/commands";
 import { startDownload } from "@/lib/downloader";
@@ -33,6 +34,7 @@ export function DownloadItem({
   itemVariants,
   formatRelativeTime
 }: DownloadItemProps) {
+  const { addLog } = useLogsStore();
   const ts = getJobTs(job);
   const relative = formatRelativeTime(ts);
   const absolute = new Date(ts).toLocaleString();
@@ -69,6 +71,7 @@ export function DownloadItem({
     } catch (e) {
       const message = e instanceof Error ? e.message : String(e);
       toast.error(`Failed to copy file: ${message}`);
+      addLog({ level: "error", message: `Copy file failed: ${message}` });
     }
   };
 
@@ -78,8 +81,9 @@ export function DownloadItem({
         await deleteFile(path);
         toast.success("File deleted from disk");
       } catch (e) {
-        toast.error("Failed to delete file");
-        console.error(e);
+        const message = e instanceof Error ? e.message : String(e);
+        toast.error(`Failed to delete file: ${message}`);
+        addLog({ level: "error", message: `Delete file failed: ${message}` });
       }
     }
     onRemove(jobId);

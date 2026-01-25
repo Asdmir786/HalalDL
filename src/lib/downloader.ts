@@ -25,7 +25,7 @@ async function sendDownloadCompleteNotification(title: string, body: string) {
       });
     }
   } catch (error) {
-    console.error("Failed to send notification:", error);
+    useLogsStore.getState().addLog({ level: "warn", message: `Failed to send notification: ${String(error)}` });
   }
 }
 
@@ -40,6 +40,15 @@ async function getToolPath(baseName: string): Promise<string> {
     // Ignore and fallback
   }
   return baseName;
+}
+
+function ytDlpEnv(): Record<string, string> {
+  return {
+    PYTHONIOENCODING: "utf-8",
+    PYTHONUTF8: "1",
+    LANG: "C.UTF-8",
+    LC_ALL: "C.UTF-8",
+  };
 }
 
 export async function startDownload(jobId: string) {
@@ -171,7 +180,7 @@ export async function startDownload(jobId: string) {
   updateJob(jobId, { status: "Downloading", progress: 0 });
 
   try {
-    const cmd = Command.create(ytDlpPath, args);
+    const cmd = Command.create(ytDlpPath, args, { env: ytDlpEnv() });
     let lastKnownOutputPath: string | undefined;
 
     const outputParser = new OutputParser();
@@ -292,7 +301,12 @@ export async function startDownload(jobId: string) {
     });
 
     cmd.on("error", (error) => {
-      addLog({ level: "error", message: `Process error: ${error}`, jobId });
+      const message = String(error);
+      if (message.toLowerCase().includes("invalid utf-8 sequence")) {
+        addLog({ level: "warn", message: `Process output decode warning: ${message}`, jobId });
+        return;
+      }
+      addLog({ level: "error", message: `Process error: ${message}`, jobId });
       updateJob(jobId, { status: "Failed" });
     });
 
@@ -318,7 +332,7 @@ export async function fetchMetadata(jobId: string) {
       "--flat-playlist",
       "--referer", job.url,
       job.url
-    ]);
+    ], { env: ytDlpEnv() });
 
     const output = await cmd.execute();
     
@@ -335,6 +349,11 @@ export async function fetchMetadata(jobId: string) {
       }
     }
   } catch (e) {
-    useLogsStore.getState().addLog({ level: "error", message: `[meta] Failed to fetch metadata: ${e}`, jobId });
+    const message = String(e);
+    if (message.toLowerCase().includes("invalid utf-8 sequence")) {
+      useLogsStore.getState().addLog({ level: "warn", message: `[meta] Metadata decode warning: ${message}`, jobId });
+      return;
+    }
+    useLogsStore.getState().addLog({ level: "error", message: `[meta] Failed to fetch metadata: ${message}`, jobId });
   }
 }
