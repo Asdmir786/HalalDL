@@ -33,16 +33,11 @@ export const BUILT_IN_PRESETS: Preset[] = [
     args: ["-f", "bestvideo[height<=1080]+bestaudio/best"],
   },
   {
-    id: "whatsapp",
-    name: "Compatibility — MP4 (H.264 + AAC)",
-    description: "Most compatible choice for phones, social apps, and editors",
+    id: "high-quality",
+    name: "Recommended — Best Available (Up to 4K)",
+    description: "Best video up to 2160p + best audio",
     isBuiltIn: true,
-    args: [
-      "-f",
-      "bv[ext=mp4][vcodec^=avc1]+ba[ext=m4a]/bv[vcodec^=avc1]+ba/b[ext=mp4][vcodec^=avc1]/b",
-      "--merge-output-format",
-      "mp4"
-    ],
+    args: ["-f", "bestvideo[height<=2160]+bestaudio/best"],
   },
   {
     id: "whatsapp-optimized",
@@ -59,6 +54,18 @@ export const BUILT_IN_PRESETS: Preset[] = [
     ],
   },
   {
+    id: "whatsapp",
+    name: "Compatibility — MP4 (H.264 + AAC)",
+    description: "Most compatible choice for phones, social apps, and editors",
+    isBuiltIn: true,
+    args: [
+      "-f",
+      "bv[ext=mp4][vcodec^=avc1]+ba[ext=m4a]/bv[vcodec^=avc1]+ba/b[ext=mp4][vcodec^=avc1]/b",
+      "--merge-output-format",
+      "mp4"
+    ],
+  },
+  {
     id: "mp4-best",
     name: "Compatibility — Best MP4 (Any Codec)",
     description: "Highest quality MP4; codec may vary by source",
@@ -71,13 +78,6 @@ export const BUILT_IN_PRESETS: Preset[] = [
     description: "Best WebM quality; not ideal for most editors",
     isBuiltIn: true,
     args: ["-f", "bestvideo[ext=webm]+bestaudio[ext=webm]/best[ext=webm]"],
-  },
-  {
-    id: "high-quality",
-    name: "Recommended — Best Available (Up to 4K)",
-    description: "Best video up to 2160p + best audio",
-    isBuiltIn: true,
-    args: ["-f", "bestvideo[height<=2160]+bestaudio/best"],
   },
   {
     id: "editors-capcut-1080p-mp4",
@@ -164,17 +164,38 @@ export const BUILT_IN_PRESETS: Preset[] = [
   },
   {
     id: "audio-only",
-    name: "Audio — Best Audio Only",
-    description: "Best available audio stream without video",
+    name: "Audio — Best Audio (Source)",
+    description: "Highest bitrate audio stream; format may be Opus/WebM depending on source",
     isBuiltIn: true,
     args: ["-f", "bestaudio"],
   },
   {
+    id: "flac",
+    name: "Audio — FLAC (Lossless Convert)",
+    description: "Converts best source audio to FLAC (no added loss; source may be lossy)",
+    isBuiltIn: true,
+    args: ["-f", "bestaudio", "-x", "--audio-format", "flac"],
+  },
+  {
+    id: "wav",
+    name: "Audio — WAV (Lossless Convert)",
+    description: "Converts best source audio to WAV (no added loss; huge files; source may be lossy)",
+    isBuiltIn: true,
+    args: ["-f", "bestaudio", "-x", "--audio-format", "wav"],
+  },
+  {
+    id: "alac",
+    name: "Audio — ALAC (Lossless Convert)",
+    description: "Converts best source audio to ALAC (no added loss; source may be lossy)",
+    isBuiltIn: true,
+    args: ["-f", "bestaudio", "-x", "--audio-format", "alac"],
+  },
+  {
     id: "mp3",
     name: "Audio — MP3 (High Quality)",
-    description: "Extracts audio as MP3 (requires FFmpeg)",
+    description: "Converts best source audio to MP3 (lossy; requires FFmpeg)",
     isBuiltIn: true,
-    args: ["-x", "--audio-format", "mp3", "--audio-quality", "0"],
+    args: ["-f", "bestaudio", "-x", "--audio-format", "mp3", "--audio-quality", "0"],
   },
 ];
 

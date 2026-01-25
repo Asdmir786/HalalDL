@@ -25,7 +25,7 @@ import {
 } from "lucide-react";
 
 import { open as openUrl } from "@tauri-apps/plugin-shell";
-import { pickFile, checkYtDlpVersion, checkFfmpegVersion, checkAria2Version, checkDenoVersion } from "@/lib/commands";
+import { downloadTools, fetchLatestAria2Version, fetchLatestDenoVersion, fetchLatestFfmpegVersion, fetchLatestYtDlpVersion, isUpdateAvailable, pickFile, checkYtDlpVersion, checkFfmpegVersion, checkAria2Version, checkDenoVersion } from "@/lib/commands";
 import { toast } from "sonner";
 import { useState } from "react";
 
@@ -40,6 +40,8 @@ export function ToolsScreen() {
   const { tools, updateTool } = useToolsStore();
   const isLite = import.meta.env.VITE_APP_MODE !== "FULL";
   const [checkingTools, setCheckingTools] = useState<Record<string, boolean>>({});
+  const [checkingLatest, setCheckingLatest] = useState<Record<string, boolean>>({});
+  const [isUpdatingTools, setIsUpdatingTools] = useState<Record<string, boolean>>({});
 
   const testTool = async (id: string) => {
     setCheckingTools(prev => ({ ...prev, [id]: true }));
@@ -72,6 +74,61 @@ export function ToolsScreen() {
     }
   };
 
+  const checkLatestForTool = async (tool: Tool) => {
+    setCheckingLatest((prev) => ({ ...prev, [tool.id]: true }));
+    try {
+      let latest: string | null = null;
+      switch (tool.id) {
+        case "yt-dlp": latest = await fetchLatestYtDlpVersion(); break;
+        case "ffmpeg": latest = await fetchLatestFfmpegVersion(); break;
+        case "aria2": latest = await fetchLatestAria2Version(); break;
+        case "deno": latest = await fetchLatestDenoVersion(); break;
+      }
+
+      updateTool(tool.id, {
+        latestVersion: latest || undefined,
+        updateAvailable: isUpdateAvailable(tool.version, latest || undefined),
+        latestCheckedAt: Date.now(),
+      });
+
+      if (latest) {
+        toast.success(`${tool.id} latest: ${latest}`);
+      } else {
+        toast.error(`Could not fetch latest for ${tool.id}`);
+      }
+    } catch {
+      toast.error(`Error checking latest for ${tool.id}`);
+    } finally {
+      setCheckingLatest((prev) => ({ ...prev, [tool.id]: false }));
+    }
+  };
+
+  const checkAllLatest = async () => {
+    const list = useToolsStore.getState().tools;
+    await Promise.all(list.map((t) => checkLatestForTool(t)));
+  };
+
+  const updateToolNow = async (tool: Tool) => {
+    if (isLite) {
+      toast.info("Lite Mode: open the tool website to update.");
+      await openUrl(TOOL_URLS[tool.id]);
+      return;
+    }
+
+    setIsUpdatingTools((prev) => ({ ...prev, [tool.id]: true }));
+    try {
+      await downloadTools([tool.id]);
+      toast.success(`${tool.id} updated`);
+      await testTool(tool.id);
+      await checkLatestForTool({ ...tool, version: useToolsStore.getState().tools.find((t) => t.id === tool.id)?.version });
+    } catch (e: unknown) {
+      const message = e instanceof Error ? e.message : String(e);
+      toast.error(`Update failed: ${message}`);
+    } finally {
+      setIsUpdatingTools((prev) => ({ ...prev, [tool.id]: false }));
+    }
+  };
+
   const ToolCard = ({ tool }: { tool: Tool }) => (
     <Card className="flex flex-col h-full overflow-hidden hover:shadow-md transition-shadow duration-200 border-muted/60 glass-card">
       <CardHeader className="pb-3">
@@ -86,16 +143,25 @@ export function ToolsScreen() {
               )}
             </CardTitle>
             <CardDescription className="font-mono text-[10px] truncate opacity-70">
-              {tool.version || "Version not detected"}
+              <span>Installed: {tool.version || "Unknown"}</span>
+              {tool.latestVersion && <span className="ml-2">Latest: {tool.latestVersion}</span>}
             </CardDescription>
           </div>
-          <Badge 
-            variant={tool.status === "Detected" ? "default" : tool.status === "Checking" ? "outline" : "destructive"}
-            className="gap-1 flex-shrink-0"
-          >
-            {tool.status === "Detected" ? <CheckCircle2 className="w-3 h-3" /> : tool.status === "Checking" ? <RefreshCcw className="w-3 h-3 animate-spin" /> : <XCircle className="w-3 h-3" />}
-            <span className="text-[10px]">{tool.status}</span>
-          </Badge>
+          <div className="flex items-center gap-2 flex-shrink-0">
+            {tool.updateAvailable && (
+              <Badge variant="secondary" className="gap-1">
+                <RefreshCcw className="w-3 h-3" />
+                <span className="text-[10px]">Update</span>
+              </Badge>
+            )}
+            <Badge
+              variant={tool.status === "Detected" ? "default" : tool.status === "Checking" ? "outline" : "destructive"}
+              className="gap-1"
+            >
+              {tool.status === "Detected" ? <CheckCircle2 className="w-3 h-3" /> : tool.status === "Checking" ? <RefreshCcw className="w-3 h-3 animate-spin" /> : <XCircle className="w-3 h-3" />}
+              <span className="text-[10px]">{tool.status}</span>
+            </Badge>
+          </div>
         </div>
       </CardHeader>
       <CardContent className="flex-1 space-y-4">
@@ -133,7 +199,7 @@ export function ToolsScreen() {
             <label className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">Custom Path</label>
             <Input 
               value={tool.path || ""} 
-              placeholder="C:\path\to\tool.exe" 
+              placeholder="C:\\path\\to\\tool.exe" 
               className="h-8 text-xs bg-background"
               onChange={(e) => updateTool(tool.id, { path: e.target.value })}
             />
@@ -164,6 +230,34 @@ export function ToolsScreen() {
           )}
           {checkingTools[tool.id] ? "Checking..." : "Check Status"}
         </MotionButton>
+        <MotionButton
+          variant="outline"
+          size="sm"
+          className="h-8 px-3 text-xs"
+          onClick={() => checkLatestForTool(tool)}
+          disabled={checkingLatest[tool.id]}
+          title="Check latest available version"
+        >
+          {checkingLatest[tool.id] ? (
+            <Loader2 className="w-3.5 h-3.5 animate-spin" />
+          ) : (
+            <span>Latest</span>
+          )}
+        </MotionButton>
+        <MotionButton
+          variant={tool.updateAvailable ? "default" : "outline"}
+          size="sm"
+          className="h-8 px-3 text-xs"
+          disabled={!tool.updateAvailable || isUpdatingTools[tool.id]}
+          onClick={() => updateToolNow(tool)}
+          title={isLite ? "Lite Mode: open download page" : "Download and replace tool"}
+        >
+          {isUpdatingTools[tool.id] ? (
+            <Loader2 className="w-3.5 h-3.5 animate-spin" />
+          ) : (
+            <span>{isLite ? "Get" : "Update"}</span>
+          )}
+        </MotionButton>
         <MotionButton 
           variant="ghost" 
           size="icon" 
@@ -178,10 +272,10 @@ export function ToolsScreen() {
   );
 
   return (
-    <div className="flex flex-col h-full bg-background max-w-6xl mx-auto" role="main">
+    <div className="flex flex-col h-full bg-background max-w-6xl mx-auto w-full" role="main">
       <FadeInStagger className="flex flex-col h-full">
         <FadeInItem>
-          <header className="p-8 pb-6 flex flex-col gap-2">
+          <header className="p-8 pb-6 flex flex-col gap-6">
             <div className="flex items-center justify-between">
               <div className="space-y-1">
                 <h2 className="text-3xl font-bold tracking-tight">Tools Manager</h2>
@@ -189,17 +283,28 @@ export function ToolsScreen() {
                   Manage external binaries required for media downloading and processing.
                 </p>
               </div>
-              <div className="bg-muted/20 border border-muted/30 rounded-xl p-3 flex items-center gap-3 glass-card">
-                <div className="p-2 bg-primary/10 rounded-lg text-primary">
-                  <ShieldCheck className="w-5 h-5" />
-                </div>
-                <div className="flex flex-col">
-                  <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest">
-                    Environment
-                  </span>
-                  <span className="text-sm font-semibold">
-                    {isLite ? "Lite Mode" : "Full Mode"}
-                  </span>
+              <div className="flex items-center gap-3">
+                <MotionButton
+                  variant="outline"
+                  size="sm"
+                  onClick={checkAllLatest}
+                  className="h-9"
+                >
+                  <RefreshCcw className="w-4 h-4 mr-2" />
+                  Check Updates
+                </MotionButton>
+                <div className="bg-muted/20 border border-muted/30 rounded-xl p-3 flex items-center gap-3 glass-card">
+                  <div className="p-2 bg-primary/10 rounded-lg text-primary">
+                    <ShieldCheck className="w-5 h-5" />
+                  </div>
+                  <div className="flex flex-col">
+                    <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest">
+                      Environment
+                    </span>
+                    <span className="text-sm font-semibold">
+                      {isLite ? "Lite Mode" : "Full Mode"}
+                    </span>
+                  </div>
                 </div>
               </div>
             </div>

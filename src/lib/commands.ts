@@ -7,6 +7,8 @@ import { revealItemInDir, openPath } from "@tauri-apps/plugin-opener";
 import { useLogsStore } from "@/store/logs";
 import { toast } from "sonner";
 
+type VersionParts = number[];
+
 async function getToolPath(baseName: string): Promise<string> {
   // 1. Check local bin folder first
   try {
@@ -21,6 +23,68 @@ async function getToolPath(baseName: string): Promise<string> {
   
   // 2. Fallback to system PATH
   return baseName;
+}
+
+function parseVersionParts(input: string): VersionParts | null {
+  const match = input.match(/\d+(?:\.\d+)+/);
+  if (!match) return null;
+  const parts = match[0]
+    .split(".")
+    .map((x) => Number.parseInt(x, 10))
+    .filter((n) => Number.isFinite(n));
+  if (!parts.length) return null;
+  return parts;
+}
+
+function compareVersionParts(a: VersionParts, b: VersionParts): number {
+  const maxLen = Math.max(a.length, b.length);
+  for (let i = 0; i < maxLen; i++) {
+    const av = a[i] ?? 0;
+    const bv = b[i] ?? 0;
+    if (av > bv) return 1;
+    if (av < bv) return -1;
+  }
+  return 0;
+}
+
+export function isUpdateAvailable(currentVersion: string | undefined, latestVersion: string | undefined): boolean | undefined {
+  if (!currentVersion || !latestVersion) return undefined;
+  const currentParts = parseVersionParts(currentVersion);
+  const latestParts = parseVersionParts(latestVersion);
+  if (!currentParts || !latestParts) return undefined;
+  return compareVersionParts(latestParts, currentParts) > 0;
+}
+
+async function fetchText(url: string, timeoutMs = 10000): Promise<string> {
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), timeoutMs);
+  try {
+    const res = await fetch(url, {
+      method: "GET",
+      signal: controller.signal,
+      headers: { Accept: "text/plain,*/*" },
+    });
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    return await res.text();
+  } finally {
+    clearTimeout(timeout);
+  }
+}
+
+async function fetchJson<T>(url: string, timeoutMs = 10000): Promise<T> {
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), timeoutMs);
+  try {
+    const res = await fetch(url, {
+      method: "GET",
+      signal: controller.signal,
+      headers: { Accept: "application/vnd.github+json" },
+    });
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    return (await res.json()) as T;
+  } finally {
+    clearTimeout(timeout);
+  }
 }
 
 export async function checkYtDlpVersion(): Promise<string | null> {
@@ -80,6 +144,52 @@ export async function checkDenoVersion(): Promise<string | null> {
     console.warn("deno check failed:", e);
   }
   return null;
+}
+
+export async function fetchLatestYtDlpVersion(): Promise<string | null> {
+  try {
+    const data = await fetchJson<{ tag_name?: string }>(
+      "https://api.github.com/repos/yt-dlp/yt-dlp/releases/latest"
+    );
+    return data.tag_name ? data.tag_name.replace(/^v/i, "").trim() : null;
+  } catch (e) {
+    console.warn("yt-dlp latest version fetch failed:", e);
+    return null;
+  }
+}
+
+export async function fetchLatestAria2Version(): Promise<string | null> {
+  try {
+    const data = await fetchJson<{ tag_name?: string }>(
+      "https://api.github.com/repos/aria2/aria2/releases/latest"
+    );
+    return data.tag_name ? data.tag_name.replace(/^release-/i, "").replace(/^v/i, "").trim() : null;
+  } catch (e) {
+    console.warn("aria2 latest version fetch failed:", e);
+    return null;
+  }
+}
+
+export async function fetchLatestDenoVersion(): Promise<string | null> {
+  try {
+    const text = await fetchText("https://dl.deno.land/release-latest.txt");
+    const first = text.trim().split(/\s+/)[0] || "";
+    return first.replace(/^v/i, "").trim() || null;
+  } catch (e) {
+    console.warn("deno latest version fetch failed:", e);
+    return null;
+  }
+}
+
+export async function fetchLatestFfmpegVersion(): Promise<string | null> {
+  try {
+    const text = await fetchText("https://www.gyan.dev/ffmpeg/builds/release-version");
+    const first = text.trim().split(/\s+/)[0] || "";
+    return first.replace(/^v/i, "").trim() || null;
+  } catch (e) {
+    console.warn("ffmpeg latest version fetch failed:", e);
+    return null;
+  }
 }
 
 export async function downloadTools(tools: string[]): Promise<string> {
@@ -175,7 +285,15 @@ export async function openFile(path: string) {
       await invoke("open_path", { path: resolved });
     } catch (e2) {
       const msg2 = e2 instanceof Error ? e2.message : String(e2);
-      toast.error(`Failed to open file: ${msg2}`);
+      try {
+        const dir = await dirname(resolved);
+        await openPath(dir);
+        addLog({ level: "info", message: `Opened parent folder (file open failed): ${dir}` });
+        toast.error("File couldn't be opened; opened folder instead");
+      } catch (e3) {
+        const msg3 = e3 instanceof Error ? e3.message : String(e3);
+        toast.error(`Failed to open file: ${msg2}. Also failed to open folder: ${msg3}`);
+      }
     }
   }
 }

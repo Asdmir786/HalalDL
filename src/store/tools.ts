@@ -8,6 +8,9 @@ export interface Tool {
   name: string;
   status: ToolStatus;
   version?: string;
+  latestVersion?: string;
+  updateAvailable?: boolean;
+  latestCheckedAt?: number;
   path?: string;
   mode: ToolMode;
   required: boolean;

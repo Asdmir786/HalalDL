@@ -15,6 +15,7 @@ export class OutputParser {
   private static DESTINATION_REGEX = /\[download\]\s+(?:Destination:|.*has already been downloaded(?: and merged into)?)\s+(.*)$/;
   private static ALREADY_DOWNLOADED_REGEX = /\[download\]\s+(.*?)\s+has already been downloaded$/;
   private static MERGER_REGEX = /^\[Merger\] Merging formats into "(.*)"\s*$/;
+  private static GENERIC_DESTINATION_REGEX = /^\[[^\]]+\]\s+Destination:\s+(.*)$/;
   private static HALALDL_OUTPUT_REGEX = /^__HALALDL_OUTPUT__:(.*)$/;
 
   parse(line: string): DownloadUpdate | null {
@@ -54,6 +55,15 @@ export class OutputParser {
     // Standard Destination
     if (line.startsWith("[download] Destination:")) {
       const path = this.cleanPath(line.replace("[download] Destination:", ""));
+      update.outputPath = path;
+      update.title = this.extractTitle(path);
+      hasUpdate = true;
+    }
+
+    // Non-download Destination (ExtractAudio/ffmpeg/etc)
+    const genericDestMatch = line.match(OutputParser.GENERIC_DESTINATION_REGEX);
+    if (genericDestMatch?.[1]) {
+      const path = this.cleanPath(genericDestMatch[1]);
       update.outputPath = path;
       update.title = this.extractTitle(path);
       hasUpdate = true;

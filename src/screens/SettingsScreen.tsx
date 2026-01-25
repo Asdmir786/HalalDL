@@ -205,53 +205,56 @@ export function SettingsScreen() {
   );
 
   return (
-    <div className="p-8 space-y-8 max-w-4xl mx-auto h-full overflow-auto pb-20">
-      <FadeInStagger className="space-y-8">
-        
-        <SettingsHeader 
-          isGlobalDirty={isGlobalDirty}
-          isDirty={isDirty}
-          isResetting={isResetting}
-          onGlobalReset={handleGlobalReset}
-          onResetAll={resetAllDraft}
-          onResetGroup={resetGroupDraft}
-          onSave={handleSave}
-        />
-
-        <div className="grid gap-6">
-          <AppearanceSection 
-            theme={draftSettings.theme}
-            onThemeChange={(v) => setDraftValue("theme", v)}
+    <div className="flex flex-col h-full bg-background max-w-6xl mx-auto w-full" role="main">
+      <FadeInStagger className="flex flex-col h-full">
+        <div className="p-8 pb-6 flex flex-col gap-6">
+          <SettingsHeader
+            isGlobalDirty={isGlobalDirty}
+            isDirty={isDirty}
+            isResetting={isResetting}
+            onGlobalReset={handleGlobalReset}
+            onResetAll={resetAllDraft}
+            onResetGroup={resetGroupDraft}
+            onSave={handleSave}
           />
+        </div>
 
-          <StorageSection 
-            defaultDownloadDir={draftSettings.defaultDownloadDir || ""}
-            onDirectoryChange={(v) => setDraftValue("defaultDownloadDir", v)}
-          />
+        <div className="flex-1 overflow-auto px-8 pb-8">
+          <div className="grid gap-6">
+            <AppearanceSection
+              theme={draftSettings.theme}
+              onThemeChange={(v) => setDraftValue("theme", v)}
+            />
 
-          <BehaviorSection 
-            notifications={draftSettings.notifications}
-            onNotificationsChange={(v) => setDraftValue("notifications", v)}
-            autoClearFinished={draftSettings.autoClearFinished}
-            onAutoClearChange={(v) => setDraftValue("autoClearFinished", v)}
-            autoCopyFile={draftSettings.autoCopyFile}
-            onAutoCopyChange={(v) => setDraftValue("autoCopyFile", v)}
-            paranoidMode={draftSettings.paranoidMode}
-            onParanoidModeChange={(v) => setDraftValue("paranoidMode", v)}
-            maxConcurrency={draftSettings.maxConcurrency}
-            onMaxConcurrencyChange={(v) => setDraftValue("maxConcurrency", v)}
-            fileCollision={draftSettings.fileCollision}
-            onFileCollisionChange={(v) => setDraftValue("fileCollision", v)}
-          />
+            <StorageSection
+              defaultDownloadDir={draftSettings.defaultDownloadDir || ""}
+              onDirectoryChange={(v) => setDraftValue("defaultDownloadDir", v)}
+            />
 
-          <EngineSection 
-            maxConcurrency={draftSettings.maxConcurrency}
-            onMaxConcurrencyChange={(v) => setDraftValue("maxConcurrency", v)}
-            maxRetries={draftSettings.maxRetries}
-            onMaxRetriesChange={(v) => setDraftValue("maxRetries", v)}
-            maxSpeed={draftSettings.maxSpeed}
-            onMaxSpeedChange={(v) => setDraftValue("maxSpeed", v)}
-          />
+            <BehaviorSection
+              notifications={draftSettings.notifications}
+              onNotificationsChange={(v) => setDraftValue("notifications", v)}
+              autoClearFinished={draftSettings.autoClearFinished}
+              onAutoClearChange={(v) => setDraftValue("autoClearFinished", v)}
+              autoCopyFile={draftSettings.autoCopyFile}
+              onAutoCopyChange={(v) => setDraftValue("autoCopyFile", v)}
+              paranoidMode={draftSettings.paranoidMode}
+              onParanoidModeChange={(v) => setDraftValue("paranoidMode", v)}
+              maxConcurrency={draftSettings.maxConcurrency}
+              onMaxConcurrencyChange={(v) => setDraftValue("maxConcurrency", v)}
+              fileCollision={draftSettings.fileCollision}
+              onFileCollisionChange={(v) => setDraftValue("fileCollision", v)}
+            />
+
+            <EngineSection
+              maxConcurrency={draftSettings.maxConcurrency}
+              onMaxConcurrencyChange={(v) => setDraftValue("maxConcurrency", v)}
+              maxRetries={draftSettings.maxRetries}
+              onMaxRetriesChange={(v) => setDraftValue("maxRetries", v)}
+              maxSpeed={draftSettings.maxSpeed}
+              onMaxSpeedChange={(v) => setDraftValue("maxSpeed", v)}
+            />
+          </div>
         </div>
       </FadeInStagger>
     </div>

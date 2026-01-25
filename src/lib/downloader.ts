@@ -61,6 +61,15 @@ export async function startDownload(jobId: string) {
 
   // Apply Format Override if present
   if (job.overrides?.format) {
+    const removeFlagWithValue = (flag: string) => {
+      const i = args.indexOf(flag);
+      if (i !== -1) args.splice(i, 2);
+    };
+    const removeFlag = (flag: string) => {
+      const i = args.indexOf(flag);
+      if (i !== -1) args.splice(i, 1);
+    };
+
     // Remove existing format args if any
     const formatIndex = args.indexOf("-f");
     if (formatIndex !== -1) {
@@ -74,8 +83,38 @@ export async function startDownload(jobId: string) {
         case "mp4":
             args.push("-f", "bestvideo[ext=mp4]+bestaudio[ext=m4a]/best[ext=mp4]/best");
             break;
+        case "webm":
+            args.push("-f", "bestvideo[ext=webm]+bestaudio[ext=webm]/best[ext=webm]/best");
+            break;
         case "mp3":
-            args.push("-x", "--audio-format", "mp3");
+            removeFlag("-x");
+            removeFlagWithValue("--audio-format");
+            removeFlagWithValue("--audio-quality");
+            args.push("-f", "bestaudio", "-x", "--audio-format", "mp3", "--audio-quality", "0");
+            break;
+        case "m4a":
+            removeFlag("-x");
+            removeFlagWithValue("--audio-format");
+            removeFlagWithValue("--audio-quality");
+            args.push("-f", "bestaudio", "-x", "--audio-format", "m4a");
+            break;
+        case "flac":
+            removeFlag("-x");
+            removeFlagWithValue("--audio-format");
+            removeFlagWithValue("--audio-quality");
+            args.push("-f", "bestaudio", "-x", "--audio-format", "flac");
+            break;
+        case "wav":
+            removeFlag("-x");
+            removeFlagWithValue("--audio-format");
+            removeFlagWithValue("--audio-quality");
+            args.push("-f", "bestaudio", "-x", "--audio-format", "wav");
+            break;
+        case "alac":
+            removeFlag("-x");
+            removeFlagWithValue("--audio-format");
+            removeFlagWithValue("--audio-quality");
+            args.push("-f", "bestaudio", "-x", "--audio-format", "alac");
             break;
         case "mkv":
             args.push("--merge-output-format", "mkv");
@@ -175,6 +214,25 @@ export async function startDownload(jobId: string) {
 
       if (trimmedLine.includes("aria2c") || trimmedLine.includes("downloader")) {
         addLog({ level: "error", message: "Downloader specific error detected", jobId });
+      }
+
+      const now = Date.now();
+      const shouldUpdate = now - lastUpdate > UPDATE_INTERVAL;
+      const update = outputParser.parse(trimmedLine);
+
+      if (!update) return;
+
+      if (update.outputPath) {
+        lastKnownOutputPath = update.outputPath;
+      }
+
+      if (update.progress || update.speed || update.eta) {
+        if (shouldUpdate) {
+          updateJob(jobId, update);
+          lastUpdate = now;
+        }
+      } else {
+        updateJob(jobId, update);
       }
     };
 

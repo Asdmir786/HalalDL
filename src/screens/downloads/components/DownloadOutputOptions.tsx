@@ -102,6 +102,9 @@ export function DownloadOutputOptions({
                 <SelectItem value="webm">WebM (Video)</SelectItem>
                 <SelectItem value="mp3">MP3 (Audio Only)</SelectItem>
                 <SelectItem value="m4a">M4A (Audio Only)</SelectItem>
+                <SelectItem value="flac">FLAC (Audio Only, Lossless)</SelectItem>
+                <SelectItem value="wav">WAV (Audio Only, Lossless)</SelectItem>
+                <SelectItem value="alac">ALAC (Audio Only, Lossless)</SelectItem>
               </SelectContent>
             </Select>
           </div>

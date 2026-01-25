@@ -49,6 +49,9 @@ export function DownloadsScreen() {
       const next = preset.args[audioFormatIndex + 1];
       if (next === "mp3") return "mp3";
       if (next === "m4a") return "m4a";
+      if (next === "flac") return "flac";
+      if (next === "wav") return "wav";
+      if (next === "alac") return "alac";
     }
 
     const mergeIndex = preset.args.indexOf("--merge-output-format");

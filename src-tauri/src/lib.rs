@@ -13,6 +13,44 @@ struct DownloadProgress {
 
 const MAX_DOWNLOAD_RETRIES: u8 = 3;
 
+async fn resolve_latest_aria2_zip_url(app_handle: &tauri::AppHandle) -> Result<String, String> {
+    let client = reqwest::Client::builder()
+        .user_agent(format!("HalalDL/{}", app_handle.package_info().version))
+        .build()
+        .map_err(|e| e.to_string())?;
+
+    let res = client
+        .get("https://api.github.com/repos/aria2/aria2/releases/latest")
+        .header("Accept", "application/vnd.github+json")
+        .send()
+        .await
+        .map_err(|e| e.to_string())?;
+
+    if !res.status().is_success() {
+        return Err(format!("GitHub API failed with status: {}", res.status()));
+    }
+
+    let json: serde_json::Value = res.json().await.map_err(|e| e.to_string())?;
+    let assets = json
+        .get("assets")
+        .and_then(|v| v.as_array())
+        .ok_or_else(|| "Missing assets in GitHub release response".to_string())?;
+
+    for asset in assets {
+        let name = asset.get("name").and_then(|v| v.as_str()).unwrap_or("");
+        if name.ends_with(".zip")
+            && !name.ends_with(".zip.asc")
+            && name.to_lowercase().contains("win-64bit")
+        {
+            if let Some(url) = asset.get("browser_download_url").and_then(|v| v.as_str()) {
+                return Ok(url.to_string());
+            }
+        }
+    }
+
+    Err("No matching aria2 Windows zip asset found".to_string())
+}
+
 #[tauri::command]
 async fn download_tools(app_handle: tauri::AppHandle, tools: Vec<String>) -> Result<String, String> {
     let bin_dir = app_handle.path().app_data_dir().map_err(|e: tauri::Error| e.to_string())?.join("bin");
@@ -40,9 +78,12 @@ async fn download_tools(app_handle: tauri::AppHandle, tools: Vec<String>) -> Res
 
     // 3. Download aria2
     if tools.contains(&"aria2".to_string()) {
-        let aria2_url = "https://github.com/aria2/aria2/releases/download/release-1.37.0/aria2-1.37.0-win-64bit-build1.zip";
+        let aria2_url = match resolve_latest_aria2_zip_url(&app_handle).await {
+            Ok(url) => url,
+            Err(_) => "https://github.com/aria2/aria2/releases/download/release-1.37.0/aria2-1.37.0-win-64bit-build1.zip".to_string(),
+        };
         let aria2_zip_path = bin_dir.join("aria2.zip");
-        download_file(&app_handle, "aria2", aria2_url, &aria2_zip_path).await?;
+        download_file(&app_handle, "aria2", &aria2_url, &aria2_zip_path).await?;
         emit_progress(&app_handle, "aria2", 99.0, "Extracting aria2c.exe...");
         let extracted = extract_from_zip(&app_handle, "aria2", &aria2_zip_path, &bin_dir, vec!["aria2c.exe"])?;
         emit_progress(&app_handle, "aria2", 100.0, &format!("Extracted: {}", extracted.join(", ")));
