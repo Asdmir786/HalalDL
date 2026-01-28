@@ -1,9 +1,31 @@
 import { Plus, Settings2, ChevronDown, ChevronUp } from "lucide-react";
 import { MotionButton } from "@/components/motion/MotionButton";
 import { Input } from "@/components/ui/input";
-import { Select, SelectContent, SelectGroup, SelectItem, SelectLabel, SelectSeparator, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { useMemo, useState } from "react";
+import {
+  Select,
+  SelectContent,
+  SelectGroup,
+  SelectItem,
+  SelectLabel,
+  SelectSeparator,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { DownloadOutputOptions } from "./DownloadOutputOptions";
 import { Preset } from "@/store/presets";
+
+const GROUP_ORDER = [
+  "Recommended",
+  "Compatibility",
+  "Editors",
+  "Editors Pro",
+  "Web",
+  "Video",
+  "Audio",
+  "Other",
+  "Custom",
+];
 
 interface DownloadInputSectionProps {
   url: string;
@@ -14,7 +36,7 @@ interface DownloadInputSectionProps {
   presets: Preset[];
   addMode: "queue" | "start";
   setAddMode: (mode: "queue" | "start") => void;
-  
+
   // Output Config Props
   showOutputConfig: boolean;
   onToggleOutputConfig: () => void;
@@ -29,35 +51,75 @@ interface DownloadInputSectionProps {
 }
 
 export function DownloadInputSection({
-  url, setUrl, onAdd,
-  selectedPreset, onPresetChange, presets,
-  addMode, setAddMode,
-  showOutputConfig, onToggleOutputConfig,
-  filenameBase, onFilenameChange,
-  outputFormat, onFormatChange,
-  customDownloadDir, onBrowseDir,
+  url,
+  setUrl,
+  onAdd,
+  selectedPreset,
+  onPresetChange,
+  presets,
+  addMode,
+  setAddMode,
+  showOutputConfig,
+  onToggleOutputConfig,
+  filenameBase,
+  onFilenameChange,
+  outputFormat,
+  onFormatChange,
+  customDownloadDir,
+  onBrowseDir,
   isCustomPreset,
-  defaultDownloadDir
+  defaultDownloadDir,
 }: DownloadInputSectionProps) {
-  const groupOrder = ["Recommended", "Compatibility", "Editors", "Editors Pro", "Web", "Video", "Audio", "Other", "Custom"];
+  const [presetOpen, setPresetOpen] = useState(false);
+  const [presetQuery, setPresetQuery] = useState("");
 
-  const getGroupAndLabel = (preset: Preset): { group: string; label: string } => {
+  const getGroupAndLabel = (
+    preset: Preset
+  ): { group: string; label: string } => {
     const parts = preset.name.split(" — ");
-    if (parts.length >= 2) return { group: parts[0], label: parts.slice(1).join(" — ") };
+    if (parts.length >= 2)
+      return { group: parts[0], label: parts.slice(1).join(" — ") };
     return { group: preset.isBuiltIn ? "Other" : "Custom", label: preset.name };
   };
 
-  const grouped = presets.reduce<Record<string, Array<{ preset: Preset; label: string }>>>((acc, preset) => {
-    const { group, label } = getGroupAndLabel(preset);
-    acc[group] = acc[group] ?? [];
-    acc[group].push({ preset, label });
-    return acc;
-  }, {});
+  const grouped = useMemo(() => {
+    const query = presetQuery.trim().toLowerCase();
+    const matches = (group: string, label: string, preset: Preset) => {
+      if (!query) return true;
+      return (
+        group.toLowerCase().includes(query) ||
+        label.toLowerCase().includes(query) ||
+        preset.name.toLowerCase().includes(query) ||
+        preset.description.toLowerCase().includes(query)
+      );
+    };
 
-  const orderedGroups = [
-    ...groupOrder.filter((g) => (grouped[g]?.length ?? 0) > 0),
-    ...Object.keys(grouped).filter((g) => !groupOrder.includes(g)).sort(),
-  ];
+    return presets.reduce<Record<string, Array<{ preset: Preset; label: string }>>>(
+      (acc, preset) => {
+        const { group, label } = getGroupAndLabel(preset);
+        if (!matches(group, label, preset)) return acc;
+        acc[group] = acc[group] ?? [];
+        acc[group].push({ preset, label });
+        return acc;
+      },
+      {}
+    );
+  }, [presetQuery, presets]);
+
+  const orderedGroups = useMemo(
+    () => [
+      ...GROUP_ORDER.filter((g) => (grouped[g]?.length ?? 0) > 0),
+      ...Object.keys(grouped)
+        .filter((g) => !GROUP_ORDER.includes(g))
+        .sort(),
+    ],
+    [grouped]
+  );
+
+  const hasPresetResults = useMemo(
+    () => orderedGroups.some((g) => (grouped[g]?.length ?? 0) > 0),
+    [grouped, orderedGroups]
+  );
 
   return (
     <div className="flex flex-col gap-3 bg-muted/30 p-3 rounded-xl border border-muted/50 shadow-sm glass-card">
@@ -71,30 +133,58 @@ export function DownloadInputSection({
             className="bg-background border-muted shadow-sm focus-visible:ring-1 h-10"
           />
         </div>
-        
+
         <div className="flex flex-wrap gap-2 items-center justify-end">
-          <Select value={selectedPreset} onValueChange={onPresetChange}>
+          <Select
+            value={selectedPreset}
+            onValueChange={onPresetChange}
+            open={presetOpen}
+            onOpenChange={(next) => {
+              setPresetOpen(next);
+              if (!next) setPresetQuery("");
+            }}
+          >
             <SelectTrigger className="w-[140px] bg-background border-muted shadow-sm focus:ring-1 h-10">
               <SelectValue placeholder="Preset" />
             </SelectTrigger>
             <SelectContent className="max-h-[300px] overflow-y-auto">
+              <div className="sticky top-0 z-20 bg-popover px-1 pt-1 pb-1 border-b border-muted/60">
+                <Input
+                  value={presetQuery}
+                  onChange={(e) => setPresetQuery(e.target.value)}
+                  onKeyDown={(e) => e.stopPropagation()}
+                  placeholder="Search presets..."
+                  className="h-8 bg-background border-muted shadow-sm focus-visible:ring-1"
+                  autoFocus
+                />
+              </div>
               <SelectItem value="custom" className="font-semibold text-primary">
                 ✨ Custom Configuration
               </SelectItem>
               <SelectSeparator />
-              {orderedGroups.map((group) => (
-                <SelectGroup key={group}>
-                  <SelectLabel className="text-[10px] uppercase tracking-wider text-muted-foreground/80 sticky top-0 bg-popover z-10 py-1.5">
-                    {group}
-                  </SelectLabel>
-                  {(grouped[group] ?? []).map(({ preset, label }) => (
-                    <SelectItem key={preset.id} value={preset.id} title={preset.description}>
-                      {label}
-                    </SelectItem>
-                  ))}
-                  <SelectSeparator />
-                </SelectGroup>
-              ))}
+              {hasPresetResults ? (
+                orderedGroups.map((group) => (
+                  <SelectGroup key={group}>
+                    <SelectLabel className="text-[10px] uppercase tracking-wider text-muted-foreground/80 sticky top-10 bg-popover z-10 py-1.5">
+                      {group}
+                    </SelectLabel>
+                    {(grouped[group] ?? []).map(({ preset, label }) => (
+                      <SelectItem
+                        key={preset.id}
+                        value={preset.id}
+                        title={preset.description}
+                      >
+                        {label}
+                      </SelectItem>
+                    ))}
+                    <SelectSeparator />
+                  </SelectGroup>
+                ))
+              ) : (
+                <div className="px-2 py-3 text-xs text-muted-foreground">
+                  No presets match "{presetQuery.trim()}"
+                </div>
+              )}
             </SelectContent>
           </Select>
 

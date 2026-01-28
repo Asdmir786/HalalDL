@@ -6,9 +6,18 @@ import { useToolsStore } from "@/store/tools";
 import { useLogsStore } from "@/store/logs";
 import { useDownloadsStore, DownloadJob } from "@/store/downloads";
 import { storage } from "@/lib/storage";
-import { checkYtDlpVersion, checkFfmpegVersion, checkAria2Version, checkDenoVersion } from "@/lib/commands";
+import {
+  checkYtDlpVersion,
+  checkFfmpegVersion,
+  checkAria2Version,
+  checkDenoVersion,
+} from "@/lib/commands";
 import { toast } from "sonner";
-import { isPermissionGranted, requestPermission, sendNotification } from '@tauri-apps/plugin-notification';
+import {
+  isPermissionGranted,
+  requestPermission,
+  sendNotification,
+} from "@tauri-apps/plugin-notification";
 import { documentDir, join } from "@tauri-apps/api/path";
 import { writeTextFile, mkdir, exists } from "@tauri-apps/plugin-fs";
 
@@ -18,17 +27,28 @@ export function PersistenceManager() {
   const { updateTool, setDiscoveredToolId } = useToolsStore();
   const { logs, addLog } = useLogsStore();
   const { jobs } = useDownloadsStore();
-  
+
   const initialized = useRef(false);
   const pendingCongratsKey = "halaldl:pendingToolCongrats";
+  const isTauriEnv =
+    typeof window !== "undefined" &&
+    Boolean(
+      (window as unknown as Record<string, unknown>).__TAURI_INTERNALS__ ||
+        (window as unknown as Record<string, unknown>).__TAURI__
+    );
 
   // Initial Load
   useEffect(() => {
     const checkTools = async () => {
       addLog({ level: "debug", message: "Checking tools..." });
-      
-      const checkAndNotify = async (id: string, checkFn: () => Promise<string | null>) => {
-        const currentTool = useToolsStore.getState().tools.find(t => t.id === id);
+
+      const checkAndNotify = async (
+        id: string,
+        checkFn: () => Promise<string | null>
+      ) => {
+        const currentTool = useToolsStore
+          .getState()
+          .tools.find((t) => t.id === id);
         const version = await checkFn();
         const discoveredAlready = useToolsStore.getState().discoveredToolId;
 
@@ -37,7 +57,9 @@ export function PersistenceManager() {
             const raw = localStorage.getItem(pendingCongratsKey);
             if (!raw) return [];
             const parsed = JSON.parse(raw);
-            return Array.isArray(parsed) ? parsed.filter((x) => typeof x === "string") : [];
+            return Array.isArray(parsed)
+              ? parsed.filter((x) => typeof x === "string")
+              : [];
           } catch {
             return [];
           }
@@ -48,14 +70,18 @@ export function PersistenceManager() {
             if (next.length === 0) localStorage.removeItem(pendingCongratsKey);
             else localStorage.setItem(pendingCongratsKey, JSON.stringify(next));
           } catch (e) {
-            addLog({ level: "warn", message: `Failed to persist pending tool congrats: ${String(e)}` });
+            addLog({
+              level: "warn",
+              message: `Failed to persist pending tool congrats: ${String(e)}`,
+            });
           }
         };
 
         const pending = readPending();
         const isPending = pending.includes(id);
-        const shouldOpenForPending = Boolean(version) && isPending && !discoveredAlready;
-        
+        const shouldOpenForPending =
+          Boolean(version) && isPending && !discoveredAlready;
+
         if (shouldOpenForPending) {
           setDiscoveredToolId(id);
           writePending(pending.filter((x) => x !== id));
@@ -65,26 +91,26 @@ export function PersistenceManager() {
           } else if (!isPending) {
             writePending([...pending, id]);
           }
-          
+
           // Send notification if app is in background
           let permissionGranted = await isPermissionGranted();
           if (!permissionGranted) {
             const permission = await requestPermission();
-            permissionGranted = permission === 'granted';
+            permissionGranted = permission === "granted";
           }
-          
+
           if (permissionGranted) {
             sendNotification({
-              title: 'Tool Discovered!',
+              title: "Tool Discovered!",
               body: `${currentTool.name} has been detected and is ready to use.`,
-              icon: 'info'
+              icon: "info",
             });
           }
         }
 
-        updateTool(id, { 
-          status: version ? "Detected" : "Missing", 
-          version: version || undefined 
+        updateTool(id, {
+          status: version ? "Detected" : "Missing",
+          version: version || undefined,
         });
       };
 
@@ -106,24 +132,41 @@ export function PersistenceManager() {
         // Load Settings
         const savedSettings = await storage.getSettings<Settings>();
         if (savedSettings) {
+          const currentSettings = useSettingsStore.getState().settings;
+          const mergedSettings = {
+            ...currentSettings,
+            ...(savedSettings as unknown as Record<string, unknown>),
+          } as unknown as Settings;
+
           // If defaultDownloadDir is empty, try to resolve it
-          if (!savedSettings.defaultDownloadDir) {
+          if (!mergedSettings.defaultDownloadDir && isTauriEnv) {
             try {
-              savedSettings.defaultDownloadDir = await downloadDir();
+              mergedSettings.defaultDownloadDir = await downloadDir();
             } catch (e) {
-              addLog({ level: "warn", message: `Could not resolve download dir: ${String(e)}` });
+              addLog({
+                level: "warn",
+                message: `Could not resolve download dir: ${String(e)}`,
+              });
             }
           }
-          setSettings(savedSettings);
+          setSettings(mergedSettings);
           addLog({ level: "info", message: "Settings loaded" });
         } else {
           // No settings found (first run), set default download dir
-          try {
-            const defaultDir = await downloadDir();
-            const currentSettings = useSettingsStore.getState().settings;
-            setSettings({ ...currentSettings, defaultDownloadDir: defaultDir });
-          } catch (e) {
-            addLog({ level: "warn", message: `Could not resolve download dir: ${String(e)}` });
+          if (isTauriEnv) {
+            try {
+              const defaultDir = await downloadDir();
+              const currentSettings = useSettingsStore.getState().settings;
+              setSettings({
+                ...currentSettings,
+                defaultDownloadDir: defaultDir,
+              });
+            } catch (e) {
+              addLog({
+                level: "warn",
+                message: `Could not resolve download dir: ${String(e)}`,
+              });
+            }
           }
         }
 
@@ -132,37 +175,59 @@ export function PersistenceManager() {
         if (savedUserPresets && Array.isArray(savedUserPresets)) {
           // Merge built-ins (fresh from code) with saved user presets
           // Filter out any built-ins from saved data to avoid duplication/stale data
-          const userOnly = savedUserPresets.filter(p => !p.isBuiltIn);
+          const userOnly = savedUserPresets.filter((p) => !p.isBuiltIn);
           const merged = [...BUILT_IN_PRESETS, ...userOnly];
           setPresets(merged);
-          addLog({ level: "info", message: `Presets loaded (${merged.length})` });
+          addLog({
+            level: "info",
+            message: `Presets loaded (${merged.length})`,
+          });
         }
 
         // Load Downloads
         const savedDownloads = await storage.getDownloads<DownloadJob[]>();
         if (savedDownloads && Array.isArray(savedDownloads)) {
           useDownloadsStore.setState({ jobs: savedDownloads });
-          addLog({ level: "info", message: `Downloads loaded (${savedDownloads.length})` });
+          addLog({
+            level: "info",
+            message: `Downloads loaded (${savedDownloads.length})`,
+          });
         }
 
         // Check Tools
-        await checkTools();
-
+        if (isTauriEnv) {
+          await checkTools();
+        }
       } catch (e) {
-        addLog({ level: "error", message: `Failed to load persistence: ${String(e)}` });
+        addLog({
+          level: "error",
+          message: `Failed to load persistence: ${String(e)}`,
+        });
         toast.error("Failed to load settings");
       }
     };
 
     init();
-  }, [setSettings, setPresets, updateTool, setDiscoveredToolId, addLog]);
+  }, [
+    setSettings,
+    setPresets,
+    updateTool,
+    setDiscoveredToolId,
+    addLog,
+    isTauriEnv,
+  ]);
 
   // Auto-Save Settings
   useEffect(() => {
     if (!initialized.current) return;
     const timer = setTimeout(() => {
       storage.saveSettings(settings).catch((e) => {
-        useLogsStore.getState().addLog({ level: "error", message: `Failed to save settings: ${String(e)}` });
+        useLogsStore
+          .getState()
+          .addLog({
+            level: "error",
+            message: `Failed to save settings: ${String(e)}`,
+          });
       });
     }, 500); // Debounce 500ms
     return () => clearTimeout(timer);
@@ -174,7 +239,8 @@ export function PersistenceManager() {
     root.classList.remove("light", "dark");
 
     if (settings.theme === "system") {
-      const systemTheme = window.matchMedia("(prefers-color-scheme: dark)").matches
+      const systemTheme = window.matchMedia("(prefers-color-scheme: dark)")
+        .matches
         ? "dark"
         : "light";
       root.classList.add(systemTheme);
@@ -189,7 +255,12 @@ export function PersistenceManager() {
     const timer = setTimeout(() => {
       const userPresets = presets.filter((p) => !p.isBuiltIn);
       storage.savePresets(userPresets).catch((e) => {
-        useLogsStore.getState().addLog({ level: "error", message: `Failed to save presets: ${String(e)}` });
+        useLogsStore
+          .getState()
+          .addLog({
+            level: "error",
+            message: `Failed to save presets: ${String(e)}`,
+          });
       });
     }, 500);
     return () => clearTimeout(timer);
@@ -199,7 +270,12 @@ export function PersistenceManager() {
     if (!initialized.current) return;
     const timer = setTimeout(() => {
       storage.saveLogs(logs).catch((e) => {
-        useLogsStore.getState().addLog({ level: "error", message: `Failed to save logs: ${String(e)}` });
+        useLogsStore
+          .getState()
+          .addLog({
+            level: "error",
+            message: `Failed to save logs: ${String(e)}`,
+          });
       });
     }, 500);
     return () => clearTimeout(timer);
@@ -211,36 +287,51 @@ export function PersistenceManager() {
     const timer = setTimeout(async () => {
       try {
         await storage.saveDownloads(jobs);
-        
+
         // Paranoid Backup Mode
-        if (settings.paranoidMode) {
+        if (settings.paranoidMode && isTauriEnv) {
           try {
             const docs = await documentDir();
             const backupDir = await join(docs, "HalalDL", "backups");
             if (!(await exists(backupDir))) {
               await mkdir(backupDir, { recursive: true });
             }
-            
+
             // We use a single rolling history file for now, or timestamped?
             // "Paranoid" implies losing nothing. Let's do timestamped but throttled?
             // Or just a single history.json that is guaranteed to be user accessible.
             // Let's do a daily backup file + latest.json
-            
-            const dateStr = new Date().toISOString().split('T')[0]; // YYYY-MM-DD
+
+            const dateStr = new Date().toISOString().split("T")[0]; // YYYY-MM-DD
             const backupPath = await join(backupDir, `history-${dateStr}.json`);
-            
+
             await writeTextFile(backupPath, JSON.stringify(jobs, null, 2));
-            useLogsStore.getState().addLog({ level: "debug", message: `Paranoid backup saved to ${backupPath}` });
+            useLogsStore
+              .getState()
+              .addLog({
+                level: "debug",
+                message: `Paranoid backup saved to ${backupPath}`,
+              });
           } catch (e) {
-            useLogsStore.getState().addLog({ level: "error", message: `Paranoid backup failed: ${String(e)}` });
+            useLogsStore
+              .getState()
+              .addLog({
+                level: "error",
+                message: `Paranoid backup failed: ${String(e)}`,
+              });
           }
         }
       } catch (e) {
-        useLogsStore.getState().addLog({ level: "error", message: `Failed to save downloads: ${String(e)}` });
+        useLogsStore
+          .getState()
+          .addLog({
+            level: "error",
+            message: `Failed to save downloads: ${String(e)}`,
+          });
       }
     }, 1000); // Debounce 1s
     return () => clearTimeout(timer);
-  }, [jobs, settings.paranoidMode]);
+  }, [jobs, settings.paranoidMode, isTauriEnv]);
 
   return null; // Logic only component
 }

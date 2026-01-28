@@ -8,22 +8,22 @@
 
 ### [Emoji] [Feature Category 1]
 
-*   **[Feature Name]**: [Description of the feature. Focus on the user benefit.]
-*   **[Feature Name]**: [Description of the feature.]
+- **[Feature Name]**: [Description of the feature. Focus on the user benefit.]
+- **[Feature Name]**: [Description of the feature.]
 
 ### [Emoji] [Feature Category 2]
 
-*   **[Feature Name]**: [Description of the feature.]
+- **[Feature Name]**: [Description of the feature.]
 
 ## 🐛 Fixes & Improvements
 
-*   **[Area]**: [Description of the fix.]
-*   **[Area]**: [Description of the fix.]
+- **[Area]**: [Description of the fix.]
+- **[Area]**: [Description of the fix.]
 
 ## 📦 Choosing Your Version
 
-*   **Full (Recommended)**: Best for most users. Includes all dependencies (FFmpeg, yt-dlp, etc.) pre-configured.
-*   **Lite**: Best for power users who manage their own tools.
+- **Full (Recommended)**: Best for most users. Includes all dependencies (FFmpeg, yt-dlp, etc.) pre-configured.
+- **Lite**: Best for power users who manage their own tools.
 
 ## 📝 Note from the Developer
 

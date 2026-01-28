@@ -13,10 +13,26 @@ import { lazy, Suspense, useEffect, useState } from "react";
 import { Cpu, Sparkles, Zap } from "lucide-react";
 
 // Lazy load non-critical screens
-const PresetsScreen = lazy(() => import("@/screens/PresetsScreen").then(module => ({ default: module.PresetsScreen })));
-const ToolsScreen = lazy(() => import("@/screens/ToolsScreen").then(module => ({ default: module.ToolsScreen })));
-const LogsScreen = lazy(() => import("@/screens/LogsScreen").then(module => ({ default: module.LogsScreen })));
-const SettingsScreen = lazy(() => import("@/screens/SettingsScreen").then(module => ({ default: module.SettingsScreen })));
+const PresetsScreen = lazy(() =>
+  import("@/screens/PresetsScreen").then((module) => ({
+    default: module.PresetsScreen,
+  }))
+);
+const ToolsScreen = lazy(() =>
+  import("@/screens/ToolsScreen").then((module) => ({
+    default: module.ToolsScreen,
+  }))
+);
+const LogsScreen = lazy(() =>
+  import("@/screens/LogsScreen").then((module) => ({
+    default: module.LogsScreen,
+  }))
+);
+const SettingsScreen = lazy(() =>
+  import("@/screens/SettingsScreen").then((module) => ({
+    default: module.SettingsScreen,
+  }))
+);
 
 const LoadingFallback = () => (
   <div className="flex h-full w-full items-center justify-center bg-transparent">
@@ -45,7 +61,7 @@ const LoadingFallback = () => (
         animate={{ rotate: 360 }}
         transition={{ duration: 1.5, repeat: Infinity, ease: "linear" }}
       />
-      
+
       <motion.div
         className="absolute h-10 w-10 rounded-full border-2 border-transparent border-b-secondary border-l-secondary/60"
         animate={{ rotate: -360 }}
@@ -67,19 +83,29 @@ const LoadingFallback = () => (
         <motion.div
           className="absolute right-0 top-1/2 -translate-y-1/2"
           animate={{ rotate: -360, opacity: [0.25, 0.75, 0.25] }}
-          transition={{ duration: 3, repeat: Infinity, ease: "linear", delay: 0.2 }}
+          transition={{
+            duration: 3,
+            repeat: Infinity,
+            ease: "linear",
+            delay: 0.2,
+          }}
         >
           <Zap className="h-4 w-4 text-primary/60 drop-shadow-[0_0_10px_rgba(var(--primary),0.3)]" />
         </motion.div>
         <motion.div
           className="absolute left-0 top-1/2 -translate-y-1/2"
           animate={{ rotate: -360, opacity: [0.2, 0.6, 0.2] }}
-          transition={{ duration: 3, repeat: Infinity, ease: "linear", delay: 0.4 }}
+          transition={{
+            duration: 3,
+            repeat: Infinity,
+            ease: "linear",
+            delay: 0.4,
+          }}
         >
           <Sparkles className="h-4 w-4 text-primary/40 drop-shadow-[0_0_10px_rgba(var(--primary),0.25)]" />
         </motion.div>
       </motion.div>
-      
+
       <motion.div
         className="relative flex h-9 w-9 items-center justify-center rounded-full border border-primary/20 bg-primary/10 shadow-[0_0_18px_rgba(var(--primary),0.35)]"
         animate={{
@@ -90,7 +116,7 @@ const LoadingFallback = () => (
       >
         <Cpu className="h-4 w-4 text-primary drop-shadow-[0_0_12px_rgba(var(--primary),0.35)]" />
       </motion.div>
-      
+
       <div className="absolute inset-0 h-24 w-24 rounded-full bg-primary/5 blur-3xl -z-10" />
     </div>
   </div>
@@ -111,12 +137,18 @@ export default function App() {
 
   const renderScreen = () => {
     switch (currentScreen) {
-      case "downloads": return <DownloadsScreen />;
-      case "presets": return <PresetsScreen />;
-      case "tools": return <ToolsScreen />;
-      case "logs": return <LogsScreen />;
-      case "settings": return <SettingsScreen />;
-      default: return <DownloadsScreen />;
+      case "downloads":
+        return <DownloadsScreen />;
+      case "presets":
+        return <PresetsScreen />;
+      case "tools":
+        return <ToolsScreen />;
+      case "logs":
+        return <LogsScreen />;
+      case "settings":
+        return <SettingsScreen />;
+      default:
+        return <DownloadsScreen />;
     }
   };
 
@@ -128,16 +160,19 @@ export default function App() {
       <main className="flex-1 overflow-hidden relative bg-gradient-to-br from-background via-background to-secondary/20">
         <AnimatePresence mode="wait">
           {isBooting ? (
-             <motion.div
-               key="boot-loader"
-               className="h-full w-full flex items-center justify-center"
-               exit={{ opacity: 0, scale: 0.9, filter: "blur(10px)" }}
-               transition={{ duration: 0.5 }}
-             >
-               <LoadingFallback />
-             </motion.div>
+            <motion.div
+              key="boot-loader"
+              className="h-full w-full flex items-center justify-center"
+              exit={{ opacity: 0, scale: 0.9, filter: "blur(10px)" }}
+              transition={{ duration: 0.5 }}
+            >
+              <LoadingFallback />
+            </motion.div>
           ) : (
-            <PageTransition key={currentScreen} className="h-full w-full overflow-hidden">
+            <PageTransition
+              key={currentScreen}
+              className="h-full w-full overflow-hidden"
+            >
               <Suspense fallback={<LoadingFallback />}>
                 {renderScreen()}
               </Suspense>

@@ -4,14 +4,14 @@ import {
   LoaderCircle,
   OctagonX,
   TriangleAlert,
-} from "lucide-react"
-import { useSettingsStore } from "@/store/settings"
-import { Toaster as Sonner } from "sonner"
+} from "lucide-react";
+import { useSettingsStore } from "@/store/settings";
+import { Toaster as Sonner } from "sonner";
 
-type ToasterProps = React.ComponentProps<typeof Sonner>
+type ToasterProps = React.ComponentProps<typeof Sonner>;
 
 const Toaster = ({ ...props }: ToasterProps) => {
-  const { theme } = useSettingsStore((state) => state.settings)
+  const { theme } = useSettingsStore((state) => state.settings);
 
   return (
     <Sonner
@@ -37,7 +37,7 @@ const Toaster = ({ ...props }: ToasterProps) => {
       }}
       {...props}
     />
-  )
-}
+  );
+};
 
-export { Toaster }
+export { Toaster };

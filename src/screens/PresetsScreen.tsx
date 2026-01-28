@@ -1,13 +1,11 @@
-import { FadeInStagger, FadeInItem } from "@/components/motion/StaggerContainer";
+import {
+  FadeInStagger,
+  FadeInItem,
+} from "@/components/motion/StaggerContainer";
 import { MotionButton } from "@/components/motion/MotionButton";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { usePresetsStore, type Preset } from "@/store/presets";
-import { 
-  Download, 
-  Upload, 
-  Plus,
-  Loader2
-} from "lucide-react";
+import { Download, Upload, Plus, Loader2 } from "lucide-react";
 import { toast } from "sonner";
 import { useState } from "react";
 import { PresetEditor } from "@/components/PresetEditor";
@@ -17,7 +15,8 @@ import { PresetCard } from "./presets/components/PresetCard";
 import { useLogsStore } from "@/store/logs";
 
 export function PresetsScreen() {
-  const { presets, duplicatePreset, deletePreset, updatePreset, addPreset } = usePresetsStore();
+  const { presets, duplicatePreset, deletePreset, updatePreset, addPreset } =
+    usePresetsStore();
   const addLog = useLogsStore((state) => state.addLog);
   const [editingPreset, setEditingPreset] = useState<Preset | null>(null);
   const [isEditorOpen, setIsEditorOpen] = useState(false);
@@ -40,8 +39,7 @@ export function PresetsScreen() {
         toast.success("Presets exported successfully");
       }
     } catch (error: unknown) {
-      const message =
-        error instanceof Error ? error.message : String(error);
+      const message = error instanceof Error ? error.message : String(error);
       addLog({ level: "error", message: `Presets export failed: ${message}` });
       toast.error(`Export failed: ${message}`);
     } finally {
@@ -71,8 +69,7 @@ export function PresetsScreen() {
         }
       }
     } catch (error: unknown) {
-      const message =
-        error instanceof Error ? error.message : String(error);
+      const message = error instanceof Error ? error.message : String(error);
       addLog({ level: "error", message: `Presets import failed: ${message}` });
       toast.error(`Import failed: ${message}`);
     } finally {
@@ -81,7 +78,10 @@ export function PresetsScreen() {
   };
 
   return (
-    <div className="flex flex-col h-full bg-background max-w-6xl mx-auto w-full" role="main">
+    <div
+      className="flex flex-col h-full bg-background max-w-6xl mx-auto w-full"
+      role="main"
+    >
       <FadeInStagger className="flex flex-col h-full">
         <FadeInItem>
           <header className="p-8 pb-6 flex flex-col gap-6">
@@ -139,75 +139,85 @@ export function PresetsScreen() {
 
         <FadeInItem className="flex-1 overflow-auto px-8 pb-8">
           <Tabs defaultValue="all" className="space-y-6">
-          <TabsList className="bg-muted/50 p-1 rounded-xl h-11">
-            <TabsTrigger value="all" className="rounded-lg px-6 h-9">All Presets</TabsTrigger>
-            <TabsTrigger value="built-in" className="rounded-lg px-6 h-9">Built-in</TabsTrigger>
-            <TabsTrigger value="user" className="rounded-lg px-6 h-9">My Presets</TabsTrigger>
-          </TabsList>
+            <TabsList className="bg-muted/50 p-1 rounded-xl h-11">
+              <TabsTrigger value="all" className="rounded-lg px-6 h-9">
+                All Presets
+              </TabsTrigger>
+              <TabsTrigger value="built-in" className="rounded-lg px-6 h-9">
+                Built-in
+              </TabsTrigger>
+              <TabsTrigger value="user" className="rounded-lg px-6 h-9">
+                My Presets
+              </TabsTrigger>
+            </TabsList>
 
-          <TabsContent value="all" className="mt-0">
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-2 xl:grid-cols-3 gap-6">
-              {presets.map((p) => (
-                <PresetCard 
-                    key={p.id} 
-                    preset={p} 
-                    onDuplicate={duplicatePreset}
-                    onEdit={(p) => {
-                        setEditingPreset(p);
-                        setIsEditorOpen(true);
-                    }}
-                    onDelete={deletePreset}
-                />
-              ))}
-            </div>
-          </TabsContent>
-
-          <TabsContent value="built-in" className="mt-0">
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-2 xl:grid-cols-3 gap-6">
-              {builtInPresets.map((p) => (
-                <PresetCard 
-                    key={p.id} 
-                    preset={p} 
-                    onDuplicate={duplicatePreset}
-                    onEdit={(p) => {
-                        setEditingPreset(p);
-                        setIsEditorOpen(true);
-                    }}
-                    onDelete={deletePreset}
-                />
-              ))}
-            </div>
-          </TabsContent>
-
-          <TabsContent value="user" className="mt-0">
-            {userPresets.length === 0 ? (
-              <div className="flex flex-col items-center justify-center p-12 border border-dashed rounded-2xl bg-muted/10">
-                 <div className="w-16 h-16 bg-muted rounded-full flex items-center justify-center mb-4">
-                    <Plus className="w-8 h-8 opacity-20" />
-                 </div>
-                 <h3 className="text-lg font-semibold mb-1">No custom presets yet</h3>
-                 <p className="text-sm text-muted-foreground mb-6">Create your own presets to save specific download settings.</p>
-                 <MotionButton onClick={() => setIsEditorOpen(true)}>
-                   Create your first preset
-                 </MotionButton>
-              </div>
-            ) : (
+            <TabsContent value="all" className="mt-0">
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-2 xl:grid-cols-3 gap-6">
-                {userPresets.map((p) => (
-                    <PresetCard 
-                        key={p.id} 
-                        preset={p} 
-                        onDuplicate={duplicatePreset}
-                        onEdit={(p) => {
-                            setEditingPreset(p);
-                            setIsEditorOpen(true);
-                        }}
-                        onDelete={deletePreset}
-                    />
+                {presets.map((p) => (
+                  <PresetCard
+                    key={p.id}
+                    preset={p}
+                    onDuplicate={duplicatePreset}
+                    onEdit={(p) => {
+                      setEditingPreset(p);
+                      setIsEditorOpen(true);
+                    }}
+                    onDelete={deletePreset}
+                  />
                 ))}
               </div>
-            )}
-          </TabsContent>
+            </TabsContent>
+
+            <TabsContent value="built-in" className="mt-0">
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-2 xl:grid-cols-3 gap-6">
+                {builtInPresets.map((p) => (
+                  <PresetCard
+                    key={p.id}
+                    preset={p}
+                    onDuplicate={duplicatePreset}
+                    onEdit={(p) => {
+                      setEditingPreset(p);
+                      setIsEditorOpen(true);
+                    }}
+                    onDelete={deletePreset}
+                  />
+                ))}
+              </div>
+            </TabsContent>
+
+            <TabsContent value="user" className="mt-0">
+              {userPresets.length === 0 ? (
+                <div className="flex flex-col items-center justify-center p-12 border border-dashed rounded-2xl bg-muted/10">
+                  <div className="w-16 h-16 bg-muted rounded-full flex items-center justify-center mb-4">
+                    <Plus className="w-8 h-8 opacity-20" />
+                  </div>
+                  <h3 className="text-lg font-semibold mb-1">
+                    No custom presets yet
+                  </h3>
+                  <p className="text-sm text-muted-foreground mb-6">
+                    Create your own presets to save specific download settings.
+                  </p>
+                  <MotionButton onClick={() => setIsEditorOpen(true)}>
+                    Create your first preset
+                  </MotionButton>
+                </div>
+              ) : (
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-2 xl:grid-cols-3 gap-6">
+                  {userPresets.map((p) => (
+                    <PresetCard
+                      key={p.id}
+                      preset={p}
+                      onDuplicate={duplicatePreset}
+                      onEdit={(p) => {
+                        setEditingPreset(p);
+                        setIsEditorOpen(true);
+                      }}
+                      onDelete={deletePreset}
+                    />
+                  ))}
+                </div>
+              )}
+            </TabsContent>
           </Tabs>
         </FadeInItem>
 

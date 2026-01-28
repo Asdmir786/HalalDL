@@ -1,8 +1,8 @@
-
 export interface DownloadUpdate {
   progress?: number;
   speed?: string;
   eta?: string;
+  totalSize?: string;
   title?: string;
   outputPath?: string;
   status?: "Post-processing" | "Downloading";
@@ -12,11 +12,16 @@ export class OutputParser {
   private static PROGRESS_REGEX = /\[download\]\s+(\d+\.\d+)%/;
   private static SPEED_REGEX = /at\s+([\d.]+\w+\/s)/;
   private static ETA_REGEX = /ETA\s+(\d+:\d+)/;
-  private static DESTINATION_REGEX = /\[download\]\s+(?:Destination:|.*has already been downloaded(?: and merged into)?)\s+(.*)$/;
-  private static ALREADY_DOWNLOADED_REGEX = /\[download\]\s+(.*?)\s+has already been downloaded$/;
+  private static TOTAL_SIZE_REGEX = /\bof\s+~?([\d.]+)\s*([KMGT]?iB|B)\b/i;
+  private static DESTINATION_REGEX =
+    /\[download\]\s+(?:Destination:|.*has already been downloaded(?: and merged into)?)\s+(.*)$/;
+  private static ALREADY_DOWNLOADED_REGEX =
+    /\[download\]\s+(.*?)\s+has already been downloaded$/;
   private static MERGER_REGEX = /^\[Merger\] Merging formats into "(.*)"\s*$/;
-  private static GENERIC_DESTINATION_REGEX = /^\[[^\]]+\]\s+Destination:\s+(.*)$/;
+  private static GENERIC_DESTINATION_REGEX =
+    /^\[[^\]]+\]\s+Destination:\s+(.*)$/;
   private static HALALDL_OUTPUT_REGEX = /^__HALALDL_OUTPUT__:(.*)$/;
+  private static HALALDL_SIZE_REGEX = /^__HALALDL_SIZE__:(.*)$/;
 
   parse(line: string): DownloadUpdate | null {
     const update: DownloadUpdate = {};
@@ -28,6 +33,16 @@ export class OutputParser {
       update.outputPath = path;
       update.title = this.extractTitle(path);
       hasUpdate = true;
+    }
+
+    const halalDlSizeMatch = line.match(OutputParser.HALALDL_SIZE_REGEX);
+    if (halalDlSizeMatch?.[1]) {
+      const raw = this.stripAnsiSimple(halalDlSizeMatch[1]).trim();
+      const bytes = Number.parseInt(raw, 10);
+      if (Number.isFinite(bytes) && bytes > 0) {
+        update.totalSize = this.formatBytes(bytes);
+        hasUpdate = true;
+      }
     }
 
     // Progress
@@ -48,6 +63,12 @@ export class OutputParser {
     const etaMatch = line.match(OutputParser.ETA_REGEX);
     if (etaMatch) {
       update.eta = etaMatch[1];
+      hasUpdate = true;
+    }
+
+    const totalSizeMatch = line.match(OutputParser.TOTAL_SIZE_REGEX);
+    if (totalSizeMatch) {
+      update.totalSize = `${totalSizeMatch[1]}${totalSizeMatch[2]}`;
       hasUpdate = true;
     }
 
@@ -107,7 +128,9 @@ export class OutputParser {
   }
 
   private cleanPath(raw: string): string {
-    let trimmed = this.stripAnsiSimple(raw).trim().replace(/[\r\n]/g, "");
+    let trimmed = this.stripAnsiSimple(raw)
+      .trim()
+      .replace(/[\r\n]/g, "");
     trimmed = trimmed.replace(/^"(.*)"$/, "$1");
     trimmed = this.stripFileUriPrefix(trimmed);
     return trimmed;
@@ -141,6 +164,18 @@ export class OutputParser {
       out += input[i];
     }
     return out;
+  }
+
+  private formatBytes(bytes: number): string {
+    const units = ["B", "KB", "MB", "GB", "TB"];
+    let value = bytes;
+    let unitIndex = 0;
+    while (value >= 1024 && unitIndex < units.length - 1) {
+      value /= 1024;
+      unitIndex++;
+    }
+    const decimals = value >= 100 ? 0 : value >= 10 ? 1 : 2;
+    return `${value.toFixed(decimals)}${units[unitIndex]}`;
   }
 
   private extractTitle(path: string): string {

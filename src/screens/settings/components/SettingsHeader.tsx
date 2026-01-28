@@ -1,8 +1,8 @@
-import { 
-  Settings as SettingsIcon, 
+import {
+  Settings as SettingsIcon,
   RotateCcw,
   Save,
-  Loader2
+  Loader2,
 } from "lucide-react";
 import { MotionButton } from "@/components/motion/MotionButton";
 import { FadeInItem } from "@/components/motion/StaggerContainer";
@@ -20,7 +20,9 @@ interface SettingsHeaderProps {
   isResetting?: boolean;
   onGlobalReset: () => void;
   onResetAll: () => void;
-  onResetGroup: (group: "appearance" | "storage" | "behavior" | "downloadEngine") => void;
+  onResetGroup: (
+    group: "appearance" | "storage" | "behavior" | "downloadEngine"
+  ) => void;
   onSave: () => void;
 }
 
@@ -31,7 +33,7 @@ export function SettingsHeader({
   onGlobalReset,
   onResetAll,
   onResetGroup,
-  onSave
+  onSave,
 }: SettingsHeaderProps) {
   return (
     <FadeInItem className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
@@ -40,7 +42,9 @@ export function SettingsHeader({
           <SettingsIcon className="w-8 h-8 text-primary" />
           Settings
         </h2>
-        <p className="text-muted-foreground">Configure HalalDL behavior and appearance.</p>
+        <p className="text-muted-foreground">
+          Configure HalalDL behavior and appearance.
+        </p>
       </div>
       <div className="flex flex-wrap items-center justify-end gap-2 sm:gap-3">
         <MotionButton
@@ -60,8 +64,8 @@ export function SettingsHeader({
         </MotionButton>
         <DropdownMenu>
           <DropdownMenuTrigger asChild disabled={!isDirty}>
-            <MotionButton 
-              variant="outline" 
+            <MotionButton
+              variant="outline"
               size="sm"
               disabled={!isDirty}
               whileHover={{ scale: 1.05 }}
@@ -74,13 +78,21 @@ export function SettingsHeader({
           <DropdownMenuContent align="end">
             <DropdownMenuItem onClick={onResetAll}>Reset all</DropdownMenuItem>
             <DropdownMenuSeparator />
-            <DropdownMenuItem onClick={() => onResetGroup("appearance")}>Reset appearance</DropdownMenuItem>
-            <DropdownMenuItem onClick={() => onResetGroup("storage")}>Reset storage</DropdownMenuItem>
-            <DropdownMenuItem onClick={() => onResetGroup("behavior")}>Reset behavior</DropdownMenuItem>
-            <DropdownMenuItem onClick={() => onResetGroup("downloadEngine")}>Reset download engine</DropdownMenuItem>
+            <DropdownMenuItem onClick={() => onResetGroup("appearance")}>
+              Reset appearance
+            </DropdownMenuItem>
+            <DropdownMenuItem onClick={() => onResetGroup("storage")}>
+              Reset storage
+            </DropdownMenuItem>
+            <DropdownMenuItem onClick={() => onResetGroup("behavior")}>
+              Reset behavior
+            </DropdownMenuItem>
+            <DropdownMenuItem onClick={() => onResetGroup("downloadEngine")}>
+              Reset download engine
+            </DropdownMenuItem>
           </DropdownMenuContent>
         </DropdownMenu>
-        <MotionButton 
+        <MotionButton
           onClick={onSave}
           size="sm"
           disabled={!isDirty}

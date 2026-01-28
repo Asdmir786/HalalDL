@@ -2,18 +2,20 @@ import { create } from "zustand";
 
 export type Theme = "system" | "light" | "dark";
 export type FileCollisionAction = "overwrite" | "rename" | "skip";
+export type DownloadsAddMode = "queue" | "start";
+export type InstallerTypePreference = "auto" | "nsis" | "msi";
 
 export interface Settings {
   // General
   theme: Theme;
   notifications: boolean;
-  
+
   // Download Logic
   maxConcurrency: number;
   maxRetries: number;
   maxSpeed: number; // in KB/s, 0 = unlimited
   fileCollision: FileCollisionAction;
-  
+
   // Paths
   defaultDownloadDir: string;
   tempDir: string;
@@ -22,6 +24,12 @@ export interface Settings {
   autoClearFinished: boolean;
   autoCopyFile: boolean;
   paranoidMode: boolean; // Auto-export history to backups folder
+
+  // UI
+  downloadsAddMode: DownloadsAddMode;
+
+  // Updates
+  installerTypePreference: InstallerTypePreference;
 }
 
 interface SettingsState {
@@ -38,14 +46,18 @@ export const DEFAULT_SETTINGS: Settings = {
   maxRetries: 3,
   maxSpeed: 0,
   fileCollision: "rename",
-  defaultDownloadDir: "", 
+  defaultDownloadDir: "",
   tempDir: "",
   autoClearFinished: false,
   autoCopyFile: true,
   paranoidMode: false,
+  downloadsAddMode: "queue",
+  installerTypePreference: "auto",
 };
 
-export const SETTINGS_KEYS = Object.keys(DEFAULT_SETTINGS) as (keyof Settings)[];
+export const SETTINGS_KEYS = Object.keys(
+  DEFAULT_SETTINGS
+) as (keyof Settings)[];
 
 export const useSettingsStore = create<SettingsState>((set) => ({
   settings: DEFAULT_SETTINGS,

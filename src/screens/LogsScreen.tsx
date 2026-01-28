@@ -16,7 +16,10 @@ import { toast } from "sonner";
 import { useLogsStore, LogLevel } from "@/store/logs";
 import { useDownloadsStore } from "@/store/downloads";
 import { MotionButton } from "@/components/motion/MotionButton";
-import { FadeInStagger, FadeInItem } from "@/components/motion/StaggerContainer";
+import {
+  FadeInStagger,
+  FadeInItem,
+} from "@/components/motion/StaggerContainer";
 import { save } from "@tauri-apps/plugin-dialog";
 import { invoke } from "@tauri-apps/api/core";
 import { Input } from "@/components/ui/input";
@@ -61,7 +64,9 @@ export function LogsScreen() {
   const [filter, setFilter] = React.useState<LogLevel | "all">("all");
   const [search, setSearch] = React.useState("");
   const [autoScroll, setAutoScroll] = React.useState(true);
-  const [jobFilter, setJobFilter] = React.useState<string | "all" | "active">("active");
+  const [jobFilter, setJobFilter] = React.useState<string | "all" | "active">(
+    "active"
+  );
   const [availableJobs, setAvailableJobs] = React.useState<string[]>([]);
   const parentRef = React.useRef<HTMLDivElement>(null);
   const didAutoSelectJob = React.useRef(false);
@@ -69,7 +74,10 @@ export function LogsScreen() {
   const activeJobIds = React.useMemo(() => {
     return new Set(
       jobs
-        .filter((job) => job.status === "Downloading" || job.status === "Post-processing")
+        .filter(
+          (job) =>
+            job.status === "Downloading" || job.status === "Post-processing"
+        )
         .map((job) => job.id)
     );
   }, [jobs]);
@@ -167,7 +175,10 @@ export function LogsScreen() {
     const lastIndex = filteredLogs.length - 1;
     if (lastScrollIndex.current !== lastIndex) {
       try {
-        rowVirtualizer.scrollToIndex(lastIndex, { align: "end", behavior: "auto" });
+        rowVirtualizer.scrollToIndex(lastIndex, {
+          align: "end",
+          behavior: "auto",
+        });
         lastScrollIndex.current = lastIndex;
       } catch {
         // Ignore scroll errors during rapid updates
@@ -205,7 +216,9 @@ export function LogsScreen() {
       }
     } catch (error: unknown) {
       const message = error instanceof Error ? error.message : String(error);
-      useLogsStore.getState().addLog({ level: "error", message: `Logs export failed: ${message}` });
+      useLogsStore
+        .getState()
+        .addLog({ level: "error", message: `Logs export failed: ${message}` });
       toast.error(`Export failed: ${message}`);
     } finally {
       setIsExporting(false);
@@ -238,21 +251,27 @@ export function LogsScreen() {
     toast.success("Logs cleared");
   }, [clearLogs]);
 
-  const handleScroll = React.useCallback((event: React.UIEvent<HTMLDivElement>) => {
-    const target = event.currentTarget;
-    const distanceFromBottom =
-      target.scrollHeight - target.scrollTop - target.clientHeight;
-    // Increased threshold for auto-scroll detection
-    const isAtBottom = distanceFromBottom < 100;
-    
-    // Only update if state changes to avoid re-renders
-    if (isAtBottom !== autoScroll) {
-       setAutoScroll(isAtBottom);
-    }
-  }, [autoScroll]);
+  const handleScroll = React.useCallback(
+    (event: React.UIEvent<HTMLDivElement>) => {
+      const target = event.currentTarget;
+      const distanceFromBottom =
+        target.scrollHeight - target.scrollTop - target.clientHeight;
+      // Increased threshold for auto-scroll detection
+      const isAtBottom = distanceFromBottom < 100;
+
+      // Only update if state changes to avoid re-renders
+      if (isAtBottom !== autoScroll) {
+        setAutoScroll(isAtBottom);
+      }
+    },
+    [autoScroll]
+  );
 
   return (
-    <div className="flex flex-col h-full bg-background max-w-6xl mx-auto w-full p-6 space-y-6" role="main">
+    <div
+      className="flex flex-col h-full bg-background max-w-6xl mx-auto w-full p-6 space-y-6"
+      role="main"
+    >
       <FadeInStagger className="flex flex-col h-full gap-6">
         {/* Modern Header */}
         <FadeInItem>
@@ -267,9 +286,9 @@ export function LogsScreen() {
                   System logs and yt-dlp process output
                 </p>
               </div>
-              
+
               <div className="flex items-center gap-2">
-                 <MotionButton
+                <MotionButton
                   variant="outline"
                   size="sm"
                   onClick={handleExport}
@@ -332,7 +351,7 @@ export function LogsScreen() {
                   </button>
                 )}
               </div>
-              
+
               <div className="flex items-center gap-2 overflow-x-auto pb-1 lg:pb-0 scrollbar-hide">
                 <div className="flex items-center bg-muted/50 rounded-lg p-1 border border-border/50">
                   <Filter className="w-3.5 h-3.5 ml-2 mr-2 text-muted-foreground" />
@@ -340,11 +359,13 @@ export function LogsScreen() {
                   {["all", "info", "warn", "error", "command"].map((l) => (
                     <button
                       key={l}
-                      onClick={() => setFilter(l === "all" ? "all" : (l as LogLevel))}
+                      onClick={() =>
+                        setFilter(l === "all" ? "all" : (l as LogLevel))
+                      }
                       className={cn(
                         "px-2.5 py-1 text-[11px] uppercase font-bold tracking-wider rounded-md transition-all",
-                        filter === l 
-                          ? "bg-background shadow-sm text-foreground" 
+                        filter === l
+                          ? "bg-background shadow-sm text-foreground"
                           : "text-muted-foreground hover:text-foreground hover:bg-background/50"
                       )}
                     >
@@ -357,7 +378,11 @@ export function LogsScreen() {
                   value={jobFilter}
                   onValueChange={(value) =>
                     setJobFilter(
-                      value === "all" ? "all" : value === "active" ? "active" : value
+                      value === "all"
+                        ? "all"
+                        : value === "active"
+                          ? "active"
+                          : value
                     )
                   }
                 >
@@ -384,22 +409,27 @@ export function LogsScreen() {
         {/* Console View */}
         <FadeInItem className="flex-1 min-h-0">
           <div className="h-full rounded-xl border border-border/50 bg-[#0c0c0c] flex flex-col shadow-inner relative overflow-hidden group/console">
-             {/* Status Bar */}
+            {/* Status Bar */}
             <div className="absolute top-0 left-0 right-0 h-8 bg-white/5 border-b border-white/5 flex items-center px-3 justify-between z-10 backdrop-blur-md select-none">
               <div className="flex items-center gap-2 text-[10px] font-mono text-white/40">
                 <Terminal className="w-3 h-3" />
                 <span>BASH</span>
               </div>
               <div className="flex items-center gap-3">
-                 <div className={cn(
+                <div
+                  className={cn(
                     "flex items-center gap-1.5 px-2 py-0.5 rounded-full text-[10px] font-medium transition-colors cursor-pointer",
-                    autoScroll ? "bg-primary/20 text-primary hover:bg-primary/30" : "bg-white/5 text-white/40 hover:bg-white/10"
-                 )}
-                 onClick={() => setAutoScroll(!autoScroll)}
-                 >
-                    <ArrowDown className={cn("w-3 h-3", autoScroll && "animate-pulse")} />
-                    {autoScroll ? "Auto-scroll On" : "Auto-scroll Off"}
-                 </div>
+                    autoScroll
+                      ? "bg-primary/20 text-primary hover:bg-primary/30"
+                      : "bg-white/5 text-white/40 hover:bg-white/10"
+                  )}
+                  onClick={() => setAutoScroll(!autoScroll)}
+                >
+                  <ArrowDown
+                    className={cn("w-3 h-3", autoScroll && "animate-pulse")}
+                  />
+                  {autoScroll ? "Auto-scroll On" : "Auto-scroll Off"}
+                </div>
                 <span className="text-[10px] font-mono text-white/30 border-l border-white/10 pl-3">
                   {filteredLogs.length} lines
                 </span>
@@ -418,7 +448,7 @@ export function LogsScreen() {
                   <div className="text-[12px]">Initializing console...</div>
                 </div>
               )}
-              
+
               {loadStatus === "error" && (
                 <div className="h-full flex flex-col items-center justify-center text-red-400/80 gap-3">
                   <AlertCircle className="w-8 h-8 opacity-50" />
@@ -463,12 +493,23 @@ export function LogsScreen() {
                             <div className="w-[140px] flex-shrink-0 text-muted-foreground/60 font-mono text-[10px] tabular-nums select-text flex flex-col justify-center">
                               <span>{formatTimestamp(log.timestamp)}</span>
                               {log.jobId && (
-                                <span className="text-[9px] opacity-50 truncate max-w-full" title={jobTitleById.get(log.jobId) || log.jobId}>
-                                  {jobTitleById.get(log.jobId) || log.jobId.substring(0, 8)}
+                                <span
+                                  className="text-[9px] opacity-50 truncate max-w-full"
+                                  title={
+                                    jobTitleById.get(log.jobId) || log.jobId
+                                  }
+                                >
+                                  {jobTitleById.get(log.jobId) ||
+                                    log.jobId.substring(0, 8)}
                                 </span>
                               )}
                             </div>
-                            <div className={cn("w-16 flex-shrink-0 text-[10px] font-bold uppercase tracking-wider select-none flex items-center", LEVEL_STYLES[log.level])}>
+                            <div
+                              className={cn(
+                                "w-16 flex-shrink-0 text-[10px] font-bold uppercase tracking-wider select-none flex items-center",
+                                LEVEL_STYLES[log.level]
+                              )}
+                            >
                               {log.level}
                             </div>
                             <div className="flex-1 min-w-0 font-mono text-[11px] leading-relaxed break-all whitespace-pre-wrap select-text text-foreground/90">
@@ -486,12 +527,14 @@ export function LogsScreen() {
                   })}
                 </div>
               )}
-              
+
               {loadStatus === "ready" && filteredLogs.length === 0 && (
                 <div className="h-full flex flex-col items-center justify-center text-white/20 select-none">
                   <Terminal className="w-12 h-12 mb-4 opacity-10" />
                   <p className="text-sm font-medium">No output found</p>
-                  <p className="text-xs opacity-50 mt-1">Try adjusting your filters</p>
+                  <p className="text-xs opacity-50 mt-1">
+                    Try adjusting your filters
+                  </p>
                 </div>
               )}
             </div>

@@ -29,9 +29,11 @@ export function DownloadList({
   onRemoveJob,
   onViewLogs,
   itemVariants,
-  formatRelativeTime
+  formatRelativeTime,
 }: DownloadListProps) {
-  const hasCompleted = jobs.some((job) => job.status === "Done" || job.status === "Failed");
+  const hasCompleted = jobs.some(
+    (job) => job.status === "Done" || job.status === "Failed"
+  );
   const { setScreen } = useNavigationStore();
 
   return (
@@ -39,126 +41,133 @@ export function DownloadList({
       <div className="bg-black/5 rounded-2xl border border-white/5 flex-1 flex flex-col overflow-hidden shadow-inner backdrop-blur-sm relative">
         {jobs.length === 0 ? (
           <div className="flex-1 flex flex-col items-center justify-center p-8 relative overflow-hidden min-h-[400px]">
-              {/* Background Effects */}
-              <div className="absolute inset-0 bg-gradient-to-b from-transparent via-background/50 to-background z-10" />
-              <div className="absolute inset-0 bg-[radial-gradient(circle_at_center,_var(--tw-gradient-stops))] from-primary/5 via-transparent to-transparent opacity-40 blur-3xl" />
-          
-              {/* Content */}
-              <motion.div 
-                  initial={{ opacity: 0, y: 20 }} 
-                  animate={{ opacity: 1, y: 0 }} 
-                  className="relative z-20 flex flex-col items-center text-center max-w-md"
-              >
-                  {/* Icon Cluster */}
-                  <div className="relative mb-8 group cursor-default">
-                      <div className="absolute -inset-4 bg-primary/20 rounded-full blur-xl opacity-0 group-hover:opacity-100 transition-opacity duration-700" />
-                      <div className="relative w-20 h-20 bg-background/50 backdrop-blur-xl border border-white/10 rounded-2xl flex items-center justify-center shadow-2xl transform group-hover:scale-105 transition-all duration-500">
-                          <Download className="w-8 h-8 text-primary/80" />
-                      </div>
-                      {/* Floating decorative icons */}
-                      <div className="absolute -top-2 -right-2 w-8 h-8 bg-background/50 backdrop-blur-md border border-white/10 rounded-lg flex items-center justify-center shadow-lg animate-bounce delay-75">
-                          <Sparkles className="w-4 h-4 text-yellow-500/80" />
-                      </div>
-                       <div className="absolute -bottom-2 -left-2 w-8 h-8 bg-background/50 backdrop-blur-md border border-white/10 rounded-lg flex items-center justify-center shadow-lg animate-bounce delay-150">
-                          <Layers className="w-4 h-4 text-blue-500/80" />
-                      </div>
-                  </div>
-          
-                  <h3 className="text-2xl font-bold tracking-tight mb-2 bg-clip-text text-transparent bg-gradient-to-br from-foreground to-muted-foreground">
-                      Ready to Download
-                  </h3>
-                  <p className="text-muted-foreground text-sm mb-8 leading-relaxed">
-                      Your queue is currently empty. Add a URL above to start downloading instantly.
-                  </p>
-          
-                  {/* Quick Actions Grid */}
-                  <div className="grid grid-cols-2 gap-3 w-full">
-                       <div 
-                         className="col-span-2 p-3 rounded-xl border border-white/5 bg-white/5 hover:bg-white/10 transition-colors cursor-pointer flex items-center gap-3 group active:scale-[0.98]" 
-                         onClick={() => document.querySelector('input')?.focus()}
-                       >
-                          <div className="w-8 h-8 rounded-lg bg-primary/10 flex items-center justify-center group-hover:bg-primary/20 transition-colors">
-                              <Plus className="w-4 h-4 text-primary" />
-                          </div>
-                          <div className="text-left">
-                              <div className="text-xs font-semibold">New Download</div>
-                              <div className="text-[10px] text-muted-foreground">Paste a URL to begin</div>
-                          </div>
-                       </div>
-                       
-                       <div 
-                         className="p-3 rounded-xl border border-white/5 bg-white/5 hover:bg-white/10 transition-colors cursor-pointer flex items-center gap-3 group active:scale-[0.98]"
-                         onClick={() => setScreen("presets")}
-                       >
-                          <div className="w-8 h-8 rounded-lg bg-purple-500/10 flex items-center justify-center group-hover:bg-purple-500/20 transition-colors">
-                              <Layers className="w-4 h-4 text-purple-400" />
-                          </div>
-                          <div className="text-left">
-                              <div className="text-xs font-semibold">Presets</div>
-                              <div className="text-[10px] text-muted-foreground">Manage formats</div>
-                          </div>
-                       </div>
+            {/* Background Effects */}
+            <div className="absolute inset-0 bg-gradient-to-b from-transparent via-background/50 to-background z-10" />
+            <div className="absolute inset-0 bg-[radial-gradient(circle_at_center,_var(--tw-gradient-stops))] from-primary/5 via-transparent to-transparent opacity-40 blur-3xl" />
 
-                       <div 
-                         className="p-3 rounded-xl border border-white/5 bg-white/5 hover:bg-white/10 transition-colors cursor-pointer flex items-center gap-3 group active:scale-[0.98]"
-                         onClick={() => setScreen("tools")}
-                       >
-                          <div className="w-8 h-8 rounded-lg bg-blue-500/10 flex items-center justify-center group-hover:bg-blue-500/20 transition-colors">
-                              <Settings className="w-4 h-4 text-blue-400" />
-                          </div>
-                          <div className="text-left">
-                              <div className="text-xs font-semibold">Tools</div>
-                              <div className="text-[10px] text-muted-foreground">Check status</div>
-                          </div>
-                       </div>
+            {/* Content */}
+            <motion.div
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              className="relative z-20 flex flex-col items-center text-center max-w-md"
+            >
+              {/* Icon Cluster */}
+              <div className="relative mb-8 group cursor-default">
+                <div className="absolute -inset-4 bg-primary/20 rounded-full blur-xl opacity-0 group-hover:opacity-100 transition-opacity duration-700" />
+                <div className="relative w-20 h-20 bg-background/50 backdrop-blur-xl border border-white/10 rounded-2xl flex items-center justify-center shadow-2xl transform group-hover:scale-105 transition-all duration-500">
+                  <Download className="w-8 h-8 text-primary/80" />
+                </div>
+                {/* Floating decorative icons */}
+                <div className="absolute -top-2 -right-2 w-8 h-8 bg-background/50 backdrop-blur-md border border-white/10 rounded-lg flex items-center justify-center shadow-lg animate-bounce delay-75">
+                  <Sparkles className="w-4 h-4 text-yellow-500/80" />
+                </div>
+                <div className="absolute -bottom-2 -left-2 w-8 h-8 bg-background/50 backdrop-blur-md border border-white/10 rounded-lg flex items-center justify-center shadow-lg animate-bounce delay-150">
+                  <Layers className="w-4 h-4 text-blue-500/80" />
+                </div>
+              </div>
+
+              <h3 className="text-2xl font-bold tracking-tight mb-2 bg-clip-text text-transparent bg-gradient-to-br from-foreground to-muted-foreground">
+                Ready to Download
+              </h3>
+              <p className="text-muted-foreground text-sm mb-8 leading-relaxed">
+                Your queue is currently empty. Add a URL above to start
+                downloading instantly.
+              </p>
+
+              {/* Quick Actions Grid */}
+              <div className="grid grid-cols-2 gap-3 w-full">
+                <div
+                  className="col-span-2 p-3 rounded-xl border border-white/5 bg-white/5 hover:bg-white/10 transition-colors cursor-pointer flex items-center gap-3 group active:scale-[0.98]"
+                  onClick={() => document.querySelector("input")?.focus()}
+                >
+                  <div className="w-8 h-8 rounded-lg bg-primary/10 flex items-center justify-center group-hover:bg-primary/20 transition-colors">
+                    <Plus className="w-4 h-4 text-primary" />
                   </div>
-              </motion.div>
+                  <div className="text-left">
+                    <div className="text-xs font-semibold">New Download</div>
+                    <div className="text-[10px] text-muted-foreground">
+                      Paste a URL to begin
+                    </div>
+                  </div>
+                </div>
+
+                <div
+                  className="p-3 rounded-xl border border-white/5 bg-white/5 hover:bg-white/10 transition-colors cursor-pointer flex items-center gap-3 group active:scale-[0.98]"
+                  onClick={() => setScreen("presets")}
+                >
+                  <div className="w-8 h-8 rounded-lg bg-purple-500/10 flex items-center justify-center group-hover:bg-purple-500/20 transition-colors">
+                    <Layers className="w-4 h-4 text-purple-400" />
+                  </div>
+                  <div className="text-left">
+                    <div className="text-xs font-semibold">Presets</div>
+                    <div className="text-[10px] text-muted-foreground">
+                      Manage formats
+                    </div>
+                  </div>
+                </div>
+
+                <div
+                  className="p-3 rounded-xl border border-white/5 bg-white/5 hover:bg-white/10 transition-colors cursor-pointer flex items-center gap-3 group active:scale-[0.98]"
+                  onClick={() => setScreen("tools")}
+                >
+                  <div className="w-8 h-8 rounded-lg bg-blue-500/10 flex items-center justify-center group-hover:bg-blue-500/20 transition-colors">
+                    <Settings className="w-4 h-4 text-blue-400" />
+                  </div>
+                  <div className="text-left">
+                    <div className="text-xs font-semibold">Tools</div>
+                    <div className="text-[10px] text-muted-foreground">
+                      Check status
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </motion.div>
           </div>
         ) : (
           <>
             <div className="flex items-center justify-end px-4 pt-4 pb-2 gap-2">
-                <AnimatePresence>
-                  {selectedIds.length > 0 && (
-                      <motion.div
-                          initial={{ opacity: 0, x: 20 }}
-                          animate={{ opacity: 1, x: 0 }}
-                          exit={{ opacity: 0, x: 20 }}
-                          className="flex gap-2"
-                      >
-                          <MotionButton
-                              type="button"
-                              variant="secondary"
-                              size="sm"
-                              className="h-7 px-3 text-xs rounded-full shadow-sm"
-                              onClick={onStartSelected}
-                          >
-                              Start Selected
-                          </MotionButton>
-                          <MotionButton
-                              type="button"
-                              variant="ghost"
-                              size="sm"
-                              className="h-7 px-3 text-xs rounded-full hover:bg-destructive/10 hover:text-destructive"
-                              onClick={onRemoveSelected}
-                          >
-                              Remove
-                          </MotionButton>
-                      </motion.div>
-                  )}
-                </AnimatePresence>
-                
-                <div className="flex-1" />
+              <AnimatePresence>
+                {selectedIds.length > 0 && (
+                  <motion.div
+                    initial={{ opacity: 0, x: 20 }}
+                    animate={{ opacity: 1, x: 0 }}
+                    exit={{ opacity: 0, x: 20 }}
+                    className="flex gap-2"
+                  >
+                    <MotionButton
+                      type="button"
+                      variant="secondary"
+                      size="sm"
+                      className="h-7 px-3 text-xs rounded-full shadow-sm"
+                      onClick={onStartSelected}
+                    >
+                      Start Selected
+                    </MotionButton>
+                    <MotionButton
+                      type="button"
+                      variant="ghost"
+                      size="sm"
+                      className="h-7 px-3 text-xs rounded-full hover:bg-destructive/10 hover:text-destructive"
+                      onClick={onRemoveSelected}
+                    >
+                      Remove
+                    </MotionButton>
+                  </motion.div>
+                )}
+              </AnimatePresence>
 
-                <MotionButton
-                  type="button"
-                  variant="ghost"
-                  size="sm"
-                  className="h-7 px-3 text-xs rounded-full text-muted-foreground hover:text-destructive hover:bg-destructive/10 transition-colors"
-                  disabled={!hasCompleted}
-                  onClick={onClearCompleted}
-                >
-                  Clear Completed
-                </MotionButton>
+              <div className="flex-1" />
+
+              <MotionButton
+                type="button"
+                variant="ghost"
+                size="sm"
+                className="h-7 px-3 text-xs rounded-full text-muted-foreground hover:text-destructive hover:bg-destructive/10 transition-colors"
+                disabled={!hasCompleted}
+                onClick={onClearCompleted}
+              >
+                Clear Completed
+              </MotionButton>
             </div>
             <div className="flex-1 overflow-auto p-4 pt-0">
               <div className="flex flex-col gap-2 relative">
@@ -176,7 +185,7 @@ export function DownloadList({
                     />
                   ))}
                 </AnimatePresence>
-            </div>
+              </div>
             </div>
           </>
         )}

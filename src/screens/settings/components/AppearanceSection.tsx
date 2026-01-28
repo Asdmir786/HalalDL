@@ -1,13 +1,19 @@
 import { Monitor, Sun, Moon } from "lucide-react";
 import { FadeInItem } from "@/components/motion/StaggerContainer";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
 import { Label } from "@/components/ui/label";
-import { 
-  Select, 
-  SelectContent, 
-  SelectItem, 
-  SelectTrigger, 
-  SelectValue 
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
 } from "@/components/ui/select";
 import { Theme } from "@/store/settings";
 
@@ -16,7 +22,10 @@ interface AppearanceSectionProps {
   onThemeChange: (theme: Theme) => void;
 }
 
-export function AppearanceSection({ theme, onThemeChange }: AppearanceSectionProps) {
+export function AppearanceSection({
+  theme,
+  onThemeChange,
+}: AppearanceSectionProps) {
   return (
     <FadeInItem>
       <Card className="glass-card">
@@ -31,10 +40,12 @@ export function AppearanceSection({ theme, onThemeChange }: AppearanceSectionPro
           <div className="flex items-center justify-between">
             <div className="space-y-0.5">
               <Label>Theme</Label>
-              <p className="text-sm text-muted-foreground">Choose your preferred color theme.</p>
+              <p className="text-sm text-muted-foreground">
+                Choose your preferred color theme.
+              </p>
             </div>
-            <Select 
-              value={theme} 
+            <Select
+              value={theme}
               onValueChange={(v) => onThemeChange(v as Theme)}
             >
               <SelectTrigger className="w-[180px]">

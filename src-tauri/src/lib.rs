@@ -1,7 +1,7 @@
 use tauri::Emitter;
 use tauri::Manager;
 use std::fs;
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 use futures_util::StreamExt;
 
 #[derive(Clone, serde::Serialize)]
@@ -156,6 +156,13 @@ fn stage_manual_tool(app_handle: tauri::AppHandle, tool: String, source: String)
     Ok(dest_path.to_string_lossy().to_string())
 }
 
+#[tauri::command]
+fn get_file_size(path: String) -> Result<u64, String> {
+    let normalized = path.replace("/", "\\");
+    let meta = fs::metadata(&normalized).map_err(|e| e.to_string())?;
+    Ok(meta.len())
+}
+
 use std::io::Write;
 
 async fn download_file(
@@ -294,6 +301,318 @@ fn emit_progress(app_handle: &tauri::AppHandle, tool: &str, percentage: f64, sta
         percentage,
         status: status.to_string(),
     });
+}
+
+#[cfg(target_os = "windows")]
+fn detect_installer_type_windows() -> Result<Option<String>, String> {
+    use std::ffi::OsStr;
+    use std::os::windows::ffi::OsStrExt;
+    use windows_sys::Win32::System::Registry::{
+        RegCloseKey, RegEnumKeyExW, RegOpenKeyExW, RegQueryValueExW, HKEY,
+        HKEY_CURRENT_USER, HKEY_LOCAL_MACHINE, KEY_READ, REG_DWORD, REG_EXPAND_SZ, REG_SZ,
+    };
+
+    const ERROR_SUCCESS: u32 = 0;
+    const ERROR_NO_MORE_ITEMS: u32 = 259;
+    const ERROR_MORE_DATA: u32 = 234;
+
+    fn to_wide(s: &str) -> Vec<u16> {
+        OsStr::new(s).encode_wide().chain(std::iter::once(0)).collect()
+    }
+
+    fn open_key(root: HKEY, subkey: &str) -> Result<HKEY, String> {
+        let mut out: HKEY = std::ptr::null_mut();
+        let subkey_w = to_wide(subkey);
+        let status = unsafe { RegOpenKeyExW(root, subkey_w.as_ptr(), 0, KEY_READ, &mut out) };
+        if status != 0 {
+            return Err(format!("RegOpenKeyExW failed: {}", status));
+        }
+        Ok(out)
+    }
+
+    fn query_string(hkey: HKEY, value: &str) -> Option<String> {
+        let value_w = to_wide(value);
+        let mut typ: u32 = 0;
+        let mut size: u32 = 0;
+        let status = unsafe {
+            RegQueryValueExW(
+                hkey,
+                value_w.as_ptr(),
+                std::ptr::null_mut(),
+                &mut typ,
+                std::ptr::null_mut(),
+                &mut size,
+            )
+        };
+        if status != 0 || size == 0 || (typ != REG_SZ && typ != REG_EXPAND_SZ) {
+            return None;
+        }
+
+        let mut buf: Vec<u8> = vec![0u8; size as usize];
+        let status2 = unsafe {
+            RegQueryValueExW(
+                hkey,
+                value_w.as_ptr(),
+                std::ptr::null_mut(),
+                &mut typ,
+                buf.as_mut_ptr(),
+                &mut size,
+            )
+        };
+        if status2 != 0 {
+            return None;
+        }
+
+        if buf.len() < 2 {
+            return None;
+        }
+
+        let u16_len = buf.len() / 2;
+        let mut wide: Vec<u16> = Vec::with_capacity(u16_len);
+        for i in 0..u16_len {
+            let lo = buf[i * 2] as u16;
+            let hi = buf[i * 2 + 1] as u16;
+            wide.push(lo | (hi << 8));
+        }
+
+        while wide.last() == Some(&0) {
+            wide.pop();
+        }
+
+        String::from_utf16(&wide).ok().map(|s| s.trim().to_string())
+    }
+
+    fn query_dword(hkey: HKEY, value: &str) -> Option<u32> {
+        let value_w = to_wide(value);
+        let mut typ: u32 = 0;
+        let mut data: u32 = 0;
+        let mut size: u32 = std::mem::size_of::<u32>() as u32;
+        let status = unsafe {
+            RegQueryValueExW(
+                hkey,
+                value_w.as_ptr(),
+                std::ptr::null_mut(),
+                &mut typ,
+                (&mut data as *mut u32) as *mut u8,
+                &mut size,
+            )
+        };
+        if status != 0 || typ != REG_DWORD {
+            return None;
+        }
+        Some(data)
+    }
+
+    fn is_guid_key(name: &str) -> bool {
+        let s = name.trim();
+        s.starts_with('{') && s.ends_with('}') && s.len() >= 36
+    }
+
+    fn classify_uninstall_entry(key_name: &str, uninstall_string: Option<String>, windows_installer: Option<u32>) -> String {
+        let uninstall_lower = uninstall_string
+            .as_deref()
+            .unwrap_or("")
+            .to_ascii_lowercase();
+        if windows_installer == Some(1) || uninstall_lower.contains("msiexec") || is_guid_key(key_name) {
+            "msi".to_string()
+        } else {
+            "nsis".to_string()
+        }
+    }
+
+    let roots: &[(HKEY, &str)] = &[
+        (HKEY_CURRENT_USER, "Software\\Microsoft\\Windows\\CurrentVersion\\Uninstall"),
+        (HKEY_LOCAL_MACHINE, "Software\\Microsoft\\Windows\\CurrentVersion\\Uninstall"),
+        (HKEY_LOCAL_MACHINE, "Software\\WOW6432Node\\Microsoft\\Windows\\CurrentVersion\\Uninstall"),
+    ];
+
+    for (root, path) in roots {
+        let hkey = match open_key(*root, path) {
+            Ok(h) => h,
+            Err(_) => continue,
+        };
+
+        let mut index: u32 = 0;
+        loop {
+            let mut name_len: u32 = 256;
+            let mut name_buf: Vec<u16> = vec![0u16; (name_len + 1) as usize];
+            let status = unsafe {
+                RegEnumKeyExW(
+                    hkey,
+                    index,
+                    name_buf.as_mut_ptr(),
+                    &mut name_len,
+                    std::ptr::null_mut(),
+                    std::ptr::null_mut(),
+                    std::ptr::null_mut(),
+                    std::ptr::null_mut(),
+                )
+            };
+
+            if status as u32 == ERROR_NO_MORE_ITEMS {
+                break;
+            }
+            if status as u32 == ERROR_MORE_DATA {
+                name_len = 1024;
+                name_buf = vec![0u16; (name_len + 1) as usize];
+                let status2 = unsafe {
+                    RegEnumKeyExW(
+                        hkey,
+                        index,
+                        name_buf.as_mut_ptr(),
+                        &mut name_len,
+                        std::ptr::null_mut(),
+                        std::ptr::null_mut(),
+                        std::ptr::null_mut(),
+                        std::ptr::null_mut(),
+                    )
+                };
+                if status2 as u32 != ERROR_SUCCESS {
+                    index = index.saturating_add(1);
+                    continue;
+                }
+            } else if status as u32 != ERROR_SUCCESS {
+                index = index.saturating_add(1);
+                continue;
+            }
+
+            let key_name = String::from_utf16_lossy(&name_buf[..name_len as usize]);
+            let full_subkey = format!("{}\\{}", path, key_name);
+            let sub = match open_key(*root, &full_subkey) {
+                Ok(h) => h,
+                Err(_) => {
+                    index = index.saturating_add(1);
+                    continue;
+                }
+            };
+
+            let display_name = query_string(sub, "DisplayName")
+                .unwrap_or_default()
+                .to_ascii_lowercase();
+            if display_name.contains("halaldl") {
+                let uninstall_string = query_string(sub, "UninstallString");
+                let windows_installer = query_dword(sub, "WindowsInstaller");
+                let typ = classify_uninstall_entry(&key_name, uninstall_string, windows_installer);
+                unsafe {
+                    RegCloseKey(sub);
+                    RegCloseKey(hkey);
+                }
+                return Ok(Some(typ));
+            }
+
+            unsafe { RegCloseKey(sub) };
+            index = index.saturating_add(1);
+        }
+
+        unsafe { RegCloseKey(hkey) };
+    }
+
+    Ok(None)
+}
+
+#[tauri::command]
+fn detect_installer_type() -> Result<Option<String>, String> {
+    #[cfg(target_os = "windows")]
+    {
+        detect_installer_type_windows()
+    }
+    #[cfg(not(target_os = "windows"))]
+    {
+        Ok(None)
+    }
+}
+
+fn sanitize_filename(input: &str) -> String {
+    let mut out = String::with_capacity(input.len());
+    for ch in input.chars() {
+        let keep = ch.is_ascii_alphanumeric() || matches!(ch, '.' | '-' | '_' | ' ' | '(' | ')' | '+');
+        out.push(if keep { ch } else { '_' });
+    }
+    let trimmed = out.trim().to_string();
+    if trimmed.is_empty() {
+        "installer".to_string()
+    } else {
+        trimmed
+    }
+}
+
+fn unique_dest_path(dir: &Path, filename: &str) -> PathBuf {
+    let base = sanitize_filename(filename);
+    let candidate = dir.join(&base);
+    if !candidate.exists() {
+        return candidate;
+    }
+
+    let (stem, ext) = match base.rsplit_once('.') {
+        Some((s, e)) if !s.is_empty() && !e.is_empty() => (s.to_string(), Some(e.to_string())),
+        _ => (base.clone(), None),
+    };
+
+    for i in 1..=999u32 {
+        let name = match &ext {
+            Some(e) => format!("{} ({}){}.{}", stem, i, "", e),
+            None => format!("{} ({})", stem, i),
+        };
+        let p = dir.join(name);
+        if !p.exists() {
+            return p;
+        }
+    }
+
+    candidate
+}
+
+fn filename_from_url(url: &str) -> String {
+    let last = url.split('/').last().unwrap_or("").trim();
+    let no_query = last.split('?').next().unwrap_or("").trim();
+    if no_query.is_empty() {
+        "HalalDL-Setup.exe".to_string()
+    } else {
+        no_query.to_string()
+    }
+}
+
+fn resolve_downloads_dir(app_handle: &tauri::AppHandle) -> Result<PathBuf, String> {
+    match app_handle.path().download_dir() {
+        Ok(p) => Ok(p),
+        Err(_) => {
+            #[cfg(target_os = "windows")]
+            {
+                let home = std::env::var("USERPROFILE").map_err(|_| "USERPROFILE not set".to_string())?;
+                Ok(PathBuf::from(home).join("Downloads"))
+            }
+            #[cfg(not(target_os = "windows"))]
+            {
+                Err("Could not resolve downloads directory".to_string())
+            }
+        }
+    }
+}
+
+#[tauri::command]
+async fn download_app_installer(app_handle: tauri::AppHandle, url: String) -> Result<String, String> {
+    if url.trim().is_empty() {
+        return Err("URL is empty".to_string());
+    }
+
+    let downloads_dir = resolve_downloads_dir(&app_handle)?;
+    if !downloads_dir.exists() {
+        fs::create_dir_all(&downloads_dir).map_err(|e| e.to_string())?;
+    }
+
+    let filename = filename_from_url(url.trim());
+    let dest = unique_dest_path(&downloads_dir, &filename);
+
+    emit_progress(&app_handle, "app-installer", 0.0, "Starting download...");
+    download_file(&app_handle, "app-installer", url.trim(), &dest).await?;
+    emit_progress(
+        &app_handle,
+        "app-installer",
+        100.0,
+        &format!("Saved: {}", dest.to_string_lossy()),
+    );
+
+    Ok(dest.to_string_lossy().to_string())
 }
 
 // Learn more about Tauri commands at https://tauri.app/develop/calling-rust/
@@ -892,7 +1211,10 @@ pub fn run() {
         .invoke_handler(tauri::generate_handler![
             greet,
             download_tools,
+            detect_installer_type,
+            download_app_installer,
             stage_manual_tool,
+            get_file_size,
             add_to_user_path,
             write_text_file,
             fetch_latest_ytdlp_version,

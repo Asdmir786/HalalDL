@@ -20,7 +20,7 @@ async function getToolPath(baseName: string): Promise<string> {
   } catch {
     // Ignore and fallback to system
   }
-  
+
   // 2. Fallback to system PATH
   return baseName;
 }
@@ -47,7 +47,10 @@ function compareVersionParts(a: VersionParts, b: VersionParts): number {
   return 0;
 }
 
-export function isUpdateAvailable(currentVersion: string | undefined, latestVersion: string | undefined): boolean | undefined {
+export function isUpdateAvailable(
+  currentVersion: string | undefined,
+  latestVersion: string | undefined
+): boolean | undefined {
   if (!currentVersion || !latestVersion) return undefined;
   const currentParts = parseVersionParts(currentVersion);
   const latestParts = parseVersionParts(latestVersion);
@@ -91,15 +94,25 @@ export async function checkYtDlpVersion(): Promise<string | null> {
   const { addLog } = useLogsStore.getState();
   try {
     const command = await getToolPath("yt-dlp");
-    addLog({ level: "command", message: "Checking for yt-dlp binary...", command: `${command} --version` });
+    addLog({
+      level: "command",
+      message: "Checking for yt-dlp binary...",
+      command: `${command} --version`,
+    });
     const cmd = Command.create(command, ["--version"]);
     const output = await cmd.execute();
     if (output.code === 0) {
       const version = output.stdout.trim();
-      addLog({ level: "info", message: `yt-dlp version ${version || "Detected"} detected at ${command}` });
+      addLog({
+        level: "info",
+        message: `yt-dlp version ${version || "Detected"} detected at ${command}`,
+      });
       return version;
     }
-    addLog({ level: "warn", message: `yt-dlp version check returned code ${output.code}` });
+    addLog({
+      level: "warn",
+      message: `yt-dlp version check returned code ${output.code}`,
+    });
   } catch (e) {
     addLog({ level: "error", message: `yt-dlp check failed: ${String(e)}` });
   }
@@ -110,16 +123,26 @@ export async function checkFfmpegVersion(): Promise<string | null> {
   const { addLog } = useLogsStore.getState();
   try {
     const command = await getToolPath("ffmpeg");
-    addLog({ level: "command", message: "Checking for ffmpeg binary...", command: `${command} -version` });
+    addLog({
+      level: "command",
+      message: "Checking for ffmpeg binary...",
+      command: `${command} -version`,
+    });
     const cmd = Command.create(command, ["-version"]);
     const output = await cmd.execute();
     if (output.code === 0) {
-      const firstLine = output.stdout.split('\n')[0];
+      const firstLine = output.stdout.split("\n")[0];
       const version = firstLine || "Detected";
-      addLog({ level: "info", message: `ffmpeg version ${version} detected at ${command}` });
+      addLog({
+        level: "info",
+        message: `ffmpeg version ${version} detected at ${command}`,
+      });
       return version;
     }
-    addLog({ level: "warn", message: `ffmpeg version check returned code ${output.code}` });
+    addLog({
+      level: "warn",
+      message: `ffmpeg version check returned code ${output.code}`,
+    });
   } catch (e) {
     addLog({ level: "error", message: `ffmpeg check failed: ${String(e)}` });
   }
@@ -130,16 +153,26 @@ export async function checkAria2Version(): Promise<string | null> {
   const { addLog } = useLogsStore.getState();
   try {
     const command = await getToolPath("aria2c");
-    addLog({ level: "command", message: "Checking for aria2c binary...", command: `${command} --version` });
+    addLog({
+      level: "command",
+      message: "Checking for aria2c binary...",
+      command: `${command} --version`,
+    });
     const cmd = Command.create(command, ["--version"]);
     const output = await cmd.execute();
     if (output.code === 0) {
-      const firstLine = output.stdout.split('\n')[0];
+      const firstLine = output.stdout.split("\n")[0];
       const version = firstLine || "Detected";
-      addLog({ level: "info", message: `aria2c version ${version} detected at ${command}` });
+      addLog({
+        level: "info",
+        message: `aria2c version ${version} detected at ${command}`,
+      });
       return version;
     }
-    addLog({ level: "warn", message: `aria2c version check returned code ${output.code}` });
+    addLog({
+      level: "warn",
+      message: `aria2c version check returned code ${output.code}`,
+    });
   } catch (e) {
     addLog({ level: "error", message: `aria2c check failed: ${String(e)}` });
   }
@@ -150,16 +183,26 @@ export async function checkDenoVersion(): Promise<string | null> {
   const { addLog } = useLogsStore.getState();
   try {
     const command = await getToolPath("deno");
-    addLog({ level: "command", message: "Checking for deno binary...", command: `${command} --version` });
+    addLog({
+      level: "command",
+      message: "Checking for deno binary...",
+      command: `${command} --version`,
+    });
     const cmd = Command.create(command, ["--version"]);
     const output = await cmd.execute();
     if (output.code === 0) {
-      const firstLine = output.stdout.split('\n')[0];
+      const firstLine = output.stdout.split("\n")[0];
       const version = firstLine || "Detected";
-      addLog({ level: "info", message: `deno version ${version} detected at ${command}` });
+      addLog({
+        level: "info",
+        message: `deno version ${version} detected at ${command}`,
+      });
       return version;
     }
-    addLog({ level: "warn", message: `deno version check returned code ${output.code}` });
+    addLog({
+      level: "warn",
+      message: `deno version check returned code ${output.code}`,
+    });
   } catch (e) {
     addLog({ level: "error", message: `deno check failed: ${String(e)}` });
   }
@@ -177,16 +220,28 @@ export async function fetchLatestYtDlpVersion(): Promise<string | null> {
     const version = await invoke<string>("fetch_latest_ytdlp_version");
     return version.trim() || null;
   } catch (e) {
-    addLog({ level: "warn", message: `yt-dlp latest version check failed: ${String(e)}` });
+    addLog({
+      level: "warn",
+      message: `yt-dlp latest version check failed: ${String(e)}`,
+    });
     try {
       const data = await fetchJson<{ tag_name?: string }>(
         "https://api.github.com/repos/yt-dlp/yt-dlp/releases/latest"
       );
-      const version = data.tag_name ? data.tag_name.replace(/^v/i, "").trim() : null;
-      if (!version) addLog({ level: "warn", message: "Latest yt-dlp version not found in GitHub response" });
+      const version = data.tag_name
+        ? data.tag_name.replace(/^v/i, "").trim()
+        : null;
+      if (!version)
+        addLog({
+          level: "warn",
+          message: "Latest yt-dlp version not found in GitHub response",
+        });
       return version;
     } catch (e2) {
-      addLog({ level: "warn", message: `yt-dlp latest version fallback failed: ${String(e2)}` });
+      addLog({
+        level: "warn",
+        message: `yt-dlp latest version fallback failed: ${String(e2)}`,
+      });
       return null;
     }
   }
@@ -203,18 +258,31 @@ export async function fetchLatestAria2Version(): Promise<string | null> {
     const version = await invoke<string>("fetch_latest_aria2_version");
     return version.trim() || null;
   } catch (e) {
-    addLog({ level: "warn", message: `aria2 latest version check failed: ${String(e)}` });
+    addLog({
+      level: "warn",
+      message: `aria2 latest version check failed: ${String(e)}`,
+    });
     try {
       const data = await fetchJson<{ tag_name?: string }>(
         "https://api.github.com/repos/aria2/aria2/releases/latest"
       );
       const version = data.tag_name
-        ? data.tag_name.replace(/^release-/i, "").replace(/^v/i, "").trim()
+        ? data.tag_name
+            .replace(/^release-/i, "")
+            .replace(/^v/i, "")
+            .trim()
         : null;
-      if (!version) addLog({ level: "warn", message: "Latest aria2 version not found in GitHub response" });
+      if (!version)
+        addLog({
+          level: "warn",
+          message: "Latest aria2 version not found in GitHub response",
+        });
       return version;
     } catch (e2) {
-      addLog({ level: "warn", message: `aria2 latest version fallback failed: ${String(e2)}` });
+      addLog({
+        level: "warn",
+        message: `aria2 latest version fallback failed: ${String(e2)}`,
+      });
       return null;
     }
   }
@@ -231,15 +299,25 @@ export async function fetchLatestDenoVersion(): Promise<string | null> {
     const version = await invoke<string>("fetch_latest_deno_version");
     return version.trim() || null;
   } catch (e) {
-    addLog({ level: "warn", message: `deno latest version check failed: ${String(e)}` });
+    addLog({
+      level: "warn",
+      message: `deno latest version check failed: ${String(e)}`,
+    });
     try {
       const text = await fetchText("https://dl.deno.land/release-latest.txt");
       const first = text.trim().split(/\s+/)[0] || "";
       const version = first.replace(/^v/i, "").trim() || null;
-      if (!version) addLog({ level: "warn", message: "Latest deno version not found in response" });
+      if (!version)
+        addLog({
+          level: "warn",
+          message: "Latest deno version not found in response",
+        });
       return version;
     } catch (e2) {
-      addLog({ level: "warn", message: `deno latest version fallback failed: ${String(e2)}` });
+      addLog({
+        level: "warn",
+        message: `deno latest version fallback failed: ${String(e2)}`,
+      });
       return null;
     }
   }
@@ -256,15 +334,27 @@ export async function fetchLatestFfmpegVersion(): Promise<string | null> {
     const version = await invoke<string>("fetch_latest_ffmpeg_version");
     return version.trim() || null;
   } catch (e) {
-    addLog({ level: "warn", message: `ffmpeg latest version check failed: ${String(e)}` });
+    addLog({
+      level: "warn",
+      message: `ffmpeg latest version check failed: ${String(e)}`,
+    });
     try {
-      const text = await fetchText("https://www.gyan.dev/ffmpeg/builds/release-version");
+      const text = await fetchText(
+        "https://www.gyan.dev/ffmpeg/builds/release-version"
+      );
       const first = text.trim().split(/\s+/)[0] || "";
       const version = first.replace(/^v/i, "").trim() || null;
-      if (!version) addLog({ level: "warn", message: "Latest ffmpeg version not found in response" });
+      if (!version)
+        addLog({
+          level: "warn",
+          message: "Latest ffmpeg version not found in response",
+        });
       return version;
     } catch (e2) {
-      addLog({ level: "warn", message: `ffmpeg latest version fallback failed: ${String(e2)}` });
+      addLog({
+        level: "warn",
+        message: `ffmpeg latest version fallback failed: ${String(e2)}`,
+      });
       return null;
     }
   }
@@ -272,23 +362,60 @@ export async function fetchLatestFfmpegVersion(): Promise<string | null> {
 
 export async function downloadTools(tools: string[]): Promise<string> {
   const { addLog } = useLogsStore.getState();
-  addLog({ level: "command", message: `Downloading tools: ${tools.join(", ") || "(none)"}`, command: `invoke("download_tools", { tools: ${JSON.stringify(tools)} })` });
+  addLog({
+    level: "command",
+    message: `Downloading tools: ${tools.join(", ") || "(none)"}`,
+    command: `invoke("download_tools", { tools: ${JSON.stringify(tools)} })`,
+  });
   return await invoke("download_tools", { tools });
 }
 
-export async function stageManualTool(tool: string, source: string): Promise<string> {
+export type InstallerType = "nsis" | "msi";
+export type InstallerTypePreference = "auto" | InstallerType;
+
+export async function detectInstallerType(): Promise<InstallerType | null> {
   const { addLog } = useLogsStore.getState();
-  addLog({ level: "command", message: `Staging manual tool: ${tool}`, command: `invoke("stage_manual_tool", { tool: "${tool}", source: "${source}" })` });
+  addLog({
+    level: "command",
+    message: "Detecting installed HalalDL installer type...",
+    command: 'invoke("detect_installer_type")',
+  });
+  const detected = await invoke<InstallerType | null>("detect_installer_type");
+  return detected || null;
+}
+
+export async function downloadAppInstaller(url: string): Promise<string> {
+  const { addLog } = useLogsStore.getState();
+  addLog({
+    level: "command",
+    message: `Downloading installer: ${url}`,
+    command: `invoke("download_app_installer", { url: "${url}" })`,
+  });
+  return await invoke("download_app_installer", { url });
+}
+
+export async function stageManualTool(
+  tool: string,
+  source: string
+): Promise<string> {
+  const { addLog } = useLogsStore.getState();
+  addLog({
+    level: "command",
+    message: `Staging manual tool: ${tool}`,
+    command: `invoke("stage_manual_tool", { tool: "${tool}", source: "${source}" })`,
+  });
   return await invoke("stage_manual_tool", { tool, source });
 }
 
 export async function pickFile(): Promise<string | null> {
   const selected = await openDialog({
     multiple: false,
-    filters: [{
-      name: 'Executable',
-      extensions: ['exe']
-    }]
+    filters: [
+      {
+        name: "Executable",
+        extensions: ["exe"],
+      },
+    ],
   });
   if (Array.isArray(selected)) return selected[0];
   return selected;
@@ -299,10 +426,10 @@ export async function revealInExplorer(path: string) {
   const resolved = normalizeFsPath(path);
   const { addLog } = useLogsStore.getState();
 
-  addLog({ 
-    level: "debug", 
+  addLog({
+    level: "debug",
     message: `Attempting to reveal file in explorer: ${resolved}`,
-    command: `invoke("show_in_folder", { path: "${resolved}" })`
+    command: `invoke("show_in_folder", { path: "${resolved}" })`,
   });
 
   try {
@@ -311,10 +438,10 @@ export async function revealInExplorer(path: string) {
     return;
   } catch (e) {
     const errorMessage = e instanceof Error ? e.message : String(e);
-    addLog({ 
-      level: "warn", 
+    addLog({
+      level: "warn",
       message: `show_in_folder failed: ${errorMessage}. Falling back to revealItemInDir`,
-      command: `revealItemInDir("${resolved}")`
+      command: `revealItemInDir("${resolved}")`,
     });
   }
 
@@ -324,7 +451,10 @@ export async function revealInExplorer(path: string) {
     return;
   } catch (e) {
     const errorMessage = e instanceof Error ? e.message : String(e);
-    addLog({ level: "warn", message: `revealItemInDir failed: ${errorMessage}. Falling back to openPath(parent)` });
+    addLog({
+      level: "warn",
+      message: `revealItemInDir failed: ${errorMessage}. Falling back to openPath(parent)`,
+    });
   }
 
   try {
@@ -333,7 +463,10 @@ export async function revealInExplorer(path: string) {
     addLog({ level: "info", message: "Successfully opened parent directory" });
   } catch (e) {
     const errorMessage = e instanceof Error ? e.message : String(e);
-    addLog({ level: "error", message: `Failed to reveal path: ${errorMessage}` });
+    addLog({
+      level: "error",
+      message: `Failed to reveal path: ${errorMessage}`,
+    });
     toast.error(`Failed to show in Explorer: ${errorMessage}`);
   }
 }
@@ -347,11 +480,20 @@ export async function openFolder(path: string) {
     addLog({ level: "info", message: `Opened folder: ${resolved}` });
   } catch (e) {
     const errorMessage = e instanceof Error ? e.message : String(e);
-    const level = errorMessage.toLowerCase().includes("not allowed by acl") ? "warn" : "error";
-    addLog({ level, message: `openPath failed: ${errorMessage}`, command: `invoke("open_path", { path: "${resolved}" })` });
+    const level = errorMessage.toLowerCase().includes("not allowed by acl")
+      ? "warn"
+      : "error";
+    addLog({
+      level,
+      message: `openPath failed: ${errorMessage}`,
+      command: `invoke("open_path", { path: "${resolved}" })`,
+    });
     try {
       await invoke("open_path", { path: resolved });
-      addLog({ level: "info", message: `Opened folder via backend: ${resolved}` });
+      addLog({
+        level: "info",
+        message: `Opened folder via backend: ${resolved}`,
+      });
     } catch (e2) {
       const msg2 = e2 instanceof Error ? e2.message : String(e2);
       addLog({ level: "error", message: `Failed to open folder: ${msg2}` });
@@ -369,23 +511,43 @@ export async function openFile(path: string) {
     addLog({ level: "info", message: `Opened file: ${resolved}` });
   } catch (e) {
     const errorMessage = e instanceof Error ? e.message : String(e);
-    const level = errorMessage.toLowerCase().includes("not allowed by acl") ? "warn" : "error";
-    addLog({ level, message: `openPath failed: ${errorMessage}`, command: `invoke("open_path", { path: "${resolved}" })` });
+    const level = errorMessage.toLowerCase().includes("not allowed by acl")
+      ? "warn"
+      : "error";
+    addLog({
+      level,
+      message: `openPath failed: ${errorMessage}`,
+      command: `invoke("open_path", { path: "${resolved}" })`,
+    });
     try {
       await invoke("open_path", { path: resolved });
-      addLog({ level: "info", message: `Opened file via backend: ${resolved}` });
+      addLog({
+        level: "info",
+        message: `Opened file via backend: ${resolved}`,
+      });
     } catch (e2) {
       const msg2 = e2 instanceof Error ? e2.message : String(e2);
-      addLog({ level: "warn", message: `Failed to open file: ${msg2}. Trying to open parent folder instead` });
+      addLog({
+        level: "warn",
+        message: `Failed to open file: ${msg2}. Trying to open parent folder instead`,
+      });
       try {
         const dir = await dirname(resolved);
         await openPath(dir);
-        addLog({ level: "info", message: `Opened parent folder (file open failed): ${dir}` });
+        addLog({
+          level: "info",
+          message: `Opened parent folder (file open failed): ${dir}`,
+        });
         toast.error("File couldn't be opened; opened folder instead");
       } catch (e3) {
         const msg3 = e3 instanceof Error ? e3.message : String(e3);
-        addLog({ level: "error", message: `Failed to open file: ${msg2}. Also failed to open folder: ${msg3}` });
-        toast.error(`Failed to open file: ${msg2}. Also failed to open folder: ${msg3}`);
+        addLog({
+          level: "error",
+          message: `Failed to open file: ${msg2}. Also failed to open folder: ${msg3}`,
+        });
+        toast.error(
+          `Failed to open file: ${msg2}. Also failed to open folder: ${msg3}`
+        );
       }
     }
   }
@@ -408,7 +570,9 @@ function normalizeFsPath(path: string): string {
     (trimmed.startsWith("'") && trimmed.endsWith("'"))
       ? trimmed.slice(1, -1)
       : trimmed;
-  const cleaned = stripAnsiSimple(unquoted).trim().replace(/[\r\n]/g, "");
+  const cleaned = stripAnsiSimple(unquoted)
+    .trim()
+    .replace(/[\r\n]/g, "");
   return stripFileUriPrefix(cleaned);
 }
 

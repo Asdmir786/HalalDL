@@ -8,7 +8,10 @@ import { useSettingsStore } from "@/store/settings";
 import { useLogsStore } from "@/store/logs";
 import { useNavigationStore } from "@/store/navigation";
 
-import { FadeInStagger, FadeInItem } from "@/components/motion/StaggerContainer";
+import {
+  FadeInStagger,
+  FadeInItem,
+} from "@/components/motion/StaggerContainer";
 import { startDownload, fetchMetadata } from "@/lib/downloader";
 
 import { DownloadInputSection } from "./downloads/components/DownloadInputSection";
@@ -20,13 +23,13 @@ export function DownloadsScreen() {
   const { settings, updateSettings } = useSettingsStore();
   const [url, setUrl] = useState("");
   const [selectedPreset, setSelectedPreset] = useState("default");
-  
+
   // Derived state for addMode from settings
-  const addMode = (settings as unknown as { downloadsAddMode?: "queue" | "start" }).downloadsAddMode ?? "queue";
+  const addMode = settings.downloadsAddMode;
   const setAddMode = (mode: "queue" | "start") => {
-    updateSettings({ downloadsAddMode: mode } as unknown as Partial<typeof settings>);
+    updateSettings({ downloadsAddMode: mode });
   };
-  
+
   // Advanced Output Config State
   const [showOutputConfig, setShowOutputConfig] = useState(false);
   const [filenameBase, setFilenameBase] = useState("%(title)s [%(id)s]");
@@ -34,7 +37,8 @@ export function DownloadsScreen() {
   const [customDownloadDir, setCustomDownloadDir] = useState<string>("");
 
   const { presets } = usePresetsStore();
-  const { jobs, addJob, removeJob, pendingUrl, setPendingUrl } = useDownloadsStore();
+  const { jobs, addJob, removeJob, pendingUrl, setPendingUrl } =
+    useDownloadsStore();
   const { setActiveJobId } = useLogsStore();
   const { setScreen } = useNavigationStore();
 
@@ -98,9 +102,14 @@ export function DownloadsScreen() {
   // Framer Motion Variants for List Items
   const itemVariants: Variants = {
     initial: { opacity: 0, y: 10, scale: 0.98 },
-    animate: { opacity: 1, y: 0, scale: 1, transition: { type: "spring", stiffness: 400, damping: 25 } },
+    animate: {
+      opacity: 1,
+      y: 0,
+      scale: 1,
+      transition: { type: "spring", stiffness: 400, damping: 25 },
+    },
     exit: { opacity: 0, scale: 0.95, transition: { duration: 0.2 } },
-    hover: { scale: 1.005, transition: { duration: 0.2 } }
+    hover: { scale: 1.005, transition: { duration: 0.2 } },
   };
 
   const [now, setNow] = useState(() => Date.now());
@@ -157,7 +166,7 @@ export function DownloadsScreen() {
 
   const handleAdd = () => {
     if (!url.trim()) return;
-    
+
     // Construct final template: NamePart + .%(ext)s
     const finalTemplate = `${filenameBase.trim() || "%(title)s"}.%(ext)s`;
 
@@ -165,7 +174,9 @@ export function DownloadsScreen() {
     const overrides =
       showOutputConfig || isCustomPreset || Boolean(customDirTrimmed)
         ? {
-            ...(showOutputConfig || isCustomPreset ? { filenameTemplate: finalTemplate } : {}),
+            ...(showOutputConfig || isCustomPreset
+              ? { filenameTemplate: finalTemplate }
+              : {}),
             ...(isCustomPreset ? { format: outputFormat } : {}),
             ...(customDirTrimmed ? { downloadDir: customDirTrimmed } : {}),
           }
@@ -174,7 +185,7 @@ export function DownloadsScreen() {
     const presetIdToUse = isCustomPreset ? "default" : selectedPreset;
 
     const id = addJob(url, presetIdToUse, overrides);
-    
+
     fetchMetadata(id);
 
     if (addMode === "start") {
@@ -200,8 +211,7 @@ export function DownloadsScreen() {
       (job) => job.status === "Queued" || job.status === "Failed"
     );
     let active = jobs.filter(
-      (job) =>
-        job.status === "Downloading" || job.status === "Post-processing"
+      (job) => job.status === "Downloading" || job.status === "Post-processing"
     ).length;
 
     for (const job of queuedOrFailed) {
@@ -235,7 +245,9 @@ export function DownloadsScreen() {
   };
 
   const handleClearCompleted = () => {
-    const completed = jobs.filter((job) => job.status === "Done" || job.status === "Failed");
+    const completed = jobs.filter(
+      (job) => job.status === "Done" || job.status === "Failed"
+    );
     if (!completed.length) return;
     completed.forEach((job) => removeJob(job.id));
     setSelectedIds((prev) =>
@@ -249,7 +261,10 @@ export function DownloadsScreen() {
   };
 
   return (
-    <div className="flex flex-col h-full bg-background max-w-6xl mx-auto w-full" role="main">
+    <div
+      className="flex flex-col h-full bg-background max-w-6xl mx-auto w-full"
+      role="main"
+    >
       <FadeInStagger className="flex flex-col h-full">
         <FadeInItem>
           <header className="p-6 pb-4 space-y-4">
@@ -259,8 +274,8 @@ export function DownloadsScreen() {
                 Add URLs to start downloading your media.
               </p>
             </div>
-            
-            <DownloadInputSection 
+
+            <DownloadInputSection
               url={url}
               setUrl={setUrl}
               onAdd={handleAdd}
@@ -270,7 +285,9 @@ export function DownloadsScreen() {
               addMode={addMode}
               setAddMode={setAddMode}
               showOutputConfig={showOutputConfig}
-              onToggleOutputConfig={() => setShowOutputConfig(!showOutputConfig)}
+              onToggleOutputConfig={() =>
+                setShowOutputConfig(!showOutputConfig)
+              }
               filenameBase={filenameBase}
               onFilenameChange={setFilenameBase}
               outputFormat={outputFormat}
@@ -281,18 +298,20 @@ export function DownloadsScreen() {
               defaultDownloadDir={settings.defaultDownloadDir || ""}
             />
 
-            <DownloadStatsBar 
+            <DownloadStatsBar
               queuedCount={queuedCount}
               activeCount={activeCount}
               failedCount={failedCount}
               doneCount={doneCount}
               onStartAll={handleStartAll}
-              canStartAll={jobs.some((job) => job.status === "Queued" || job.status === "Failed")}
+              canStartAll={jobs.some(
+                (job) => job.status === "Queued" || job.status === "Failed"
+              )}
             />
           </header>
         </FadeInItem>
 
-        <DownloadList 
+        <DownloadList
           jobs={sortedJobs}
           selectedIds={selectedIds}
           onToggleSelection={handleToggleSelection}

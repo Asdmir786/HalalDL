@@ -1,17 +1,36 @@
 import { motion, Variants } from "framer-motion";
-import { 
-  X, FolderOpen, Download, Terminal, 
-  Copy, RotateCcw, Play, Clock, 
-  CheckCircle2, AlertTriangle, Link 
+import {
+  X,
+  FolderOpen,
+  Download,
+  Terminal,
+  Copy,
+  RotateCcw,
+  Play,
+  Clock,
+  CheckCircle2,
+  AlertTriangle,
+  Link,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { DownloadJob } from "@/store/downloads";
 import { useLogsStore } from "@/store/logs";
 import { MotionButton } from "@/components/motion/MotionButton";
-import { revealInExplorer, deleteFile, openFile, copyFilesToClipboard } from "@/lib/commands";
+import {
+  revealInExplorer,
+  deleteFile,
+  openFile,
+  copyFilesToClipboard,
+} from "@/lib/commands";
 import { startDownload } from "@/lib/downloader";
 import { Checkbox } from "@/components/ui/checkbox";
-import { ContextMenu, ContextMenuContent, ContextMenuItem, ContextMenuTrigger, ContextMenuSeparator } from "@/components/ui/context-menu";
+import {
+  ContextMenu,
+  ContextMenuContent,
+  ContextMenuItem,
+  ContextMenuTrigger,
+  ContextMenuSeparator,
+} from "@/components/ui/context-menu";
 import { toast } from "sonner";
 import { getJobTs } from "../utils";
 
@@ -32,7 +51,7 @@ export function DownloadItem({
   onRemove,
   onViewLogs,
   itemVariants,
-  formatRelativeTime
+  formatRelativeTime,
 }: DownloadItemProps) {
   const { addLog } = useLogsStore();
   const ts = getJobTs(job);
@@ -44,34 +63,60 @@ export function DownloadItem({
       ? Clock
       : job.status === "Failed"
         ? AlertTriangle
-      : job.status === "Done"
-        ? CheckCircle2
-        : Download;
+        : job.status === "Done"
+          ? CheckCircle2
+          : Download;
 
   const statusColor =
     job.status === "Queued"
       ? "text-yellow-500 border-yellow-500/20 bg-yellow-500/10"
       : job.status === "Failed"
         ? "text-destructive border-destructive/20 bg-destructive/10"
-      : job.status === "Done"
-        ? "text-emerald-500 border-emerald-500/20 bg-emerald-500/10"
-        : "text-blue-500 border-blue-500/20 bg-blue-500/10";
+        : job.status === "Done"
+          ? "text-emerald-500 border-emerald-500/20 bg-emerald-500/10"
+          : "text-blue-500 border-blue-500/20 bg-blue-500/10";
 
   const StatusIcon = statusIcon;
 
+  const handleCopyText = (text: string, label: string) => {
+    navigator.clipboard.writeText(text);
+    toast.success(`${label} copied to clipboard`);
+  };
+
   const handleCopyLink = (url: string) => {
-    navigator.clipboard.writeText(url);
-    toast.success("Link copied to clipboard");
+    handleCopyText(url, "Link");
+  };
+
+  const getCopyLabel = (path: string): "Video" | "Audio" | "File" => {
+    const ext = path.split(".").pop()?.toLowerCase();
+    if (!ext) return "File";
+    const audioExts = new Set([
+      "mp3",
+      "m4a",
+      "aac",
+      "wav",
+      "flac",
+      "opus",
+      "ogg",
+    ]);
+    if (audioExts.has(ext)) return "Audio";
+    const videoExts = new Set(["mp4", "mkv", "webm", "mov", "avi", "m4v"]);
+    if (videoExts.has(ext)) return "Video";
+    return "File";
   };
 
   const handleCopyFile = async (path: string) => {
+    const label = getCopyLabel(path);
     try {
       await copyFilesToClipboard([path]);
-      toast.success("File copied to clipboard");
+      toast.success(`${label} copied to clipboard`);
     } catch (e) {
       const message = e instanceof Error ? e.message : String(e);
-      toast.error(`Failed to copy file: ${message}`);
-      addLog({ level: "error", message: `Copy file failed: ${message}` });
+      toast.error(`Failed to copy ${label.toLowerCase()}: ${message}`);
+      addLog({
+        level: "error",
+        message: `Copy ${label.toLowerCase()} failed: ${message}`,
+      });
     }
   };
 
@@ -102,10 +147,17 @@ export function DownloadItem({
     >
       <ContextMenu>
         <ContextMenuTrigger>
-          <div className="group relative flex gap-4 p-3 rounded-xl border border-white/5 bg-background/40 hover:bg-background/60 hover:border-white/10 backdrop-blur-md shadow-sm transition-all duration-300">
+          <div
+            className="group relative flex gap-4 p-3 rounded-xl border border-white/5 bg-background/40 hover:bg-background/60 hover:border-white/10 backdrop-blur-md shadow-sm transition-all duration-300 select-none"
+          >
             {/* Selection & Thumbnail Column */}
             <div className="flex items-start gap-3">
-              <div className="pt-1">
+              <div
+                className="pt-1"
+                onClick={(e) => {
+                  e.stopPropagation();
+                }}
+              >
                 <Checkbox
                   checked={isSelected}
                   onCheckedChange={() => onToggleSelection(job.id)}
@@ -136,38 +188,60 @@ export function DownloadItem({
               {/* Header */}
               <div className="flex items-start justify-between gap-4">
                 <div className="flex flex-col gap-0.5 min-w-0">
-                    <h4 className="font-semibold text-sm leading-tight text-foreground/90 truncate pr-2 group-hover:text-primary transition-colors">
+                  <h4 className="font-semibold text-sm leading-tight text-foreground/90 truncate pr-2 group-hover:text-primary transition-colors">
                     {job.title || job.url}
-                    </h4>
-                    <div className="flex items-center gap-2 text-[10px] text-muted-foreground font-medium">
-                        <span className="flex items-center gap-1" title={absolute}>
-                            <Clock className="w-3 h-3 opacity-70" /> {relative}
-                        </span>
-                        {job.outputPath && <span className="w-0.5 h-0.5 rounded-full bg-muted-foreground/50" />}
-                        {job.outputPath && (
-                            <span className="truncate max-w-[200px] opacity-70" title={job.outputPath}>
-                                {job.outputPath.split(/[/\\]/).pop()}
-                            </span>
-                        )}
-                    </div>
+                  </h4>
+                  <div className="flex items-center gap-2 text-[10px] text-muted-foreground font-medium">
+                    <span className="flex items-center gap-1" title={absolute}>
+                      <Clock className="w-3 h-3 opacity-70" /> {relative}
+                    </span>
+                    {job.outputPath && (
+                      <span className="w-0.5 h-0.5 rounded-full bg-muted-foreground/50" />
+                    )}
+                    {job.outputPath && (
+                      <span
+                        className="truncate max-w-[200px] opacity-70"
+                        title={job.outputPath}
+                      >
+                        {job.outputPath.split(/[/\\]/).pop()}
+                      </span>
+                    )}
+                  </div>
                 </div>
-
-                <div className={cn("flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[10px] font-semibold border shadow-sm backdrop-blur-sm transition-colors", statusColor)}>
+                <div className="flex flex-col items-end gap-1 flex-shrink-0">
+                  <div
+                    className={cn(
+                      "flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[10px] font-semibold border shadow-sm backdrop-blur-sm transition-colors",
+                      statusColor
+                    )}
+                  >
                     <StatusIcon className="w-3 h-3" />
                     <span>{job.status}</span>
+                  </div>
+                  {job.totalSize && (
+                    <div className="px-2 py-0.5 rounded-full text-[10px] font-semibold border border-white/10 bg-muted/30 text-muted-foreground">
+                      {job.totalSize}
+                    </div>
+                  )}
                 </div>
               </div>
 
               {/* Footer: Progress or Actions */}
               <div className="mt-2">
-                {job.status === "Downloading" || job.status === "Post-processing" ? (
+                {job.status === "Downloading" ||
+                job.status === "Post-processing" ? (
                   <div className="flex flex-col gap-1.5 w-full">
                     <div className="flex items-center justify-between w-full text-[10px] font-mono font-medium text-muted-foreground">
-                      <span className="text-foreground">{job.speed || "0 KB/s"}</span>
+                      <span className="text-foreground">
+                        {job.speed || "0 KB/s"}
+                      </span>
+                      <span className="tabular-nums opacity-80">
+                        {Math.round(job.progress)}%
+                      </span>
                       <span className="opacity-70">{job.eta || "--:--"}</span>
                     </div>
                     <div className="w-full h-1.5 bg-muted/50 rounded-full overflow-hidden">
-                      <motion.div 
+                      <motion.div
                         className="h-full bg-gradient-to-r from-primary/80 to-primary rounded-full"
                         initial={{ width: 0 }}
                         animate={{ width: `${job.progress}%` }}
@@ -235,21 +309,37 @@ export function DownloadItem({
                 <Play className="mr-2 h-3.5 w-3.5" />
                 Open File
               </ContextMenuItem>
-              <ContextMenuItem onClick={() => revealInExplorer(job.outputPath!)}>
+              <ContextMenuItem
+                onClick={() => revealInExplorer(job.outputPath!)}
+              >
                 <FolderOpen className="mr-2 h-3.5 w-3.5" />
                 Show in Explorer
               </ContextMenuItem>
               <ContextMenuItem onClick={() => handleCopyFile(job.outputPath!)}>
                 <Copy className="mr-2 h-3.5 w-3.5" />
-                Copy File
+                Copy {getCopyLabel(job.outputPath!)}
               </ContextMenuItem>
               <ContextMenuSeparator />
             </>
           )}
+          <ContextMenuItem
+            onClick={() => handleCopyText(job.title || job.url, "Title")}
+          >
+            <Copy className="mr-2 h-3.5 w-3.5" />
+            Copy Title
+          </ContextMenuItem>
           <ContextMenuItem onClick={() => handleCopyLink(job.url)}>
             <Link className="mr-2 h-3.5 w-3.5" />
             Copy Link
           </ContextMenuItem>
+          {job.outputPath && (
+            <ContextMenuItem
+              onClick={() => handleCopyText(job.outputPath!, "Path")}
+            >
+              <Copy className="mr-2 h-3.5 w-3.5" />
+              Copy Path
+            </ContextMenuItem>
+          )}
           {job.status === "Failed" && (
             <ContextMenuItem onClick={() => startDownload(job.id)}>
               <RotateCcw className="mr-2 h-3.5 w-3.5" />

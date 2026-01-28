@@ -85,9 +85,15 @@
   --radius-sm: calc(var(--radius) - 4px);
 
   @keyframes gradient-slow {
-    0% { background-position: 0% 50%; }
-    50% { background-position: 100% 50%; }
-    100% { background-position: 0% 50%; }
+    0% {
+      background-position: 0% 50%;
+    }
+    50% {
+      background-position: 100% 50%;
+    }
+    100% {
+      background-position: 0% 50%;
+    }
   }
   --animate-gradient-slow: gradient-slow 8s ease infinite;
   --background-size-gradient: 200% 200%;
@@ -99,6 +105,13 @@
   }
   body {
     @apply bg-background text-foreground;
+  }
+  button,
+  [role="button"] {
+    @apply cursor-pointer select-none;
+  }
+  a {
+    @apply cursor-pointer;
   }
 }
 
@@ -129,7 +142,9 @@
 .screen-enter-active {
   opacity: 1;
   transform: translateY(0);
-  transition: opacity 200ms ease-out, transform 200ms ease-out;
+  transition:
+    opacity 200ms ease-out,
+    transform 200ms ease-out;
 }
 
 .screen-exit {

@@ -1,13 +1,16 @@
 import { useNavigationStore, type Screen } from "@/store/navigation";
-import { 
-  Download, 
-  Settings, 
-  ListMusic, 
-  Wrench, 
+import {
+  Download,
+  CheckCircle2,
+  AlertTriangle,
+  Clock,
+  Settings,
+  ListMusic,
+  Wrench,
   Terminal,
   ChevronLeft,
   ChevronRight,
-  type LucideIcon
+  type LucideIcon,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { MotionButton } from "@/components/motion/MotionButton";
@@ -27,21 +30,36 @@ const NAV_ITEMS: { id: Screen; label: string; icon: LucideIcon }[] = [
 import { motion } from "framer-motion";
 
 export function Sidebar() {
-  const { currentScreen, setScreen, sidebarCollapsed, toggleSidebar } = useNavigationStore();
+  const { currentScreen, setScreen, sidebarCollapsed, toggleSidebar } =
+    useNavigationStore();
   const jobs = useDownloadsStore((s) => s.jobs);
   const [version, setVersion] = useState("...");
 
   useEffect(() => {
-    getVersion().then(setVersion).catch(() => setVersion("0.3.0"));
+    getVersion()
+      .then(setVersion)
+      .catch(() => setVersion("0.3.0"));
   }, []);
 
-  const activeCount = useMemo(
+  const activeJobs = useMemo(
     () =>
       jobs.filter(
-        (job) => job.status === "Downloading" || job.status === "Post-processing"
-      ).length,
+        (job) =>
+          job.status === "Downloading" || job.status === "Post-processing"
+      ),
     [jobs]
   );
+
+  const activeJob = useMemo(() => {
+    if (activeJobs.length === 0) return undefined;
+    return [...activeJobs].sort((a, b) => {
+      const aTs = a.statusChangedAt ?? a.createdAt;
+      const bTs = b.statusChangedAt ?? b.createdAt;
+      return bTs - aTs;
+    })[0];
+  }, [activeJobs]);
+
+  const hasActive = Boolean(activeJob);
 
   const doneCount = useMemo(
     () => jobs.filter((job) => job.status === "Done").length,
@@ -49,45 +67,76 @@ export function Sidebar() {
   );
 
   const overallProgress = useMemo(() => {
-    const active = jobs.filter(
-      (job) => job.status === "Downloading" || job.status === "Post-processing"
-    );
-    if (!active.length) return 0;
-    const sum = active.reduce((acc, j) => acc + (Number.isFinite(j.progress) ? j.progress : 0), 0);
-    return Math.max(0, Math.min(100, Math.round(sum / active.length)));
-  }, [jobs]);
+    if (!activeJob) return 0;
+    const value = Number.isFinite(activeJob.progress) ? activeJob.progress : 0;
+    return Math.max(0, Math.min(100, Math.round(value)));
+  }, [activeJob]);
+
+  const queuedCount = useMemo(
+    () => jobs.filter((job) => job.status === "Queued").length,
+    [jobs]
+  );
+
+  const failedCount = useMemo(
+    () => jobs.filter((job) => job.status === "Failed").length,
+    [jobs]
+  );
 
   const queueStatus = useMemo(() => {
     const total = jobs.length;
-    const processed = doneCount + activeCount;
-    return `${String(processed).padStart(2, "0")}/${String(total).padStart(2, "0")}`;
-  }, [activeCount, doneCount, jobs.length]);
+    return `${String(doneCount).padStart(2, "0")}/${String(total).padStart(2, "0")}`;
+  }, [doneCount, jobs.length]);
 
-  const showGlobalProgress = activeCount > 0 && currentScreen !== "downloads";
+  const showGlobalProgress = hasActive && currentScreen !== "downloads";
 
   return (
-    <aside className={cn(
-      "border-r border-white/10 glass flex flex-col h-full transition-all duration-300 ease-in-out relative",
-      sidebarCollapsed ? "w-16" : "w-64"
-    )}>
-      <div className={cn(
-        "p-6 border-b flex items-center justify-between overflow-hidden h-[73px]",
-        sidebarCollapsed ? "px-4" : "px-6"
-      )}>
+    <aside
+      className={cn(
+        "border-r border-white/10 glass flex flex-col h-full transition-all duration-300 ease-in-out relative",
+        sidebarCollapsed ? "w-16" : "w-64"
+      )}
+    >
+      <div
+        className={cn(
+          "p-6 border-b flex items-center justify-between overflow-hidden h-[73px]",
+          sidebarCollapsed ? "px-4" : "px-6"
+        )}
+      >
         {!sidebarCollapsed && (
           <h1 className="text-xl font-bold tracking-tight truncate">HalalDL</h1>
         )}
         {sidebarCollapsed && (
           <div className="w-8 h-8 rounded-lg bg-primary/10 flex items-center justify-center">
-             <span className="text-xs font-bold text-primary">H</span>
+            <span className="text-xs font-bold text-primary">H</span>
           </div>
         )}
       </div>
 
       <nav className="flex-1 p-3 space-y-1 mt-2">
         {NAV_ITEMS.map((item) => {
+          const isDownloads = item.id === "downloads";
           const Icon = item.icon;
           const isActive = currentScreen === item.id;
+          const allDone = jobs.length > 0 && doneCount === jobs.length;
+          const showProgressRing = isDownloads && hasActive;
+          const showMultiActiveBadge = isDownloads && activeJobs.length > 1;
+          const statusDot =
+            isDownloads && !hasActive && failedCount > 0
+              ? "failed"
+              : isDownloads && !hasActive && queuedCount > 0
+                ? "queued"
+                : isDownloads && !hasActive && allDone
+                  ? "done"
+                  : null;
+
+          const DotIcon =
+            statusDot === "failed"
+              ? AlertTriangle
+              : statusDot === "queued"
+                ? Clock
+                : statusDot === "done"
+                  ? CheckCircle2
+                  : null;
           return (
             <MotionButton
               key={item.id}
@@ -97,9 +146,11 @@ export function Sidebar() {
               onClick={() => setScreen(item.id)}
               className={cn(
                 "w-full h-10 rounded-lg transition-all duration-200 cursor-pointer group relative overflow-hidden",
-                sidebarCollapsed ? "justify-center px-0" : "justify-start gap-3 px-3",
-                isActive 
-                  ? "text-foreground font-semibold" 
+                sidebarCollapsed
+                  ? "justify-center px-0"
+                  : "justify-start gap-3 px-3",
+                isActive
+                  ? "text-foreground font-semibold"
                   : "text-muted-foreground hover:text-foreground"
               )}
               title={sidebarCollapsed ? item.label : undefined}
@@ -113,17 +164,75 @@ export function Sidebar() {
               )}
 
               <span className="relative z-10">
-                <Icon className={cn(
-                  "w-5 h-5 flex-shrink-0",
-                  !isActive && "group-hover:scale-110 transition-transform duration-200"
-                )} />
-                {item.id === "downloads" && activeCount > 0 && (
-                  <span className="absolute -top-1 -right-1 min-w-5 h-5 px-1 rounded-full bg-primary text-primary-foreground text-[10px] font-bold flex items-center justify-center shadow">
-                    {activeCount}
-                  </span>
-                )}
+                <span className="relative block w-5 h-5">
+                  {showProgressRing && (
+                    <svg
+                      viewBox="0 0 36 36"
+                      className="absolute -inset-1 w-7 h-7"
+                    >
+                      <circle
+                        cx="18"
+                        cy="18"
+                        r="14"
+                        fill="none"
+                        stroke="currentColor"
+                        className="text-muted-foreground/20"
+                        strokeWidth="4"
+                      />
+                      <circle
+                        cx="18"
+                        cy="18"
+                        r="14"
+                        fill="none"
+                        stroke="currentColor"
+                        className="text-primary"
+                        strokeWidth="4"
+                        strokeLinecap="round"
+                        strokeDasharray={2 * Math.PI * 14}
+                        strokeDashoffset={
+                          2 * Math.PI * 14 * (1 - overallProgress / 100)
+                        }
+                        style={{ transition: "stroke-dashoffset 250ms ease" }}
+                      />
+                    </svg>
+                  )}
+
+                  <Icon
+                    className={cn(
+                      "w-5 h-5 flex-shrink-0",
+                      !isActive &&
+                        "group-hover:scale-110 transition-transform duration-200"
+                    )}
+                  />
+
+                  {DotIcon && (
+                    <span className="absolute -top-1 -right-1 inline-flex items-center justify-center h-4 w-4 rounded-full ring-2 ring-background bg-background shadow">
+                      <DotIcon
+                        className={cn(
+                          "h-3 w-3",
+                          statusDot === "failed" && "text-destructive",
+                          statusDot === "queued" && "text-yellow-500",
+                          statusDot === "done" && "text-emerald-500"
+                        )}
+                      />
+                    </span>
+                  )}
+
+                  {isDownloads && hasActive && (
+                    <span className="absolute -top-1 -right-1">
+                      <span className="absolute inline-flex h-3 w-3 rounded-full bg-primary/30 animate-ping" />
+                      <span className="relative inline-flex h-2.5 w-2.5 rounded-full bg-primary ring-2 ring-background" />
+                    </span>
+                  )}
+
+                  {showMultiActiveBadge && (
+                    <span className="absolute -bottom-2 -right-2 min-w-5 h-4 px-1 rounded-full bg-primary text-primary-foreground text-[10px] font-bold flex items-center justify-center shadow ring-2 ring-background">
+                      {activeJobs.length}
+                    </span>
+                  )}
+                </span>
               </span>
-              
+
               {!sidebarCollapsed && (
                 <span className="truncate z-10 relative">{item.label}</span>
               )}
@@ -134,17 +243,32 @@ export function Sidebar() {
 
       {showGlobalProgress && (
         <div className={cn("px-3 pb-3", sidebarCollapsed && "px-2")}>
-          <div className={cn("rounded-xl border border-white/10 bg-muted/10 glass-card", sidebarCollapsed ? "p-2" : "p-3")}>
+          <div
+            className={cn(
+              "rounded-xl border border-white/10 bg-muted/10 glass-card",
+              sidebarCollapsed ? "p-2" : "p-3"
+            )}
+          >
             {!sidebarCollapsed && (
               <div className="flex items-center justify-between mb-2">
-                <span className="text-xs font-semibold text-foreground/90">Downloading</span>
-                <span className="text-[10px] font-mono text-muted-foreground">{queueStatus}</span>
+                <span className="text-xs font-semibold text-foreground/90">
+                  Downloading
+                </span>
+                <div className="flex items-center gap-2 text-[10px] font-mono text-muted-foreground">
+                  <span className="tabular-nums">{overallProgress}%</span>
+                  <span className="opacity-60">•</span>
+                  <span>{queueStatus}</span>
+                </div>
               </div>
             )}
-            <Progress value={overallProgress} className={cn("h-2 bg-secondary/70", sidebarCollapsed && "h-1.5")} />
+            <Progress
+              value={overallProgress}
+              className={cn("h-2 bg-secondary/70", sidebarCollapsed && "h-1.5")}
+            />
             {sidebarCollapsed && (
               <div className="mt-1 text-[9px] font-mono text-muted-foreground text-center">
-                {queueStatus}
+                <span className="tabular-nums">{overallProgress}%</span>{" "}
+                <span className="opacity-60">•</span> {queueStatus}
               </div>
             )}
           </div>
@@ -159,7 +283,9 @@ export function Sidebar() {
           className="w-full flex items-center justify-center hover:bg-accent h-10"
           onClick={toggleSidebar}
         >
-          {sidebarCollapsed ? <ChevronRight className="w-4 h-4" /> : (
+          {sidebarCollapsed ? (
+            <ChevronRight className="w-4 h-4" />
+          ) : (
             <div className="flex items-center gap-2 w-full px-1">
               <ChevronLeft className="w-4 h-4" />
               <span className="text-xs font-medium">Collapse Sidebar</span>

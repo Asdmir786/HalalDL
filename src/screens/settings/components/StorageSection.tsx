@@ -1,6 +1,12 @@
 import { Folder, Search } from "lucide-react";
 import { FadeInItem } from "@/components/motion/StaggerContainer";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
 import { MotionButton } from "@/components/motion/MotionButton";
@@ -11,7 +17,10 @@ interface StorageSectionProps {
   onDirectoryChange: (dir: string) => void;
 }
 
-export function StorageSection({ defaultDownloadDir, onDirectoryChange }: StorageSectionProps) {
+export function StorageSection({
+  defaultDownloadDir,
+  onDirectoryChange,
+}: StorageSectionProps) {
   return (
     <FadeInItem>
       <Card className="glass-card">
@@ -26,14 +35,14 @@ export function StorageSection({ defaultDownloadDir, onDirectoryChange }: Storag
           <div className="space-y-2">
             <Label>Default Download Directory</Label>
             <div className="flex gap-2">
-              <Input 
-                value={defaultDownloadDir || ""} 
-                readOnly 
+              <Input
+                value={defaultDownloadDir || ""}
+                readOnly
                 placeholder="Select a folder..."
                 className="bg-muted"
               />
-              <MotionButton 
-                variant="outline" 
+              <MotionButton
+                variant="outline"
                 whileHover={{ scale: 1.05 }}
                 whileTap={{ scale: 0.95 }}
                 onClick={async () => {

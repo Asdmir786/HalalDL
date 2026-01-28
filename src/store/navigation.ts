@@ -13,5 +13,6 @@ export const useNavigationStore = create<NavigationState>((set) => ({
   currentScreen: "downloads",
   sidebarCollapsed: false,
   setScreen: (screen) => set({ currentScreen: screen }),
-  toggleSidebar: () => set((state) => ({ sidebarCollapsed: !state.sidebarCollapsed })),
+  toggleSidebar: () =>
+    set((state) => ({ sidebarCollapsed: !state.sidebarCollapsed })),
 }));

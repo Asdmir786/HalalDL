@@ -49,7 +49,9 @@ export function SettingsScreen() {
     [edits, savedSettings]
   );
 
-  const [resolvedDefaults, setResolvedDefaults] = useState<Settings | null>(null);
+  const [resolvedDefaults, setResolvedDefaults] = useState<Settings | null>(
+    null
+  );
 
   useEffect(() => {
     let mounted = true;
@@ -71,7 +73,9 @@ export function SettingsScreen() {
   }, [settings]);
 
   const isDirty = useMemo(() => {
-    return SETTINGS_KEYS.some((k) => !Object.is(draftSettings[k], savedSettings[k]));
+    return SETTINGS_KEYS.some(
+      (k) => !Object.is(draftSettings[k], savedSettings[k])
+    );
   }, [draftSettings, savedSettings]);
 
   const isGlobalDirty = useMemo(() => {
@@ -105,7 +109,8 @@ export function SettingsScreen() {
     root.classList.remove("light", "dark");
 
     if (theme === "system") {
-      const systemTheme = window.matchMedia("(prefers-color-scheme: dark)").matches
+      const systemTheme = window.matchMedia("(prefers-color-scheme: dark)")
+        .matches
         ? "dark"
         : "light";
       root.classList.add(systemTheme);
@@ -121,7 +126,10 @@ export function SettingsScreen() {
 
   const handleSave = useCallback(() => {
     if (!isDirty) return;
-    setSettings({ ...(settings as unknown as Record<string, unknown>), ...draftSettings } as unknown as Settings);
+    setSettings({
+      ...(settings as unknown as Record<string, unknown>),
+      ...draftSettings,
+    } as unknown as Settings);
     setEdits({});
     toast.success("Settings saved successfully");
   }, [draftSettings, isDirty, setSettings, settings]);
@@ -132,28 +140,30 @@ export function SettingsScreen() {
     setIsResetting(true);
     try {
       const defaults = resolvedDefaults ?? (await resolveDefaultSettings());
-      
+
       // Calculate what changed
       const changedKeys: string[] = [];
       for (const key of SETTINGS_KEYS) {
-          if (!Object.is(settings[key], defaults[key])) {
-              // Convert camelCase to readable format
-              const readable = key.replace(/([A-Z])/g, ' $1').replace(/^./, str => str.toUpperCase());
-              changedKeys.push(readable);
-          }
+        if (!Object.is(settings[key], defaults[key])) {
+          // Convert camelCase to readable format
+          const readable = key
+            .replace(/([A-Z])/g, " $1")
+            .replace(/^./, (str) => str.toUpperCase());
+          changedKeys.push(readable);
+        }
       }
 
       setSettings(defaults);
       setEdits({});
-      
+
       if (changedKeys.length > 0) {
-          toast.info("Settings restored to defaults", {
-              description: `Reset: ${changedKeys.join(", ")}`
-          });
+        toast.info("Settings restored to defaults", {
+          description: `Reset: ${changedKeys.join(", ")}`,
+        });
       } else {
-          toast.info("Settings restored to defaults", {
-              description: "No changes were needed."
-          });
+        toast.info("Settings restored to defaults", {
+          description: "No changes were needed.",
+        });
       }
     } finally {
       setIsResetting(false);
@@ -183,20 +193,27 @@ export function SettingsScreen() {
 
   const resetGroupDraft = useCallback(
     async (group: "appearance" | "storage" | "behavior" | "downloadEngine") => {
-      const defaults = group === "storage" ? await resolveDefaultSettings() : DEFAULT_SETTINGS;
+      const defaults =
+        group === "storage" ? await resolveDefaultSettings() : DEFAULT_SETTINGS;
       const partial: Partial<Settings> =
         group === "appearance"
           ? { theme: defaults.theme }
           : group === "storage"
-          ? { defaultDownloadDir: defaults.defaultDownloadDir, tempDir: defaults.tempDir }
-          : group === "behavior"
-          ? { notifications: defaults.notifications, autoClearFinished: defaults.autoClearFinished }
-          : {
-              maxConcurrency: defaults.maxConcurrency,
-              maxRetries: defaults.maxRetries,
-              maxSpeed: defaults.maxSpeed,
-              fileCollision: defaults.fileCollision,
-            };
+            ? {
+                defaultDownloadDir: defaults.defaultDownloadDir,
+                tempDir: defaults.tempDir,
+              }
+            : group === "behavior"
+              ? {
+                  notifications: defaults.notifications,
+                  autoClearFinished: defaults.autoClearFinished,
+                }
+              : {
+                  maxConcurrency: defaults.maxConcurrency,
+                  maxRetries: defaults.maxRetries,
+                  maxSpeed: defaults.maxSpeed,
+                  fileCollision: defaults.fileCollision,
+                };
 
       setDraftFromSettings({ ...draftSettings, ...partial });
       toast.info("Settings reset to defaults");
@@ -205,7 +222,10 @@ export function SettingsScreen() {
   );
 
   return (
-    <div className="flex flex-col h-full bg-background max-w-6xl mx-auto w-full" role="main">
+    <div
+      className="flex flex-col h-full bg-background max-w-6xl mx-auto w-full"
+      role="main"
+    >
       <FadeInStagger className="flex flex-col h-full">
         <div className="p-8 pb-6 flex flex-col gap-6">
           <SettingsHeader

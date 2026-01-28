@@ -46,20 +46,26 @@ export function GlobalDragDrop() {
         for (let i = 0; i < items.length; i++) {
           if (items[i].kind === "string" && items[i].type === "text/plain") {
             items[i].getAsString((str) => {
-              if (str && (str.startsWith("http://") || str.startsWith("https://"))) {
-                 setPendingUrl(str);
-                 setScreen("downloads");
+              if (
+                str &&
+                (str.startsWith("http://") || str.startsWith("https://"))
+              ) {
+                setPendingUrl(str);
+                setScreen("downloads");
               }
             });
-            break; 
-          } else if (items[i].kind === "string" && items[i].type === "text/uri-list") {
-             items[i].getAsString((str) => {
-                if (str) {
-                  setPendingUrl(str);
-                  setScreen("downloads");
-                }
-             });
-             break;
+            break;
+          } else if (
+            items[i].kind === "string" &&
+            items[i].type === "text/uri-list"
+          ) {
+            items[i].getAsString((str) => {
+              if (str) {
+                setPendingUrl(str);
+                setScreen("downloads");
+              }
+            });
+            break;
           }
         }
       }
@@ -96,7 +102,9 @@ export function GlobalDragDrop() {
             <div className="w-24 h-24 bg-primary/20 rounded-full flex items-center justify-center mb-4 ring-8 ring-primary/10">
               <Download className="w-12 h-12 text-primary" />
             </div>
-            <h2 className="text-4xl font-bold tracking-tight">Drop Link Here</h2>
+            <h2 className="text-4xl font-bold tracking-tight">
+              Drop Link Here
+            </h2>
             <p className="text-xl text-muted-foreground">
               Release to add to downloads
             </p>

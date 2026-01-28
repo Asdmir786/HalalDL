@@ -16,7 +16,7 @@ export function DownloadStatsBar({
   failedCount,
   doneCount,
   onStartAll,
-  canStartAll
+  canStartAll,
 }: DownloadStatsBarProps) {
   return (
     <div className="flex items-center justify-between pt-2 border-t border-muted/50">

@@ -1,4 +1,3 @@
-
 import { motion } from "framer-motion";
 import { ReactNode } from "react";
 
@@ -34,7 +33,10 @@ const pageTransition = {
   duration: 0.4,
 };
 
-export const PageTransition = ({ children, className }: PageTransitionProps) => {
+export const PageTransition = ({
+  children,
+  className,
+}: PageTransitionProps) => {
   return (
     <motion.div
       initial="initial"

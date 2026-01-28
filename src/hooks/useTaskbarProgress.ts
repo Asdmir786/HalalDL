@@ -37,7 +37,12 @@ export function useTaskbarProgress() {
       } catch (err) {
         if (!loggedErrorRef.current) {
           loggedErrorRef.current = true;
-          useLogsStore.getState().addLog({ level: "warn", message: `Failed to update taskbar progress: ${String(err)}` });
+          useLogsStore
+            .getState()
+            .addLog({
+              level: "warn",
+              message: `Failed to update taskbar progress: ${String(err)}`,
+            });
         }
       }
     };

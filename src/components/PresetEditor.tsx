@@ -1,11 +1,11 @@
 import { useState } from "react";
-import { 
-  Dialog, 
-  DialogContent, 
-  DialogDescription, 
-  DialogFooter, 
-  DialogHeader, 
-  DialogTitle 
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
 } from "@/components/ui/dialog";
 import { MotionButton } from "@/components/motion/MotionButton";
 import { Input } from "@/components/ui/input";
@@ -19,7 +19,12 @@ interface PresetEditorProps {
   onSave: (preset: Partial<Preset>) => void;
 }
 
-export function PresetEditor({ preset, isOpen, onClose, onSave }: PresetEditorProps) {
+export function PresetEditor({
+  preset,
+  isOpen,
+  onClose,
+  onSave,
+}: PresetEditorProps) {
   const [name, setName] = useState(preset?.name ?? "");
   const [description, setDescription] = useState(preset?.description ?? "");
   const [args, setArgs] = useState(preset ? preset.args.join(" ") : "");
@@ -28,7 +33,7 @@ export function PresetEditor({ preset, isOpen, onClose, onSave }: PresetEditorPr
     onSave({
       name,
       description,
-      args: args.split(" ").filter(a => a.trim() !== ""),
+      args: args.split(" ").filter((a) => a.trim() !== ""),
     });
     onClose();
   };
@@ -45,28 +50,28 @@ export function PresetEditor({ preset, isOpen, onClose, onSave }: PresetEditorPr
         <div className="grid gap-4 py-4">
           <div className="grid gap-2">
             <Label htmlFor="name">Name</Label>
-            <Input 
-              id="name" 
-              value={name} 
-              onChange={(e) => setName(e.target.value)} 
+            <Input
+              id="name"
+              value={name}
+              onChange={(e) => setName(e.target.value)}
               placeholder="My Custom Preset"
             />
           </div>
           <div className="grid gap-2">
             <Label htmlFor="description">Description</Label>
-            <Input 
-              id="description" 
-              value={description} 
-              onChange={(e) => setDescription(e.target.value)} 
+            <Input
+              id="description"
+              value={description}
+              onChange={(e) => setDescription(e.target.value)}
               placeholder="Extract audio as FLAC..."
             />
           </div>
           <div className="grid gap-2">
             <Label htmlFor="args">Arguments (yt-dlp flags)</Label>
-            <Input 
-              id="args" 
-              value={args} 
-              onChange={(e) => setArgs(e.target.value)} 
+            <Input
+              id="args"
+              value={args}
+              onChange={(e) => setArgs(e.target.value)}
               placeholder="-f bestvideo+bestaudio --merge-output-format mp4"
               className="font-mono text-xs"
             />

@@ -20,69 +20,90 @@ interface PresetsState {
 export const BUILT_IN_PRESETS: Preset[] = [
   {
     id: "default",
-    name: "Recommended — Best Available",
-    description: "Best video + audio from the source (no size limits)",
+    name: "Best Quality",
+    description: "Highest quality video + audio available",
     isBuiltIn: true,
     args: ["-f", "bestvideo+bestaudio/best"],
   },
   {
     id: "recommended-1080p",
-    name: "Recommended — Best Available (Up to 1080p)",
-    description: "Best video up to 1080p + best audio",
+    name: "Best Quality (Up to 1080p)",
+    description: "Caps video to 1080p; keeps best available audio",
     isBuiltIn: true,
     args: ["-f", "bestvideo[height<=1080]+bestaudio/best"],
   },
   {
     id: "high-quality",
-    name: "Recommended — Best Available (Up to 4K)",
-    description: "Best video up to 2160p + best audio",
+    name: "Best Quality (Up to 4K)",
+    description: "Caps video to 4K; keeps best available audio",
     isBuiltIn: true,
     args: ["-f", "bestvideo[height<=2160]+bestaudio/best"],
   },
   {
-    id: "whatsapp-optimized",
-    name: "Compatibility — WhatsApp Optimized (H.264 + AAC)",
-    description: "Optimized for WhatsApp (1080p, compatible codecs, fast start)",
+    id: "whatsapp",
+    name: "WhatsApp (Best Quality)",
+    description: "Best quality with WhatsApp-friendly MP4 playback",
     isBuiltIn: true,
     args: [
       "-f",
-      "bv[height<=1080][ext=mp4][vcodec^=avc1]+ba[ext=m4a]/bv[height<=1080][vcodec^=avc1]+ba/b[height<=1080][ext=mp4][vcodec^=avc1]/b[height<=1080]",
+      "bestvideo+bestaudio/best",
       "--merge-output-format",
       "mp4",
       "--postprocessor-args",
-      "VideoConvertor:-c:v libx264 -pix_fmt yuv420p -c:a aac -b:a 128k -crf 23 -preset slow -movflags +faststart"
+      "Merger:-c:v libx264 -pix_fmt yuv420p -c:a aac -b:a 192k -ac 2 -ar 44100 -crf 20 -preset slow -movflags +faststart",
     ],
   },
   {
-    id: "whatsapp",
-    name: "Compatibility — MP4 (H.264 + AAC)",
-    description: "Most compatible choice for phones, social apps, and editors",
+    id: "whatsapp-1080p",
+    name: "WhatsApp (Up to 1080p)",
+    description: "Caps to 1080p for easier sharing; WhatsApp-friendly MP4",
     isBuiltIn: true,
     args: [
       "-f",
-      "bv[ext=mp4][vcodec^=avc1]+ba[ext=m4a]/bv[vcodec^=avc1]+ba/b[ext=mp4][vcodec^=avc1]/b",
+      "bestvideo+bestaudio/best",
       "--merge-output-format",
-      "mp4"
+      "mp4",
+      "--postprocessor-args",
+      "Merger:-vf scale=-2:1080:force_original_aspect_ratio=decrease -c:v libx264 -pix_fmt yuv420p -c:a aac -b:a 192k -ac 2 -ar 44100 -crf 22 -preset slow -movflags +faststart",
+    ],
+  },
+  {
+    id: "whatsapp-optimized",
+    name: "WhatsApp (Up to 720p)",
+    description: "Smaller files for quick sending; WhatsApp-friendly MP4",
+    isBuiltIn: true,
+    args: [
+      "-f",
+      "bestvideo+bestaudio/best",
+      "--merge-output-format",
+      "mp4",
+      "--postprocessor-args",
+      "Merger:-vf scale=-2:720:force_original_aspect_ratio=decrease -c:v libx264 -pix_fmt yuv420p -c:a aac -b:a 160k -ac 2 -ar 44100 -crf 23 -preset slow -movflags +faststart",
     ],
   },
   {
     id: "mp4-best",
-    name: "Compatibility — Best MP4 (Any Codec)",
-    description: "Highest quality MP4; codec may vary by source",
+    name: "MP4 (High Quality)",
+    description: "High quality MP4; may re-encode depending on source",
     isBuiltIn: true,
-    args: ["-f", "bestvideo[ext=mp4]+bestaudio[ext=m4a]/best[ext=mp4]", "--merge-output-format", "mp4"],
+    args: [
+      "-f",
+      "bestvideo[ext=mp4]+bestaudio[ext=m4a]/best[ext=mp4]",
+      "--merge-output-format",
+      "mp4",
+    ],
   },
   {
     id: "webm-best",
-    name: "Web — Best WebM (VP9/AV1)",
-    description: "Best WebM quality; not ideal for most editors",
+    name: "WebM (High Quality)",
+    description: "High quality WebM; best for web playback, not editors",
     isBuiltIn: true,
     args: ["-f", "bestvideo[ext=webm]+bestaudio[ext=webm]/best[ext=webm]"],
   },
   {
     id: "editors-capcut-1080p-mp4",
-    name: "Editors — CapCut (1080p MP4 H.264 + AAC)",
-    description: "Editing-friendly MP4 for CapCut; prefers H.264/AAC when available",
+    name: "CapCut (1080p)",
+    description: "Editing-friendly MP4 for CapCut",
     isBuiltIn: true,
     args: [
       "-f",
@@ -92,9 +113,21 @@ export const BUILT_IN_PRESETS: Preset[] = [
     ],
   },
   {
+    id: "editors-capcut-best-mp4",
+    name: "CapCut (Best)",
+    description: "Editing-friendly MP4 (best available; no resolution cap)",
+    isBuiltIn: true,
+    args: [
+      "-f",
+      "bv[ext=mp4][vcodec^=avc1]+ba[ext=m4a]/bv[vcodec^=avc1]+ba/b[ext=mp4]/b",
+      "--merge-output-format",
+      "mp4",
+    ],
+  },
+  {
     id: "editors-capcut-4k-mp4",
-    name: "Editors — CapCut (4K MP4 H.264 + AAC)",
-    description: "Editing-friendly MP4 for CapCut; prefers H.264/AAC when available",
+    name: "CapCut (4K)",
+    description: "Editing-friendly MP4 for CapCut",
     isBuiltIn: true,
     args: [
       "-f",
@@ -105,8 +138,8 @@ export const BUILT_IN_PRESETS: Preset[] = [
   },
   {
     id: "editors-premiere-ae-1080p-mp4",
-    name: "Editors — Premiere/After Effects (1080p MP4 H.264 + AAC)",
-    description: "Editing-friendly MP4 for Premiere/AE; prefers H.264/AAC when available",
+    name: "Premiere/AE (1080p)",
+    description: "Editing-friendly MP4 for Premiere/After Effects",
     isBuiltIn: true,
     args: [
       "-f",
@@ -116,9 +149,21 @@ export const BUILT_IN_PRESETS: Preset[] = [
     ],
   },
   {
+    id: "editors-premiere-ae-best-mp4",
+    name: "Premiere/AE (Best)",
+    description: "Editing-friendly MP4 (best available; no resolution cap)",
+    isBuiltIn: true,
+    args: [
+      "-f",
+      "bv[ext=mp4][vcodec^=avc1]+ba[ext=m4a]/bv[vcodec^=avc1]+ba/b[ext=mp4]/b",
+      "--merge-output-format",
+      "mp4",
+    ],
+  },
+  {
     id: "editors-premiere-ae-4k-mp4",
-    name: "Editors — Premiere/After Effects (4K MP4 H.264 + AAC)",
-    description: "Editing-friendly MP4 for Premiere/AE; prefers H.264/AAC when available",
+    name: "Premiere/AE (4K)",
+    description: "Editing-friendly MP4 for Premiere/After Effects",
     isBuiltIn: true,
     args: [
       "-f",
@@ -129,8 +174,8 @@ export const BUILT_IN_PRESETS: Preset[] = [
   },
   {
     id: "editors-prores-1080p-mov",
-    name: "Editors Pro — ProRes 422 (1080p MOV)",
-    description: "Transcodes to ProRes for smoother editing (large files; requires FFmpeg)",
+    name: "ProRes (1080p)",
+    description: "Smoother editing; very large files (requires FFmpeg)",
     isBuiltIn: true,
     args: [
       "-f",
@@ -143,8 +188,8 @@ export const BUILT_IN_PRESETS: Preset[] = [
   },
   {
     id: "editors-prores-4k-mov",
-    name: "Editors Pro — ProRes 422 (4K MOV)",
-    description: "Transcodes to ProRes for smoother editing (huge files; requires FFmpeg)",
+    name: "ProRes (4K)",
+    description: "Smoother editing; huge files (requires FFmpeg)",
     isBuiltIn: true,
     args: [
       "-f",
@@ -157,73 +202,90 @@ export const BUILT_IN_PRESETS: Preset[] = [
   },
   {
     id: "video-only",
-    name: "Video — Best Video Only",
-    description: "Highest quality video stream without audio",
+    name: "Video Only",
+    description: "Highest quality video without audio",
     isBuiltIn: true,
     args: ["-f", "bestvideo"],
   },
   {
     id: "audio-only",
-    name: "Audio — Best Audio (Source)",
-    description: "Highest bitrate audio stream; format may be Opus/WebM depending on source",
+    name: "Audio Only",
+    description: "Highest quality audio from the source",
     isBuiltIn: true,
     args: ["-f", "bestaudio"],
   },
   {
     id: "flac",
-    name: "Audio — FLAC (Lossless Convert)",
-    description: "Converts best source audio to FLAC (no added loss; source may be lossy)",
+    name: "Audio to FLAC",
+    description: "Converts audio to FLAC (requires FFmpeg)",
     isBuiltIn: true,
     args: ["-f", "bestaudio", "-x", "--audio-format", "flac"],
   },
   {
     id: "wav",
-    name: "Audio — WAV (Lossless Convert)",
-    description: "Converts best source audio to WAV (no added loss; huge files; source may be lossy)",
+    name: "Audio to WAV",
+    description: "Converts audio to WAV (very large; requires FFmpeg)",
     isBuiltIn: true,
     args: ["-f", "bestaudio", "-x", "--audio-format", "wav"],
   },
   {
     id: "alac",
-    name: "Audio — ALAC (Lossless Convert)",
-    description: "Converts best source audio to ALAC (no added loss; source may be lossy)",
+    name: "Audio to ALAC",
+    description: "Converts audio to ALAC (requires FFmpeg)",
     isBuiltIn: true,
     args: ["-f", "bestaudio", "-x", "--audio-format", "alac"],
   },
   {
     id: "mp3",
-    name: "Audio — MP3 (High Quality)",
-    description: "Converts best source audio to MP3 (lossy; requires FFmpeg)",
+    name: "Audio to MP3",
+    description: "High quality MP3 conversion (requires FFmpeg)",
     isBuiltIn: true,
-    args: ["-f", "bestaudio", "-x", "--audio-format", "mp3", "--audio-quality", "0"],
+    args: [
+      "-f",
+      "bestaudio",
+      "-x",
+      "--audio-format",
+      "mp3",
+      "--audio-quality",
+      "0",
+    ],
   },
 ];
 
 export const usePresetsStore = create<PresetsState>((set) => ({
   presets: BUILT_IN_PRESETS,
   setPresets: (presets) => set({ presets }),
-  addPreset: (preset) => set((state) => ({
-    presets: [...state.presets, { ...preset, id: Math.random().toString(36).substring(7) }],
-  })),
-  updatePreset: (id, updatedFields) => set((state) => ({
-    presets: state.presets.map((p) => p.id === id ? { ...p, ...updatedFields } : p),
-  })),
-  deletePreset: (id) => set((state) => ({
-    presets: state.presets.filter((p) => p.id !== id),
-  })),
-  duplicatePreset: (id) => set((state) => {
-    const original = state.presets.find((p) => p.id === id);
-    if (!original) return state;
-    return {
+  addPreset: (preset) =>
+    set((state) => ({
       presets: [
         ...state.presets,
-        {
-          ...original,
-          id: Math.random().toString(36).substring(7),
-          name: `${original.name} (Copy)`,
-          isBuiltIn: false,
-        },
+        { ...preset, id: Math.random().toString(36).substring(7) },
       ],
-    };
-  }),
+    })),
+  updatePreset: (id, updatedFields) =>
+    set((state) => ({
+      presets: state.presets.map((p) =>
+        p.id === id ? { ...p, ...updatedFields } : p
+      ),
+    })),
+  deletePreset: (id) =>
+    set((state) => ({
+      presets: state.presets.filter((p) => p.id !== id),
+    })),
+  duplicatePreset: (id) =>
+    set((state) => {
+      const original = state.presets.find((p) => p.id === id);
+      if (!original) return state;
+      return {
+        presets: [
+          ...state.presets,
+          {
+            ...original,
+            id: Math.random().toString(36).substring(7),
+            name: `${original.name} (Copy)`,
+            isBuiltIn: false,
+          },
+        ],
+      };
+    }),
 }));

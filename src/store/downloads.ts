@@ -1,6 +1,11 @@
 import { create } from "zustand";
 
-export type JobStatus = "Queued" | "Downloading" | "Post-processing" | "Done" | "Failed";
+export type JobStatus =
+  | "Queued"
+  | "Downloading"
+  | "Post-processing"
+  | "Done"
+  | "Failed";
 
 export interface DownloadJob {
   id: string;
@@ -10,6 +15,7 @@ export interface DownloadJob {
   progress: number;
   speed?: string;
   eta?: string;
+  totalSize?: string;
   status: JobStatus;
   presetId: string;
   outputPath?: string;
@@ -26,7 +32,11 @@ interface DownloadsState {
   jobs: DownloadJob[];
   pendingUrl?: string;
   setPendingUrl: (url: string | undefined) => void;
-  addJob: (url: string, presetId: string, overrides?: DownloadJob["overrides"]) => string;
+  addJob: (
+    url: string,
+    presetId: string,
+    overrides?: DownloadJob["overrides"]
+  ) => string;
   removeJob: (id: string) => void;
   updateJob: (id: string, updates: Partial<DownloadJob>) => void;
 }
@@ -55,20 +65,28 @@ export const useDownloadsStore = create<DownloadsState>((set) => ({
     }));
     return id;
   },
-  removeJob: (id) => set((state) => ({
-    jobs: state.jobs.filter((j) => j.id !== id),
-  })),
-  updateJob: (id, updates) => set((state) => ({
-    jobs: state.jobs.map((j) => {
-      if (j.id !== id) return j;
-      const statusWillChange = typeof updates.status !== "undefined" && updates.status !== j.status;
-      return {
-        ...j,
-        ...updates,
-        ...(statusWillChange
-          ? { statusChangedAt: typeof updates.statusChangedAt === "number" ? updates.statusChangedAt : Date.now() }
-          : {}),
-      };
-    }),
-  })),
+  removeJob: (id) =>
+    set((state) => ({
+      jobs: state.jobs.filter((j) => j.id !== id),
+    })),
+  updateJob: (id, updates) =>
+    set((state) => ({
+      jobs: state.jobs.map((j) => {
+        if (j.id !== id) return j;
+        const statusWillChange =
+          typeof updates.status !== "undefined" && updates.status !== j.status;
+        return {
+          ...j,
+          ...updates,
+          ...(statusWillChange
+            ? {
+                statusChangedAt:
+                  typeof updates.statusChangedAt === "number"
+                    ? updates.statusChangedAt
+                    : Date.now(),
+              }
+            : {}),
+        };
+      }),
+    })),
 }));

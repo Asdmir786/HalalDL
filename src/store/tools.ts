@@ -57,8 +57,9 @@ const INITIAL_TOOLS: Tool[] = [
 export const useToolsStore = create<ToolsState>((set) => ({
   tools: INITIAL_TOOLS,
   discoveredToolId: null,
-  updateTool: (id, updates) => set((state) => ({
-    tools: state.tools.map((t) => t.id === id ? { ...t, ...updates } : t),
-  })),
+  updateTool: (id, updates) =>
+    set((state) => ({
+      tools: state.tools.map((t) => (t.id === id ? { ...t, ...updates } : t)),
+    })),
   setDiscoveredToolId: (id) => set({ discoveredToolId: id }),
 }));

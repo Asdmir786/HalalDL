@@ -44,7 +44,8 @@ export const useLogsStore = create<LogsState>((set) => ({
       id: "3",
       timestamp: new Date().toISOString(),
       level: "info",
-      message: "yt-dlp version 2025.01.15 detected at C:\\Users\\halal\\AppData\\Local\\yt-dlp.exe",
+      message:
+        "yt-dlp version 2025.01.15 detected at C:\\Users\\halal\\AppData\\Local\\yt-dlp.exe",
     },
   ],
   loadStatus: "idle",
@@ -60,10 +61,11 @@ export const useLogsStore = create<LogsState>((set) => ({
       // Optimization: Avoid full array copy if possible, but for Zustand immutability we need a new reference.
       // However, we can optimize by slicing first if needed.
       const currentLogs = state.logs;
-      const nextLogs = currentLogs.length >= 1000 
-        ? [...currentLogs.slice(1), newLog]
-        : [...currentLogs, newLog];
-      
+      const nextLogs =
+        currentLogs.length >= 1000
+          ? [...currentLogs.slice(1), newLog]
+          : [...currentLogs, newLog];
+
       return { logs: nextLogs };
     }),
   setActiveJobId: (jobId) => set({ activeJobId: jobId }),
