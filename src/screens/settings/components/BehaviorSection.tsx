@@ -1,4 +1,4 @@
-import { Zap, Save, FileWarning } from "lucide-react";
+import { Zap, FileWarning } from "lucide-react";
 import { FadeInItem } from "@/components/motion/StaggerContainer";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Label } from "@/components/ui/label";
@@ -21,8 +21,6 @@ interface BehaviorSectionProps {
   onAutoClearChange: (val: boolean) => void;
   autoCopyFile: boolean;
   onAutoCopyChange: (val: boolean) => void;
-  paranoidMode: boolean;
-  onParanoidModeChange: (val: boolean) => void;
   maxConcurrency: number;
   onMaxConcurrencyChange: (val: number) => void;
   fileCollision: FileCollisionAction;
@@ -33,7 +31,6 @@ export function BehaviorSection({
   notifications, onNotificationsChange,
   autoClearFinished, onAutoClearChange,
   autoCopyFile, onAutoCopyChange,
-  paranoidMode, onParanoidModeChange,
   maxConcurrency, onMaxConcurrencyChange,
   fileCollision, onFileCollisionChange
 }: BehaviorSectionProps) {
@@ -82,22 +79,6 @@ export function BehaviorSection({
             <Switch
               checked={autoCopyFile}
               onCheckedChange={onAutoCopyChange}
-            />
-          </div>
-
-          <Separator />
-
-          <div className="flex items-center justify-between">
-            <div className="space-y-0.5">
-              <Label className="flex items-center gap-2">
-                <Save className="w-4 h-4 text-green-500" />
-                Paranoid Backup Mode
-              </Label>
-              <p className="text-sm text-muted-foreground">Automatically backup download history to Documents/HalalDL/backups.</p>
-            </div>
-            <Switch
-              checked={paranoidMode}
-              onCheckedChange={onParanoidModeChange}
             />
           </div>
 

@@ -21,7 +21,6 @@ export interface Settings {
   // Behavior
   autoClearFinished: boolean;
   autoCopyFile: boolean;
-  paranoidMode: boolean; // Auto-export history to backups folder
 }
 
 interface SettingsState {
@@ -42,7 +41,6 @@ export const DEFAULT_SETTINGS: Settings = {
   tempDir: "",
   autoClearFinished: false,
   autoCopyFile: true,
-  paranoidMode: false,
 };
 
 export const SETTINGS_KEYS = Object.keys(DEFAULT_SETTINGS) as (keyof Settings)[];

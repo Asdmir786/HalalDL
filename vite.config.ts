@@ -45,13 +45,32 @@ export default defineConfig(async () => ({
   build: {
     rollupOptions: {
       output: {
-        manualChunks: {
-          'vendor-react': ['react', 'react-dom'],
-          'vendor-ui': ['@radix-ui/react-checkbox', '@radix-ui/react-dialog', '@radix-ui/react-dropdown-menu', '@radix-ui/react-label', '@radix-ui/react-progress', '@radix-ui/react-scroll-area', '@radix-ui/react-select', '@radix-ui/react-separator', '@radix-ui/react-slider', '@radix-ui/react-slot', '@radix-ui/react-switch', '@radix-ui/react-tabs'],
-          'vendor-motion': ['framer-motion'],
-          'vendor-utils': ['clsx', 'tailwind-merge', 'class-variance-authority', 'lucide-react', 'sonner', 'next-themes', 'zustand'],
-        }
-      }
-    }
-  }
+        manualChunks: (id: string) => {
+          if (!id.includes("node_modules")) return undefined;
+          if (
+            id.includes("node_modules/react") ||
+            id.includes("node_modules/react-dom") ||
+            id.includes("node_modules/scheduler") ||
+            id.includes("node_modules/use-sync-external-store")
+          ) {
+            return "vendor-react";
+          }
+          if (id.includes("node_modules/framer-motion")) return "vendor-motion";
+          if (
+            id.includes("node_modules/@radix-ui/") ||
+            id.includes("node_modules/clsx") ||
+            id.includes("node_modules/tailwind-merge") ||
+            id.includes("node_modules/class-variance-authority") ||
+            id.includes("node_modules/lucide-react") ||
+            id.includes("node_modules/sonner") ||
+            id.includes("node_modules/next-themes") ||
+            id.includes("node_modules/zustand")
+          ) {
+            return "vendor-ui";
+          }
+          return undefined;
+        },
+      },
+    },
+  },
 }));

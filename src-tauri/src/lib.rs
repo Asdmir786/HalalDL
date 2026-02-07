@@ -370,6 +370,22 @@ fn write_text_file(path: String, contents: String) -> Result<(), String> {
 }
 
 #[tauri::command]
+fn read_text_file(path: String) -> Result<String, String> {
+    let normalized = if cfg!(target_os = "windows") {
+        path.replace("/", "\\")
+    } else {
+        path
+    };
+
+    if normalized.trim().is_empty() {
+        return Err("Path is empty".to_string());
+    }
+
+    let p = PathBuf::from(normalized);
+    fs::read_to_string(&p).map_err(|e| format!("Failed to read file: {}", e))
+}
+
+#[tauri::command]
 async fn fetch_latest_ytdlp_version(app_handle: tauri::AppHandle) -> Result<String, String> {
     let client = reqwest::Client::builder()
         .user_agent(format!("HalalDL/{}", app_handle.package_info().version))
@@ -895,6 +911,7 @@ pub fn run() {
             stage_manual_tool,
             add_to_user_path,
             write_text_file,
+            read_text_file,
             fetch_latest_ytdlp_version,
             fetch_latest_aria2_version,
             fetch_latest_deno_version,

@@ -1,4 +1,5 @@
 import { AnimatePresence, motion, Variants } from "framer-motion";
+import { useLayoutEffect, useRef, type UIEvent } from "react";
 import { DownloadItem } from "./DownloadItem";
 import { DownloadJob } from "@/store/downloads";
 import { MotionButton } from "@/components/motion/MotionButton";
@@ -33,6 +34,18 @@ export function DownloadList({
 }: DownloadListProps) {
   const hasCompleted = jobs.some((job) => job.status === "Done" || job.status === "Failed");
   const { setScreen } = useNavigationStore();
+  const scrollRef = useRef<HTMLDivElement>(null);
+  const scrollTopRef = useRef(0);
+
+  useLayoutEffect(() => {
+    const el = scrollRef.current;
+    if (!el) return;
+    el.scrollTop = scrollTopRef.current;
+  });
+
+  const handleScroll = (event: UIEvent<HTMLDivElement>) => {
+    scrollTopRef.current = event.currentTarget.scrollTop;
+  };
 
   return (
     <FadeInItem className="flex-1 overflow-hidden flex flex-col px-8 pb-8">
@@ -160,7 +173,11 @@ export function DownloadList({
                   Clear Completed
                 </MotionButton>
             </div>
-            <div className="flex-1 overflow-auto p-4 pt-0">
+            <div
+              ref={scrollRef}
+              onScroll={handleScroll}
+              className="flex-1 overflow-auto p-4 pt-0"
+            >
               <div className="flex flex-col gap-2 relative">
                 <AnimatePresence mode="popLayout" initial={false}>
                   {jobs.map((job) => (

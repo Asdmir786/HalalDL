@@ -9,8 +9,6 @@ import { storage } from "@/lib/storage";
 import { checkYtDlpVersion, checkFfmpegVersion, checkAria2Version, checkDenoVersion } from "@/lib/commands";
 import { toast } from "sonner";
 import { isPermissionGranted, requestPermission, sendNotification } from '@tauri-apps/plugin-notification';
-import { documentDir, join } from "@tauri-apps/api/path";
-import { writeTextFile, mkdir, exists } from "@tauri-apps/plugin-fs";
 
 export function PersistenceManager() {
   const { settings, setSettings } = useSettingsStore();
@@ -211,36 +209,12 @@ export function PersistenceManager() {
     const timer = setTimeout(async () => {
       try {
         await storage.saveDownloads(jobs);
-        
-        // Paranoid Backup Mode
-        if (settings.paranoidMode) {
-          try {
-            const docs = await documentDir();
-            const backupDir = await join(docs, "HalalDL", "backups");
-            if (!(await exists(backupDir))) {
-              await mkdir(backupDir, { recursive: true });
-            }
-            
-            // We use a single rolling history file for now, or timestamped?
-            // "Paranoid" implies losing nothing. Let's do timestamped but throttled?
-            // Or just a single history.json that is guaranteed to be user accessible.
-            // Let's do a daily backup file + latest.json
-            
-            const dateStr = new Date().toISOString().split('T')[0]; // YYYY-MM-DD
-            const backupPath = await join(backupDir, `history-${dateStr}.json`);
-            
-            await writeTextFile(backupPath, JSON.stringify(jobs, null, 2));
-            useLogsStore.getState().addLog({ level: "debug", message: `Paranoid backup saved to ${backupPath}` });
-          } catch (e) {
-            useLogsStore.getState().addLog({ level: "error", message: `Paranoid backup failed: ${String(e)}` });
-          }
-        }
       } catch (e) {
         useLogsStore.getState().addLog({ level: "error", message: `Failed to save downloads: ${String(e)}` });
       }
     }, 1000); // Debounce 1s
     return () => clearTimeout(timer);
-  }, [jobs, settings.paranoidMode]);
+  }, [jobs]);
 
   return null; // Logic only component
 }

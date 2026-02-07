@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type UIEvent } from "react";
 import { toast } from "sonner";
 import { downloadDir } from "@tauri-apps/api/path";
 import {
@@ -41,6 +41,8 @@ const resolveDefaultSettings = async (): Promise<Settings> => {
 
 export function SettingsScreen() {
   const { settings, setSettings } = useSettingsStore();
+  const scrollRef = useRef<HTMLDivElement>(null);
+  const scrollTopRef = useRef(0);
 
   const savedSettings = useMemo(() => pickKnownSettings(settings), [settings]);
   const [edits, setEdits] = useState<Partial<Settings>>({});
@@ -204,6 +206,16 @@ export function SettingsScreen() {
     [draftSettings, setDraftFromSettings]
   );
 
+  useLayoutEffect(() => {
+    const el = scrollRef.current;
+    if (!el) return;
+    el.scrollTop = scrollTopRef.current;
+  });
+
+  const handleScroll = (event: UIEvent<HTMLDivElement>) => {
+    scrollTopRef.current = event.currentTarget.scrollTop;
+  };
+
   return (
     <div className="flex flex-col h-full bg-background max-w-6xl mx-auto w-full" role="main">
       <FadeInStagger className="flex flex-col h-full">
@@ -219,7 +231,11 @@ export function SettingsScreen() {
           />
         </div>
 
-        <div className="flex-1 overflow-auto px-8 pb-8">
+        <div
+          ref={scrollRef}
+          onScroll={handleScroll}
+          className="flex-1 overflow-auto px-8 pb-8"
+        >
           <div className="grid gap-6">
             <AppearanceSection
               theme={draftSettings.theme}
@@ -238,8 +254,6 @@ export function SettingsScreen() {
               onAutoClearChange={(v) => setDraftValue("autoClearFinished", v)}
               autoCopyFile={draftSettings.autoCopyFile}
               onAutoCopyChange={(v) => setDraftValue("autoCopyFile", v)}
-              paranoidMode={draftSettings.paranoidMode}
-              onParanoidModeChange={(v) => setDraftValue("paranoidMode", v)}
               maxConcurrency={draftSettings.maxConcurrency}
               onMaxConcurrencyChange={(v) => setDraftValue("maxConcurrency", v)}
               fileCollision={draftSettings.fileCollision}

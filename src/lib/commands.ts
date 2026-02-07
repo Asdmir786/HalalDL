@@ -9,20 +9,27 @@ import { toast } from "sonner";
 
 type VersionParts = number[];
 
-async function getToolPath(baseName: string): Promise<string> {
-  // 1. Check local bin folder first
+type ToolResolution = {
+  command: string;
+  path: string;
+  isLocal: boolean;
+};
+
+function toLocalCommandName(baseName: string): string {
+  return `local-${baseName}`;
+}
+
+async function resolveTool(baseName: string): Promise<ToolResolution> {
   try {
     const dataDir = await appDataDir();
     const localPath = await join(dataDir, "bin", `${baseName}.exe`);
     if (await exists(localPath)) {
-      return localPath;
+      return { command: toLocalCommandName(baseName), path: localPath, isLocal: true };
     }
   } catch {
-    // Ignore and fallback to system
+    void 0;
   }
-  
-  // 2. Fallback to system PATH
-  return baseName;
+  return { command: baseName, path: baseName, isLocal: false };
 }
 
 function parseVersionParts(input: string): VersionParts | null {
@@ -90,13 +97,13 @@ async function fetchJson<T>(url: string, timeoutMs = 10000): Promise<T> {
 export async function checkYtDlpVersion(): Promise<string | null> {
   const { addLog } = useLogsStore.getState();
   try {
-    const command = await getToolPath("yt-dlp");
-    addLog({ level: "command", message: "Checking for yt-dlp binary...", command: `${command} --version` });
-    const cmd = Command.create(command, ["--version"]);
+    const tool = await resolveTool("yt-dlp");
+    addLog({ level: "command", message: "Checking for yt-dlp binary...", command: `${tool.path} --version` });
+    const cmd = Command.create(tool.command, ["--version"]);
     const output = await cmd.execute();
     if (output.code === 0) {
       const version = output.stdout.trim();
-      addLog({ level: "info", message: `yt-dlp version ${version || "Detected"} detected at ${command}` });
+      addLog({ level: "info", message: `yt-dlp version ${version || "Detected"} detected at ${tool.path}` });
       return version;
     }
     addLog({ level: "warn", message: `yt-dlp version check returned code ${output.code}` });
@@ -109,14 +116,14 @@ export async function checkYtDlpVersion(): Promise<string | null> {
 export async function checkFfmpegVersion(): Promise<string | null> {
   const { addLog } = useLogsStore.getState();
   try {
-    const command = await getToolPath("ffmpeg");
-    addLog({ level: "command", message: "Checking for ffmpeg binary...", command: `${command} -version` });
-    const cmd = Command.create(command, ["-version"]);
+    const tool = await resolveTool("ffmpeg");
+    addLog({ level: "command", message: "Checking for ffmpeg binary...", command: `${tool.path} -version` });
+    const cmd = Command.create(tool.command, ["-version"]);
     const output = await cmd.execute();
     if (output.code === 0) {
       const firstLine = output.stdout.split('\n')[0];
       const version = firstLine || "Detected";
-      addLog({ level: "info", message: `ffmpeg version ${version} detected at ${command}` });
+      addLog({ level: "info", message: `ffmpeg version ${version} detected at ${tool.path}` });
       return version;
     }
     addLog({ level: "warn", message: `ffmpeg version check returned code ${output.code}` });
@@ -129,14 +136,14 @@ export async function checkFfmpegVersion(): Promise<string | null> {
 export async function checkAria2Version(): Promise<string | null> {
   const { addLog } = useLogsStore.getState();
   try {
-    const command = await getToolPath("aria2c");
-    addLog({ level: "command", message: "Checking for aria2c binary...", command: `${command} --version` });
-    const cmd = Command.create(command, ["--version"]);
+    const tool = await resolveTool("aria2c");
+    addLog({ level: "command", message: "Checking for aria2c binary...", command: `${tool.path} --version` });
+    const cmd = Command.create(tool.command, ["--version"]);
     const output = await cmd.execute();
     if (output.code === 0) {
       const firstLine = output.stdout.split('\n')[0];
       const version = firstLine || "Detected";
-      addLog({ level: "info", message: `aria2c version ${version} detected at ${command}` });
+      addLog({ level: "info", message: `aria2c version ${version} detected at ${tool.path}` });
       return version;
     }
     addLog({ level: "warn", message: `aria2c version check returned code ${output.code}` });
@@ -149,14 +156,14 @@ export async function checkAria2Version(): Promise<string | null> {
 export async function checkDenoVersion(): Promise<string | null> {
   const { addLog } = useLogsStore.getState();
   try {
-    const command = await getToolPath("deno");
-    addLog({ level: "command", message: "Checking for deno binary...", command: `${command} --version` });
-    const cmd = Command.create(command, ["--version"]);
+    const tool = await resolveTool("deno");
+    addLog({ level: "command", message: "Checking for deno binary...", command: `${tool.path} --version` });
+    const cmd = Command.create(tool.command, ["--version"]);
     const output = await cmd.execute();
     if (output.code === 0) {
       const firstLine = output.stdout.split('\n')[0];
       const version = firstLine || "Detected";
-      addLog({ level: "info", message: `deno version ${version} detected at ${command}` });
+      addLog({ level: "info", message: `deno version ${version} detected at ${tool.path}` });
       return version;
     }
     addLog({ level: "warn", message: `deno version check returned code ${output.code}` });

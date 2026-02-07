@@ -27,7 +27,7 @@ import {
 import { open as openUrl } from "@tauri-apps/plugin-shell";
 import { downloadTools, fetchLatestAria2Version, fetchLatestDenoVersion, fetchLatestFfmpegVersion, fetchLatestYtDlpVersion, isUpdateAvailable, pickFile, checkYtDlpVersion, checkFfmpegVersion, checkAria2Version, checkDenoVersion, stageManualTool } from "@/lib/commands";
 import { toast } from "sonner";
-import { useState } from "react";
+import { useLayoutEffect, useRef, useState, type UIEvent } from "react";
 import { useLogsStore } from "@/store/logs";
 
 const TOOL_URLS: Record<string, string> = {
@@ -44,6 +44,18 @@ export function ToolsScreen() {
   const [checkingTools, setCheckingTools] = useState<Record<string, boolean>>({});
   const [checkingLatest, setCheckingLatest] = useState<Record<string, boolean>>({});
   const [isUpdatingTools, setIsUpdatingTools] = useState<Record<string, boolean>>({});
+  const scrollRef = useRef<HTMLDivElement>(null);
+  const scrollTopRef = useRef(0);
+
+  useLayoutEffect(() => {
+    const el = scrollRef.current;
+    if (!el) return;
+    el.scrollTop = scrollTopRef.current;
+  });
+
+  const handleScroll = (event: UIEvent<HTMLDivElement>) => {
+    scrollTopRef.current = event.currentTarget.scrollTop;
+  };
 
   const testTool = async (id: string) => {
     setCheckingTools(prev => ({ ...prev, [id]: true }));
@@ -349,7 +361,12 @@ export function ToolsScreen() {
           </header>
         </FadeInItem>
 
-        <FadeInItem className="flex-1 overflow-auto px-8 pb-8">
+        <FadeInItem className="flex-1 min-h-0">
+          <div
+            ref={scrollRef}
+            onScroll={handleScroll}
+            className="h-full overflow-auto px-8 pb-8"
+          >
           <div className="space-y-8">
           {isLite && (
             <div className="rounded-xl border border-muted/40 bg-muted/20 p-3 flex items-start gap-3">
@@ -398,6 +415,7 @@ export function ToolsScreen() {
             </Card>
           </div>
         </div>
+          </div>
         </FadeInItem>
       </FadeInStagger>
     </div>

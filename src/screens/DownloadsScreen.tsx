@@ -9,7 +9,7 @@ import { useLogsStore } from "@/store/logs";
 import { useNavigationStore } from "@/store/navigation";
 
 import { FadeInStagger, FadeInItem } from "@/components/motion/StaggerContainer";
-import { startDownload, fetchMetadata } from "@/lib/downloader";
+import { startDownload, fetchMetadata, cleanupThumbnailByJobId } from "@/lib/downloader";
 
 import { DownloadInputSection } from "./downloads/components/DownloadInputSection";
 import { DownloadStatsBar } from "./downloads/components/DownloadStatsBar";
@@ -230,14 +230,20 @@ export function DownloadsScreen() {
 
   const handleRemoveSelected = () => {
     if (!selectedIds.length) return;
-    selectedIds.forEach((id) => removeJob(id));
+    selectedIds.forEach((id) => {
+      void cleanupThumbnailByJobId(id);
+      removeJob(id);
+    });
     setSelectedIds([]);
   };
 
   const handleClearCompleted = () => {
     const completed = jobs.filter((job) => job.status === "Done" || job.status === "Failed");
     if (!completed.length) return;
-    completed.forEach((job) => removeJob(job.id));
+    completed.forEach((job) => {
+      void cleanupThumbnailByJobId(job.id);
+      removeJob(job.id);
+    });
     setSelectedIds((prev) =>
       prev.filter((id) => !completed.some((job) => job.id === id))
     );
@@ -246,6 +252,11 @@ export function DownloadsScreen() {
   const handleViewLogs = (jobId: string) => {
     setActiveJobId(jobId);
     setScreen("logs");
+  };
+
+  const handleRemoveJob = (jobId: string) => {
+    void cleanupThumbnailByJobId(jobId);
+    removeJob(jobId);
   };
 
   return (
@@ -299,7 +310,7 @@ export function DownloadsScreen() {
           onStartSelected={handleStartSelected}
           onRemoveSelected={handleRemoveSelected}
           onClearCompleted={handleClearCompleted}
-          onRemoveJob={removeJob}
+          onRemoveJob={handleRemoveJob}
           onViewLogs={handleViewLogs}
           itemVariants={itemVariants}
           formatRelativeTime={formatRelativeTime}
