@@ -19,13 +19,15 @@ import {
   Search, 
   Info,
   ExternalLink,
+  FolderOpen,
   ShieldCheck,
   Package,
   Loader2
 } from "lucide-react";
 
 import { open as openUrl } from "@tauri-apps/plugin-shell";
-import { downloadTools, fetchLatestAria2Version, fetchLatestDenoVersion, fetchLatestFfmpegVersion, fetchLatestYtDlpVersion, isUpdateAvailable, pickFile, checkYtDlpVersion, checkFfmpegVersion, checkAria2Version, checkDenoVersion, stageManualTool } from "@/lib/commands";
+import { relaunch } from "@tauri-apps/plugin-process";
+import { downloadTools, fetchLatestAria2Version, fetchLatestDenoVersion, fetchLatestFfmpegVersion, fetchLatestYtDlpVersion, isUpdateAvailable, pickFile, checkYtDlpVersion, checkFfmpegVersion, checkAria2Version, checkDenoVersion, stageManualTool, revealToolInExplorer } from "@/lib/commands";
 import { toast } from "sonner";
 import { useLayoutEffect, useRef, useState, type UIEvent } from "react";
 import { useLogsStore } from "@/store/logs";
@@ -142,6 +144,8 @@ export function ToolsScreen() {
       toast.success(`${tool.id} updated`);
       await testTool(tool.id);
       await checkLatestForTool({ ...tool, version: useToolsStore.getState().tools.find((t) => t.id === tool.id)?.version });
+      toast.info("Restarting app to apply tool updates...");
+      await relaunch();
     } catch (e: unknown) {
       const message = e instanceof Error ? e.message : String(e);
       addLog({ level: "error", message: `Tool update failed (${tool.id}): ${message}` });
@@ -315,6 +319,15 @@ export function ToolsScreen() {
           title="Visit Website"
         >
           <ExternalLink className="w-3.5 h-3.5" />
+        </MotionButton>
+        <MotionButton
+          variant="ghost"
+          size="icon"
+          className="h-8 w-8"
+          onClick={() => revealToolInExplorer(tool.id, tool.path)}
+          title="Show in Explorer"
+        >
+          <FolderOpen className="w-3.5 h-3.5" />
         </MotionButton>
       </CardFooter>
     </Card>

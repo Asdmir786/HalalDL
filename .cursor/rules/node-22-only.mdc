@@ -1,0 +1,12 @@
+---
+description: Enforce Node.js 22 only for tooling and typings
+alwaysApply: true
+---
+
+# Node 22 Only
+
+- Use Node.js `22.x` for all project commands, installs, and CI guidance.
+- Do not suggest or apply upgrades to Node 23/24/25+ for this repo.
+- Keep `@types/node` on `^22` to match runtime APIs.
+- If a package suggests newer Node features, prefer a compatible package version rather than changing Node major.
+- Mention Node-version compatibility when recommending dependency updates.

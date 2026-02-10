@@ -12,6 +12,9 @@
     "shell:default",
     "dialog:default",
     "fs:default",
+    "fs:allow-appdata-meta-recursive",
+    "fs:allow-appdata-read-recursive",
+    "fs:allow-appdata-write-recursive",
     "os:default",
     "notification:default"
   ]

@@ -2,7 +2,7 @@ import { useEffect, useRef } from "react";
 import { downloadDir } from "@tauri-apps/api/path";
 import { useSettingsStore, Settings } from "@/store/settings";
 import { usePresetsStore, BUILT_IN_PRESETS, Preset } from "@/store/presets";
-import { useToolsStore } from "@/store/tools";
+import { useToolsStore, Tool } from "@/store/tools";
 import { useLogsStore } from "@/store/logs";
 import { useDownloadsStore, DownloadJob } from "@/store/downloads";
 import { storage } from "@/lib/storage";
@@ -13,7 +13,7 @@ import { isPermissionGranted, requestPermission, sendNotification } from '@tauri
 export function PersistenceManager() {
   const { settings, setSettings } = useSettingsStore();
   const { presets, setPresets } = usePresetsStore();
-  const { updateTool, setDiscoveredToolId } = useToolsStore();
+  const { tools, updateTool, setTools, setDiscoveredToolId } = useToolsStore();
   const { logs, addLog } = useLogsStore();
   const { jobs } = useDownloadsStore();
   
@@ -94,7 +94,6 @@ export function PersistenceManager() {
 
     const init = async () => {
       if (initialized.current) return;
-      initialized.current = true;
 
       try {
         await storage.init();
@@ -143,8 +142,21 @@ export function PersistenceManager() {
           addLog({ level: "info", message: `Downloads loaded (${savedDownloads.length})` });
         }
 
+        // Load Tools
+        const savedTools = await storage.getTools<Tool[]>();
+        if (savedTools && Array.isArray(savedTools)) {
+          const currentTools = useToolsStore.getState().tools;
+          const mergedTools = currentTools.map((baseTool) => {
+            const saved = savedTools.find((t) => t.id === baseTool.id);
+            return saved ? { ...baseTool, ...saved, id: baseTool.id, name: baseTool.name, required: baseTool.required } : baseTool;
+          });
+          setTools(mergedTools);
+          addLog({ level: "info", message: `Tools loaded (${mergedTools.length})` });
+        }
+
         // Check Tools
         await checkTools();
+        initialized.current = true;
 
       } catch (e) {
         addLog({ level: "error", message: `Failed to load persistence: ${String(e)}` });
@@ -153,7 +165,7 @@ export function PersistenceManager() {
     };
 
     init();
-  }, [setSettings, setPresets, updateTool, setDiscoveredToolId, addLog]);
+  }, [setSettings, setPresets, setTools, updateTool, setDiscoveredToolId, addLog]);
 
   // Auto-Save Settings
   useEffect(() => {
@@ -215,6 +227,17 @@ export function PersistenceManager() {
     }, 1000); // Debounce 1s
     return () => clearTimeout(timer);
   }, [jobs]);
+
+  // Auto-Save Tools
+  useEffect(() => {
+    if (!initialized.current) return;
+    const timer = setTimeout(() => {
+      storage.saveTools(tools).catch((e) => {
+        useLogsStore.getState().addLog({ level: "error", message: `Failed to save tools: ${String(e)}` });
+      });
+    }, 500);
+    return () => clearTimeout(timer);
+  }, [tools]);
 
   return null; // Logic only component
 }

@@ -2,6 +2,7 @@ import { create } from "zustand";
 
 export type Theme = "system" | "light" | "dark";
 export type FileCollisionAction = "overwrite" | "rename" | "skip";
+export type DownloadsAddMode = "queue" | "start";
 
 export interface Settings {
   // General
@@ -21,6 +22,7 @@ export interface Settings {
   // Behavior
   autoClearFinished: boolean;
   autoCopyFile: boolean;
+  downloadsAddMode: DownloadsAddMode;
 }
 
 interface SettingsState {
@@ -41,6 +43,7 @@ export const DEFAULT_SETTINGS: Settings = {
   tempDir: "",
   autoClearFinished: false,
   autoCopyFile: true,
+  downloadsAddMode: "queue",
 };
 
 export const SETTINGS_KEYS = Object.keys(DEFAULT_SETTINGS) as (keyof Settings)[];

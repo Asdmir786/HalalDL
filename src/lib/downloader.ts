@@ -4,7 +4,7 @@ import { useLogsStore } from "@/store/logs";
 import { usePresetsStore } from "@/store/presets";
 import { useSettingsStore } from "@/store/settings";
 import { appDataDir, join } from "@tauri-apps/api/path";
-import { exists, mkdir } from "@tauri-apps/plugin-fs";
+import { BaseDirectory, exists, mkdir } from "@tauri-apps/plugin-fs";
 import { OutputParser } from "@/lib/output-parser";
 import { copyFilesToClipboard, deleteFile } from "@/lib/commands";
 
@@ -78,12 +78,16 @@ function isYouTubeUrl(url: string): boolean {
 }
 
 async function ensureThumbnailDir(): Promise<string> {
+  if (!(await exists("thumbnails", { baseDir: BaseDirectory.AppData }))) {
+    await mkdir("thumbnails", { baseDir: BaseDirectory.AppData, recursive: true });
+  }
   const dataDir = await appDataDir();
   const thumbsDir = await join(dataDir, "thumbnails");
-  if (!(await exists(thumbsDir))) {
-    await mkdir(thumbsDir, { recursive: true });
-  }
   return thumbsDir;
+}
+
+function thumbnailRelativePathForJob(jobId: string): string {
+  return `thumbnails/${jobId}.jpg`;
 }
 
 function toFileUrl(path: string): string {
@@ -137,9 +141,16 @@ async function generateThumbnailFromMediaUrl(jobId: string, mediaUrl: string) {
   const { addLog } = useLogsStore.getState();
 
   try {
+    updateJob(jobId, {
+      phase: "Generating thumbnail",
+      statusDetail: "Creating thumbnail preview",
+      thumbnailStatus: "generating",
+      thumbnailError: undefined,
+    });
     const ffmpeg = await resolveTool("ffmpeg");
     const thumbsDir = await ensureThumbnailDir();
     const outputPath = await join(thumbsDir, `${jobId}.jpg`);
+    const outputRelativePath = thumbnailRelativePathForJob(jobId);
     const filter = "blackframe=amount=98:threshold=32,select='lt(lavfi.blackframe.pblack,98)',scale=320:-1";
 
     const primary = Command.create(ffmpeg.command, [
@@ -154,8 +165,9 @@ async function generateThumbnailFromMediaUrl(jobId: string, mediaUrl: string) {
     ]);
 
     const primaryOutput = await primary.execute();
-    if (primaryOutput.code === 0 && (await exists(outputPath))) {
+    if (primaryOutput.code === 0 && (await exists(outputRelativePath, { baseDir: BaseDirectory.AppData }))) {
       updateJob(jobId, { thumbnail: toFileUrl(outputPath) });
+      updateJob(jobId, { thumbnailStatus: "ready", statusDetail: "Thumbnail ready" });
       return;
     }
 
@@ -171,14 +183,25 @@ async function generateThumbnailFromMediaUrl(jobId: string, mediaUrl: string) {
     ]);
 
     const fallbackOutput = await fallback.execute();
-    if (fallbackOutput.code === 0 && (await exists(outputPath))) {
+    if (fallbackOutput.code === 0 && (await exists(outputRelativePath, { baseDir: BaseDirectory.AppData }))) {
       updateJob(jobId, { thumbnail: toFileUrl(outputPath) });
+      updateJob(jobId, { thumbnailStatus: "ready", statusDetail: "Thumbnail ready" });
       return;
     }
 
     addLog({ level: "warn", message: "Thumbnail generation failed", jobId });
+    updateJob(jobId, {
+      thumbnailStatus: "failed",
+      thumbnailError: "Could not generate thumbnail",
+      statusDetail: "Thumbnail unavailable (download completed)",
+    });
   } catch (e) {
     addLog({ level: "warn", message: `Thumbnail generation error: ${String(e)}`, jobId });
+    updateJob(jobId, {
+      thumbnailStatus: "failed",
+      thumbnailError: String(e),
+      statusDetail: "Thumbnail unavailable (download completed)",
+    });
   }
 }
 
@@ -300,7 +323,7 @@ export async function startDownload(jobId: string) {
   if (aria2.isLocal) {
     addLog({ level: "info", message: `Using local aria2c: ${aria2.path}`, jobId });
     args.push("--external-downloader", aria2.path);
-    args.push("--external-downloader-args", "-x 16 -s 16 -k 1M --summary-interval=0");
+    args.push("--external-downloader-args", "aria2c:-x 16 -s 16 -k 1M --summary-interval=0");
   } else {
     addLog({ level: "info", message: "Aria2c not found in local bin, checking system PATH...", jobId });
   }
@@ -330,18 +353,57 @@ export async function startDownload(jobId: string) {
 
   const quotedArgs = args.map(arg => arg.includes(' ') ? `"${arg}"` : arg).join(" ");
   addLog({ level: "info", message: `Executing Command:\n${ytDlp.path} ${quotedArgs}`, jobId });
-  updateJob(jobId, { status: "Downloading", progress: 0 });
+  updateJob(jobId, {
+    status: "Downloading",
+    phase: "Resolving formats",
+    statusDetail: "Preparing download",
+    progress: 0,
+    speed: undefined,
+    eta: undefined,
+    thumbnailStatus: "pending",
+    thumbnailError: undefined,
+    fallbackUsed: false,
+    fallbackFormat: undefined,
+  });
 
-  const buildFallbackArgs = (sourceArgs: string[]) => {
+  const buildArgsWithFormat = (sourceArgs: string[], format: string) => {
     const next = [...sourceArgs];
     const formatIndex = next.indexOf("-f");
-    const formatValue = formatIndex !== -1 ? next[formatIndex + 1] : "";
-    const audioOnly =
-      next.includes("-x") ||
-      next.includes("--audio-format") ||
-      (formatValue ? formatValue.startsWith("bestaudio") : false);
     if (formatIndex !== -1) next.splice(formatIndex, 2);
-    next.push("-f", audioOnly ? "bestaudio" : "bestvideo+bestaudio/best");
+    next.push("-f", format);
+    return next;
+  };
+
+  const buildFallbackAttempts = (sourceArgs: string[]) => {
+    const formatIndex = sourceArgs.indexOf("-f");
+    const formatValue = formatIndex !== -1 ? sourceArgs[formatIndex + 1] : "";
+    const audioOnly =
+      sourceArgs.includes("-x") ||
+      sourceArgs.includes("--audio-format") ||
+      (formatValue ? formatValue.startsWith("bestaudio") : false);
+
+    const fallbacks = audioOnly
+      ? ["bestaudio", "best"]
+      : ["bestvideo+bestaudio/best", "best[ext=mp4]/best", "best"];
+
+    return fallbacks.map((fmt) => ({ format: fmt, args: buildArgsWithFormat(sourceArgs, fmt) }));
+  };
+
+  const removeFlagWithValueFromArgs = (sourceArgs: string[], flag: string) => {
+    const next = [...sourceArgs];
+    let index = next.indexOf(flag);
+    while (index !== -1) {
+      next.splice(index, 2);
+      index = next.indexOf(flag);
+    }
+    return next;
+  };
+
+  const stripExternalDownloaderArgs = (sourceArgs: string[]) => {
+    let next = removeFlagWithValueFromArgs(sourceArgs, "--external-downloader");
+    next = removeFlagWithValueFromArgs(next, "--external-downloader-args");
+    next = removeFlagWithValueFromArgs(next, "--downloader");
+    next = removeFlagWithValueFromArgs(next, "--downloader-args");
     return next;
   };
 
@@ -349,6 +411,7 @@ export async function startDownload(jobId: string) {
     const cmd = Command.create(ytDlp.command, runArgs, { env: ytDlpEnv() });
     let lastKnownOutputPath: string | undefined;
     let formatUnavailable = false;
+    let aria2Error = false;
 
     const outputParser = new OutputParser();
     let lastUpdate = 0;
@@ -361,6 +424,22 @@ export async function startDownload(jobId: string) {
       if (!trimmedLine) return;
 
       addLog({ level: "info", message: trimmedLine, jobId });
+
+      if (trimmedLine.startsWith("[download]")) {
+        updateJob(jobId, { phase: "Downloading streams", statusDetail: "Downloading media streams" });
+      } else if (trimmedLine.startsWith("[Merger]")) {
+        updateJob(jobId, {
+          status: "Post-processing",
+          phase: "Merging streams",
+          statusDetail: "Merging audio and video",
+        });
+      } else if (trimmedLine.startsWith("[ffmpeg]") || trimmedLine.startsWith("[VideoConvertor]")) {
+        updateJob(jobId, {
+          status: "Post-processing",
+          phase: "Converting with FFmpeg",
+          statusDetail: "Converting to target format",
+        });
+      }
 
       const now = Date.now();
       const shouldUpdate = now - lastUpdate > UPDATE_INTERVAL;
@@ -386,14 +465,20 @@ export async function startDownload(jobId: string) {
       const trimmedLine = line.replace(/\r/g, "");
       if (!trimmedLine) return;
 
-      addLog({ level: "error", message: `STDERR: ${trimmedLine}`, jobId });
+      const isWarning = /^warning:/i.test(trimmedLine) || /\bwarning\b/i.test(trimmedLine);
+      addLog({ level: isWarning ? "warn" : "error", message: `STDERR: ${trimmedLine}`, jobId });
 
       if (/requested format is not available/i.test(trimmedLine)) {
         formatUnavailable = true;
         addLog({ level: "warn", message: "Requested format is not available, preparing fallback", jobId });
+        updateJob(jobId, {
+          phase: "Resolving formats",
+          statusDetail: "Requested format unavailable, trying adaptive fallback",
+        });
       }
 
-      if (trimmedLine.includes("aria2c") || trimmedLine.includes("downloader")) {
+      if (!isWarning && (trimmedLine.includes("aria2c") || trimmedLine.includes("downloader"))) {
+        aria2Error = true;
         addLog({ level: "error", message: "Downloader specific error detected", jobId });
       }
 
@@ -435,46 +520,91 @@ export async function startDownload(jobId: string) {
       code: number;
       lastKnownOutputPath?: string;
       formatUnavailable: boolean;
+      aria2Error: boolean;
     }>((resolve) => {
       cmd.on("close", (data) => {
         flushStdoutLine(stdoutBuffer);
         flushStderrLine(stderrBuffer);
         const code = typeof data.code === "number" ? data.code : 1;
         addLog({ level: "info", message: `Process finished with code ${code}`, jobId });
-        resolve({ code, lastKnownOutputPath, formatUnavailable });
+        resolve({ code, lastKnownOutputPath, formatUnavailable, aria2Error });
       });
 
       cmd.on("error", (error) => {
         const message = String(error);
         if (message.toLowerCase().includes("invalid utf-8 sequence")) {
           addLog({ level: "warn", message: `Process output decode warning: ${message}`, jobId });
-          resolve({ code: 1, lastKnownOutputPath, formatUnavailable });
+          resolve({ code: 1, lastKnownOutputPath, formatUnavailable, aria2Error });
           return;
         }
         addLog({ level: "error", message: `Process error: ${message}`, jobId });
-        resolve({ code: 1, lastKnownOutputPath, formatUnavailable });
+        resolve({ code: 1, lastKnownOutputPath, formatUnavailable, aria2Error });
       });
 
       cmd.spawn().catch((e) => {
         addLog({ level: "error", message: `Failed to spawn process: ${e}`, jobId });
-        resolve({ code: 1, lastKnownOutputPath, formatUnavailable });
+        resolve({ code: 1, lastKnownOutputPath, formatUnavailable, aria2Error });
       });
     });
   };
 
-  let result = await runDownload(args);
+  const hadExternalDownloader = args.includes("--external-downloader") || args.includes("--downloader");
+  let activeArgs = [...args];
+  let result = await runDownload(activeArgs);
+
+  if (result.code !== 0 && hadExternalDownloader && result.aria2Error) {
+    const nativeArgs = stripExternalDownloaderArgs(activeArgs);
+    const nativeQuoted = nativeArgs.map(arg => arg.includes(" ") ? `"${arg}"` : arg).join(" ");
+    addLog({ level: "warn", message: "aria2c error detected, retrying with native downloader", jobId });
+    addLog({ level: "info", message: `Retrying without external downloader:\n${ytDlp.path} ${nativeQuoted}`, jobId });
+    updateJob(jobId, {
+      phase: "Downloading streams",
+      statusDetail: "Retrying with native downloader",
+    });
+    activeArgs = nativeArgs;
+    result = await runDownload(activeArgs);
+  }
+
   if (result.code !== 0 && result.formatUnavailable) {
-    const fallbackArgs = buildFallbackArgs(args);
-    const fallbackQuoted = fallbackArgs.map(arg => arg.includes(' ') ? `"${arg}"` : arg).join(" ");
-    const fallbackFormatIndex = fallbackArgs.indexOf("-f");
-    const fallbackFormat = fallbackFormatIndex !== -1 ? fallbackArgs[fallbackFormatIndex + 1] : "best";
-    addLog({ level: "warn", message: `Falling back to format: ${fallbackFormat}`, jobId });
-    addLog({ level: "info", message: `Retrying with fallback format:\n${ytDlp.path} ${fallbackQuoted}`, jobId });
-    result = await runDownload(fallbackArgs);
+    const fallbackAttempts = buildFallbackAttempts(activeArgs);
+    let fallbackSucceeded = false;
+
+    for (const [index, attempt] of fallbackAttempts.entries()) {
+      updateJob(jobId, {
+        phase: "Resolving formats",
+        statusDetail: `Trying fallback format ${index + 1}/${fallbackAttempts.length}: ${attempt.format}`,
+      });
+      const fallbackQuoted = attempt.args.map(arg => arg.includes(" ") ? `"${arg}"` : arg).join(" ");
+      addLog({ level: "warn", message: `Falling back to format: ${attempt.format}`, jobId });
+      addLog({ level: "info", message: `Retrying with fallback format:\n${ytDlp.path} ${fallbackQuoted}`, jobId });
+      result = await runDownload(attempt.args);
+      if (result.code === 0) {
+        fallbackSucceeded = true;
+        addLog({ level: "info", message: `Fallback succeeded with format: ${attempt.format}`, jobId });
+        updateJob(jobId, {
+          fallbackUsed: true,
+          fallbackFormat: attempt.format,
+          statusDetail: `Adaptive fallback active (${attempt.format})`,
+        });
+        break;
+      }
+      if (!result.formatUnavailable) {
+        break;
+      }
+    }
+
+    if (!fallbackSucceeded && result.code !== 0 && result.formatUnavailable) {
+      addLog({ level: "error", message: "All fallback formats failed", jobId });
+    }
   }
 
   if (result.code === 0) {
-    updateJob(jobId, { status: "Done", progress: 100 });
+    updateJob(jobId, {
+      status: "Post-processing",
+      phase: "Generating thumbnail",
+      statusDetail: "Finalizing download and generating thumbnail",
+      progress: 100,
+    });
     fetchMetadata(jobId);
 
     setTimeout(() => {
@@ -505,11 +635,19 @@ export async function startDownload(jobId: string) {
         });
       }, 2000);
     }
+
+    updateJob(jobId, { status: "Done", statusDetail: "Completed" });
   } else {
     if (result.formatUnavailable) {
       addLog({ level: "error", message: "Fallback failed: format unavailable after retry", jobId });
     }
-    updateJob(jobId, { status: "Failed" });
+    updateJob(jobId, {
+      status: "Failed",
+      phase: "Resolving formats",
+      statusDetail: result.formatUnavailable
+        ? "Failed to resolve a compatible format"
+        : "Download failed (see logs)",
+    });
   }
 }
 
@@ -519,33 +657,45 @@ export async function fetchMetadata(jobId: string) {
   if (!job) return;
 
   try {
+    updateJob(jobId, {
+      phase: "Generating thumbnail",
+      statusDetail: "Fetching metadata and thumbnail",
+    });
     const ytDlp = await resolveTool("yt-dlp");
-    if (isYouTubeUrl(job.url)) {
-      const cmd = Command.create(ytDlp.command, [
-        "--print",
-        "%(title)s:::%(thumbnail)s",
-        "--skip-download",
-        "--no-warnings",
-        "--flat-playlist",
-        "--no-playlist",
-        "--referer", job.url,
-        job.url
-      ], { env: ytDlpEnv() });
+    const titleAndThumbCmd = Command.create(ytDlp.command, [
+      "--print",
+      "%(title)s:::%(thumbnail)s",
+      "--skip-download",
+      "--no-warnings",
+      "--flat-playlist",
+      "--no-playlist",
+      "--referer", job.url,
+      job.url
+    ], { env: ytDlpEnv() });
 
-      const output = await cmd.execute();
-      
-      if (output.code === 0) {
-        const parts = output.stdout.trim().split(":::");
-        if (parts.length >= 2) {
-          const title = parts[0].trim();
-          const thumbnailUrl = parts[1].trim();
-
-          updateJob(jobId, { 
-            title: title || job.title, 
-            thumbnail: thumbnailUrl || undefined,
-          });
-        }
+    const titleAndThumbOutput = await titleAndThumbCmd.execute();
+    if (titleAndThumbOutput.code === 0) {
+      const parts = titleAndThumbOutput.stdout.trim().split(":::");
+      if (parts.length >= 2) {
+        const title = parts[0].trim();
+        const thumbnailUrl = parts[1].trim();
+        updateJob(jobId, {
+          title: title || job.title,
+          thumbnail: thumbnailUrl || undefined,
+          thumbnailStatus: thumbnailUrl ? "ready" : "pending",
+          thumbnailError: thumbnailUrl ? undefined : "No thumbnail URL available",
+        });
+        // If source provides thumbnail URL (e.g. Instagram), use it to avoid black-frame extraction.
+        if (thumbnailUrl) return;
       }
+    }
+
+    if (isYouTubeUrl(job.url)) {
+      // For YouTube, if no direct thumbnail was returned, avoid ffmpeg frame extraction.
+      updateJob(jobId, {
+        thumbnailStatus: "failed",
+        thumbnailError: "No thumbnail URL available",
+      });
       return;
     }
 
@@ -586,7 +736,17 @@ export async function fetchMetadata(jobId: string) {
         .find(Boolean);
       if (mediaUrl) {
         await generateThumbnailFromMediaUrl(jobId, mediaUrl);
+      } else {
+        updateJob(jobId, {
+          thumbnailStatus: "failed",
+          thumbnailError: "No media URL found for thumbnail generation",
+        });
       }
+    } else {
+      updateJob(jobId, {
+        thumbnailStatus: "failed",
+        thumbnailError: "Failed to fetch media URL",
+      });
     }
   } catch (e) {
     const message = String(e);
@@ -595,5 +755,9 @@ export async function fetchMetadata(jobId: string) {
       return;
     }
     useLogsStore.getState().addLog({ level: "error", message: `[meta] Failed to fetch metadata: ${message}`, jobId });
+    updateJob(jobId, {
+      thumbnailStatus: "failed",
+      thumbnailError: message,
+    });
   }
 }

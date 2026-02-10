@@ -1,0 +1,12 @@
+---
+description: Validate time-sensitive info with current web sources
+alwaysApply: true
+---
+
+# Current-Year Knowledge Rule
+
+- For time-sensitive or external facts (tool versions, API changes, release notes, docs behavior), verify with live web sources before answering.
+- Prefer official sources first (project docs, GitHub releases, vendor docs), then secondary sources if needed.
+- Do not rely only on model memory for "latest/current" questions.
+- Include a brief note of what was checked (source + date relevance) when providing version/release guidance.
+- If web access is unavailable, explicitly say so and label any version/date details as potentially stale.

@@ -1,6 +1,13 @@
 import { create } from "zustand";
 
 export type JobStatus = "Queued" | "Downloading" | "Post-processing" | "Done" | "Failed";
+export type DownloadPhase =
+  | "Resolving formats"
+  | "Downloading streams"
+  | "Merging streams"
+  | "Converting with FFmpeg"
+  | "Generating thumbnail";
+export type ThumbnailStatus = "pending" | "generating" | "ready" | "failed";
 
 export interface DownloadJob {
   id: string;
@@ -11,6 +18,8 @@ export interface DownloadJob {
   speed?: string;
   eta?: string;
   status: JobStatus;
+  phase?: DownloadPhase;
+  statusDetail?: string;
   presetId: string;
   outputPath?: string;
   createdAt: number;
@@ -20,6 +29,10 @@ export interface DownloadJob {
     format?: string;
     downloadDir?: string;
   };
+  thumbnailStatus?: ThumbnailStatus;
+  thumbnailError?: string;
+  fallbackUsed?: boolean;
+  fallbackFormat?: string;
 }
 
 interface DownloadsState {
@@ -45,6 +58,11 @@ export const useDownloadsStore = create<DownloadsState>((set) => ({
           url,
           status: "Queued",
           progress: 0,
+          phase: "Resolving formats",
+          statusDetail: "Waiting to start",
+          thumbnailStatus: "pending",
+          fallbackUsed: false,
+          fallbackFormat: undefined,
           presetId,
           overrides,
           createdAt: now,

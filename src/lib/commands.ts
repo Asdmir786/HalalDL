@@ -22,7 +22,8 @@ function toLocalCommandName(baseName: string): string {
 async function resolveTool(baseName: string): Promise<ToolResolution> {
   try {
     const dataDir = await appDataDir();
-    const localPath = await join(dataDir, "bin", `${baseName}.exe`);
+    const exeSuffix = navigator.userAgent.toLowerCase().includes("windows") ? ".exe" : "";
+    const localPath = await join(dataDir, "bin", `${baseName}${exeSuffix}`);
     if (await exists(localPath)) {
       return { command: toLocalCommandName(baseName), path: localPath, isLocal: true };
     }
@@ -289,6 +290,13 @@ export async function stageManualTool(tool: string, source: string): Promise<str
   return await invoke("stage_manual_tool", { tool, source });
 }
 
+const TOOL_BIN_NAMES: Record<string, { windows: string; unix: string }> = {
+  "yt-dlp": { windows: "yt-dlp.exe", unix: "yt-dlp" },
+  "ffmpeg": { windows: "ffmpeg.exe", unix: "ffmpeg" },
+  "aria2": { windows: "aria2c.exe", unix: "aria2c" },
+  "deno": { windows: "deno.exe", unix: "deno" },
+};
+
 export async function pickFile(): Promise<string | null> {
   const selected = await openDialog({
     multiple: false,
@@ -343,6 +351,30 @@ export async function revealInExplorer(path: string) {
     addLog({ level: "error", message: `Failed to reveal path: ${errorMessage}` });
     toast.error(`Failed to show in Explorer: ${errorMessage}`);
   }
+}
+
+export async function revealToolInExplorer(toolId: string, currentPath?: string) {
+  const preferred = (currentPath || "").trim();
+  if (preferred) {
+    await revealInExplorer(preferred);
+    return;
+  }
+
+  const entry = TOOL_BIN_NAMES[toolId];
+  if (!entry) return;
+  const isWindows = navigator.userAgent.toLowerCase().includes("windows");
+  const fileName = isWindows ? entry.windows : entry.unix;
+
+  const dataDir = await appDataDir();
+  const binDir = await join(dataDir, "bin");
+  const toolPath = await join(binDir, fileName);
+
+  if (await exists(toolPath)) {
+    await revealInExplorer(toolPath);
+    return;
+  }
+
+  await revealInExplorer(binDir);
 }
 
 export async function openFolder(path: string) {

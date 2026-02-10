@@ -1,6 +1,7 @@
 use tauri::Emitter;
 use tauri::Manager;
 use std::fs;
+use std::path::Path;
 use std::path::PathBuf;
 use futures_util::StreamExt;
 
@@ -12,6 +13,57 @@ struct DownloadProgress {
 }
 
 const MAX_DOWNLOAD_RETRIES: u8 = 3;
+
+fn temp_path_for(path: &Path) -> Result<PathBuf, String> {
+    let file_name = path
+        .file_name()
+        .and_then(|name| name.to_str())
+        .ok_or_else(|| format!("Invalid target path: {}", path.display()))?;
+    Ok(path.with_file_name(format!("{}.new", file_name)))
+}
+
+fn backup_path_for(path: &Path) -> Result<PathBuf, String> {
+    let file_name = path
+        .file_name()
+        .and_then(|name| name.to_str())
+        .ok_or_else(|| format!("Invalid target path: {}", path.display()))?;
+    Ok(path.with_file_name(format!("{}.old", file_name)))
+}
+
+fn safe_replace_with_backup(dest: &Path, incoming: &Path) -> Result<(), String> {
+    let backup = backup_path_for(dest)?;
+
+    if backup.exists() {
+        let _ = fs::remove_file(&backup);
+    }
+
+    if dest.exists() {
+        fs::rename(dest, &backup).map_err(|e| {
+            format!(
+                "Failed to backup existing file {} -> {}: {}",
+                dest.display(),
+                backup.display(),
+                e
+            )
+        })?;
+    }
+
+    match fs::rename(incoming, dest) {
+        Ok(()) => Ok(()),
+        Err(e) => {
+            // Best-effort rollback if swapping in the new file failed.
+            if backup.exists() {
+                let _ = fs::rename(&backup, dest);
+            }
+            Err(format!(
+                "Failed to activate new file {} -> {}: {}",
+                incoming.display(),
+                dest.display(),
+                e
+            ))
+        }
+    }
+}
 
 async fn resolve_latest_aria2_zip_url(app_handle: &tauri::AppHandle) -> Result<String, String> {
     let client = reqwest::Client::builder()
@@ -53,6 +105,13 @@ async fn resolve_latest_aria2_zip_url(app_handle: &tauri::AppHandle) -> Result<S
 
 #[tauri::command]
 async fn download_tools(app_handle: tauri::AppHandle, tools: Vec<String>) -> Result<String, String> {
+    #[cfg(not(target_os = "windows"))]
+    {
+        let _ = app_handle;
+        let _ = tools;
+        return Err("download_tools is currently supported on Windows only".to_string());
+    }
+
     let bin_dir = app_handle.path().app_data_dir().map_err(|e: tauri::Error| e.to_string())?.join("bin");
     
     if !bin_dir.exists() {
@@ -116,7 +175,11 @@ fn stage_manual_tool(app_handle: tauri::AppHandle, tool: String, source: String)
         fs::create_dir_all(&bin_dir).map_err(|e| e.to_string())?;
     }
 
-    let normalized_source = source.replace("/", "\\");
+    let normalized_source = if cfg!(target_os = "windows") {
+        source.replace("/", "\\")
+    } else {
+        source
+    };
     let source_path = PathBuf::from(normalized_source);
 
     if !source_path.exists() {
@@ -135,13 +198,21 @@ fn stage_manual_tool(app_handle: tauri::AppHandle, tool: String, source: String)
     };
 
     let dest_path = bin_dir.join(dest_name);
-    fs::copy(&source_path, &dest_path).map_err(|e| format!("Failed to copy file: {}", e))?;
+    let temp_dest = temp_path_for(&dest_path)?;
 
-    let metadata = fs::metadata(&dest_path).map_err(|e| format!("Failed to read copied file: {}", e))?;
+    if temp_dest.exists() {
+        let _ = fs::remove_file(&temp_dest);
+    }
+
+    fs::copy(&source_path, &temp_dest).map_err(|e| format!("Failed to copy file: {}", e))?;
+
+    let metadata = fs::metadata(&temp_dest).map_err(|e| format!("Failed to read copied file: {}", e))?;
     if metadata.len() == 0 {
-        let _ = fs::remove_file(&dest_path);
+        let _ = fs::remove_file(&temp_dest);
         return Err("Copied file is empty".to_string());
     }
+
+    safe_replace_with_backup(&dest_path, &temp_dest)?;
 
     if let Some(sidecar_name) = extra_sidecar {
         if let Some(parent) = source_path.parent() {
@@ -214,7 +285,12 @@ async fn download_file_once(
     let mut downloaded: u64 = 0;
     let mut stream = response.bytes_stream();
     
-    let mut file = fs::File::create(dest).map_err(|e| e.to_string())?;
+    let temp_dest = temp_path_for(dest)?;
+    if temp_dest.exists() {
+        let _ = fs::remove_file(&temp_dest);
+    }
+
+    let mut file = fs::File::create(&temp_dest).map_err(|e| e.to_string())?;
 
     let mut last_percentage = 0.0;
 
@@ -231,6 +307,16 @@ async fn download_file_once(
             }
         }
     }
+
+    file.flush().map_err(|e| e.to_string())?;
+
+    let metadata = fs::metadata(&temp_dest).map_err(|e| e.to_string())?;
+    if metadata.len() == 0 {
+        let _ = fs::remove_file(&temp_dest);
+        return Err("Downloaded file is empty".to_string());
+    }
+
+    safe_replace_with_backup(dest, &temp_dest)?;
 
     Ok(())
 }
@@ -256,15 +342,20 @@ fn extract_from_zip(app_handle: &tauri::AppHandle, tool_name: &str, zip_path: &P
         if targets.iter().any(|&t| filename.to_lowercase() == t.to_lowercase()) {
             let target_name = filename.to_string();
             let dest_file = dest_dir.join(&target_name);
+            let temp_dest = temp_path_for(&dest_file)?;
             
             emit_progress(app_handle, tool_name, 99.0, &format!("Extracting {}...", target_name));
             
             // Create output file
-            let mut outfile = fs::File::create(&dest_file).map_err(|e| format!("Failed to create output file {}: {}", target_name, e))?;
+            if temp_dest.exists() {
+                let _ = fs::remove_file(&temp_dest);
+            }
+            let mut outfile = fs::File::create(&temp_dest).map_err(|e| format!("Failed to create output file {}: {}", target_name, e))?;
             std::io::copy(&mut file, &mut outfile).map_err(|e| format!("Failed to extract file {}: {}", target_name, e))?;
+            outfile.flush().map_err(|e| format!("Failed to flush file {}: {}", target_name, e))?;
             
             // Verify file exists and has size > 0
-            let metadata = fs::metadata(&dest_file).map_err(|e| format!("Failed to read metadata for {}: {}", target_name, e))?;
+            let metadata = fs::metadata(&temp_dest).map_err(|e| format!("Failed to read metadata for {}: {}", target_name, e))?;
             if metadata.len() == 0 {
                 return Err(format!("Extracted file {} is empty", target_name));
             }
@@ -274,9 +365,10 @@ fn extract_from_zip(app_handle: &tauri::AppHandle, tool_name: &str, zip_path: &P
                 use std::os::unix::fs::PermissionsExt;
                 let mut perms = metadata.permissions();
                 perms.set_mode(0o755);
-                fs::set_permissions(&dest_file, perms).map_err(|e| e.to_string())?;
+                fs::set_permissions(&temp_dest, perms).map_err(|e| e.to_string())?;
             }
 
+            safe_replace_with_backup(&dest_file, &temp_dest)?;
             found_targets.push(target_name);
         }
     }

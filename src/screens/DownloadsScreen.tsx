@@ -22,9 +22,9 @@ export function DownloadsScreen() {
   const [selectedPreset, setSelectedPreset] = useState("default");
   
   // Derived state for addMode from settings
-  const addMode = (settings as unknown as { downloadsAddMode?: "queue" | "start" }).downloadsAddMode ?? "queue";
+  const addMode = settings.downloadsAddMode;
   const setAddMode = (mode: "queue" | "start") => {
-    updateSettings({ downloadsAddMode: mode } as unknown as Partial<typeof settings>);
+    updateSettings({ downloadsAddMode: mode });
   };
   
   // Advanced Output Config State

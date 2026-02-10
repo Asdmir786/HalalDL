@@ -1,0 +1,11 @@
+---
+description: Use pnpm check as the default verification command
+alwaysApply: true
+---
+
+# Verification Standard
+
+- Use `pnpm check` as the default verification command after substantive code changes.
+- Treat `pnpm check` as the primary validation step before reporting work complete.
+- If `pnpm check` cannot run (environment/tooling issue), report why and run the closest subset checks possible (for example `pnpm lint`, `pnpm typecheck`, or `pnpm cargo:check`).
+- Include a short note in the response stating whether verification was run and the result.

@@ -58,6 +58,14 @@ export function DownloadItem({
         : "text-blue-500 border-blue-500/20 bg-blue-500/10";
 
   const StatusIcon = statusIcon;
+  const phaseOrder = [
+    "Resolving formats",
+    "Downloading streams",
+    "Merging streams",
+    "Converting with FFmpeg",
+    "Generating thumbnail",
+  ] as const;
+  const phaseIndex = job.phase ? phaseOrder.indexOf(job.phase as (typeof phaseOrder)[number]) : -1;
 
   const handleCopyLink = (url: string) => {
     navigator.clipboard.writeText(url);
@@ -143,6 +151,17 @@ export function DownloadItem({
                         <span className="flex items-center gap-1" title={absolute}>
                             <Clock className="w-3 h-3 opacity-70" /> {relative}
                         </span>
+                        {job.fallbackUsed && (
+                            <>
+                              <span className="w-0.5 h-0.5 rounded-full bg-muted-foreground/50" />
+                              <span
+                                className="rounded-full border border-blue-500/30 bg-blue-500/10 px-1.5 py-0.5 text-[9px] font-semibold text-blue-300"
+                                title={job.fallbackFormat ? `Fallback format: ${job.fallbackFormat}` : "Adaptive fallback used"}
+                              >
+                                Adaptive fallback
+                              </span>
+                            </>
+                        )}
                         {job.outputPath && <span className="w-0.5 h-0.5 rounded-full bg-muted-foreground/50" />}
                         {job.outputPath && (
                             <span className="truncate max-w-[200px] opacity-70" title={job.outputPath}>
@@ -162,13 +181,28 @@ export function DownloadItem({
               <div className="mt-2">
                 {job.status === "Downloading" || job.status === "Post-processing" ? (
                   <div className="flex flex-col gap-1.5 w-full">
+                    <div className="flex items-center justify-between w-full text-[10px] text-muted-foreground">
+                      <span className="truncate">{job.phase || "Preparing"}</span>
+                      <span className="truncate text-right">{job.statusDetail || "Working..."}</span>
+                    </div>
+                    <div className="flex items-center gap-1">
+                      {phaseOrder.map((phase, idx) => (
+                        <div
+                          key={phase}
+                          className={cn(
+                            "h-1 flex-1 rounded-full transition-colors",
+                            idx <= phaseIndex ? "bg-primary/80" : "bg-muted/40"
+                          )}
+                        />
+                      ))}
+                    </div>
                     <div className="flex items-center justify-between w-full text-[10px] font-mono font-medium text-muted-foreground">
                       <span className="text-foreground">{job.speed || "0 KB/s"}</span>
                       <span className="opacity-70">{job.eta || "--:--"}</span>
                     </div>
                     <div className="w-full h-1.5 bg-muted/50 rounded-full overflow-hidden">
                       <motion.div 
-                        className="h-full bg-gradient-to-r from-primary/80 to-primary rounded-full"
+                        className="h-full bg-linear-to-r from-primary/80 to-primary rounded-full"
                         initial={{ width: 0 }}
                         animate={{ width: `${job.progress}%` }}
                         transition={{ duration: 0.5, ease: "easeOut" }}
@@ -176,7 +210,12 @@ export function DownloadItem({
                     </div>
                   </div>
                 ) : (
-                  <div className="flex items-center justify-end gap-1">
+                  <div className="flex items-center justify-between gap-2">
+                    <div className="text-[10px] text-muted-foreground truncate">
+                      {job.thumbnailStatus === "failed"
+                        ? `Thumbnail: ${job.thumbnailError || "Unavailable"}`
+                        : job.statusDetail || ""}
+                    </div>
                     <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-all duration-300 transform translate-x-4 group-hover:translate-x-0">
                       {job.status === "Done" && (
                         <MotionButton

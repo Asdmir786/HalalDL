@@ -1,4 +1,5 @@
 import { Plus, Settings2, ChevronDown, ChevronUp } from "lucide-react";
+import { useMemo } from "react";
 import { MotionButton } from "@/components/motion/MotionButton";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectGroup, SelectItem, SelectLabel, SelectSeparator, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -28,6 +29,8 @@ interface DownloadInputSectionProps {
   defaultDownloadDir: string;
 }
 
+const GROUP_ORDER = ["Recommended", "Compatibility", "Editors", "Editors Pro", "Web", "Video", "Audio", "Other", "Custom"] as const;
+
 export function DownloadInputSection({
   url, setUrl, onAdd,
   selectedPreset, onPresetChange, presets,
@@ -39,25 +42,27 @@ export function DownloadInputSection({
   isCustomPreset,
   defaultDownloadDir
 }: DownloadInputSectionProps) {
-  const groupOrder = ["Recommended", "Compatibility", "Editors", "Editors Pro", "Web", "Video", "Audio", "Other", "Custom"];
-
   const getGroupAndLabel = (preset: Preset): { group: string; label: string } => {
     const parts = preset.name.split(" — ");
     if (parts.length >= 2) return { group: parts[0], label: parts.slice(1).join(" — ") };
     return { group: preset.isBuiltIn ? "Other" : "Custom", label: preset.name };
   };
 
-  const grouped = presets.reduce<Record<string, Array<{ preset: Preset; label: string }>>>((acc, preset) => {
-    const { group, label } = getGroupAndLabel(preset);
-    acc[group] = acc[group] ?? [];
-    acc[group].push({ preset, label });
-    return acc;
-  }, {});
+  const { grouped, orderedGroups } = useMemo(() => {
+    const groupedMap = presets.reduce<Record<string, Array<{ preset: Preset; label: string }>>>((acc, preset) => {
+      const { group, label } = getGroupAndLabel(preset);
+      acc[group] = acc[group] ?? [];
+      acc[group].push({ preset, label });
+      return acc;
+    }, {});
 
-  const orderedGroups = [
-    ...groupOrder.filter((g) => (grouped[g]?.length ?? 0) > 0),
-    ...Object.keys(grouped).filter((g) => !groupOrder.includes(g)).sort(),
-  ];
+    const ordered = [
+      ...GROUP_ORDER.filter((g) => (groupedMap[g]?.length ?? 0) > 0),
+      ...Object.keys(groupedMap).filter((g) => !GROUP_ORDER.includes(g as (typeof GROUP_ORDER)[number])).sort(),
+    ];
+
+    return { grouped: groupedMap, orderedGroups: ordered };
+  }, [presets]);
 
   return (
     <div className="flex flex-col gap-3 bg-muted/30 p-3 rounded-xl border border-muted/50 shadow-sm glass-card">
@@ -77,14 +82,14 @@ export function DownloadInputSection({
             <SelectTrigger className="w-[140px] bg-background border-muted shadow-sm focus:ring-1 h-10">
               <SelectValue placeholder="Preset" />
             </SelectTrigger>
-            <SelectContent className="max-h-[300px] overflow-y-auto">
+            <SelectContent className="max-h-[300px] overflow-y-auto" position="popper" sideOffset={6} align="start">
               <SelectItem value="custom" className="font-semibold text-primary">
                 ✨ Custom Configuration
               </SelectItem>
               <SelectSeparator />
               {orderedGroups.map((group) => (
                 <SelectGroup key={group}>
-                  <SelectLabel className="text-[10px] uppercase tracking-wider text-muted-foreground/80 sticky top-0 bg-popover z-10 py-1.5">
+                  <SelectLabel className="text-[10px] uppercase tracking-wider text-muted-foreground/80 py-1.5">
                     {group}
                   </SelectLabel>
                   {(grouped[group] ?? []).map(({ preset, label }) => (

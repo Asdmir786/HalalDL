@@ -40,10 +40,12 @@ import {
 export function UpgradePrompt() {
   const [open, setOpen] = useState(false);
   const [isDownloading, setIsDownloading] = useState(false);
+  const [downloadComplete, setDownloadComplete] = useState(false);
   const [isFinishing, setIsFinishing] = useState(false);
   const [progress, setProgress] = useState(0);
   const [logs, setLogs] = useState<string[]>([]);
   const [error, setError] = useState<string | null>(null);
+  const [hasShownFullReadyPrompt, setHasShownFullReadyPrompt] = useState(false);
   
   // Track which tools are selected for download
   const [selectedTools, setSelectedTools] = useState<string[]>([]);
@@ -52,10 +54,18 @@ export function UpgradePrompt() {
   const { addLog } = useLogsStore();
   const isFullMode = import.meta.env.VITE_APP_MODE === 'FULL';
   
-  // Check if we have strictly required tools missing (yt-dlp)
-  const hasMissingRequired = tools.some((t) => t.status === "Missing" && t.required);
-  // If we have required missing tools, or we are in Full Mode, the dialog is mandatory.
-  const isMandatory = isFullMode || hasMissingRequired;
+  const missingTools = tools.filter((t) => t.status === "Missing");
+  const hasMissingRequired = missingTools.some((t) => t.required);
+  const allToolsChecked = tools.length > 0 && tools.every((t) => t.status !== "Checking");
+  const hasMissingForMode = isFullMode ? missingTools.length > 0 : hasMissingRequired;
+  const isMandatory = hasMissingForMode;
+  const showFullModeReadyState =
+    isFullMode &&
+    allToolsChecked &&
+    !hasMissingForMode &&
+    !isDownloading &&
+    !downloadComplete &&
+    !error;
 
   const totalSize = selectedTools.reduce((acc, id) => acc + (TOOL_SIZES[id] || 0), 0);
 
@@ -64,6 +74,7 @@ export function UpgradePrompt() {
     if (!open) {
       const timer = setTimeout(() => {
         setIsDownloading(false);
+        setDownloadComplete(false);
         setProgress(0);
         setLogs([]);
         setError(null);
@@ -73,22 +84,39 @@ export function UpgradePrompt() {
   }, [open]);
 
   useEffect(() => {
-    const missingTools = tools.filter((t) => t.status === "Missing");
-    
+    if (!allToolsChecked) return;
+
     if (missingTools.length > 0) {
        const timer = setTimeout(() => {
-         setSelectedTools(prev => {
-           if (prev.length === 0) return missingTools.map(t => t.id);
-           return prev;
+         const missingIds = missingTools.map((t) => t.id);
+         setSelectedTools((prev) => {
+           if (prev.length === 0) return missingIds;
+           // Keep previous user picks only if still missing; add any newly-missing required tools.
+           const stillMissing = prev.filter((id) => missingIds.includes(id));
+           const requiredMissing = missingTools.filter((t) => t.required).map((t) => t.id);
+           return Array.from(new Set([...stillMissing, ...requiredMissing]));
          });
          setOpen(true);
        }, 2500);
        return () => clearTimeout(timer);
     }
-  }, [tools]);
+
+    if (isFullMode && !hasShownFullReadyPrompt) {
+      const timer = setTimeout(() => {
+        setSelectedTools([]);
+        setOpen(true);
+        setHasShownFullReadyPrompt(true);
+      }, 500);
+      return () => clearTimeout(timer);
+    }
+  }, [allToolsChecked, hasShownFullReadyPrompt, isFullMode, missingTools]);
 
   useEffect(() => {
-    const unlisten = listen<DownloadProgress>("download-progress", (event) => {
+    let disposed = false;
+    let cleanup: (() => void) | null = null;
+
+    void listen<DownloadProgress>("download-progress", (event) => {
+      if (disposed) return;
       setProgress(event.payload.percentage);
       
       if (event.payload.status && event.payload.status !== "Downloading...") {
@@ -102,10 +130,17 @@ export function UpgradePrompt() {
           message: `[${event.payload.tool}] ${event.payload.status}`,
         });
       }
+    }).then((fn) => {
+      if (disposed) {
+        fn();
+      } else {
+        cleanup = fn;
+      }
     });
 
     return () => {
-      unlisten.then(fn => fn());
+      disposed = true;
+      if (cleanup) cleanup();
     };
   }, [addLog]);
 
@@ -151,15 +186,19 @@ export function UpgradePrompt() {
 
   const handleUpgrade = async () => {
     if (selectedTools.length === 0) {
-      setOpen(false);
+      if (!isMandatory) {
+        setOpen(false);
+      }
       return;
     }
 
     setIsDownloading(true);
+    setDownloadComplete(false);
     setError(null);
     try {
       await invoke("download_tools", { tools: selectedTools });
       setProgress(100);
+      setDownloadComplete(true);
       addLog({
         level: "info",
         message: "All selected tools downloaded and ready",
@@ -169,6 +208,7 @@ export function UpgradePrompt() {
         error instanceof Error ? error.message : String(error);
       setError(message);
       setIsDownloading(false);
+      setDownloadComplete(false);
       addLog({
         level: "error",
         message: `Tool download failed: ${message}`,
@@ -176,8 +216,15 @@ export function UpgradePrompt() {
     }
   };
 
+  const handleStartNow = () => {
+    setOpen(false);
+  };
+
   const toggleTool = (id: string) => {
-    setSelectedTools(prev => 
+    const tool = tools.find((t) => t.id === id);
+    if (tool?.required && tool.status === "Missing") return;
+
+    setSelectedTools(prev =>
       prev.includes(id) ? prev.filter(t => t !== id) : [...prev, id]
     );
   };
@@ -202,7 +249,7 @@ export function UpgradePrompt() {
       >
         <div className="relative bg-background/90 backdrop-blur-2xl border border-white/10 rounded-xl overflow-hidden">
           {/* Animated Gradient Border Top */}
-          <div className="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-primary via-purple-500 to-primary animate-gradient-x" />
+          <div className="absolute top-0 left-0 right-0 h-1 bg-linear-to-r from-primary via-purple-500 to-primary animate-gradient-x" />
           
           <div className="p-6 pb-2">
             <DialogHeader className="mb-4">
@@ -215,10 +262,14 @@ export function UpgradePrompt() {
                 </div>
                 <div>
                   <DialogTitle className="text-lg font-bold tracking-tight">
-                    {isDownloading ? "Installing Components" : "Setup Required"}
+                    {isDownloading ? "Installing Components" : showFullModeReadyState ? "Setup Complete" : "Setup Required"}
                   </DialogTitle>
                   <p className="text-xs text-muted-foreground font-medium mt-0.5">
-                    {isDownloading ? "Optimizing your environment..." : "Missing dependencies detected"}
+                    {isDownloading
+                      ? "Optimizing your environment..."
+                      : showFullModeReadyState
+                        ? "All required tools are already available"
+                        : "Missing dependencies detected"}
                   </p>
                 </div>
               </div>
@@ -261,7 +312,7 @@ export function UpgradePrompt() {
                       )}
                     </div>
                     {/* Fade out bottom */}
-                    <div className="absolute bottom-0 left-0 right-0 h-8 bg-gradient-to-t from-black/40 to-transparent" />
+                    <div className="absolute bottom-0 left-0 right-0 h-8 bg-linear-to-t from-black/40 to-transparent" />
                   </div>
                 </motion.div>
               ) : error ? (
@@ -279,44 +330,75 @@ export function UpgradePrompt() {
                   animate={{ opacity: 1 }}
                   className="space-y-4"
                 >
-                  <div className="grid grid-cols-1 gap-2">
-                    {tools.map(tool => {
-                      const isMissing = tool.status === "Missing";
-                      const isSelected = selectedTools.includes(tool.id);
-                      
-                      return (
-                        <div 
-                          key={tool.id} 
-                          className={`group flex items-center justify-between p-3 rounded-xl border transition-all duration-300 ${
-                            isSelected 
-                              ? "bg-primary/5 border-primary/20 shadow-[0_0_10px_rgba(var(--primary),0.05)]" 
-                              : "bg-muted/20 border-white/5 opacity-60"
-                          } ${!isMissing ? "opacity-50 pointer-events-none grayscale" : "cursor-pointer hover:bg-muted/40"}`}
-                          onClick={() => isMissing && toggleTool(tool.id)}
-                        >
-                          <div className="flex items-center gap-3">
-                            <Checkbox 
-                              checked={!isMissing ? true : isSelected}
-                              className="border-white/20 data-[state=checked]:bg-primary data-[state=checked]:border-primary"
-                            />
-                            <div className="flex flex-col">
-                              <span className="font-semibold text-sm flex items-center gap-2">
-                                {tool.name}
-                                {!isMissing && <CheckCircle2 className="w-3 h-3 text-green-500" />}
-                              </span>
-                              <span className="text-[10px] text-muted-foreground">
-                                {TOOL_SIZES[tool.id]}MB • {tool.id === "yt-dlp" ? "Core" : "Extension"}
-                              </span>
-                            </div>
+                  {showFullModeReadyState ? (
+                    <div className="rounded-xl border border-green-500/20 bg-green-500/5 p-4">
+                      <div className="mb-3 flex items-center gap-2 text-green-400">
+                        <CheckCircle2 className="h-4 w-4" />
+                        <span className="text-sm font-semibold">All components are already installed</span>
+                      </div>
+                      <p className="mb-3 text-xs text-muted-foreground">
+                        No downloads are needed. You can start using the app immediately.
+                      </p>
+                      <div className="grid grid-cols-1 gap-2">
+                        {tools.map((tool) => (
+                          <div
+                            key={tool.id}
+                            className="flex items-center justify-between rounded-lg border border-white/10 bg-muted/20 px-3 py-2 text-xs"
+                          >
+                            <span className="font-medium">{tool.name}</span>
+                            <span className="text-muted-foreground">{tool.version || "Detected"}</span>
                           </div>
-                          
-                          {isMissing && (
-                             <div className={`w-2 h-2 rounded-full ${isSelected ? "bg-primary shadow-[0_0_8px_rgba(var(--primary),0.8)]" : "bg-muted-foreground/30"}`} />
-                          )}
-                        </div>
-                      );
-                    })}
-                  </div>
+                        ))}
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="grid grid-cols-1 gap-2">
+                      {tools.map(tool => {
+                        const isMissing = tool.status === "Missing";
+                        const isSelected = selectedTools.includes(tool.id);
+                        const isRequiredMissing = isMissing && tool.required;
+                        
+                        return (
+                          <div 
+                            key={tool.id} 
+                            className={`group flex items-center justify-between p-3 rounded-xl border transition-all duration-300 ${
+                              isSelected 
+                                ? "bg-primary/5 border-primary/20 shadow-[0_0_10px_rgba(var(--primary),0.05)]" 
+                                : "bg-muted/20 border-white/5 opacity-60"
+                            } ${
+                              !isMissing
+                                ? "opacity-50 pointer-events-none grayscale"
+                                : isRequiredMissing
+                                  ? "cursor-not-allowed"
+                                  : "cursor-pointer hover:bg-muted/40"
+                            }`}
+                            onClick={() => isMissing && !isRequiredMissing && toggleTool(tool.id)}
+                          >
+                            <div className="flex items-center gap-3">
+                              <Checkbox 
+                                checked={!isMissing ? true : isSelected}
+                                disabled={isRequiredMissing}
+                                className="border-white/20 data-[state=checked]:bg-primary data-[state=checked]:border-primary"
+                              />
+                              <div className="flex flex-col">
+                                <span className="font-semibold text-sm flex items-center gap-2">
+                                  {tool.name}
+                                  {!isMissing && <CheckCircle2 className="w-3 h-3 text-green-500" />}
+                                </span>
+                                <span className="text-[10px] text-muted-foreground">
+                                  {TOOL_SIZES[tool.id]}MB • {tool.id === "yt-dlp" ? "Core" : "Extension"}
+                                </span>
+                              </div>
+                            </div>
+                            
+                            {isMissing && (
+                               <div className={`w-2 h-2 rounded-full ${isSelected ? "bg-primary shadow-[0_0_8px_rgba(var(--primary),0.8)]" : "bg-muted-foreground/30"}`} />
+                            )}
+                          </div>
+                        );
+                      })}
+                    </div>
+                  )}
                 </motion.div>
               )}
             </AnimatePresence>
@@ -330,18 +412,29 @@ export function UpgradePrompt() {
                     Skip
                   </MotionButton>
                 )}
-                <MotionButton 
-                  type="button" 
-                  onClick={handleUpgrade} 
-                  disabled={selectedTools.length === 0} 
-                  className="flex-1 gap-2 h-11 rounded-xl bg-primary text-primary-foreground hover:bg-primary/90 shadow-lg shadow-primary/20"
-                >
-                  <Download className="w-4 h-4" />
-                  Install ({totalSize}MB)
-                </MotionButton>
+                {showFullModeReadyState ? (
+                  <MotionButton
+                    type="button"
+                    onClick={handleStartNow}
+                    className="flex-1 gap-2 h-11 rounded-xl bg-green-600 text-white hover:bg-green-700 shadow-lg shadow-green-500/20"
+                  >
+                    <CheckCircle2 className="w-4 h-4" />
+                    Start Now
+                  </MotionButton>
+                ) : (
+                  <MotionButton 
+                    type="button" 
+                    onClick={handleUpgrade} 
+                    disabled={selectedTools.length === 0} 
+                    className="flex-1 gap-2 h-11 rounded-xl bg-primary text-primary-foreground hover:bg-primary/90 shadow-lg shadow-primary/20"
+                  >
+                    <Download className="w-4 h-4" />
+                    Install ({totalSize}MB)
+                  </MotionButton>
+                )}
               </>
             )}
-            {isDownloading && progress === 100 && (
+            {isDownloading && downloadComplete && (
               <MotionButton 
                 type="button" 
                 onClick={handleFinish} 

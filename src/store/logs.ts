@@ -26,27 +26,7 @@ export interface LogsState {
 }
 
 export const useLogsStore = create<LogsState>((set) => ({
-  logs: [
-    {
-      id: "1",
-      timestamp: new Date().toISOString(),
-      level: "info",
-      message: "Application started",
-    },
-    {
-      id: "2",
-      timestamp: new Date().toISOString(),
-      level: "command",
-      message: "Checking for yt-dlp binary...",
-      command: "yt-dlp --version",
-    },
-    {
-      id: "3",
-      timestamp: new Date().toISOString(),
-      level: "info",
-      message: "yt-dlp version 2025.01.15 detected at C:\\Users\\halal\\AppData\\Local\\yt-dlp.exe",
-    },
-  ],
+  logs: [],
   loadStatus: "idle",
   loadError: undefined,
   activeJobId: undefined,
@@ -97,5 +77,11 @@ export const useLogsStore = create<LogsState>((set) => ({
       }));
     }
   },
-  clearLogs: () => set({ logs: [] }),
+  clearLogs: () => {
+    set({ logs: [] });
+    // Persist immediately to avoid old logs reappearing on fast app close.
+    void storage.saveLogs<LogEntry[]>([]).catch(() => {
+      void 0;
+    });
+  },
 }));
