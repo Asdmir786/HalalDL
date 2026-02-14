@@ -1,54 +1,155 @@
 import { useToolsStore, type Tool } from "@/store/tools";
-import { 
-  Card, 
-  CardContent, 
-  CardDescription, 
-  CardHeader, 
-  CardTitle,
-  CardFooter
-} from "@/components/ui/card";
 import { MotionButton } from "@/components/motion/MotionButton";
 import { FadeInStagger, FadeInItem } from "@/components/motion/StaggerContainer";
 import { Badge } from "@/components/ui/badge";
-import { Switch } from "@/components/ui/switch";
-import { Input } from "@/components/ui/input";
-import { 
-  CheckCircle2, 
-  XCircle, 
-  RefreshCcw, 
-  Search, 
-  Info,
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogFooter,
+} from "@/components/ui/dialog";
+import { Progress } from "@/components/ui/progress";
+import {
+  CheckCircle2,
+  RefreshCcw,
   ExternalLink,
   FolderOpen,
-  ShieldCheck,
-  Package,
-  Loader2
+  Wrench,
+  Loader2,
+  MoreHorizontal,
+  Download,
+  ArrowRight,
+  Search,
+  Info,
+  RotateCcw,
+  Terminal,
+  ChevronRight,
+  Sparkles,
+  AlertCircle,
 } from "lucide-react";
 
+import { cn } from "@/lib/utils";
 import { open as openUrl } from "@tauri-apps/plugin-shell";
+import { listen } from "@tauri-apps/api/event";
 import { relaunch } from "@tauri-apps/plugin-process";
-import { downloadTools, fetchLatestAria2Version, fetchLatestDenoVersion, fetchLatestFfmpegVersion, fetchLatestYtDlpVersion, isUpdateAvailable, pickFile, checkYtDlpVersion, checkFfmpegVersion, checkAria2Version, checkDenoVersion, stageManualTool, revealToolInExplorer } from "@/lib/commands";
+import {
+  downloadTools,
+  fetchLatestAria2Version,
+  fetchLatestDenoVersion,
+  fetchLatestFfmpegVersion,
+  fetchLatestYtDlpVersion,
+  isUpdateAvailable,
+  pickFile,
+  checkYtDlpVersion,
+  checkFfmpegVersion,
+  checkAria2Version,
+  checkDenoVersion,
+  stageManualTool,
+  revealToolInExplorer,
+  upgradeYtDlpViaPip,
+  type ToolCheckResult,
+} from "@/lib/commands";
 import { toast } from "sonner";
-import { useLayoutEffect, useRef, useState, type UIEvent } from "react";
+import {
+  useCallback,
+  useEffect,
+  useLayoutEffect,
+  useRef,
+  useState,
+  type UIEvent,
+} from "react";
 import { useLogsStore } from "@/store/logs";
+import { AnimatePresence, motion } from "framer-motion";
+
+/* ── Constants ── */
 
 const TOOL_URLS: Record<string, string> = {
   "yt-dlp": "https://github.com/yt-dlp/yt-dlp",
-  "ffmpeg": "https://ffmpeg.org/",
-  "aria2": "https://aria2.github.io/",
-  "deno": "https://deno.land/"
+  ffmpeg: "https://ffmpeg.org/",
+  aria2: "https://aria2.github.io/",
+  deno: "https://deno.land/",
 };
+
+const TOOL_DESCRIPTIONS: Record<string, string> = {
+  "yt-dlp": "Core media downloader engine",
+  ffmpeg: "Audio & video processing",
+  aria2: "Multi-connection downloads",
+  deno: "JavaScript runtime for challenges",
+};
+
+interface DownloadProgress {
+  tool: string;
+  percentage: number;
+  status: string;
+}
+
+/* ── Component ── */
 
 export function ToolsScreen() {
   const { tools, updateTool } = useToolsStore();
   const addLog = useLogsStore((state) => state.addLog);
   const isLite = import.meta.env.VITE_APP_MODE !== "FULL";
-  const [checkingTools, setCheckingTools] = useState<Record<string, boolean>>({});
-  const [checkingLatest, setCheckingLatest] = useState<Record<string, boolean>>({});
-  const [isUpdatingTools, setIsUpdatingTools] = useState<Record<string, boolean>>({});
+  const [busyTools, setBusyTools] = useState<Record<string, boolean>>({});
+  const [isCheckingAll, setIsCheckingAll] = useState(false);
   const scrollRef = useRef<HTMLDivElement>(null);
   const scrollTopRef = useRef(0);
 
+  /* ── Progress modal state ── */
+  const [modalOpen, setModalOpen] = useState(false);
+  const [modalProgress, setModalProgress] = useState(0);
+  const [modalLogs, setModalLogs] = useState<string[]>([]);
+  const [modalError, setModalError] = useState<string | null>(null);
+  const [modalDone, setModalDone] = useState(false);
+  const [isRestarting, setIsRestarting] = useState(false);
+  const [modalTitle, setModalTitle] = useState("Updating Tools");
+
+  const resetModal = useCallback(() => {
+    setModalProgress(0);
+    setModalLogs([]);
+    setModalError(null);
+    setModalDone(false);
+    setIsRestarting(false);
+  }, []);
+
+  /* ── Listen to download-progress events ── */
+  useEffect(() => {
+    let disposed = false;
+    let cleanup: (() => void) | null = null;
+
+    void listen<DownloadProgress>("download-progress", (event) => {
+      if (disposed) return;
+      setModalProgress(event.payload.percentage);
+
+      if (event.payload.status && event.payload.status !== "Downloading...") {
+        setModalLogs((prev) => {
+          const newLog = `[${event.payload.tool}] ${event.payload.status}`;
+          if (prev[prev.length - 1] === newLog) return prev;
+          return [...prev, newLog];
+        });
+      }
+    }).then((fn) => {
+      if (disposed) {
+        fn();
+      } else {
+        cleanup = fn;
+      }
+    });
+
+    return () => {
+      disposed = true;
+      if (cleanup) cleanup();
+    };
+  }, []);
+
+  /* ── Scroll preservation ── */
   useLayoutEffect(() => {
     const el = scrollRef.current;
     if (!el) return;
@@ -59,378 +160,622 @@ export function ToolsScreen() {
     scrollTopRef.current = event.currentTarget.scrollTop;
   };
 
-  const testTool = async (id: string) => {
-    setCheckingTools(prev => ({ ...prev, [id]: true }));
+  /* ── Per-tool: detect installed + check latest in one go ── */
+  const refreshTool = async (id: string) => {
+    setBusyTools((prev) => ({ ...prev, [id]: true }));
     updateTool(id, { status: "Checking" });
-    let version: string | null = null;
-    
     try {
+      let result: ToolCheckResult | null = null;
       switch (id) {
-        case "yt-dlp": version = await checkYtDlpVersion(); break;
-        case "ffmpeg": version = await checkFfmpegVersion(); break;
-        case "aria2": version = await checkAria2Version(); break;
-        case "deno": version = await checkDenoVersion(); break;
+        case "yt-dlp":
+          result = await checkYtDlpVersion();
+          break;
+        case "ffmpeg":
+          result = await checkFfmpegVersion();
+          break;
+        case "aria2":
+          result = await checkAria2Version();
+          break;
+        case "deno":
+          result = await checkDenoVersion();
+          break;
       }
-      
-      updateTool(id, { 
-        status: version ? "Detected" : "Missing", 
-        version: version || undefined 
+      updateTool(id, {
+        status: result ? "Detected" : "Missing",
+        version: result?.version,
+        variant: result?.variant,
       });
-      
-      if (version) {
-        addLog({ level: "info", message: `${id} detected: ${version}` });
-        toast.success(`${id} detected: ${version}`);
-      } else {
-        addLog({ level: "warn", message: `${id} not found` });
-        toast.error(`${id} not found`);
-      }
-    } catch (e: unknown) {
-      addLog({ level: "error", message: `Tool test failed (${id}): ${e instanceof Error ? e.message : String(e)}` });
-      updateTool(id, { status: "Missing" });
-      toast.error(`Error testing ${id}`);
-    } finally {
-      setCheckingTools(prev => ({ ...prev, [id]: false }));
-    }
-  };
 
-  const checkLatestForTool = async (tool: Tool) => {
-    setCheckingLatest((prev) => ({ ...prev, [tool.id]: true }));
-    try {
       let latest: string | null = null;
-      switch (tool.id) {
-        case "yt-dlp": latest = await fetchLatestYtDlpVersion(); break;
-        case "ffmpeg": latest = await fetchLatestFfmpegVersion(); break;
-        case "aria2": latest = await fetchLatestAria2Version(); break;
-        case "deno": latest = await fetchLatestDenoVersion(); break;
+      switch (id) {
+        case "yt-dlp":
+          latest = await fetchLatestYtDlpVersion();
+          break;
+        case "ffmpeg":
+          latest = await fetchLatestFfmpegVersion();
+          break;
+        case "aria2":
+          latest = await fetchLatestAria2Version();
+          break;
+        case "deno":
+          latest = await fetchLatestDenoVersion();
+          break;
       }
-
-      updateTool(tool.id, {
+      const current = useToolsStore.getState().tools.find((t) => t.id === id);
+      updateTool(id, {
         latestVersion: latest || undefined,
-        updateAvailable: isUpdateAvailable(tool.version, latest || undefined),
+        updateAvailable: isUpdateAvailable(
+          current?.version,
+          latest || undefined
+        ),
         latestCheckedAt: Date.now(),
       });
-
-      if (latest) {
-        addLog({ level: "info", message: `${tool.id} latest: ${latest}` });
-        toast.success(`${tool.id} latest: ${latest}`);
-      } else {
-        addLog({ level: "warn", message: `Could not fetch latest for ${tool.id}` });
-        toast.error(`Could not fetch latest for ${tool.id}`);
-      }
-    } catch (e: unknown) {
-      addLog({ level: "error", message: `Latest check failed (${tool.id}): ${e instanceof Error ? e.message : String(e)}` });
-      toast.error(`Error checking latest for ${tool.id}`);
+    } catch (e) {
+      addLog({
+        level: "error",
+        message: `Refresh failed (${id}): ${e instanceof Error ? e.message : String(e)}`,
+      });
+      updateTool(id, { status: "Missing" });
+      toast.error(`Error refreshing ${id}`);
     } finally {
-      setCheckingLatest((prev) => ({ ...prev, [tool.id]: false }));
+      setBusyTools((prev) => ({ ...prev, [id]: false }));
     }
   };
 
-  const checkAllLatest = async () => {
-    const list = useToolsStore.getState().tools;
-    await Promise.all(list.map((t) => checkLatestForTool(t)));
+  const checkAll = async () => {
+    setIsCheckingAll(true);
+    try {
+      await Promise.all(tools.map((t) => refreshTool(t.id)));
+    } finally {
+      setIsCheckingAll(false);
+    }
   };
 
-  const updateToolNow = async (tool: Tool) => {
-    if (isLite) {
-      toast.info("Lite Mode: open the tool website to update.");
-      await openUrl(TOOL_URLS[tool.id]);
-      return;
-    }
+  /* ── Install / Update (with progress modal) ── */
+  const installOrUpdate = async (tool: Tool) => {
+    resetModal();
+    setModalTitle(
+      tool.status === "Missing"
+        ? `Installing ${tool.name}`
+        : `Updating ${tool.name}`
+    );
+    setModalOpen(true);
+    setBusyTools((prev) => ({ ...prev, [tool.id]: true }));
 
-    setIsUpdatingTools((prev) => ({ ...prev, [tool.id]: true }));
     try {
       await downloadTools([tool.id]);
-      addLog({ level: "info", message: `${tool.id} updated` });
-      toast.success(`${tool.id} updated`);
-      await testTool(tool.id);
-      await checkLatestForTool({ ...tool, version: useToolsStore.getState().tools.find((t) => t.id === tool.id)?.version });
-      toast.info("Restarting app to apply tool updates...");
-      await relaunch();
-    } catch (e: unknown) {
+      setModalProgress(100);
+      setModalDone(true);
+      addLog({ level: "info", message: `${tool.id} installed/updated` });
+    } catch (e) {
       const message = e instanceof Error ? e.message : String(e);
-      addLog({ level: "error", message: `Tool update failed (${tool.id}): ${message}` });
-      toast.error(`Update failed: ${message}`);
+      setModalError(message);
+      addLog({
+        level: "error",
+        message: `Install failed (${tool.id}): ${message}`,
+      });
     } finally {
-      setIsUpdatingTools((prev) => ({ ...prev, [tool.id]: false }));
+      setBusyTools((prev) => ({ ...prev, [tool.id]: false }));
     }
   };
 
-  const ToolCard = ({ tool }: { tool: Tool }) => {
-    const canInstallOrUpdate = isLite || tool.status === "Missing" || tool.updateAvailable === true;
+  /* ── pip upgrade for yt-dlp (with progress modal) ── */
+  const handlePipUpgrade = async (tool: Tool) => {
+    resetModal();
+    setModalTitle("Upgrading yt-dlp via pip");
+    setModalOpen(true);
+    setBusyTools((prev) => ({ ...prev, [tool.id]: true }));
+    setModalLogs(["Running pip install --upgrade yt-dlp..."]);
+
+    try {
+      const ok = await upgradeYtDlpViaPip();
+      if (ok) {
+        setModalProgress(100);
+        setModalDone(true);
+        setModalLogs((prev) => [...prev, "pip upgrade completed"]);
+      } else {
+        setModalError("pip upgrade failed — check logs for details");
+      }
+    } catch (e) {
+      setModalError(
+        `pip upgrade error: ${e instanceof Error ? e.message : String(e)}`
+      );
+    } finally {
+      setBusyTools((prev) => ({ ...prev, [tool.id]: false }));
+    }
+  };
+
+  /* ── Update All (with progress modal) ── */
+  const updateAll = async () => {
+    const toUpdate = tools.filter(
+      (t) => t.updateAvailable || t.status === "Missing"
+    );
+    if (toUpdate.length === 0) return;
+
+    resetModal();
+    setModalTitle(`Updating ${toUpdate.length} tool${toUpdate.length > 1 ? "s" : ""}`);
+    setModalOpen(true);
+
+    const ids = toUpdate.map((t) => t.id);
+    setBusyTools((prev) => {
+      const next = { ...prev };
+      for (const id of ids) next[id] = true;
+      return next;
+    });
+
+    try {
+      await downloadTools(ids);
+      setModalProgress(100);
+      setModalDone(true);
+    } catch (e) {
+      setModalError(
+        `Update failed: ${e instanceof Error ? e.message : String(e)}`
+      );
+    } finally {
+      setBusyTools((prev) => {
+        const next = { ...prev };
+        for (const id of ids) next[id] = false;
+        return next;
+      });
+    }
+  };
+
+  /* ── Modal: restart app ── */
+  const handleRestart = async () => {
+    setIsRestarting(true);
+    try {
+      await relaunch();
+    } catch (e) {
+      toast.error(
+        `Restart failed: ${e instanceof Error ? e.message : String(e)}`
+      );
+      setIsRestarting(false);
+      // Restart failed — refresh all tools so UI reflects new binaries
+      handleDismiss();
+      toast.info("Refreshing tool status...");
+      await checkAll();
+    }
+  };
+
+  /* ── Modal: dismiss on error/completion ── */
+  const handleDismiss = () => {
+    setModalOpen(false);
+    resetModal();
+  };
+
+  /* ── Manual path (file picker) ── */
+  const handleManualPath = async (tool: Tool) => {
+    const path = await pickFile();
+    if (!path) return;
+    try {
+      const stagedPath = await stageManualTool(tool.id, path);
+      updateTool(tool.id, { path: stagedPath, mode: "Manual" });
+      addLog({ level: "info", message: `${tool.id} path set manually` });
+      toast.success(`${tool.id} path updated`);
+    } catch (e) {
+      toast.error(
+        `Failed: ${e instanceof Error ? e.message : String(e)}`
+      );
+    }
+  };
+
+  const resetToAuto = (tool: Tool) => {
+    updateTool(tool.id, { mode: "Auto", path: undefined });
+    toast.success(`${tool.name} reset to auto-detect`);
+  };
+
+  /* ── Derived state ── */
+  const actionableCount = tools.filter(
+    (t) => t.updateAvailable || t.status === "Missing"
+  ).length;
+  const anyBusy = Object.values(busyTools).some(Boolean);
+
+  /* ── Tool Row ── */
+  const ToolRow = ({ tool, isLast }: { tool: Tool; isLast: boolean }) => {
+    const isBusy = busyTools[tool.id];
+    const isPip = tool.variant === "pip";
 
     return (
-    <Card className="flex flex-col h-full overflow-hidden hover:shadow-md transition-shadow duration-200 border-muted/60 glass-card">
-      <CardHeader className="pb-3">
-        <div className="flex justify-between items-start gap-2">
-          <div className="space-y-1 min-w-0">
-            <CardTitle className="text-lg flex items-center gap-2 truncate">
-              {tool.name}
+      <div
+        className={cn(
+          "flex items-center gap-4 px-5 py-4 transition-colors hover:bg-muted/30",
+          !isLast && "border-b border-white/[0.04]"
+        )}
+      >
+        {/* Status indicator + info */}
+        <div className="flex items-center gap-3.5 flex-1 min-w-0">
+          <div
+            className={cn(
+              "w-2.5 h-2.5 rounded-full shrink-0 ring-4 transition-colors",
+              tool.status === "Detected"
+                ? "bg-green-500 ring-green-500/10"
+                : tool.status === "Checking"
+                  ? "bg-yellow-500 ring-yellow-500/10 animate-pulse"
+                  : "bg-red-500 ring-red-500/10"
+            )}
+          />
+          <div className="min-w-0">
+            <div className="flex items-center gap-2">
+              <span className="font-semibold text-sm">{tool.name}</span>
               {tool.required && (
-                <Badge variant="secondary" className="text-[9px] uppercase h-4 px-1 flex-shrink-0">
+                <Badge
+                  variant="secondary"
+                  className="text-[9px] uppercase h-4 px-1.5 font-bold"
+                >
                   Required
                 </Badge>
               )}
-            </CardTitle>
-            <CardDescription className="font-mono text-[10px] truncate opacity-70">
-              <span>Installed: {tool.version || "Unknown"}</span>
-              {tool.latestVersion && <span className="ml-2">Latest: {tool.latestVersion}</span>}
-            </CardDescription>
-          </div>
-          <div className="flex items-center gap-2 flex-shrink-0">
-            {tool.updateAvailable && (
-              <Badge variant="secondary" className="gap-1">
-                <RefreshCcw className="w-3 h-3" />
-                <span className="text-[10px]">Update</span>
-              </Badge>
-            )}
-            <Badge
-              variant={tool.status === "Detected" ? "default" : tool.status === "Checking" ? "outline" : "destructive"}
-              className="gap-1"
-            >
-              {tool.status === "Detected" ? <CheckCircle2 className="w-3 h-3" /> : tool.status === "Checking" ? <RefreshCcw className="w-3 h-3 animate-spin" /> : <XCircle className="w-3 h-3" />}
-              <span className="text-[10px]">{tool.status}</span>
-            </Badge>
-          </div>
-        </div>
-      </CardHeader>
-      <CardContent className="flex-1 space-y-4">
-        <div className="space-y-2">
-          <label className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">Detection Mode</label>
-          <div className="flex items-center justify-between gap-4 bg-muted/30 p-2 rounded-md">
-            <div className="flex items-center space-x-2">
-              <Switch 
-                checked={tool.mode === "Auto"} 
-                onCheckedChange={(checked) => updateTool(tool.id, { mode: checked ? "Auto" : "Manual" })}
-              />
-              <span className="text-xs font-medium">Auto-detect</span>
+              {tool.variant && tool.status === "Detected" && (
+                <Badge
+                  variant="outline"
+                  className="text-[9px] h-4 px-1.5 font-medium text-muted-foreground border-white/10"
+                >
+                  {tool.variant}
+                </Badge>
+              )}
             </div>
-            {tool.mode === "Manual" && (
-                  <MotionButton 
-                    variant="ghost" 
-                    size="sm" 
-                    className="h-6 text-[10px] px-2"
-                    onClick={async () => {
-                      const path = await pickFile();
-                      if (path) {
-                        try {
-                          const stagedPath = await stageManualTool(tool.id, path);
-                          updateTool(tool.id, { path: stagedPath });
-                          addLog({ level: "info", message: `${tool.id} path set (Browse)` });
-                          toast.success(`${tool.id} path set`);
-                        } catch (e) {
-                          const message = e instanceof Error ? e.message : String(e);
-                          addLog({ level: "error", message: `Failed to set ${tool.id} path (Browse): ${message}` });
-                          toast.error(`Failed to set path: ${message}`);
-                        }
-                      }
-                    }}
-                  >
-                    <Search className="w-3 h-3 mr-1" />
-                    Browse
-                  </MotionButton>
-                )}
+            <p className="text-[11px] text-muted-foreground truncate">
+              {tool.mode === "Manual" && tool.path
+                ? tool.path
+                : TOOL_DESCRIPTIONS[tool.id]}
+            </p>
           </div>
         </div>
 
-        {tool.mode === "Manual" && (
-          <div className="space-y-1.5">
-            <label className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">Custom Path</label>
-            <Input 
-              value={tool.path || ""} 
-              placeholder="C:\\path\\to\\tool.exe" 
-              className="h-8 text-xs bg-background"
-              onChange={(e) => updateTool(tool.id, { path: e.target.value })}
-              onKeyDown={async (e) => {
-                if (e.key !== "Enter") return;
-                const raw = (e.currentTarget.value || "").trim();
-                if (!raw) return;
-                try {
-                  const stagedPath = await stageManualTool(tool.id, raw);
-                  updateTool(tool.id, { path: stagedPath });
-                  addLog({ level: "info", message: `${tool.id} path set (Manual input)` });
-                  toast.success(`${tool.id} path set`);
-                } catch (err) {
-                  const message = err instanceof Error ? err.message : String(err);
-                  addLog({ level: "error", message: `Failed to set ${tool.id} path (Manual input): ${message}` });
-                  toast.error(`Failed to set path: ${message}`);
-                }
-              }}
-            />
-          </div>
-        )}
-
-        <div className="pt-2">
-          <div className="text-[10px] text-muted-foreground flex flex-col gap-1">
-            <span className="uppercase font-bold opacity-50">Current Path</span>
-            <span className="text-foreground font-mono truncate bg-muted/50 p-1.5 rounded text-[10px]">
-              {tool.path || "System Default"}
+        {/* Version info */}
+        <div className="hidden sm:flex items-center gap-2 text-xs font-mono shrink-0">
+          {tool.version ? (
+            <>
+              <span className="text-muted-foreground">{tool.version}</span>
+              {tool.updateAvailable && tool.latestVersion && (
+                <>
+                  <ArrowRight className="w-3 h-3 text-primary" />
+                  <span className="text-primary font-semibold">
+                    {tool.latestVersion}
+                  </span>
+                </>
+              )}
+            </>
+          ) : tool.status === "Checking" ? (
+            <span className="text-muted-foreground/50 text-[11px]">
+              Checking...
             </span>
-          </div>
+          ) : (
+            <span className="text-muted-foreground/40 italic text-[11px]">
+              Not installed
+            </span>
+          )}
         </div>
-      </CardContent>
-      <CardFooter className="bg-muted/30 border-t p-2 flex gap-2">
-        <MotionButton 
-          variant="outline" 
-          size="sm" 
-          className="flex-1 h-8 text-xs"
-          onClick={() => testTool(tool.id)}
-          disabled={checkingTools[tool.id]}
-        >
-          {checkingTools[tool.id] ? (
-            <Loader2 className="w-3.5 h-3.5 mr-2 animate-spin" />
+
+        {/* Primary action + overflow */}
+        <div className="flex items-center gap-1.5 shrink-0">
+          {isBusy ? (
+            <MotionButton
+              variant="outline"
+              size="sm"
+              className="h-8 px-3 text-xs"
+              disabled
+            >
+              <Loader2 className="w-3.5 h-3.5 animate-spin mr-1.5" />
+              Working
+            </MotionButton>
+          ) : tool.status === "Missing" ? (
+            <MotionButton
+              size="sm"
+              className="h-8 px-3 text-xs"
+              onClick={() => installOrUpdate(tool)}
+            >
+              <Download className="w-3.5 h-3.5 mr-1.5" />
+              Install
+            </MotionButton>
+          ) : tool.updateAvailable ? (
+            <MotionButton
+              size="sm"
+              className="h-8 px-3 text-xs"
+              onClick={() =>
+                isPip ? handlePipUpgrade(tool) : installOrUpdate(tool)
+              }
+            >
+              <RefreshCcw className="w-3.5 h-3.5 mr-1.5" />
+              {isPip ? "pip upgrade" : "Update"}
+            </MotionButton>
           ) : (
-            <RefreshCcw className="w-3.5 h-3.5 mr-2" />
+            <Badge
+              variant="outline"
+              className="h-7 px-2.5 gap-1.5 text-[11px] font-medium text-green-500 border-green-500/20 bg-green-500/5"
+            >
+              <CheckCircle2 className="w-3 h-3" />
+              Ready
+            </Badge>
           )}
-          {checkingTools[tool.id] ? "Checking..." : "Check Status"}
-        </MotionButton>
-        <MotionButton
-          variant="outline"
-          size="sm"
-          className="h-8 px-3 text-xs"
-          onClick={() => checkLatestForTool(tool)}
-          disabled={checkingLatest[tool.id]}
-          title="Check latest available version"
-        >
-          {checkingLatest[tool.id] ? (
-            <Loader2 className="w-3.5 h-3.5 animate-spin" />
-          ) : (
-            <span>Latest</span>
-          )}
-        </MotionButton>
-        <MotionButton
-          variant={tool.updateAvailable ? "default" : "outline"}
-          size="sm"
-          className="h-8 px-3 text-xs"
-          disabled={!canInstallOrUpdate || isUpdatingTools[tool.id]}
-          onClick={() => updateToolNow(tool)}
-          title={isLite ? "Lite Mode: open download page" : "Download and replace tool"}
-        >
-          {isUpdatingTools[tool.id] ? (
-            <Loader2 className="w-3.5 h-3.5 animate-spin" />
-          ) : (
-            <span>{isLite ? "Get" : tool.status === "Missing" ? "Install" : "Update"}</span>
-          )}
-        </MotionButton>
-        <MotionButton 
-          variant="ghost" 
-          size="icon" 
-          className="h-8 w-8"
-          onClick={() => openUrl(TOOL_URLS[tool.id])}
-          title="Visit Website"
-        >
-          <ExternalLink className="w-3.5 h-3.5" />
-        </MotionButton>
-        <MotionButton
-          variant="ghost"
-          size="icon"
-          className="h-8 w-8"
-          onClick={() => revealToolInExplorer(tool.id, tool.path)}
-          title="Show in Explorer"
-        >
-          <FolderOpen className="w-3.5 h-3.5" />
-        </MotionButton>
-      </CardFooter>
-    </Card>
+
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <MotionButton variant="ghost" size="icon" className="h-8 w-8">
+                <MoreHorizontal className="w-4 h-4" />
+              </MotionButton>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end" className="w-52">
+              <DropdownMenuItem
+                onClick={() => refreshTool(tool.id)}
+                disabled={isBusy}
+              >
+                <RefreshCcw className="w-3.5 h-3.5 mr-2" />
+                Refresh status
+              </DropdownMenuItem>
+              {isPip && tool.updateAvailable && (
+                <DropdownMenuItem
+                  onClick={() => installOrUpdate(tool)}
+                  disabled={isBusy}
+                >
+                  <Download className="w-3.5 h-3.5 mr-2" />
+                  Download standalone instead
+                </DropdownMenuItem>
+              )}
+              {!isPip && tool.id === "yt-dlp" && tool.updateAvailable && (
+                <DropdownMenuItem
+                  onClick={() => handlePipUpgrade(tool)}
+                  disabled={isBusy}
+                >
+                  <RefreshCcw className="w-3.5 h-3.5 mr-2" />
+                  Update via pip
+                </DropdownMenuItem>
+              )}
+              <DropdownMenuSeparator />
+              <DropdownMenuItem onClick={() => openUrl(TOOL_URLS[tool.id])}>
+                <ExternalLink className="w-3.5 h-3.5 mr-2" />
+                Visit website
+              </DropdownMenuItem>
+              <DropdownMenuItem
+                onClick={() => revealToolInExplorer(tool.id, tool.path)}
+              >
+                <FolderOpen className="w-3.5 h-3.5 mr-2" />
+                Open in Explorer
+              </DropdownMenuItem>
+              <DropdownMenuSeparator />
+              <DropdownMenuItem onClick={() => handleManualPath(tool)}>
+                <Search className="w-3.5 h-3.5 mr-2" />
+                Set custom path...
+              </DropdownMenuItem>
+              {tool.mode === "Manual" && (
+                <DropdownMenuItem onClick={() => resetToAuto(tool)}>
+                  <RotateCcw className="w-3.5 h-3.5 mr-2" />
+                  Reset to auto-detect
+                </DropdownMenuItem>
+              )}
+            </DropdownMenuContent>
+          </DropdownMenu>
+        </div>
+      </div>
     );
   };
 
+  /* ── Progress Modal ── */
+  const isDownloading = modalOpen && !modalDone && !modalError;
+
   return (
-    <div className="flex flex-col h-full bg-background max-w-6xl mx-auto w-full" role="main">
+    <div
+      className="flex flex-col h-full bg-background max-w-6xl mx-auto w-full"
+      role="main"
+    >
       <FadeInStagger className="flex flex-col h-full">
+        {/* ── Header ── */}
         <FadeInItem>
-          <header className="p-8 pb-6 flex flex-col gap-6">
+          <header className="p-8 pb-6">
             <div className="flex items-center justify-between">
               <div className="space-y-1">
-                <h2 className="text-3xl font-bold tracking-tight">Tools Manager</h2>
+                <h2 className="text-3xl font-bold tracking-tight flex items-center gap-2">
+                  <Wrench className="w-8 h-8 text-primary" />
+                  Tools
+                </h2>
                 <p className="text-muted-foreground text-sm">
-                  Manage external binaries required for media downloading and processing.
+                  External binaries for downloading and processing media.
                 </p>
               </div>
-              <div className="flex items-center gap-3">
+              <div className="flex items-center gap-2">
                 <MotionButton
                   variant="outline"
                   size="sm"
-                  onClick={checkAllLatest}
+                  onClick={checkAll}
+                  disabled={isCheckingAll || anyBusy}
                   className="h-9"
                 >
-                  <RefreshCcw className="w-4 h-4 mr-2" />
-                  Check Updates
+                  {isCheckingAll ? (
+                    <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                  ) : (
+                    <RefreshCcw className="w-4 h-4 mr-2" />
+                  )}
+                  Check All
                 </MotionButton>
-                <div className="bg-muted/20 border border-muted/30 rounded-xl p-3 flex items-center gap-3 glass-card">
-                  <div className="p-2 bg-primary/10 rounded-lg text-primary">
-                    <ShieldCheck className="w-5 h-5" />
-                  </div>
-                  <div className="flex flex-col">
-                    <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest">
-                      Environment
-                    </span>
-                    <span className="text-sm font-semibold">
-                      {isLite ? "Lite Mode" : "Full Mode"}
-                    </span>
-                  </div>
-                </div>
+                {actionableCount > 0 && (
+                  <MotionButton
+                    size="sm"
+                    onClick={updateAll}
+                    disabled={anyBusy}
+                    className="h-9"
+                  >
+                    <Download className="w-4 h-4 mr-2" />
+                    Update All
+                  </MotionButton>
+                )}
               </div>
             </div>
           </header>
         </FadeInItem>
 
+        {/* ── Tool list ── */}
         <FadeInItem className="flex-1 min-h-0">
           <div
             ref={scrollRef}
             onScroll={handleScroll}
             className="h-full overflow-auto px-8 pb-8"
           >
-          <div className="space-y-8">
-          {isLite && (
-            <div className="rounded-xl border border-muted/40 bg-muted/20 p-3 flex items-start gap-3">
-              <div className="p-2 rounded-lg bg-primary/10 text-primary">
-                <Info className="w-4 h-4" />
+            <div className="space-y-4">
+              <div className="rounded-xl border border-white/[0.06] bg-background/40 backdrop-blur-sm overflow-hidden shadow-sm">
+                {tools.map((tool, i) => (
+                  <ToolRow
+                    key={tool.id}
+                    tool={tool}
+                    isLast={i === tools.length - 1}
+                  />
+                ))}
               </div>
-              <div className="flex-1">
-                <div className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-                  Lite Mode
+
+              {isLite && (
+                <div className="rounded-xl border border-muted/40 bg-muted/10 p-4 flex items-center gap-3 text-xs text-muted-foreground">
+                  <Info className="w-4 h-4 shrink-0 text-primary" />
+                  <span>
+                    <strong className="text-foreground">Lite Mode</strong>{" "}
+                    &mdash; Tools are downloaded to the app directory. Use the
+                    overflow menu to set custom paths or visit tool websites.
+                  </span>
                 </div>
-                <div className="text-xs text-muted-foreground">
-                  Tools aren’t bundled in Lite mode. Use system PATH or set custom paths below.
-                </div>
-              </div>
+              )}
             </div>
-          )}
-
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-2 xl:grid-cols-2 gap-6">
-            {tools.map((tool) => (
-              <ToolCard key={tool.id} tool={tool} />
-            ))}
-          </div>
-
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            <Card className="bg-muted/20 border-dashed">
-               <CardHeader>
-                  <CardTitle className="text-sm flex items-center gap-2">
-                    <Package className="w-4 h-4 text-muted-foreground" />
-                    Bypass Mode
-                  </CardTitle>
-                  <CardDescription className="text-xs">
-                    If you have issues with auto-detection, you can force the app to use specific binary versions.
-                  </CardDescription>
-               </CardHeader>
-            </Card>
-            <Card className="bg-muted/20 border-dashed">
-               <CardHeader>
-                  <CardTitle className="text-sm flex items-center gap-2">
-                    <RefreshCcw className="w-4 h-4 text-muted-foreground" />
-                    Auto-Repair
-                  </CardTitle>
-                  <CardDescription className="text-xs">
-                    The app automatically checks for missing tools on startup and prompts for installation.
-                  </CardDescription>
-               </CardHeader>
-            </Card>
-          </div>
-        </div>
           </div>
         </FadeInItem>
       </FadeInStagger>
+
+      {/* ── Download Progress Modal ── */}
+      <Dialog
+        open={modalOpen}
+        onOpenChange={(val) => {
+          if (isDownloading) return; // prevent closing during download
+          if (!val) handleDismiss();
+        }}
+      >
+        <DialogContent
+          className="sm:max-w-[440px] border-none bg-transparent shadow-2xl p-0 overflow-hidden"
+          onInteractOutside={(e) => {
+            if (isDownloading) e.preventDefault();
+          }}
+          onEscapeKeyDown={(e) => {
+            if (isDownloading) e.preventDefault();
+          }}
+        >
+          <div className="relative bg-background/90 backdrop-blur-2xl border border-white/10 rounded-xl overflow-hidden">
+            {/* Gradient top accent */}
+            <div className="absolute top-0 left-0 right-0 h-1 bg-linear-to-r from-primary via-purple-500 to-primary animate-gradient-x" />
+
+            <div className="p-6 pb-2">
+              <DialogHeader className="mb-4">
+                <div className="flex items-center gap-3">
+                  <div className="relative">
+                    <div className="absolute inset-0 bg-primary/20 blur-lg rounded-full animate-pulse" />
+                    <div className="relative p-2.5 bg-primary/10 rounded-xl border border-primary/20">
+                      <Sparkles className="w-5 h-5 text-primary" />
+                    </div>
+                  </div>
+                  <div>
+                    <DialogTitle className="text-lg font-bold tracking-tight">
+                      {modalTitle}
+                    </DialogTitle>
+                    <p className="text-xs text-muted-foreground font-medium mt-0.5">
+                      {modalDone
+                        ? "Download complete — restart to apply"
+                        : modalError
+                          ? "Something went wrong"
+                          : "Downloading and extracting..."}
+                    </p>
+                  </div>
+                </div>
+              </DialogHeader>
+
+              <AnimatePresence mode="wait">
+                {modalError ? (
+                  <motion.div
+                    key="error"
+                    initial={{ opacity: 0 }}
+                    animate={{ opacity: 1 }}
+                    className="flex items-start gap-3 p-4 rounded-xl bg-destructive/5 border border-destructive/20 text-destructive text-sm"
+                  >
+                    <AlertCircle className="w-5 h-5 shrink-0 mt-0.5" />
+                    <p>{modalError}</p>
+                  </motion.div>
+                ) : (
+                  <motion.div
+                    key="progress"
+                    initial={{ opacity: 0, y: 10 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    exit={{ opacity: 0, y: -10 }}
+                    className="space-y-6 py-2"
+                  >
+                    {/* Progress bar */}
+                    <div className="relative pt-2">
+                      <div className="flex justify-between items-end mb-2">
+                        <span className="text-xs font-mono text-muted-foreground uppercase tracking-wider">
+                          Progress
+                        </span>
+                        <span className="text-2xl font-bold tabular-nums tracking-tight">
+                          {Math.round(modalProgress)}%
+                        </span>
+                      </div>
+                      <Progress
+                        value={modalProgress}
+                        className="h-1.5 bg-muted/50"
+                      />
+                    </div>
+
+                    {/* Log output */}
+                    <div className="bg-black/40 rounded-lg border border-white/5 p-4 font-mono text-[10px] space-y-2 h-[120px] overflow-hidden relative">
+                      <div className="absolute top-2 right-2 opacity-50">
+                        <Terminal className="w-3 h-3" />
+                      </div>
+                      <div className="space-y-1.5 opacity-80">
+                        {modalLogs.slice(-4).map((log, i) => (
+                          <motion.div
+                            key={`${log}-${i}`}
+                            initial={{ opacity: 0, x: -5 }}
+                            animate={{ opacity: 1, x: 0 }}
+                            className="flex gap-2 items-center"
+                          >
+                            <ChevronRight className="w-2.5 h-2.5 text-primary shrink-0" />
+                            <span className="truncate">{log}</span>
+                          </motion.div>
+                        ))}
+                        {modalLogs.length === 0 && (
+                          <span className="text-muted-foreground italic">
+                            Initializing download...
+                          </span>
+                        )}
+                      </div>
+                      <div className="absolute bottom-0 left-0 right-0 h-8 bg-linear-to-t from-black/40 to-transparent" />
+                    </div>
+                  </motion.div>
+                )}
+              </AnimatePresence>
+            </div>
+
+            <DialogFooter className="p-6 pt-2 flex-col sm:flex-row gap-2 bg-muted/5">
+              {modalDone && (
+                <MotionButton
+                  type="button"
+                  onClick={handleRestart}
+                  disabled={isRestarting}
+                  className="w-full gap-2 h-12 rounded-xl bg-green-600 hover:bg-green-700 text-white shadow-lg shadow-green-500/20"
+                >
+                  {isRestarting ? (
+                    <Loader2 className="w-4 h-4 animate-spin" />
+                  ) : (
+                    <CheckCircle2 className="w-4 h-4" />
+                  )}
+                  {isRestarting ? "Restarting..." : "Restart to Apply"}
+                </MotionButton>
+              )}
+              {modalError && (
+                <MotionButton
+                  type="button"
+                  variant="outline"
+                  onClick={handleDismiss}
+                  className="w-full h-11 rounded-xl"
+                >
+                  Dismiss
+                </MotionButton>
+              )}
+            </DialogFooter>
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

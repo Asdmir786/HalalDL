@@ -46,6 +46,16 @@
           "name": "local-deno",
           "cmd": "$APPDATA/bin/deno.exe",
           "args": true
+        },
+        {
+          "name": "pip",
+          "cmd": "pip",
+          "args": true
+        },
+        {
+          "name": "pip3",
+          "cmd": "pip3",
+          "args": true
         }
       ]
     },

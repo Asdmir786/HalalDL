@@ -5,6 +5,7 @@ import { usePresetsStore } from "@/store/presets";
 import { useSettingsStore } from "@/store/settings";
 import { appDataDir, join } from "@tauri-apps/api/path";
 import { BaseDirectory, exists, mkdir } from "@tauri-apps/plugin-fs";
+import { convertFileSrc } from "@tauri-apps/api/core";
 import { OutputParser } from "@/lib/output-parser";
 import { copyFilesToClipboard, deleteFile } from "@/lib/commands";
 
@@ -90,50 +91,11 @@ function thumbnailRelativePathForJob(jobId: string): string {
   return `thumbnails/${jobId}.jpg`;
 }
 
-function toFileUrl(path: string): string {
-  const normalized = path.replace(/\\/g, "/");
-  if (/^[a-zA-Z]:\//.test(normalized)) {
-    return `file:///${normalized}`;
-  }
-  if (normalized.startsWith("/")) {
-    return `file://${normalized}`;
-  }
-  return `file://${normalized}`;
-}
-
-function stripFileUriPrefix(path: string): string {
-  const lower = path.toLowerCase();
-  if (!lower.startsWith("file:")) return path;
-
-  let out = path.replace(/^file:\/\//i, "").replace(/^file:\//i, "");
-  out = out.replace(/^localhost\//i, "");
-  if (/^\/[a-zA-Z]:\//.test(out)) out = out.slice(1);
-
-  try {
-    out = decodeURIComponent(out);
-  } catch {
-    void 0;
-  }
-
-  return out;
-}
-
-async function resolveLocalThumbnailPath(thumbnail: string): Promise<string | null> {
-  if (!thumbnail) return null;
-  if (/^https?:/i.test(thumbnail)) return null;
-
-  let candidate = thumbnail;
-  if (/^file:/i.test(candidate)) {
-    candidate = stripFileUriPrefix(candidate);
-  }
-
+/** Convert a relative thumbnail path (e.g. "thumbnails/abc.jpg") to an asset URL the webview can load. */
+async function thumbnailAssetUrl(relPath: string): Promise<string> {
   const dataDir = await appDataDir();
-  const thumbsDir = await join(dataDir, "thumbnails");
-  if (candidate.toLowerCase().startsWith(thumbsDir.toLowerCase())) {
-    return candidate;
-  }
-
-  return null;
+  const absPath = await join(dataDir, relPath);
+  return convertFileSrc(absPath);
 }
 
 async function generateThumbnailFromMediaUrl(jobId: string, mediaUrl: string) {
@@ -153,6 +115,9 @@ async function generateThumbnailFromMediaUrl(jobId: string, mediaUrl: string) {
     const outputRelativePath = thumbnailRelativePathForJob(jobId);
     const filter = "blackframe=amount=98:threshold=32,select='lt(lavfi.blackframe.pblack,98)',scale=320:-1";
 
+    addLog({ level: "info", message: `[thumb] ffmpeg primary: extracting frame from ${mediaUrl.substring(0, 150)}...`, jobId });
+    addLog({ level: "info", message: `[thumb] ffmpeg output path: ${outputPath}`, jobId });
+
     const primary = Command.create(ffmpeg.command, [
       "-y",
       "-i",
@@ -165,11 +130,21 @@ async function generateThumbnailFromMediaUrl(jobId: string, mediaUrl: string) {
     ]);
 
     const primaryOutput = await primary.execute();
+    addLog({ level: "info", message: `[thumb] ffmpeg primary exit code: ${primaryOutput.code}`, jobId });
+    if (primaryOutput.stderr.trim()) {
+      // ffmpeg outputs to stderr by default — only log last ~300 chars
+      const stderrTail = primaryOutput.stderr.trim().slice(-300);
+      addLog({ level: "info", message: `[thumb] ffmpeg primary stderr (tail): ${stderrTail}`, jobId });
+    }
+
     if (primaryOutput.code === 0 && (await exists(outputRelativePath, { baseDir: BaseDirectory.AppData }))) {
-      updateJob(jobId, { thumbnail: toFileUrl(outputPath) });
-      updateJob(jobId, { thumbnailStatus: "ready", statusDetail: "Thumbnail ready" });
+      addLog({ level: "info", message: `[thumb] Primary extraction succeeded`, jobId });
+      const assetUrl = await thumbnailAssetUrl(outputRelativePath);
+      updateJob(jobId, { thumbnail: assetUrl, thumbnailStatus: "ready", statusDetail: "Thumbnail ready" });
       return;
     }
+
+    addLog({ level: "warn", message: `[thumb] Primary extraction failed, trying simple fallback`, jobId });
 
     const fallback = Command.create(ffmpeg.command, [
       "-y",
@@ -183,20 +158,27 @@ async function generateThumbnailFromMediaUrl(jobId: string, mediaUrl: string) {
     ]);
 
     const fallbackOutput = await fallback.execute();
+    addLog({ level: "info", message: `[thumb] ffmpeg fallback exit code: ${fallbackOutput.code}`, jobId });
+    if (fallbackOutput.stderr.trim()) {
+      const stderrTail = fallbackOutput.stderr.trim().slice(-300);
+      addLog({ level: "info", message: `[thumb] ffmpeg fallback stderr (tail): ${stderrTail}`, jobId });
+    }
+
     if (fallbackOutput.code === 0 && (await exists(outputRelativePath, { baseDir: BaseDirectory.AppData }))) {
-      updateJob(jobId, { thumbnail: toFileUrl(outputPath) });
-      updateJob(jobId, { thumbnailStatus: "ready", statusDetail: "Thumbnail ready" });
+      addLog({ level: "info", message: `[thumb] Fallback extraction succeeded`, jobId });
+      const assetUrl = await thumbnailAssetUrl(outputRelativePath);
+      updateJob(jobId, { thumbnail: assetUrl, thumbnailStatus: "ready", statusDetail: "Thumbnail ready" });
       return;
     }
 
-    addLog({ level: "warn", message: "Thumbnail generation failed", jobId });
+    addLog({ level: "warn", message: `[thumb] Both ffmpeg extraction attempts failed`, jobId });
     updateJob(jobId, {
       thumbnailStatus: "failed",
       thumbnailError: "Could not generate thumbnail",
       statusDetail: "Thumbnail unavailable (download completed)",
     });
   } catch (e) {
-    addLog({ level: "warn", message: `Thumbnail generation error: ${String(e)}`, jobId });
+    addLog({ level: "warn", message: `[thumb] Exception: ${String(e)}`, jobId });
     updateJob(jobId, {
       thumbnailStatus: "failed",
       thumbnailError: String(e),
@@ -206,15 +188,16 @@ async function generateThumbnailFromMediaUrl(jobId: string, mediaUrl: string) {
 }
 
 export async function cleanupThumbnailByJobId(jobId: string) {
-  const { jobs } = useDownloadsStore.getState();
   const { addLog } = useLogsStore.getState();
-  const job = jobs.find((j) => j.id === jobId);
-  if (!job?.thumbnail) return;
-
   try {
-    const localPath = await resolveLocalThumbnailPath(job.thumbnail);
-    if (!localPath) return;
-    await deleteFile(localPath);
+    const dataDir = await appDataDir();
+    for (const ext of ["jpg", "webp", "png", "jpeg"]) {
+      const relPath = `thumbnails/${jobId}.${ext}`;
+      if (await exists(relPath, { baseDir: BaseDirectory.AppData })) {
+        const absPath = await join(dataDir, relPath);
+        await deleteFile(absPath);
+      }
+    }
   } catch (e) {
     addLog({ level: "warn", message: `Thumbnail cleanup failed: ${String(e)}`, jobId });
   }
@@ -330,13 +313,35 @@ export async function startDownload(jobId: string) {
 
   // Add output template
   const downloadDir = job.overrides?.downloadDir || settings.defaultDownloadDir;
-  const filenameTemplate = job.overrides?.filenameTemplate || "%(title)s.%(ext)s";
+  const outputFormatIndex = args.indexOf("-f");
+  const outputFormatValue = outputFormatIndex !== -1 ? args[outputFormatIndex + 1] ?? "" : "";
+  const inferredAudioOnly =
+    args.includes("-x") ||
+    args.includes("--audio-format") ||
+    (outputFormatValue.startsWith("bestaudio") && !outputFormatValue.includes("+"));
+  const defaultFilenameTemplate =
+    settings.fileCollision === "rename"
+      ? `%(title)s${inferredAudioOnly ? " [audio]" : " [video]"} [${jobId}].%(ext)s`
+      : "%(title)s.%(ext)s";
+  const filenameTemplate = job.overrides?.filenameTemplate || defaultFilenameTemplate;
 
   if (downloadDir) {
     args.push("-o", await join(downloadDir, filenameTemplate));
   } else {
     // If no dir set, just use template (current working dir)
     args.push("-o", filenameTemplate);
+  }
+
+  if (settings.fileCollision === "overwrite") {
+    args.push("--force-overwrites");
+    addLog({ level: "info", message: "File collision policy: overwrite", jobId });
+  } else if (settings.fileCollision === "skip") {
+    args.push("--no-overwrites");
+    addLog({ level: "info", message: "File collision policy: skip existing files", jobId });
+  } else {
+    // Rename mode: use unique default template per job and still avoid overwrites.
+    args.push("--no-overwrites");
+    addLog({ level: "info", message: "File collision policy: rename (unique filename per job)", jobId });
   }
 
   // Ensure consistent behavior: ignore global config and force newline output for logs
@@ -653,6 +658,7 @@ export async function startDownload(jobId: string) {
 
 export async function fetchMetadata(jobId: string) {
   const { jobs, updateJob } = useDownloadsStore.getState();
+  const { addLog } = useLogsStore.getState();
   const job = jobs.find((j) => j.id === jobId);
   if (!job) return;
 
@@ -661,88 +667,188 @@ export async function fetchMetadata(jobId: string) {
       phase: "Generating thumbnail",
       statusDetail: "Fetching metadata and thumbnail",
     });
+
     const ytDlp = await resolveTool("yt-dlp");
-    const titleAndThumbCmd = Command.create(ytDlp.command, [
-      "--print",
-      "%(title)s:::%(thumbnail)s",
+    const ffmpeg = await resolveTool("ffmpeg");
+    const thumbsDir = await ensureThumbnailDir();
+    const thumbOutputTemplate = await join(thumbsDir, jobId);
+
+    addLog({ level: "info", message: `[meta] Starting metadata fetch for ${job.url}`, jobId });
+    addLog({ level: "info", message: `[meta] Thumbnail output template: ${thumbOutputTemplate}`, jobId });
+
+    // Phase 1: Fetch title + thumbnail URL, and try --write-thumbnail to save locally
+    const metaArgs = [
+      "--print", "%(title)s:::%(thumbnail)s",
+      "--write-thumbnail",
+      "--convert-thumbnails", "jpg",
       "--skip-download",
-      "--no-warnings",
       "--flat-playlist",
       "--no-playlist",
       "--referer", job.url,
-      job.url
-    ], { env: ytDlpEnv() });
+      "-o", thumbOutputTemplate,
+      job.url,
+    ];
 
-    const titleAndThumbOutput = await titleAndThumbCmd.execute();
-    if (titleAndThumbOutput.code === 0) {
-      const parts = titleAndThumbOutput.stdout.trim().split(":::");
-      if (parts.length >= 2) {
-        const title = parts[0].trim();
-        const thumbnailUrl = parts[1].trim();
-        updateJob(jobId, {
-          title: title || job.title,
-          thumbnail: thumbnailUrl || undefined,
-          thumbnailStatus: thumbnailUrl ? "ready" : "pending",
-          thumbnailError: thumbnailUrl ? undefined : "No thumbnail URL available",
-        });
-        // If source provides thumbnail URL (e.g. Instagram), use it to avoid black-frame extraction.
-        if (thumbnailUrl) return;
-      }
+    // Ensure yt-dlp can find ffmpeg for --convert-thumbnails
+    if (ffmpeg.isLocal) {
+      const ffmpegDir = ffmpeg.path.replace(/\\ffmpeg\.exe$/, "");
+      metaArgs.unshift("--ffmpeg-location", ffmpegDir);
     }
 
-    if (isYouTubeUrl(job.url)) {
-      // For YouTube, if no direct thumbnail was returned, avoid ffmpeg frame extraction.
+    addLog({ level: "info", message: `[meta] Phase 1: yt-dlp ${metaArgs.join(" ")}`, jobId });
+    const metaCmd = Command.create(ytDlp.command, metaArgs, { env: ytDlpEnv() });
+    const metaOutput = await metaCmd.execute();
+
+    addLog({ level: "info", message: `[meta] Phase 1 exit code: ${metaOutput.code}`, jobId });
+    addLog({ level: "info", message: `[meta] Phase 1 stdout: ${metaOutput.stdout.trim().substring(0, 500)}`, jobId });
+    if (metaOutput.stderr.trim()) {
+      addLog({ level: "warn", message: `[meta] Phase 1 stderr: ${metaOutput.stderr.trim().substring(0, 500)}`, jobId });
+    }
+
+    let title = "";
+    let thumbnailUrl = "";
+
+    if (metaOutput.code === 0) {
+      // stdout format: "title:::thumbnailUrl" (using ::: as separator since \n is unreliable across platforms)
+      const raw = metaOutput.stdout.trim().split(/\r?\n/)[0] || "";
+      const sepIdx = raw.indexOf(":::");
+      if (sepIdx !== -1) {
+        title = raw.substring(0, sepIdx).trim();
+        thumbnailUrl = raw.substring(sepIdx + 3).trim();
+      } else {
+        title = raw.trim();
+      }
+
+      if (title) {
+        updateJob(jobId, { title: title || job.title });
+      }
+      addLog({ level: "info", message: `[meta] Parsed title: "${title}"`, jobId });
+      addLog({ level: "info", message: `[meta] Parsed thumbnail URL: "${thumbnailUrl.substring(0, 200)}"`, jobId });
+    } else {
+      addLog({ level: "warn", message: `[meta] Phase 1 failed (exit ${metaOutput.code}), continuing to fallbacks`, jobId });
+    }
+
+    // Check if --write-thumbnail produced a file locally
+    let thumbFound = false;
+    for (const ext of ["jpg", "webp", "png"]) {
+      const relPath = `thumbnails/${jobId}.${ext}`;
+      if (await exists(relPath, { baseDir: BaseDirectory.AppData })) {
+        addLog({ level: "info", message: `[meta] Thumbnail file found locally: ${relPath}`, jobId });
+        const assetUrl = await thumbnailAssetUrl(relPath);
+        updateJob(jobId, {
+          thumbnail: assetUrl,
+          thumbnailStatus: "ready",
+          statusDetail: "Thumbnail ready",
+        });
+        thumbFound = true;
+        break;
+      }
+    }
+    if (thumbFound) return;
+
+    addLog({ level: "warn", message: `[meta] No local thumbnail file produced by --write-thumbnail`, jobId });
+
+    // Phase 2: If we got a thumbnail URL from yt-dlp, try downloading it directly
+    if (thumbnailUrl && /^https?:/i.test(thumbnailUrl) && thumbnailUrl.toUpperCase() !== "NA") {
+      addLog({ level: "info", message: `[meta] Phase 2: Downloading thumbnail URL directly via yt-dlp`, jobId });
+
+      const dlThumbArgs = [
+        "--no-check-certificates",
+        "--referer", job.url,
+        "-o", await join(thumbsDir, `${jobId}.%(ext)s`),
+        thumbnailUrl,
+      ];
+
+      if (ffmpeg.isLocal) {
+        const ffmpegDir = ffmpeg.path.replace(/\\ffmpeg\.exe$/, "");
+        dlThumbArgs.unshift("--ffmpeg-location", ffmpegDir);
+      }
+
+      addLog({ level: "info", message: `[meta] Phase 2: yt-dlp ${dlThumbArgs.join(" ")}`, jobId });
+
+      // yt-dlp can download arbitrary URLs as "generic" extractor
+      const dlThumbCmd = Command.create(ytDlp.command, dlThumbArgs, { env: ytDlpEnv() });
+      const dlThumbOutput = await dlThumbCmd.execute();
+
+      addLog({ level: "info", message: `[meta] Phase 2 exit code: ${dlThumbOutput.code}`, jobId });
+      if (dlThumbOutput.stderr.trim()) {
+        addLog({ level: "warn", message: `[meta] Phase 2 stderr: ${dlThumbOutput.stderr.trim().substring(0, 500)}`, jobId });
+      }
+
+      // Check for any image file that appeared
+      for (const ext of ["jpg", "webp", "png", "jpeg"]) {
+        const relPath = `thumbnails/${jobId}.${ext}`;
+        if (await exists(relPath, { baseDir: BaseDirectory.AppData })) {
+          addLog({ level: "info", message: `[meta] Phase 2 thumbnail downloaded: ${relPath}`, jobId });
+          const assetUrl = await thumbnailAssetUrl(relPath);
+          updateJob(jobId, {
+            thumbnail: assetUrl,
+            thumbnailStatus: "ready",
+            statusDetail: "Thumbnail ready",
+          });
+          return;
+        }
+      }
+
+      addLog({ level: "warn", message: `[meta] Phase 2 failed: no file produced`, jobId });
+
+      // Phase 2b: Use the raw URL as-is (works for YouTube, may work for some sources)
+      addLog({ level: "info", message: `[meta] Phase 2b: Using thumbnail URL directly as fallback`, jobId });
       updateJob(jobId, {
-        thumbnailStatus: "failed",
-        thumbnailError: "No thumbnail URL available",
+        thumbnail: thumbnailUrl,
+        thumbnailStatus: "ready",
+        statusDetail: "Thumbnail ready (remote URL)",
       });
       return;
     }
 
-    const titleCmd = Command.create(ytDlp.command, [
-      "--print",
-      "%(title)s",
-      "--skip-download",
-      "--no-warnings",
-      "--flat-playlist",
-      "--no-playlist",
-      "--referer", job.url,
-      job.url
-    ], { env: ytDlpEnv() });
+    addLog({ level: "warn", message: `[meta] No usable thumbnail URL from yt-dlp (got: "${thumbnailUrl}")`, jobId });
 
-    const titleOutput = await titleCmd.execute();
-    if (titleOutput.code === 0) {
-      const title = titleOutput.stdout.trim();
-      if (title) {
-        updateJob(jobId, { title });
-      }
+    // Phase 3: For YouTube, no ffmpeg extraction — just mark failed
+    if (isYouTubeUrl(job.url)) {
+      addLog({ level: "info", message: `[meta] YouTube source, skipping ffmpeg extraction`, jobId });
+      updateJob(jobId, {
+        thumbnailStatus: "failed",
+        thumbnailError: "No thumbnail available",
+      });
+      return;
     }
 
+    // Phase 4: ffmpeg frame extraction from media URL (non-YouTube)
+    addLog({ level: "info", message: `[meta] Phase 4: Fetching media URL for ffmpeg extraction`, jobId });
+
     const mediaCmd = Command.create(ytDlp.command, [
-      "-f",
-      "best",
+      "-f", "best",
       "-g",
-      "--no-warnings",
       "--no-playlist",
       "--referer", job.url,
-      job.url
+      job.url,
     ], { env: ytDlpEnv() });
 
     const mediaOutput = await mediaCmd.execute();
+    addLog({ level: "info", message: `[meta] Phase 4 media URL exit code: ${mediaOutput.code}`, jobId });
+    if (mediaOutput.stderr.trim()) {
+      addLog({ level: "warn", message: `[meta] Phase 4 stderr: ${mediaOutput.stderr.trim().substring(0, 300)}`, jobId });
+    }
+
     if (mediaOutput.code === 0) {
       const mediaUrl = mediaOutput.stdout
         .split(/\r?\n/)
         .map((line) => line.trim())
         .find(Boolean);
+      addLog({ level: "info", message: `[meta] Phase 4 media URL: ${mediaUrl?.substring(0, 200) || "(empty)"}`, jobId });
+
       if (mediaUrl) {
         await generateThumbnailFromMediaUrl(jobId, mediaUrl);
       } else {
+        addLog({ level: "error", message: `[meta] Phase 4: no media URL in stdout`, jobId });
         updateJob(jobId, {
           thumbnailStatus: "failed",
           thumbnailError: "No media URL found for thumbnail generation",
         });
       }
     } else {
+      addLog({ level: "error", message: `[meta] Phase 4: yt-dlp -g failed (exit ${mediaOutput.code})`, jobId });
       updateJob(jobId, {
         thumbnailStatus: "failed",
         thumbnailError: "Failed to fetch media URL",
@@ -754,7 +860,7 @@ export async function fetchMetadata(jobId: string) {
       useLogsStore.getState().addLog({ level: "warn", message: `[meta] Metadata decode warning: ${message}`, jobId });
       return;
     }
-    useLogsStore.getState().addLog({ level: "error", message: `[meta] Failed to fetch metadata: ${message}`, jobId });
+    useLogsStore.getState().addLog({ level: "error", message: `[meta] Exception in fetchMetadata: ${message}`, jobId });
     updateJob(jobId, {
       thumbnailStatus: "failed",
       thumbnailError: message,

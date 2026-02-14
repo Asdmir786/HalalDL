@@ -9,6 +9,11 @@ import { toast } from "sonner";
 
 type VersionParts = number[];
 
+export interface ToolCheckResult {
+  version: string;
+  variant: string;
+}
+
 type ToolResolution = {
   command: string;
   path: string;
@@ -34,14 +39,21 @@ async function resolveTool(baseName: string): Promise<ToolResolution> {
 }
 
 function parseVersionParts(input: string): VersionParts | null {
-  const match = input.match(/\d+(?:\.\d+)+/);
-  if (!match) return null;
-  const parts = match[0]
-    .split(".")
-    .map((x) => Number.parseInt(x, 10))
-    .filter((n) => Number.isFinite(n));
-  if (!parts.length) return null;
-  return parts;
+  // Try dotted version first (e.g. "7.1.2", "1.37.0", "2025.06.01")
+  const dotted = input.match(/\d+(?:\.\d+)+/);
+  if (dotted) {
+    const parts = dotted[0]
+      .split(".")
+      .map((x) => Number.parseInt(x, 10))
+      .filter((n) => Number.isFinite(n));
+    if (parts.length) return parts;
+  }
+  // Fallback: date-based version with dashes (e.g. "2024-08-11")
+  const dashed = input.match(/(\d{4})-(\d{2})-(\d{2})/);
+  if (dashed) {
+    return [Number(dashed[1]), Number(dashed[2]), Number(dashed[3])];
+  }
+  return null;
 }
 
 function compareVersionParts(a: VersionParts, b: VersionParts): number {
@@ -57,6 +69,8 @@ function compareVersionParts(a: VersionParts, b: VersionParts): number {
 
 export function isUpdateAvailable(currentVersion: string | undefined, latestVersion: string | undefined): boolean | undefined {
   if (!currentVersion || !latestVersion) return undefined;
+  // Fast path: identical strings → no update
+  if (currentVersion.trim() === latestVersion.trim()) return false;
   const currentParts = parseVersionParts(currentVersion);
   const latestParts = parseVersionParts(latestVersion);
   if (!currentParts || !latestParts) return undefined;
@@ -95,7 +109,7 @@ async function fetchJson<T>(url: string, timeoutMs = 10000): Promise<T> {
   }
 }
 
-export async function checkYtDlpVersion(): Promise<string | null> {
+export async function checkYtDlpVersion(): Promise<ToolCheckResult | null> {
   const { addLog } = useLogsStore.getState();
   try {
     const tool = await resolveTool("yt-dlp");
@@ -104,8 +118,32 @@ export async function checkYtDlpVersion(): Promise<string | null> {
     const output = await cmd.execute();
     if (output.code === 0) {
       const version = output.stdout.trim();
-      addLog({ level: "info", message: `yt-dlp version ${version || "Detected"} detected at ${tool.path}` });
-      return version;
+
+      // Detect variant: bundled (our bin dir) vs pip vs system PATH
+      let variant = tool.isLocal ? "Bundled" : "System";
+      if (!tool.isLocal) {
+        try {
+          const pipCmd = Command.create("pip", ["show", "yt-dlp"]);
+          const pipOut = await pipCmd.execute();
+          if (pipOut.code === 0 && pipOut.stdout.toLowerCase().includes("name: yt-dlp")) {
+            variant = "pip";
+          }
+        } catch {
+          // pip not available — try pip3
+          try {
+            const pip3Cmd = Command.create("pip3", ["show", "yt-dlp"]);
+            const pip3Out = await pip3Cmd.execute();
+            if (pip3Out.code === 0 && pip3Out.stdout.toLowerCase().includes("name: yt-dlp")) {
+              variant = "pip";
+            }
+          } catch {
+            // neither pip nor pip3 available, keep "System"
+          }
+        }
+      }
+
+      addLog({ level: "info", message: `yt-dlp ${version || "Detected"} (${variant}) at ${tool.path}` });
+      return { version, variant };
     }
     addLog({ level: "warn", message: `yt-dlp version check returned code ${output.code}` });
   } catch (e) {
@@ -114,7 +152,7 @@ export async function checkYtDlpVersion(): Promise<string | null> {
   return null;
 }
 
-export async function checkFfmpegVersion(): Promise<string | null> {
+export async function checkFfmpegVersion(): Promise<ToolCheckResult | null> {
   const { addLog } = useLogsStore.getState();
   try {
     const tool = await resolveTool("ffmpeg");
@@ -122,10 +160,23 @@ export async function checkFfmpegVersion(): Promise<string | null> {
     const cmd = Command.create(tool.command, ["-version"]);
     const output = await cmd.execute();
     if (output.code === 0) {
-      const firstLine = output.stdout.split('\n')[0];
-      const version = firstLine || "Detected";
-      addLog({ level: "info", message: `ffmpeg version ${version} detected at ${tool.path}` });
-      return version;
+      const firstLine = output.stdout.split('\n')[0] || "";
+      const versionMatch = firstLine.match(/version\s+(\S+)/i);
+      const version = versionMatch ? versionMatch[1] : (firstLine || "Detected");
+
+      // Detect build variant from version string
+      const lower = firstLine.toLowerCase();
+      let variant = tool.isLocal ? "Bundled" : "System";
+      if (lower.includes("full_build") || lower.includes("full-build")) {
+        variant = "Full Build";
+      } else if (lower.includes("essentials_build") || lower.includes("essentials-build") || lower.includes("essentials")) {
+        variant = "Essentials";
+      } else if (lower.includes("shared")) {
+        variant = "Shared";
+      }
+
+      addLog({ level: "info", message: `ffmpeg ${version} (${variant}) at ${tool.path}` });
+      return { version, variant };
     }
     addLog({ level: "warn", message: `ffmpeg version check returned code ${output.code}` });
   } catch (e) {
@@ -134,7 +185,7 @@ export async function checkFfmpegVersion(): Promise<string | null> {
   return null;
 }
 
-export async function checkAria2Version(): Promise<string | null> {
+export async function checkAria2Version(): Promise<ToolCheckResult | null> {
   const { addLog } = useLogsStore.getState();
   try {
     const tool = await resolveTool("aria2c");
@@ -142,10 +193,13 @@ export async function checkAria2Version(): Promise<string | null> {
     const cmd = Command.create(tool.command, ["--version"]);
     const output = await cmd.execute();
     if (output.code === 0) {
-      const firstLine = output.stdout.split('\n')[0];
-      const version = firstLine || "Detected";
-      addLog({ level: "info", message: `aria2c version ${version} detected at ${tool.path}` });
-      return version;
+      const firstLine = output.stdout.split('\n')[0] || "";
+      const versionMatch = firstLine.match(/version\s+(\S+)/i);
+      const version = versionMatch ? versionMatch[1] : (firstLine || "Detected");
+      const variant = tool.isLocal ? "Bundled" : "System";
+
+      addLog({ level: "info", message: `aria2c ${version} (${variant}) at ${tool.path}` });
+      return { version, variant };
     }
     addLog({ level: "warn", message: `aria2c version check returned code ${output.code}` });
   } catch (e) {
@@ -154,7 +208,7 @@ export async function checkAria2Version(): Promise<string | null> {
   return null;
 }
 
-export async function checkDenoVersion(): Promise<string | null> {
+export async function checkDenoVersion(): Promise<ToolCheckResult | null> {
   const { addLog } = useLogsStore.getState();
   try {
     const tool = await resolveTool("deno");
@@ -162,16 +216,40 @@ export async function checkDenoVersion(): Promise<string | null> {
     const cmd = Command.create(tool.command, ["--version"]);
     const output = await cmd.execute();
     if (output.code === 0) {
-      const firstLine = output.stdout.split('\n')[0];
-      const version = firstLine || "Detected";
-      addLog({ level: "info", message: `deno version ${version} detected at ${tool.path}` });
-      return version;
+      const firstLine = output.stdout.split('\n')[0] || "";
+      const versionMatch = firstLine.match(/deno\s+(\S+)/i);
+      const version = versionMatch ? versionMatch[1] : (firstLine || "Detected");
+      const variant = tool.isLocal ? "Bundled" : "System";
+
+      addLog({ level: "info", message: `deno ${version} (${variant}) at ${tool.path}` });
+      return { version, variant };
     }
     addLog({ level: "warn", message: `deno version check returned code ${output.code}` });
   } catch (e) {
     addLog({ level: "error", message: `deno check failed: ${String(e)}` });
   }
   return null;
+}
+
+export async function upgradeYtDlpViaPip(): Promise<boolean> {
+  const { addLog } = useLogsStore.getState();
+  // Try pip first, fall back to pip3
+  for (const pipCmd of ["pip", "pip3"]) {
+    try {
+      addLog({ level: "command", message: `Upgrading yt-dlp via ${pipCmd}...`, command: `${pipCmd} install --upgrade yt-dlp` });
+      const cmd = Command.create(pipCmd, ["install", "--upgrade", "yt-dlp"]);
+      const output = await cmd.execute();
+      if (output.code === 0) {
+        addLog({ level: "info", message: `yt-dlp upgraded via ${pipCmd}` });
+        return true;
+      }
+      addLog({ level: "warn", message: `${pipCmd} upgrade returned code ${output.code}: ${output.stderr}` });
+    } catch (e) {
+      addLog({ level: "debug", message: `${pipCmd} not available: ${String(e)}` });
+    }
+  }
+  addLog({ level: "error", message: "pip upgrade failed: neither pip nor pip3 available" });
+  return false;
 }
 
 export async function fetchLatestYtDlpVersion(): Promise<string | null> {

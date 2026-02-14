@@ -124,15 +124,17 @@ async fn download_tools(app_handle: tauri::AppHandle, tools: Vec<String>) -> Res
         download_file(&app_handle, "yt-dlp", yt_dlp_url, &bin_dir.join("yt-dlp.exe")).await?;
     }
 
-    // 2. Download FFmpeg (Essentials Build)
+    // 2. Download FFmpeg (Full Build — all codecs)
     if tools.contains(&"ffmpeg".to_string()) {
-        let ffmpeg_url = "https://www.gyan.dev/ffmpeg/builds/ffmpeg-release-essentials.zip";
+        let ffmpeg_url = "https://www.gyan.dev/ffmpeg/builds/ffmpeg-release-full.zip";
         let ffmpeg_zip_path = bin_dir.join("ffmpeg.zip");
         download_file(&app_handle, "ffmpeg", ffmpeg_url, &ffmpeg_zip_path).await?;
         emit_progress(&app_handle, "ffmpeg", 99.0, "Extracting ffmpeg.exe, ffprobe.exe...");
         let extracted = extract_from_zip(&app_handle, "ffmpeg", &ffmpeg_zip_path, &bin_dir, vec!["ffmpeg.exe", "ffprobe.exe"])?;
         emit_progress(&app_handle, "ffmpeg", 100.0, &format!("Extracted: {}", extracted.join(", ")));
-        let _ = fs::remove_file(ffmpeg_zip_path);
+        if let Err(e) = fs::remove_file(&ffmpeg_zip_path) {
+            eprintln!("[tools] Warning: failed to clean up {:?}: {}", ffmpeg_zip_path, e);
+        }
     }
 
     // 3. Download aria2
@@ -146,7 +148,9 @@ async fn download_tools(app_handle: tauri::AppHandle, tools: Vec<String>) -> Res
         emit_progress(&app_handle, "aria2", 99.0, "Extracting aria2c.exe...");
         let extracted = extract_from_zip(&app_handle, "aria2", &aria2_zip_path, &bin_dir, vec!["aria2c.exe"])?;
         emit_progress(&app_handle, "aria2", 100.0, &format!("Extracted: {}", extracted.join(", ")));
-        let _ = fs::remove_file(aria2_zip_path);
+        if let Err(e) = fs::remove_file(&aria2_zip_path) {
+            eprintln!("[tools] Warning: failed to clean up {:?}: {}", aria2_zip_path, e);
+        }
     }
 
     // 4. Download Deno
@@ -157,7 +161,9 @@ async fn download_tools(app_handle: tauri::AppHandle, tools: Vec<String>) -> Res
         emit_progress(&app_handle, "deno", 99.0, "Extracting deno.exe...");
         let extracted = extract_from_zip(&app_handle, "deno", &deno_zip_path, &bin_dir, vec!["deno.exe"])?;
         emit_progress(&app_handle, "deno", 100.0, &format!("Extracted: {}", extracted.join(", ")));
-        let _ = fs::remove_file(deno_zip_path);
+        if let Err(e) = fs::remove_file(&deno_zip_path) {
+            eprintln!("[tools] Warning: failed to clean up {:?}: {}", deno_zip_path, e);
+        }
     }
 
     Ok("Selected tools downloaded successfully".to_string())
@@ -189,13 +195,23 @@ fn stage_manual_tool(app_handle: tauri::AppHandle, tool: String, source: String)
         return Err("Source path is not a file".to_string());
     }
 
-    let (dest_name, extra_sidecar) = match tool.as_str() {
-        "yt-dlp" => ("yt-dlp.exe", None),
-        "ffmpeg" => ("ffmpeg.exe", Some("ffprobe.exe")),
-        "aria2" => ("aria2c.exe", None),
-        "deno" => ("deno.exe", None),
+    let (dest_name, expected_filename, extra_sidecar) = match tool.as_str() {
+        "yt-dlp" => ("yt-dlp.exe", "yt-dlp.exe", None),
+        "ffmpeg" => ("ffmpeg.exe", "ffmpeg.exe", Some("ffprobe.exe")),
+        "aria2" => ("aria2c.exe", "aria2c.exe", None),
+        "deno" => ("deno.exe", "deno.exe", None),
         _ => return Err("Unsupported tool id".to_string()),
     };
+
+    // Validate selected file name matches the expected binary
+    if let Some(file_name) = source_path.file_name().and_then(|n| n.to_str()) {
+        if !file_name.eq_ignore_ascii_case(expected_filename) {
+            return Err(format!(
+                "Expected '{}' but got '{}'. Please select the correct binary.",
+                expected_filename, file_name
+            ));
+        }
+    }
 
     let dest_path = bin_dir.join(dest_name);
     let temp_dest = temp_path_for(&dest_path)?;

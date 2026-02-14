@@ -25,7 +25,7 @@ interface DownloadProgress {
 
 const TOOL_SIZES: Record<string, number> = {
   "yt-dlp": 16,
-  "ffmpeg": 35,
+  "ffmpeg": 140,
   "aria2": 5,
   "deno": 31
 };
@@ -147,10 +147,10 @@ export function UpgradePrompt() {
   const handleFinish = async () => {
     setIsFinishing(true);
     try {
-      const checkTool = async (id: string, checkFn: () => Promise<string | null>) => {
-        const version = await checkFn();
-        if (version) {
-          updateTool(id, { status: "Detected", version });
+      const checkTool = async (id: string, checkFn: () => Promise<{ version: string; variant?: string } | null>) => {
+        const result = await checkFn();
+        if (result) {
+          updateTool(id, { status: "Detected", version: result.version, variant: result.variant });
           return true;
         }
         return false;

@@ -6,7 +6,17 @@ import { useToolsStore, Tool } from "@/store/tools";
 import { useLogsStore } from "@/store/logs";
 import { useDownloadsStore, DownloadJob } from "@/store/downloads";
 import { storage } from "@/lib/storage";
-import { checkYtDlpVersion, checkFfmpegVersion, checkAria2Version, checkDenoVersion } from "@/lib/commands";
+import {
+  checkYtDlpVersion,
+  checkFfmpegVersion,
+  checkAria2Version,
+  checkDenoVersion,
+  fetchLatestYtDlpVersion,
+  fetchLatestFfmpegVersion,
+  fetchLatestAria2Version,
+  fetchLatestDenoVersion,
+  isUpdateAvailable,
+} from "@/lib/commands";
 import { toast } from "sonner";
 import { isPermissionGranted, requestPermission, sendNotification } from '@tauri-apps/plugin-notification';
 
@@ -25,9 +35,10 @@ export function PersistenceManager() {
     const checkTools = async () => {
       addLog({ level: "debug", message: "Checking tools..." });
       
-      const checkAndNotify = async (id: string, checkFn: () => Promise<string | null>) => {
+      const checkAndNotify = async (id: string, checkFn: () => Promise<{ version: string; variant?: string } | null>) => {
         const currentTool = useToolsStore.getState().tools.find(t => t.id === id);
-        const version = await checkFn();
+        const result = await checkFn();
+        const version = result?.version ?? null;
         const discoveredAlready = useToolsStore.getState().discoveredToolId;
 
         const readPending = (): string[] => {
@@ -82,7 +93,12 @@ export function PersistenceManager() {
 
         updateTool(id, { 
           status: version ? "Detected" : "Missing", 
-          version: version || undefined 
+          version: version || undefined,
+          variant: result?.variant,
+          // Reset stale update info — will be refreshed below
+          updateAvailable: undefined,
+          latestVersion: undefined,
+          latestCheckedAt: undefined,
         });
       };
 
@@ -90,6 +106,33 @@ export function PersistenceManager() {
       await checkAndNotify("ffmpeg", checkFfmpegVersion);
       await checkAndNotify("aria2", checkAria2Version);
       await checkAndNotify("deno", checkDenoVersion);
+    };
+
+    const checkLatestVersions = async () => {
+      addLog({ level: "debug", message: "Checking latest tool versions..." });
+
+      const checks: Array<{ id: string; fetchFn: () => Promise<string | null> }> = [
+        { id: "yt-dlp", fetchFn: fetchLatestYtDlpVersion },
+        { id: "ffmpeg", fetchFn: fetchLatestFfmpegVersion },
+        { id: "aria2", fetchFn: fetchLatestAria2Version },
+        { id: "deno", fetchFn: fetchLatestDenoVersion },
+      ];
+
+      await Promise.all(
+        checks.map(async ({ id, fetchFn }) => {
+          try {
+            const latest = await fetchFn();
+            const tool = useToolsStore.getState().tools.find((t) => t.id === id);
+            updateTool(id, {
+              latestVersion: latest || undefined,
+              updateAvailable: isUpdateAvailable(tool?.version, latest || undefined),
+              latestCheckedAt: Date.now(),
+            });
+          } catch (e) {
+            addLog({ level: "warn", message: `Latest version check failed (${id}): ${String(e)}` });
+          }
+        })
+      );
     };
 
     const init = async () => {
@@ -142,21 +185,31 @@ export function PersistenceManager() {
           addLog({ level: "info", message: `Downloads loaded (${savedDownloads.length})` });
         }
 
-        // Load Tools
+        // Load Tools — restore user prefs (mode, path) but NOT stale version/update data
         const savedTools = await storage.getTools<Tool[]>();
         if (savedTools && Array.isArray(savedTools)) {
           const currentTools = useToolsStore.getState().tools;
           const mergedTools = currentTools.map((baseTool) => {
             const saved = savedTools.find((t) => t.id === baseTool.id);
-            return saved ? { ...baseTool, ...saved, id: baseTool.id, name: baseTool.name, required: baseTool.required } : baseTool;
+            if (!saved) return baseTool;
+            return {
+              ...baseTool,
+              mode: saved.mode ?? baseTool.mode,
+              path: saved.path,
+              // Deliberately omit: version, variant, latestVersion, updateAvailable, latestCheckedAt
+              // These are always re-checked on startup to prevent stale data
+            };
           });
           setTools(mergedTools);
           addLog({ level: "info", message: `Tools loaded (${mergedTools.length})` });
         }
 
-        // Check Tools
+        // Check installed tool versions
         await checkTools();
         initialized.current = true;
+
+        // Check latest available versions in background (non-blocking)
+        void checkLatestVersions();
 
       } catch (e) {
         addLog({ level: "error", message: `Failed to load persistence: ${String(e)}` });

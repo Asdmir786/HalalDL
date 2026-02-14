@@ -8,6 +8,10 @@
   "permissions": [
     "core:default",
     "opener:default",
+    {
+      "identifier": "opener:allow-open-path",
+      "allow": [{ "path": "/**" }]
+    },
     "store:default",
     "shell:default",
     "dialog:default",
@@ -16,6 +20,8 @@
     "fs:allow-appdata-read-recursive",
     "fs:allow-appdata-write-recursive",
     "os:default",
-    "notification:default"
+    "notification:default",
+    "process:default",
+    "process:allow-restart"
   ]
 }

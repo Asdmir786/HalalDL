@@ -16,18 +16,21 @@ export class OutputParser {
   private static ALREADY_DOWNLOADED_REGEX = /\[download\]\s+(.*?)\s+has already been downloaded$/;
   private static MERGER_REGEX = /^\[Merger\] Merging formats into "(.*)"\s*$/;
   private static GENERIC_DESTINATION_REGEX = /^\[[^\]]+\]\s+Destination:\s+(.*)$/;
-  private static HALALDL_OUTPUT_REGEX = /^__HALALDL_OUTPUT__:(.*)$/;
+  private static HALALDL_OUTPUT_MARKER = "__HALALDL_OUTPUT__:";
 
   parse(line: string): DownloadUpdate | null {
     const update: DownloadUpdate = {};
     let hasUpdate = false;
 
-    const halalDlOutputMatch = line.match(OutputParser.HALALDL_OUTPUT_REGEX);
-    if (halalDlOutputMatch?.[1]) {
-      const path = this.cleanPath(halalDlOutputMatch[1]);
-      update.outputPath = path;
-      update.title = this.extractTitle(path);
-      hasUpdate = true;
+    const markerIndex = line.indexOf(OutputParser.HALALDL_OUTPUT_MARKER);
+    if (markerIndex !== -1) {
+      const rawPath = line.slice(markerIndex + OutputParser.HALALDL_OUTPUT_MARKER.length);
+      const path = this.cleanPath(rawPath);
+      if (path) {
+        update.outputPath = path;
+        update.title = this.extractTitle(path);
+        hasUpdate = true;
+      }
     }
 
     // Progress

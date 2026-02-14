@@ -39,6 +39,9 @@ export function DownloadItem({
   const relative = formatRelativeTime(ts);
   const absolute = new Date(ts).toLocaleString();
 
+  const thumbnailLoading =
+    !job.thumbnail && job.thumbnailStatus !== "failed" && job.thumbnailStatus !== "ready";
+
   const statusIcon =
     job.status === "Queued"
       ? Clock
@@ -110,7 +113,14 @@ export function DownloadItem({
     >
       <ContextMenu>
         <ContextMenuTrigger>
-          <div className="group relative flex gap-4 p-3 rounded-xl border border-white/5 bg-background/40 hover:bg-background/60 hover:border-white/10 backdrop-blur-md shadow-sm transition-all duration-300">
+          <div
+            onDoubleClick={() => {
+              if (job.status === "Done" && job.outputPath) {
+                openFile(job.outputPath);
+              }
+            }}
+            className="group relative flex gap-4 p-3 rounded-xl border border-white/5 bg-background/40 hover:bg-background/60 hover:border-white/10 backdrop-blur-md shadow-sm transition-all duration-300"
+          >
             {/* Selection & Thumbnail Column */}
             <div className="flex items-start gap-3">
               <div className="pt-1">
@@ -131,6 +141,10 @@ export function DownloadItem({
                       (e.target as HTMLImageElement).style.display = "none";
                     }}
                   />
+                ) : thumbnailLoading ? (
+                  <div className="w-full h-full flex items-center justify-center">
+                    <div className="w-4 h-4 border-2 border-muted-foreground/20 border-t-muted-foreground/60 rounded-full animate-spin" />
+                  </div>
                 ) : (
                   <div className="w-full h-full flex items-center justify-center text-muted-foreground/20">
                     <Play className="w-6 h-6" />
