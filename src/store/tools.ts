@@ -15,6 +15,7 @@ export interface Tool {
   path?: string;
   mode: ToolMode;
   required: boolean;
+  hasBackup?: boolean;
 }
 
 interface ToolsState {

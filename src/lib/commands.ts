@@ -518,6 +518,10 @@ export async function deleteFile(path: string) {
   await invoke("delete_file", { path });
 }
 
+export async function renameFile(from: string, to: string) {
+  await invoke("rename_file", { from, to });
+}
+
 function normalizeFsPath(path: string): string {
   const trimmed = path.trim();
   const unquoted =
@@ -557,4 +561,31 @@ function stripAnsiSimple(input: string): string {
     out += input[i];
   }
   return out;
+}
+
+// ── Tool backup / rollback commands ──
+
+/** Returns IDs of tools that have .old backups available */
+export async function listToolBackups(): Promise<string[]> {
+  return invoke<string[]>("list_tool_backups");
+}
+
+/** Roll back a tool to its .old backup */
+export async function rollbackTool(tool: string): Promise<string> {
+  return invoke<string>("rollback_tool", { tool });
+}
+
+/** Delete the .old backup for a single tool */
+export async function cleanupToolBackup(tool: string): Promise<string> {
+  return invoke<string>("cleanup_tool_backup", { tool });
+}
+
+/** Delete all .old backups in the bin directory */
+export async function cleanupAllBackups(): Promise<string> {
+  return invoke<string>("cleanup_all_backups");
+}
+
+/** Download a URL directly to a local file (bypasses yt-dlp) */
+export async function downloadUrlToFile(url: string, dest: string, referer?: string): Promise<string> {
+  return invoke<string>("download_url_to_file", { url, dest, referer: referer ?? null });
 }

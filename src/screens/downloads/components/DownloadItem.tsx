@@ -1,3 +1,4 @@
+import { useState } from "react";
 import { motion, Variants } from "framer-motion";
 import { 
   X, FolderOpen, Download, Terminal, 
@@ -35,6 +36,7 @@ export function DownloadItem({
   formatRelativeTime
 }: DownloadItemProps) {
   const { addLog } = useLogsStore();
+  const [thumbError, setThumbError] = useState(false);
   const ts = getJobTs(job);
   const relative = formatRelativeTime(ts);
   const absolute = new Date(ts).toLocaleString();
@@ -132,14 +134,12 @@ export function DownloadItem({
               </div>
 
               <div className="relative w-28 aspect-video rounded-lg overflow-hidden bg-black/20 ring-1 ring-white/10 shadow-inner group-hover:shadow-md transition-all">
-                {job.thumbnail ? (
+                {job.thumbnail && !thumbError ? (
                   <img
                     src={job.thumbnail}
                     alt="Thumbnail"
                     className="w-full h-full object-cover opacity-90 group-hover:opacity-100 transition-opacity"
-                    onError={(e) => {
-                      (e.target as HTMLImageElement).style.display = "none";
-                    }}
+                    onError={() => setThumbError(true)}
                   />
                 ) : thumbnailLoading ? (
                   <div className="w-full h-full flex items-center justify-center">
@@ -210,25 +210,42 @@ export function DownloadItem({
                         />
                       ))}
                     </div>
-                    <div className="flex items-center justify-between w-full text-[10px] font-mono font-medium text-muted-foreground">
-                      <span className="text-foreground">{job.speed || "0 KB/s"}</span>
-                      <span className="opacity-70">{job.eta || "--:--"}</span>
-                    </div>
-                    <div className="w-full h-1.5 bg-muted/50 rounded-full overflow-hidden">
-                      <motion.div 
-                        className="h-full bg-linear-to-r from-primary/80 to-primary rounded-full"
-                        initial={{ width: 0 }}
-                        animate={{ width: `${job.progress}%` }}
-                        transition={{ duration: 0.5, ease: "easeOut" }}
-                      />
-                    </div>
+                    {job.phase === "Converting with FFmpeg" || job.phase === "Merging streams" ? (
+                      <>
+                        <div className="flex items-center justify-between w-full text-[10px] font-mono font-medium text-muted-foreground">
+                          <span className="text-foreground">FFmpeg</span>
+                          <span className="opacity-70 animate-pulse">Converting...</span>
+                        </div>
+                        <div className="w-full h-1.5 bg-muted/50 rounded-full overflow-hidden">
+                          <motion.div
+                            className="h-full bg-linear-to-r from-primary/60 via-primary to-primary/60 rounded-full"
+                            animate={{ x: ["-100%", "100%"] }}
+                            transition={{ duration: 1.5, repeat: Infinity, ease: "easeInOut" }}
+                            style={{ width: "50%" }}
+                          />
+                        </div>
+                      </>
+                    ) : (
+                      <>
+                        <div className="flex items-center justify-between w-full text-[10px] font-mono font-medium text-muted-foreground">
+                          <span className="text-foreground">{job.speed || "0 KB/s"}</span>
+                          <span className="opacity-70">{job.eta || "--:--"}</span>
+                        </div>
+                        <div className="w-full h-1.5 bg-muted/50 rounded-full overflow-hidden">
+                          <motion.div 
+                            className="h-full bg-linear-to-r from-primary/80 to-primary rounded-full"
+                            initial={{ width: 0 }}
+                            animate={{ width: `${job.progress}%` }}
+                            transition={{ duration: 0.5, ease: "easeOut" }}
+                          />
+                        </div>
+                      </>
+                    )}
                   </div>
                 ) : (
                   <div className="flex items-center justify-between gap-2">
                     <div className="text-[10px] text-muted-foreground truncate">
-                      {job.thumbnailStatus === "failed"
-                        ? `Thumbnail: ${job.thumbnailError || "Unavailable"}`
-                        : job.statusDetail || ""}
+                      {job.statusDetail || ""}
                     </div>
                     <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-all duration-300 transform translate-x-4 group-hover:translate-x-0">
                       {job.status === "Done" && (

@@ -1,5 +1,23 @@
 # Changelog
 
+## 0.3.6 - 2026-02-15
+- **Downloads**: Completely reworked fallback download logic — fallback now downloads the best available quality with yt-dlp first, then runs a separate FFmpeg conversion step to match the preset's intended codec/container (e.g. H.264 + AAC for WhatsApp). Much simpler and more reliable than the previous in-pipeline approach.
+- **Downloads**: Fixed WhatsApp-incompatible output when using the "WhatsApp Optimized" preset on sites like Instagram — videos with VP9 codecs are now properly converted to H.264/AAC/MP4 with `yuv420p` and `faststart`.
+- **Downloads**: Added indeterminate (sliding) progress bar and "Converting..." label during FFmpeg post-processing, replacing the stale percentage that used to freeze.
+- **Thumbnails**: Fixed Instagram/TikTok thumbnail loading failures by replacing the unreliable yt-dlp generic extractor with a direct HTTP download via the Rust backend (`reqwest`).
+- **Thumbnails**: Fixed a React rendering bug where failed thumbnails would permanently hide (DOM `display:none`) even if a valid URL was later available — now uses proper React state.
+- **Thumbnails**: Removed the "Thumbnail: Unavailable" status text from the download list UI.
+- **Tools**: Added **rollback/revert** — after updating a tool, the previous version is kept as a `.old` backup. You can revert to it or delete it from the Tools screen dropdown menu.
+- **Tools**: Added "Clean up backups" header button to delete all `.old` backup files at once.
+- **Tools**: Backup status is now checked on app startup and after every install/update, so revert/cleanup options always reflect the current state.
+- **Tools**: Redesigned the Tools screen with a streamlined UI — clearer update flow, progress modal for installs/updates, variant detection (pip vs GitHub for yt-dlp, full vs essentials for FFmpeg), and smart update behavior per mode (Lite redirects, Full downloads directly).
+- **Tools**: All tool statuses are now refreshed on app startup to fix stale UI edge cases (e.g. showing "Update" when already on the latest version).
+- **Backend**: Added `download_url_to_file` Rust command for reliable direct HTTP downloads (used for thumbnails).
+- **Backend**: Added `rename_file` Rust command for safe file swaps during FFmpeg conversion.
+- **Backend**: Added rollback commands: `list_tool_backups`, `rollback_tool`, `cleanup_tool_backup`, `cleanup_all_backups`.
+- **Backend**: Fixed `process|restart` ACL error by adding the permission to Tauri capabilities.
+- **UX**: Double-clicking a download list item now opens the file directly.
+
 ## 0.3.5 - 2026-01-26
 - **Logs**: Fixed log export/write failures caused by Windows ACL restrictions by writing via the Tauri backend.
 - **Logs**: Added timestamped log export filenames for easier sharing and no overwrites.

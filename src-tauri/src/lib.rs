@@ -33,7 +33,9 @@ fn backup_path_for(path: &Path) -> Result<PathBuf, String> {
 fn safe_replace_with_backup(dest: &Path, incoming: &Path) -> Result<(), String> {
     let backup = backup_path_for(dest)?;
 
-    if backup.exists() {
+    // Keep existing .old backup — user can revert or clean up from the UI.
+    // If a backup already exists, remove it only to make room for the new one.
+    if backup.exists() && dest.exists() {
         let _ = fs::remove_file(&backup);
     }
 
@@ -63,6 +65,49 @@ fn safe_replace_with_backup(dest: &Path, incoming: &Path) -> Result<(), String> 
             ))
         }
     }
+}
+
+/// Download any URL directly to a local file (used for thumbnails).
+#[tauri::command]
+async fn download_url_to_file(url: String, dest: String, referer: Option<String>) -> Result<String, String> {
+    use tokio::io::AsyncWriteExt;
+
+    let client = reqwest::Client::builder()
+        .danger_accept_invalid_certs(true)
+        .build()
+        .map_err(|e| format!("HTTP client error: {}", e))?;
+
+    let mut req = client.get(&url);
+    if let Some(ref r) = referer {
+        req = req.header("Referer", r);
+    }
+
+    let resp = req.send().await.map_err(|e| format!("Download failed: {}", e))?;
+    if !resp.status().is_success() {
+        return Err(format!("HTTP {}: {}", resp.status(), url));
+    }
+
+    let bytes = resp.bytes().await.map_err(|e| format!("Read body failed: {}", e))?;
+    if bytes.is_empty() {
+        return Err("Empty response body".to_string());
+    }
+
+    let dest_path = Path::new(&dest);
+    if let Some(parent) = dest_path.parent() {
+        if !parent.exists() {
+            fs::create_dir_all(parent)
+                .map_err(|e| format!("mkdir failed: {}", e))?;
+        }
+    }
+
+    let mut file = tokio::fs::File::create(&dest).await
+        .map_err(|e| format!("File create failed: {}", e))?;
+    file.write_all(&bytes).await
+        .map_err(|e| format!("File write failed: {}", e))?;
+    file.flush().await
+        .map_err(|e| format!("File flush failed: {}", e))?;
+
+    Ok(dest)
 }
 
 async fn resolve_latest_aria2_zip_url(app_handle: &tauri::AppHandle) -> Result<String, String> {
@@ -727,6 +772,11 @@ async fn delete_file(path: String) -> Result<(), String> {
 }
 
 #[tauri::command]
+async fn rename_file(from: String, to: String) -> Result<(), String> {
+    fs::rename(&from, &to).map_err(|e| format!("Rename failed: {}", e))
+}
+
+#[tauri::command]
 fn copy_files_to_clipboard(paths: Vec<String>) -> Result<(), String> {
     #[cfg(target_os = "windows")]
     {
@@ -1002,6 +1052,170 @@ fn copy_files_to_clipboard(paths: Vec<String>) -> Result<(), String> {
     }
 }
 
+// ── Tool backup / rollback commands ──
+
+const TOOL_BINARIES: &[(&str, &[&str])] = &[
+    ("yt-dlp", &["yt-dlp.exe"]),
+    ("ffmpeg", &["ffmpeg.exe", "ffprobe.exe"]),
+    ("aria2", &["aria2c.exe"]),
+    ("deno", &["deno.exe"]),
+];
+
+fn tool_id_for_binary(bin_name: &str) -> Option<&'static str> {
+    for &(id, binaries) in TOOL_BINARIES {
+        for &b in binaries {
+            if bin_name.eq_ignore_ascii_case(b) {
+                return Some(id);
+            }
+        }
+    }
+    None
+}
+
+#[tauri::command]
+fn list_tool_backups(app_handle: tauri::AppHandle) -> Result<Vec<String>, String> {
+    let bin_dir = app_handle
+        .path()
+        .app_data_dir()
+        .map_err(|e: tauri::Error| e.to_string())?
+        .join("bin");
+
+    if !bin_dir.exists() {
+        return Ok(vec![]);
+    }
+
+    let mut tool_ids: Vec<String> = Vec::new();
+    if let Ok(entries) = fs::read_dir(&bin_dir) {
+        for entry in entries.flatten() {
+            let name = entry.file_name().to_string_lossy().to_string();
+            if name.ends_with(".old") {
+                let original = name.trim_end_matches(".old");
+                if let Some(id) = tool_id_for_binary(original) {
+                    if !tool_ids.contains(&id.to_string()) {
+                        tool_ids.push(id.to_string());
+                    }
+                }
+            }
+        }
+    }
+
+    Ok(tool_ids)
+}
+
+#[tauri::command]
+fn rollback_tool(app_handle: tauri::AppHandle, tool: String) -> Result<String, String> {
+    let bin_dir = app_handle
+        .path()
+        .app_data_dir()
+        .map_err(|e: tauri::Error| e.to_string())?
+        .join("bin");
+
+    let binaries: &[&str] = TOOL_BINARIES
+        .iter()
+        .find(|&&(id, _)| id == tool.as_str())
+        .map(|&(_, bins)| bins)
+        .ok_or_else(|| format!("Unknown tool: {}", tool))?;
+
+    let mut rolled_back = Vec::new();
+    for &bin_name in binaries {
+        let current = bin_dir.join(bin_name);
+        let backup = bin_dir.join(format!("{}.old", bin_name));
+
+        if !backup.exists() {
+            continue;
+        }
+
+        // Move current out of the way
+        let temp = bin_dir.join(format!("{}.rollback-tmp", bin_name));
+        if current.exists() {
+            fs::rename(&current, &temp).map_err(|e| {
+                format!("Failed to move current {} aside: {}", bin_name, e)
+            })?;
+        }
+
+        // Restore backup as current
+        match fs::rename(&backup, &current) {
+            Ok(()) => {
+                // Delete the old current (now temp)
+                if temp.exists() {
+                    let _ = fs::remove_file(&temp);
+                }
+                rolled_back.push(bin_name.to_string());
+            }
+            Err(e) => {
+                // Restore current from temp on failure
+                if temp.exists() {
+                    let _ = fs::rename(&temp, &current);
+                }
+                return Err(format!("Failed to restore backup for {}: {}", bin_name, e));
+            }
+        }
+    }
+
+    if rolled_back.is_empty() {
+        return Err(format!("No backups found for {}", tool));
+    }
+
+    Ok(format!("Rolled back: {}", rolled_back.join(", ")))
+}
+
+#[tauri::command]
+fn cleanup_tool_backup(app_handle: tauri::AppHandle, tool: String) -> Result<String, String> {
+    let bin_dir = app_handle
+        .path()
+        .app_data_dir()
+        .map_err(|e: tauri::Error| e.to_string())?
+        .join("bin");
+
+    let binaries: &[&str] = TOOL_BINARIES
+        .iter()
+        .find(|&&(id, _)| id == tool.as_str())
+        .map(|&(_, bins)| bins)
+        .ok_or_else(|| format!("Unknown tool: {}", tool))?;
+
+    let mut cleaned = Vec::new();
+    for &bin_name in binaries {
+        let backup = bin_dir.join(format!("{}.old", bin_name));
+        if backup.exists() {
+            fs::remove_file(&backup).map_err(|e| {
+                format!("Failed to remove {}.old: {}", bin_name, e)
+            })?;
+            cleaned.push(bin_name.to_string());
+        }
+    }
+
+    Ok(format!("Cleaned: {}", cleaned.join(", ")))
+}
+
+#[tauri::command]
+fn cleanup_all_backups(app_handle: tauri::AppHandle) -> Result<String, String> {
+    let bin_dir = app_handle
+        .path()
+        .app_data_dir()
+        .map_err(|e: tauri::Error| e.to_string())?
+        .join("bin");
+
+    if !bin_dir.exists() {
+        return Ok("No bin directory".to_string());
+    }
+
+    let mut count = 0u32;
+    if let Ok(entries) = fs::read_dir(&bin_dir) {
+        for entry in entries.flatten() {
+            let name = entry.file_name().to_string_lossy().to_string();
+            if name.ends_with(".old") {
+                if let Err(e) = fs::remove_file(entry.path()) {
+                    eprintln!("[tools] Warning: failed to remove {}: {}", name, e);
+                } else {
+                    count += 1;
+                }
+            }
+        }
+    }
+
+    Ok(format!("Removed {} backup file(s)", count))
+}
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     tauri::Builder::default()
@@ -1027,7 +1241,13 @@ pub fn run() {
             show_in_folder,
             open_path,
             delete_file,
-            copy_files_to_clipboard
+            rename_file,
+            copy_files_to_clipboard,
+            download_url_to_file,
+            list_tool_backups,
+            rollback_tool,
+            cleanup_tool_backup,
+            cleanup_all_backups
         ])
         .setup(|app| {
             let win = app.get_webview_window("main").unwrap();

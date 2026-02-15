@@ -34,6 +34,8 @@ import {
   ChevronRight,
   Sparkles,
   AlertCircle,
+  Undo2,
+  Trash2,
 } from "lucide-react";
 
 import { cn } from "@/lib/utils";
@@ -55,6 +57,10 @@ import {
   stageManualTool,
   revealToolInExplorer,
   upgradeYtDlpViaPip,
+  listToolBackups,
+  rollbackTool,
+  cleanupToolBackup,
+  cleanupAllBackups,
   type ToolCheckResult,
 } from "@/lib/commands";
 import { toast } from "sonner";
@@ -247,6 +253,7 @@ export function ToolsScreen() {
       setModalProgress(100);
       setModalDone(true);
       addLog({ level: "info", message: `${tool.id} installed/updated` });
+      void refreshBackups();
     } catch (e) {
       const message = e instanceof Error ? e.message : String(e);
       setModalError(message);
@@ -307,6 +314,7 @@ export function ToolsScreen() {
       await downloadTools(ids);
       setModalProgress(100);
       setModalDone(true);
+      void refreshBackups();
     } catch (e) {
       setModalError(
         `Update failed: ${e instanceof Error ? e.message : String(e)}`
@@ -364,11 +372,76 @@ export function ToolsScreen() {
     toast.success(`${tool.name} reset to auto-detect`);
   };
 
+  /* ── Backup helpers ── */
+  const refreshBackups = useCallback(async () => {
+    try {
+      const ids = await listToolBackups();
+      const { tools: current, updateTool: update } = useToolsStore.getState();
+      for (const t of current) {
+        update(t.id, { hasBackup: ids.includes(t.id) });
+      }
+    } catch (e) {
+      addLog({
+        level: "warn",
+        message: `Failed to list backups: ${e instanceof Error ? e.message : String(e)}`,
+      });
+    }
+  }, [addLog]);
+
+  const handleRollback = async (tool: Tool) => {
+    setBusyTools((prev) => ({ ...prev, [tool.id]: true }));
+    try {
+      const result = await rollbackTool(tool.id);
+      toast.success(`Reverted ${tool.name}: ${result}`);
+      addLog({ level: "info", message: `Rolled back ${tool.id}: ${result}` });
+      await refreshTool(tool.id);
+      await refreshBackups();
+    } catch (e) {
+      toast.error(
+        `Rollback failed: ${e instanceof Error ? e.message : String(e)}`
+      );
+    } finally {
+      setBusyTools((prev) => ({ ...prev, [tool.id]: false }));
+    }
+  };
+
+  const handleCleanupBackup = async (tool: Tool) => {
+    try {
+      const result = await cleanupToolBackup(tool.id);
+      toast.success(`Old ${tool.name} removed: ${result}`);
+      addLog({ level: "info", message: `Cleaned backup ${tool.id}: ${result}` });
+      await refreshBackups();
+    } catch (e) {
+      toast.error(
+        `Cleanup failed: ${e instanceof Error ? e.message : String(e)}`
+      );
+    }
+  };
+
+  const handleCleanupAll = async () => {
+    try {
+      const result = await cleanupAllBackups();
+      toast.success(result);
+      addLog({ level: "info", message: `Cleanup all: ${result}` });
+      await refreshBackups();
+    } catch (e) {
+      toast.error(
+        `Cleanup failed: ${e instanceof Error ? e.message : String(e)}`
+      );
+    }
+  };
+
+  /* Refresh backup flags on mount */
+  useEffect(() => {
+    void refreshBackups();
+  }, [refreshBackups]);
+
   /* ── Derived state ── */
   const actionableCount = tools.filter(
     (t) => t.updateAvailable || t.status === "Missing"
   ).length;
   const anyBusy = Object.values(busyTools).some(Boolean);
+  const hasAnyBackup = tools.some((t) => t.hasBackup);
 
   /* ── Tool Row ── */
   const ToolRow = ({ tool, isLast }: { tool: Tool; isLast: boolean }) => {
@@ -543,6 +616,26 @@ export function ToolsScreen() {
                   Reset to auto-detect
                 </DropdownMenuItem>
               )}
+              {tool.hasBackup && (
+                <>
+                  <DropdownMenuSeparator />
+                  <DropdownMenuItem
+                    onClick={() => handleRollback(tool)}
+                    disabled={isBusy}
+                  >
+                    <Undo2 className="w-3.5 h-3.5 mr-2" />
+                    Revert to previous
+                  </DropdownMenuItem>
+                  <DropdownMenuItem
+                    onClick={() => handleCleanupBackup(tool)}
+                    disabled={isBusy}
+                    className="text-muted-foreground"
+                  >
+                    <Trash2 className="w-3.5 h-3.5 mr-2" />
+                    Delete old version
+                  </DropdownMenuItem>
+                </>
+              )}
             </DropdownMenuContent>
           </DropdownMenu>
         </div>
@@ -573,6 +666,18 @@ export function ToolsScreen() {
                 </p>
               </div>
               <div className="flex items-center gap-2">
+                {hasAnyBackup && (
+                  <MotionButton
+                    variant="ghost"
+                    size="sm"
+                    onClick={handleCleanupAll}
+                    disabled={anyBusy}
+                    className="h-9 text-muted-foreground hover:text-foreground"
+                  >
+                    <Trash2 className="w-4 h-4 mr-2" />
+                    Clean up backups
+                  </MotionButton>
+                )}
                 <MotionButton
                   variant="outline"
                   size="sm"

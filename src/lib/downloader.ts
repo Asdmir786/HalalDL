@@ -7,7 +7,7 @@ import { appDataDir, join } from "@tauri-apps/api/path";
 import { BaseDirectory, exists, mkdir } from "@tauri-apps/plugin-fs";
 import { convertFileSrc } from "@tauri-apps/api/core";
 import { OutputParser } from "@/lib/output-parser";
-import { copyFilesToClipboard, deleteFile } from "@/lib/commands";
+import { copyFilesToClipboard, deleteFile, renameFile, downloadUrlToFile } from "@/lib/commands";
 
 import { sendNotification, requestPermission, isPermissionGranted } from '@tauri-apps/plugin-notification';
 
@@ -379,6 +379,17 @@ export async function startDownload(jobId: string) {
     return next;
   };
 
+  /** Remove a --flag value pair from an args array (e.g. --postprocessor-args "...") */
+  const removeFlagWithValueFromArgs = (a: string[], flag: string): string[] => {
+    const out = [...a];
+    let idx = out.indexOf(flag);
+    while (idx !== -1) {
+      out.splice(idx, 2);
+      idx = out.indexOf(flag);
+    }
+    return out;
+  };
+
   const buildFallbackAttempts = (sourceArgs: string[]) => {
     const formatIndex = sourceArgs.indexOf("-f");
     const formatValue = formatIndex !== -1 ? sourceArgs[formatIndex + 1] : "";
@@ -387,21 +398,66 @@ export async function startDownload(jobId: string) {
       sourceArgs.includes("--audio-format") ||
       (formatValue ? formatValue.startsWith("bestaudio") : false);
 
-    const fallbacks = audioOnly
-      ? ["bestaudio", "best"]
-      : ["bestvideo+bestaudio/best", "best[ext=mp4]/best", "best"];
+    // Strip bracket filters for a relaxed version of the original selector.
+    const stripped = formatValue.replace(/\[[^\]]*\]/g, "");
+    const simplified = [...new Set(stripped.split("/").filter(Boolean))].join("/");
 
-    return fallbacks.map((fmt) => ({ format: fmt, args: buildArgsWithFormat(sourceArgs, fmt) }));
+    // Clean download args: strip ALL conversion/recode/postprocessor flags.
+    // The fallback just downloads the best available — conversion is separate.
+    const buildCleanArgs = (format: string) => {
+      let next = buildArgsWithFormat(sourceArgs, format);
+      next = removeFlagWithValueFromArgs(next, "--postprocessor-args");
+      next = removeFlagWithValueFromArgs(next, "--recode-video");
+      return next;
+    };
+
+    const fallbacks: Array<{ format: string; args: string[] }> = [];
+
+    // 1) Relaxed version of the original (same selectors, no filters)
+    if (simplified && simplified !== formatValue) {
+      fallbacks.push({ format: simplified, args: buildCleanArgs(simplified) });
+    }
+
+    // 2) Fully generic — just get the content
+    const genericFmt = audioOnly ? "bestaudio" : "bestvideo+bestaudio/best";
+    if (!fallbacks.some((f) => f.format === genericFmt)) {
+      fallbacks.push({ format: genericFmt, args: buildCleanArgs(genericFmt) });
+    }
+
+    // 3) Absolute last resort
+    fallbacks.push({ format: "best", args: buildCleanArgs("best") });
+
+    return fallbacks;
   };
 
-  const removeFlagWithValueFromArgs = (sourceArgs: string[], flag: string) => {
-    const next = [...sourceArgs];
-    let index = next.indexOf(flag);
-    while (index !== -1) {
-      next.splice(index, 2);
-      index = next.indexOf(flag);
+  /** Determine FFmpeg conversion args needed after a fallback download.
+   *  Returns null if no conversion is needed. */
+  const getFallbackConversionArgs = (): string[] | null => {
+    const formatIndex = args.indexOf("-f");
+    const formatValue = formatIndex !== -1 ? args[formatIndex + 1] : "";
+    const audioOnly =
+      args.includes("-x") || args.includes("--audio-format") ||
+      (formatValue ? formatValue.startsWith("bestaudio") : false);
+    if (audioOnly) return null; // audio presets handle conversion via -x/--audio-format
+
+    // 1) Preset has explicit VideoConvertor args (e.g. WhatsApp Optimized, ProRes)
+    const ppIdx = args.indexOf("--postprocessor-args");
+    if (ppIdx !== -1 && args[ppIdx + 1]?.includes("VideoConvertor:")) {
+      return args[ppIdx + 1].replace("VideoConvertor:", "").split(/\s+/).filter(Boolean);
     }
-    return next;
+
+    // 2) Preset wanted H.264 (format had [vcodec^=avc1]) — use safe defaults
+    if (/\[vcodec\^=avc1\]/.test(formatValue)) {
+      return ["-c:v", "libx264", "-pix_fmt", "yuv420p", "-c:a", "aac", "-movflags", "+faststart"];
+    }
+
+    // 3) Preset had --recode-video — already handled by case 1 normally,
+    //    but catch any remaining recode-only presets (just copy streams)
+    if (args.includes("--recode-video")) {
+      return ["-c:v", "copy", "-c:a", "copy"];
+    }
+
+    return null;
   };
 
   const stripExternalDownloaderArgs = (sourceArgs: string[]) => {
@@ -570,9 +626,10 @@ export async function startDownload(jobId: string) {
     result = await runDownload(activeArgs);
   }
 
+  let didFallback = false;
+
   if (result.code !== 0 && result.formatUnavailable) {
     const fallbackAttempts = buildFallbackAttempts(activeArgs);
-    let fallbackSucceeded = false;
 
     for (const [index, attempt] of fallbackAttempts.entries()) {
       updateJob(jobId, {
@@ -584,7 +641,7 @@ export async function startDownload(jobId: string) {
       addLog({ level: "info", message: `Retrying with fallback format:\n${ytDlp.path} ${fallbackQuoted}`, jobId });
       result = await runDownload(attempt.args);
       if (result.code === 0) {
-        fallbackSucceeded = true;
+        didFallback = true;
         addLog({ level: "info", message: `Fallback succeeded with format: ${attempt.format}`, jobId });
         updateJob(jobId, {
           fallbackUsed: true,
@@ -598,8 +655,57 @@ export async function startDownload(jobId: string) {
       }
     }
 
-    if (!fallbackSucceeded && result.code !== 0 && result.formatUnavailable) {
+    if (!didFallback && result.code !== 0 && result.formatUnavailable) {
       addLog({ level: "error", message: "All fallback formats failed", jobId });
+    }
+  }
+
+  // ── Separate FFmpeg conversion after fallback ────────────────────────
+  // If fallback downloaded the best available (potentially wrong codec),
+  // run FFmpeg directly to convert to the format the preset intended.
+  if (result.code === 0 && didFallback && result.lastKnownOutputPath) {
+    const conversionArgs = getFallbackConversionArgs();
+    if (conversionArgs) {
+      const inputPath = result.lastKnownOutputPath;
+      // Target container from the original preset args
+      const mergeIdx = args.indexOf("--merge-output-format");
+      const targetExt = mergeIdx !== -1 ? args[mergeIdx + 1] : "mp4";
+      const baseName = inputPath.replace(/\.[^.]+$/, "");
+      const tmpPath = `${baseName}.converting.${targetExt}`;
+      const finalPath = `${baseName}.${targetExt}`;
+
+      updateJob(jobId, {
+        status: "Post-processing",
+        phase: "Converting with FFmpeg",
+        statusDetail: "Converting to target format",
+        progress: 99,
+      });
+
+      const ffmpegArgs = ["-i", inputPath, ...conversionArgs, "-y", tmpPath];
+      const ffmpegQuoted = ffmpegArgs.map(a => a.includes(" ") ? `"${a}"` : a).join(" ");
+      addLog({ level: "info", message: `Running separate FFmpeg conversion:\n${ffmpeg.path} ${ffmpegQuoted}`, jobId });
+
+      const ffmpegCmd = Command.create(ffmpeg.command, ffmpegArgs);
+      const ffmpegResult = await ffmpegCmd.execute();
+
+      if (ffmpegResult.code === 0) {
+        addLog({ level: "info", message: "FFmpeg conversion succeeded, replacing original file", jobId });
+        try {
+          await deleteFile(inputPath);
+          if (tmpPath !== finalPath) {
+            await renameFile(tmpPath, finalPath);
+          }
+          // Update result path in case extension changed (e.g. .webm → .mp4)
+          result.lastKnownOutputPath = finalPath;
+        } catch (e) {
+          addLog({ level: "error", message: `File swap failed: ${e}`, jobId });
+          try { await deleteFile(tmpPath); } catch { void 0; }
+        }
+      } else {
+        addLog({ level: "error", message: `FFmpeg conversion failed (code ${ffmpegResult.code}):\n${ffmpegResult.stderr}`, jobId });
+        // Keep the original unconverted file — better than nothing
+        try { await deleteFile(tmpPath); } catch { void 0; }
+      }
     }
   }
 
@@ -748,39 +854,21 @@ export async function fetchMetadata(jobId: string) {
 
     addLog({ level: "warn", message: `[meta] No local thumbnail file produced by --write-thumbnail`, jobId });
 
-    // Phase 2: If we got a thumbnail URL from yt-dlp, try downloading it directly
+    // Phase 2: If we got a thumbnail URL, download it directly via HTTP (no yt-dlp)
     if (thumbnailUrl && /^https?:/i.test(thumbnailUrl) && thumbnailUrl.toUpperCase() !== "NA") {
-      addLog({ level: "info", message: `[meta] Phase 2: Downloading thumbnail URL directly via yt-dlp`, jobId });
+      // Determine extension from URL path (default to jpg)
+      const urlExt = (thumbnailUrl.split("?")[0].match(/\.(jpe?g|webp|png)$/i)?.[1] || "jpg").toLowerCase();
+      const thumbFileName = `${jobId}.${urlExt === "jpeg" ? "jpg" : urlExt}`;
+      const thumbDest = await join(thumbsDir, thumbFileName);
+      const thumbRelPath = `thumbnails/${thumbFileName}`;
 
-      const dlThumbArgs = [
-        "--no-check-certificates",
-        "--referer", job.url,
-        "-o", await join(thumbsDir, `${jobId}.%(ext)s`),
-        thumbnailUrl,
-      ];
+      addLog({ level: "info", message: `[meta] Phase 2: Direct HTTP download → ${thumbRelPath}`, jobId });
 
-      if (ffmpeg.isLocal) {
-        const ffmpegDir = ffmpeg.path.replace(/\\ffmpeg\.exe$/, "");
-        dlThumbArgs.unshift("--ffmpeg-location", ffmpegDir);
-      }
-
-      addLog({ level: "info", message: `[meta] Phase 2: yt-dlp ${dlThumbArgs.join(" ")}`, jobId });
-
-      // yt-dlp can download arbitrary URLs as "generic" extractor
-      const dlThumbCmd = Command.create(ytDlp.command, dlThumbArgs, { env: ytDlpEnv() });
-      const dlThumbOutput = await dlThumbCmd.execute();
-
-      addLog({ level: "info", message: `[meta] Phase 2 exit code: ${dlThumbOutput.code}`, jobId });
-      if (dlThumbOutput.stderr.trim()) {
-        addLog({ level: "warn", message: `[meta] Phase 2 stderr: ${dlThumbOutput.stderr.trim().substring(0, 500)}`, jobId });
-      }
-
-      // Check for any image file that appeared
-      for (const ext of ["jpg", "webp", "png", "jpeg"]) {
-        const relPath = `thumbnails/${jobId}.${ext}`;
-        if (await exists(relPath, { baseDir: BaseDirectory.AppData })) {
-          addLog({ level: "info", message: `[meta] Phase 2 thumbnail downloaded: ${relPath}`, jobId });
-          const assetUrl = await thumbnailAssetUrl(relPath);
+      try {
+        await downloadUrlToFile(thumbnailUrl, thumbDest, job.url);
+        if (await exists(thumbRelPath, { baseDir: BaseDirectory.AppData })) {
+          addLog({ level: "info", message: `[meta] Phase 2 thumbnail downloaded: ${thumbRelPath}`, jobId });
+          const assetUrl = await thumbnailAssetUrl(thumbRelPath);
           updateJob(jobId, {
             thumbnail: assetUrl,
             thumbnailStatus: "ready",
@@ -788,6 +876,9 @@ export async function fetchMetadata(jobId: string) {
           });
           return;
         }
+        addLog({ level: "warn", message: `[meta] Phase 2: file not found after download`, jobId });
+      } catch (e) {
+        addLog({ level: "warn", message: `[meta] Phase 2 HTTP download failed: ${String(e)}`, jobId });
       }
 
       addLog({ level: "warn", message: `[meta] Phase 2 failed: no file produced`, jobId });

@@ -16,6 +16,7 @@ import {
   fetchLatestAria2Version,
   fetchLatestDenoVersion,
   isUpdateAvailable,
+  listToolBackups,
 } from "@/lib/commands";
 import { toast } from "sonner";
 import { isPermissionGranted, requestPermission, sendNotification } from '@tauri-apps/plugin-notification';
@@ -206,6 +207,19 @@ export function PersistenceManager() {
 
         // Check installed tool versions
         await checkTools();
+
+        // Check for .old backups so UI can show revert/cleanup options
+        try {
+          const backupIds = await listToolBackups();
+          const currentTools = useToolsStore.getState().tools;
+          for (const t of currentTools) {
+            updateTool(t.id, { hasBackup: backupIds.includes(t.id) });
+          }
+          addLog({ level: "debug", message: `Backups found: ${backupIds.length > 0 ? backupIds.join(", ") : "none"}` });
+        } catch (e) {
+          addLog({ level: "warn", message: `Failed to list backups: ${String(e)}` });
+        }
+
         initialized.current = true;
 
         // Check latest available versions in background (non-blocking)
