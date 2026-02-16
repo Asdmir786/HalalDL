@@ -82,7 +82,6 @@ export function Sidebar() {
         count: activeCount,
         badgeClassName: "border border-white/20 bg-white/10 text-foreground/90 backdrop-blur-xl shadow-sm",
         iconClassName: "text-foreground/95",
-        pulse: true,
       };
     }
     if (queuedCount > 0) {
@@ -91,7 +90,6 @@ export function Sidebar() {
         count: queuedCount,
         badgeClassName: "border border-white/15 bg-white/5 text-foreground/80 backdrop-blur-xl",
         iconClassName: "text-foreground/85",
-        pulse: false,
       };
     }
     if (failedCount > 0) {
@@ -100,7 +98,6 @@ export function Sidebar() {
         count: failedCount,
         badgeClassName: "border border-white/10 bg-background/70 text-foreground/75 backdrop-blur-xl",
         iconClassName: "text-foreground/80",
-        pulse: false,
       };
     }
     if (doneCount > 0) {
@@ -109,7 +106,6 @@ export function Sidebar() {
         count: 0,
         badgeClassName: "",
         iconClassName: "text-foreground/75",
-        pulse: false,
       };
     }
     return {
@@ -117,7 +113,6 @@ export function Sidebar() {
       count: 0,
       badgeClassName: "",
       iconClassName: "text-muted-foreground",
-      pulse: false,
     };
   }, [activeCount, queuedCount, failedCount, doneCount]);
 
@@ -173,22 +168,15 @@ export function Sidebar() {
                 />
               )}
 
-              <span className="relative z-10">
+              <span className="relative z-10 inline-flex h-5 w-5 items-center justify-center overflow-visible">
                 <NavIcon className={cn(
                   "w-5 h-5 shrink-0",
                   isDownloadsItem && downloadNavMeta.iconClassName,
                   !isActive && "group-hover:scale-110 transition-transform duration-200"
                 )} />
-                {isDownloadsItem && downloadNavMeta.pulse && (
-                  <motion.span
-                    className="absolute -bottom-0.5 -left-0.5 h-2 w-2 rounded-full bg-foreground/70"
-                    animate={{ opacity: [0.35, 1, 0.35], scale: [0.85, 1, 0.85] }}
-                    transition={{ duration: 1.6, repeat: Infinity, ease: "easeInOut" }}
-                  />
-                )}
-                {isDownloadsItem && downloadNavMeta.count > 0 && (
+                {isDownloadsItem && sidebarCollapsed && downloadNavMeta.count > 0 && (
                   <span className={cn(
-                    "absolute -top-1 -right-1 min-w-5 h-5 px-1.5 rounded-[10px] text-[10px] font-bold flex items-center justify-center",
+                    "absolute -top-2 -right-2 min-w-5 h-5 px-1.5 rounded-[10px] text-[10px] font-bold flex items-center justify-center ring-1 ring-background/80",
                     downloadNavMeta.badgeClassName
                   )}>
                     {downloadNavMeta.count}
@@ -197,7 +185,19 @@ export function Sidebar() {
               </span>
               
               {!sidebarCollapsed && (
-                <span className="truncate z-10 relative">{item.label}</span>
+                <span className="truncate z-10 relative inline-flex items-center gap-2">
+                  <span className="truncate">{item.label}</span>
+                  {isDownloadsItem && downloadNavMeta.count > 0 && (
+                    <span
+                      className={cn(
+                        "inline-flex h-5 min-w-5 items-center justify-center rounded-[10px] px-1.5 text-[10px] font-semibold",
+                        downloadNavMeta.badgeClassName
+                      )}
+                    >
+                      {downloadNavMeta.count}
+                    </span>
+                  )}
+                </span>
               )}
             </MotionButton>
           );
