@@ -1,4 +1,4 @@
-import { AlertTriangle, CheckCircle2, Clock3, Loader2, Play } from "lucide-react";
+import { AlertTriangle, CheckCircle2, Clock3, Download, Play } from "lucide-react";
 import { MotionButton } from "@/components/motion/MotionButton";
 
 interface DownloadStatsBarProps {
@@ -29,8 +29,7 @@ export function DownloadStatsBar({
     {
       id: "active",
       label: `${activeCount} active`,
-      Icon: Loader2,
-      iconClassName: "animate-spin",
+      Icon: Download,
       className:
         "border-blue-500/20 bg-blue-500/10 text-blue-300",
     },
@@ -53,12 +52,12 @@ export function DownloadStatsBar({
   return (
     <div className="flex items-center justify-between pt-2 border-t border-muted/50 gap-3">
       <div className="flex items-center gap-2 text-[11px] font-semibold tabular-nums flex-wrap">
-        {stats.map(({ id, label, Icon, className, iconClassName }) => (
+        {stats.map(({ id, label, Icon, className }) => (
           <div
             key={id}
             className={`inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 backdrop-blur-sm transition-colors ${className}`}
           >
-            <Icon className={`w-3 h-3 ${iconClassName ?? ""}`} />
+            <Icon className="w-3 h-3" />
             <span>{label}</span>
           </div>
         ))}

@@ -3,7 +3,7 @@ import { motion, Variants } from "framer-motion";
 import { 
   X, FolderOpen, Terminal, 
   Copy, RotateCcw, Play, Clock, 
-  CheckCircle2, AlertTriangle, Link, Loader2, Sparkles 
+  CheckCircle2, AlertTriangle, Link, Download, Sparkles 
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { DownloadJob } from "@/store/downloads";
@@ -70,8 +70,7 @@ export function DownloadItem({
                   "text-violet-300 border-violet-500/20 bg-violet-500/10 shadow-[0_0_0_1px_rgba(139,92,246,0.14)]",
               }
             : {
-                Icon: Loader2,
-                iconClassName: "animate-spin",
+                Icon: Download,
                 badgeClassName:
                   "text-blue-300 border-blue-500/20 bg-blue-500/10 shadow-[0_0_0_1px_rgba(59,130,246,0.14)]",
               };
@@ -200,7 +199,7 @@ export function DownloadItem({
                 </div>
 
                 <div className={cn("flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[10px] font-semibold border shadow-sm backdrop-blur-sm transition-colors", statusMeta.badgeClassName)}>
-                    <StatusIcon className={cn("w-3 h-3", statusMeta.iconClassName)} />
+                    <StatusIcon className="w-3 h-3" />
                     <span>{job.status}</span>
                 </div>
               </div>

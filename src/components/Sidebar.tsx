@@ -1,5 +1,8 @@
 import { useNavigationStore, type Screen } from "@/store/navigation";
 import { 
+  AlertTriangle,
+  CheckCircle2,
+  Clock3,
   Download, 
   Settings, 
   ListMusic, 
@@ -48,6 +51,16 @@ export function Sidebar() {
     [jobs]
   );
 
+  const failedCount = useMemo(
+    () => jobs.filter((job) => job.status === "Failed").length,
+    [jobs]
+  );
+
+  const doneCount = useMemo(
+    () => jobs.filter((job) => job.status === "Done").length,
+    [jobs]
+  );
+
   const overallProgress = useMemo(() => {
     const active = jobs.filter(
       (job) => job.status === "Downloading" || job.status === "Post-processing"
@@ -61,6 +74,47 @@ export function Sidebar() {
     const total = activeCount + queuedCount;
     return `${String(activeCount).padStart(2, "0")}/${String(total).padStart(2, "0")}`;
   }, [activeCount, queuedCount]);
+
+  const downloadNavMeta = useMemo(() => {
+    if (activeCount > 0) {
+      return {
+        Icon: Download,
+        count: activeCount,
+        badgeClassName: "bg-blue-500 text-white",
+        iconClassName: "text-blue-300",
+      };
+    }
+    if (queuedCount > 0) {
+      return {
+        Icon: Clock3,
+        count: queuedCount,
+        badgeClassName: "bg-yellow-500 text-black",
+        iconClassName: "text-yellow-300",
+      };
+    }
+    if (failedCount > 0) {
+      return {
+        Icon: AlertTriangle,
+        count: failedCount,
+        badgeClassName: "bg-destructive text-destructive-foreground",
+        iconClassName: "text-destructive",
+      };
+    }
+    if (doneCount > 0) {
+      return {
+        Icon: CheckCircle2,
+        count: 0,
+        badgeClassName: "",
+        iconClassName: "text-emerald-400",
+      };
+    }
+    return {
+      Icon: Download,
+      count: 0,
+      badgeClassName: "",
+      iconClassName: "",
+    };
+  }, [activeCount, queuedCount, failedCount, doneCount]);
 
   const showGlobalProgress = activeCount > 0 && currentScreen !== "downloads";
 
@@ -87,6 +141,8 @@ export function Sidebar() {
         {NAV_ITEMS.map((item) => {
           const Icon = item.icon;
           const isActive = currentScreen === item.id;
+          const isDownloadsItem = item.id === "downloads";
+          const NavIcon = isDownloadsItem ? downloadNavMeta.Icon : Icon;
           return (
             <MotionButton
               key={item.id}
@@ -112,13 +168,17 @@ export function Sidebar() {
               )}
 
               <span className="relative z-10">
-                <Icon className={cn(
+                <NavIcon className={cn(
                   "w-5 h-5 shrink-0",
+                  isDownloadsItem && downloadNavMeta.iconClassName,
                   !isActive && "group-hover:scale-110 transition-transform duration-200"
                 )} />
-                {item.id === "downloads" && activeCount > 0 && (
-                  <span className="absolute -top-1 -right-1 min-w-5 h-5 px-1 rounded-full bg-primary text-primary-foreground text-[10px] font-bold flex items-center justify-center shadow">
-                    {activeCount}
+                {isDownloadsItem && downloadNavMeta.count > 0 && (
+                  <span className={cn(
+                    "absolute -top-1 -right-1 min-w-5 h-5 px-1 rounded-full text-[10px] font-bold flex items-center justify-center shadow",
+                    downloadNavMeta.badgeClassName
+                  )}>
+                    {downloadNavMeta.count}
                   </span>
                 )}
               </span>
@@ -136,7 +196,10 @@ export function Sidebar() {
           <div className={cn("rounded-xl border border-white/10 bg-muted/10 glass-card", sidebarCollapsed ? "p-2" : "p-3")}>
             {!sidebarCollapsed && (
               <div className="flex items-center justify-between mb-2">
-                <span className="text-xs font-semibold text-foreground/90">Downloading</span>
+                <span className="inline-flex items-center gap-1.5 text-xs font-semibold text-foreground/90">
+                  <Download className="w-3.5 h-3.5 text-blue-300" />
+                  Downloading
+                </span>
                 <span className="text-[10px] font-mono text-muted-foreground">{queueStatus}</span>
               </div>
             )}
