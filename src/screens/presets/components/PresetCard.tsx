@@ -29,9 +29,9 @@ export function PresetCard({ preset, onDuplicate, onEdit, onDelete }: PresetCard
     <Card className="flex flex-col h-full hover:shadow-md transition-shadow duration-200 border-muted/60 overflow-hidden glass-card">
       <CardHeader className="pb-3">
         <div className="flex justify-between items-start gap-2">
-          <div className="space-y-1 min-w-0">
-            <CardTitle className="text-lg truncate">{preset.name}</CardTitle>
-            <CardDescription className="text-xs line-clamp-2 h-8 leading-relaxed">
+          <div className="space-y-1.5 min-w-0 flex-1">
+            <CardTitle className="text-base font-bold leading-snug break-words">{preset.name}</CardTitle>
+            <CardDescription className="text-xs leading-relaxed">
               {preset.description}
             </CardDescription>
           </div>
@@ -46,8 +46,8 @@ export function PresetCard({ preset, onDuplicate, onEdit, onDelete }: PresetCard
         </div>
       </CardHeader>
       <CardContent className="flex-1 space-y-3">
-        <div className="bg-muted/30 p-3 rounded-lg border border-muted/50 font-mono text-[10px] text-muted-foreground break-all relative group">
-           <div className="line-clamp-3">
+        <div className="bg-muted/30 p-3 rounded-lg border border-muted/50 font-mono text-[10px] text-muted-foreground break-words relative group max-h-24 overflow-y-auto">
+           <div className="line-clamp-4">
               yt-dlp {preset.args.join(" ")}
            </div>
            <MotionButton 

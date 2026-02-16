@@ -2,6 +2,7 @@ import { create } from "zustand";
 
 export type ToolStatus = "Detected" | "Missing" | "Checking";
 export type ToolMode = "Auto" | "Manual" | "Bundled";
+export type ToolChannel = "stable" | "nightly";
 
 export interface Tool {
   id: string;
@@ -13,7 +14,9 @@ export interface Tool {
   updateAvailable?: boolean;
   latestCheckedAt?: number;
   path?: string;
+  systemPath?: string;
   mode: ToolMode;
+  channel: ToolChannel;
   required: boolean;
   hasBackup?: boolean;
 }
@@ -26,12 +29,16 @@ interface ToolsState {
   setDiscoveredToolId: (id: string | null) => void;
 }
 
+/** Tools that support a nightly channel */
+export const NIGHTLY_CAPABLE_TOOLS = ["yt-dlp", "ffmpeg"] as const;
+
 const INITIAL_TOOLS: Tool[] = [
   {
     id: "yt-dlp",
     name: "yt-dlp",
     status: "Checking",
     mode: "Auto",
+    channel: "stable",
     required: true,
   },
   {
@@ -39,6 +46,7 @@ const INITIAL_TOOLS: Tool[] = [
     name: "FFmpeg",
     status: "Checking",
     mode: "Auto",
+    channel: "stable",
     required: false,
   },
   {
@@ -46,6 +54,7 @@ const INITIAL_TOOLS: Tool[] = [
     name: "aria2",
     status: "Checking",
     mode: "Auto",
+    channel: "stable",
     required: false,
   },
   {
@@ -53,6 +62,7 @@ const INITIAL_TOOLS: Tool[] = [
     name: "Deno",
     status: "Checking",
     mode: "Auto",
+    channel: "stable",
     required: false,
   },
 ];

@@ -105,7 +105,7 @@ async function generateThumbnailFromMediaUrl(jobId: string, mediaUrl: string) {
   try {
     updateJob(jobId, {
       phase: "Generating thumbnail",
-      statusDetail: "Creating thumbnail preview",
+      statusDetail: "",
       thumbnailStatus: "generating",
       thumbnailError: undefined,
     });
@@ -140,7 +140,7 @@ async function generateThumbnailFromMediaUrl(jobId: string, mediaUrl: string) {
     if (primaryOutput.code === 0 && (await exists(outputRelativePath, { baseDir: BaseDirectory.AppData }))) {
       addLog({ level: "info", message: `[thumb] Primary extraction succeeded`, jobId });
       const assetUrl = await thumbnailAssetUrl(outputRelativePath);
-      updateJob(jobId, { thumbnail: assetUrl, thumbnailStatus: "ready", statusDetail: "Thumbnail ready" });
+      updateJob(jobId, { thumbnail: assetUrl, thumbnailStatus: "ready" });
       return;
     }
 
@@ -167,7 +167,7 @@ async function generateThumbnailFromMediaUrl(jobId: string, mediaUrl: string) {
     if (fallbackOutput.code === 0 && (await exists(outputRelativePath, { baseDir: BaseDirectory.AppData }))) {
       addLog({ level: "info", message: `[thumb] Fallback extraction succeeded`, jobId });
       const assetUrl = await thumbnailAssetUrl(outputRelativePath);
-      updateJob(jobId, { thumbnail: assetUrl, thumbnailStatus: "ready", statusDetail: "Thumbnail ready" });
+      updateJob(jobId, { thumbnail: assetUrl, thumbnailStatus: "ready" });
       return;
     }
 
@@ -175,14 +175,12 @@ async function generateThumbnailFromMediaUrl(jobId: string, mediaUrl: string) {
     updateJob(jobId, {
       thumbnailStatus: "failed",
       thumbnailError: "Could not generate thumbnail",
-      statusDetail: "Thumbnail unavailable (download completed)",
     });
   } catch (e) {
     addLog({ level: "warn", message: `[thumb] Exception: ${String(e)}`, jobId });
     updateJob(jobId, {
       thumbnailStatus: "failed",
       thumbnailError: String(e),
-      statusDetail: "Thumbnail unavailable (download completed)",
     });
   }
 }
@@ -669,7 +667,10 @@ export async function startDownload(jobId: string) {
       const inputPath = result.lastKnownOutputPath;
       // Target container from the original preset args
       const mergeIdx = args.indexOf("--merge-output-format");
-      const targetExt = mergeIdx !== -1 ? args[mergeIdx + 1] : "mp4";
+      const recodeIdx = args.indexOf("--recode-video");
+      const targetExt = mergeIdx !== -1 ? args[mergeIdx + 1]
+                      : recodeIdx !== -1 ? args[recodeIdx + 1]
+                      : "mp4";
       const baseName = inputPath.replace(/\.[^.]+$/, "");
       const tmpPath = `${baseName}.converting.${targetExt}`;
       const finalPath = `${baseName}.${targetExt}`;
@@ -713,7 +714,7 @@ export async function startDownload(jobId: string) {
     updateJob(jobId, {
       status: "Post-processing",
       phase: "Generating thumbnail",
-      statusDetail: "Finalizing download and generating thumbnail",
+      statusDetail: "Finalizing download",
       progress: 100,
     });
     fetchMetadata(jobId);
@@ -771,7 +772,7 @@ export async function fetchMetadata(jobId: string) {
   try {
     updateJob(jobId, {
       phase: "Generating thumbnail",
-      statusDetail: "Fetching metadata and thumbnail",
+      statusDetail: "Fetching metadata",
     });
 
     const ytDlp = await resolveTool("yt-dlp");
@@ -841,11 +842,7 @@ export async function fetchMetadata(jobId: string) {
       if (await exists(relPath, { baseDir: BaseDirectory.AppData })) {
         addLog({ level: "info", message: `[meta] Thumbnail file found locally: ${relPath}`, jobId });
         const assetUrl = await thumbnailAssetUrl(relPath);
-        updateJob(jobId, {
-          thumbnail: assetUrl,
-          thumbnailStatus: "ready",
-          statusDetail: "Thumbnail ready",
-        });
+        updateJob(jobId, { thumbnail: assetUrl, thumbnailStatus: "ready" });
         thumbFound = true;
         break;
       }
@@ -869,11 +866,7 @@ export async function fetchMetadata(jobId: string) {
         if (await exists(thumbRelPath, { baseDir: BaseDirectory.AppData })) {
           addLog({ level: "info", message: `[meta] Phase 2 thumbnail downloaded: ${thumbRelPath}`, jobId });
           const assetUrl = await thumbnailAssetUrl(thumbRelPath);
-          updateJob(jobId, {
-            thumbnail: assetUrl,
-            thumbnailStatus: "ready",
-            statusDetail: "Thumbnail ready",
-          });
+          updateJob(jobId, { thumbnail: assetUrl, thumbnailStatus: "ready" });
           return;
         }
         addLog({ level: "warn", message: `[meta] Phase 2: file not found after download`, jobId });
@@ -885,11 +878,7 @@ export async function fetchMetadata(jobId: string) {
 
       // Phase 2b: Use the raw URL as-is (works for YouTube, may work for some sources)
       addLog({ level: "info", message: `[meta] Phase 2b: Using thumbnail URL directly as fallback`, jobId });
-      updateJob(jobId, {
-        thumbnail: thumbnailUrl,
-        thumbnailStatus: "ready",
-        statusDetail: "Thumbnail ready (remote URL)",
-      });
+      updateJob(jobId, { thumbnail: thumbnailUrl, thumbnailStatus: "ready" });
       return;
     }
 

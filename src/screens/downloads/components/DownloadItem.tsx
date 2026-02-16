@@ -212,16 +212,49 @@ export function DownloadItem({
                     </div>
                     {job.phase === "Converting with FFmpeg" || job.phase === "Merging streams" ? (
                       <>
-                        <div className="flex items-center justify-between w-full text-[10px] font-mono font-medium text-muted-foreground">
-                          <span className="text-foreground">FFmpeg</span>
-                          <span className="opacity-70 animate-pulse">Converting...</span>
+                        <div className="flex items-center justify-between w-full text-[10px] font-mono font-medium">
+                          <span className="flex items-center gap-1.5 text-foreground">
+                            <motion.span
+                              className="inline-block w-1.5 h-1.5 rounded-full bg-amber-400"
+                              animate={{ opacity: [1, 0.3, 1], scale: [1, 0.8, 1] }}
+                              transition={{ duration: 1.2, repeat: Infinity, ease: "easeInOut" }}
+                            />
+                            FFmpeg
+                          </span>
+                          <motion.span
+                            className="text-muted-foreground"
+                            animate={{ opacity: [0.5, 1, 0.5] }}
+                            transition={{ duration: 2, repeat: Infinity, ease: "easeInOut" }}
+                          >
+                            {job.phase === "Merging streams" ? "Merging..." : "Converting..."}
+                          </motion.span>
                         </div>
-                        <div className="w-full h-1.5 bg-muted/50 rounded-full overflow-hidden">
+                        <div className="relative w-full h-1.5 bg-muted/30 rounded-full overflow-hidden">
                           <motion.div
-                            className="h-full bg-linear-to-r from-primary/60 via-primary to-primary/60 rounded-full"
+                            className="absolute inset-0 rounded-full"
+                            style={{
+                              background: "linear-gradient(90deg, transparent, rgba(251,191,36,0.15), transparent)",
+                            }}
                             animate={{ x: ["-100%", "100%"] }}
-                            transition={{ duration: 1.5, repeat: Infinity, ease: "easeInOut" }}
-                            style={{ width: "50%" }}
+                            transition={{ duration: 2, repeat: Infinity, ease: "linear" }}
+                          />
+                          <motion.div
+                            className="absolute h-full rounded-full"
+                            style={{
+                              background: "linear-gradient(90deg, rgba(251,191,36,0.6), rgba(251,191,36,0.9), rgba(251,191,36,0.6))",
+                              width: "40%",
+                            }}
+                            animate={{ left: ["-40%", "100%"] }}
+                            transition={{ duration: 1.8, repeat: Infinity, ease: [0.4, 0, 0.2, 1] }}
+                          />
+                          <motion.div
+                            className="absolute h-full rounded-full"
+                            style={{
+                              background: "linear-gradient(90deg, transparent, rgba(251,191,36,0.4), transparent)",
+                              width: "25%",
+                            }}
+                            animate={{ left: ["-25%", "100%"] }}
+                            transition={{ duration: 1.8, repeat: Infinity, ease: [0.4, 0, 0.2, 1], delay: 0.6 }}
                           />
                         </div>
                       </>

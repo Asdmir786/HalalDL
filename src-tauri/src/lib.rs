@@ -148,15 +148,155 @@ async fn resolve_latest_aria2_zip_url(app_handle: &tauri::AppHandle) -> Result<S
     Err("No matching aria2 Windows zip asset found".to_string())
 }
 
+/// Resolve the full system path of a tool using `where` (Windows).
 #[tauri::command]
-async fn download_tools(app_handle: tauri::AppHandle, tools: Vec<String>) -> Result<String, String> {
+fn resolve_system_tool_path(tool: String) -> Result<Option<String>, String> {
+    let bin_name = match tool.as_str() {
+        "yt-dlp" => "yt-dlp.exe",
+        "ffmpeg" => "ffmpeg.exe",
+        "aria2"  => "aria2c.exe",
+        "deno"   => "deno.exe",
+        _ => return Err(format!("Unknown tool: {}", tool)),
+    };
+
+    #[cfg(target_os = "windows")]
+    {
+        let output = std::process::Command::new("where")
+            .arg(bin_name)
+            .output()
+            .map_err(|e| format!("Failed to run 'where': {}", e))?;
+
+        if output.status.success() {
+            let stdout = String::from_utf8_lossy(&output.stdout);
+            let first_path = stdout.lines().next().unwrap_or("").trim();
+            if !first_path.is_empty() {
+                return Ok(Some(first_path.to_string()));
+            }
+        }
+    }
+
+    #[cfg(not(target_os = "windows"))]
+    {
+        let output = std::process::Command::new("which")
+            .arg(bin_name.trim_end_matches(".exe"))
+            .output()
+            .map_err(|e| format!("Failed to run 'which': {}", e))?;
+
+        if output.status.success() {
+            let stdout = String::from_utf8_lossy(&output.stdout);
+            let first_path = stdout.lines().next().unwrap_or("").trim();
+            if !first_path.is_empty() {
+                return Ok(Some(first_path.to_string()));
+            }
+        }
+    }
+
+    Ok(None)
+}
+
+/// Update a tool at its original (system) location instead of the app bin dir.
+/// `variant` controls which FFmpeg build to download (Full Build / Essentials / Shared).
+/// `channel` controls stable vs nightly (only yt-dlp and ffmpeg support nightly).
+#[tauri::command]
+async fn update_tool_at_path(
+    app_handle: tauri::AppHandle,
+    tool: String,
+    dest_dir: String,
+    variant: Option<String>,
+    channel: Option<String>,
+) -> Result<String, String> {
+    let dest = PathBuf::from(&dest_dir);
+    if !dest.exists() {
+        return Err(format!("Directory does not exist: {}", dest_dir));
+    }
+
+    let is_nightly = channel.as_deref().unwrap_or("stable") == "nightly";
+
+    match tool.as_str() {
+        "yt-dlp" => {
+            let url = if is_nightly {
+                "https://github.com/yt-dlp/yt-dlp-nightly-builds/releases/latest/download/yt-dlp.exe"
+            } else {
+                "https://github.com/yt-dlp/yt-dlp/releases/latest/download/yt-dlp.exe"
+            };
+            download_file(&app_handle, "yt-dlp", url, &dest.join("yt-dlp.exe")).await?;
+        }
+        "ffmpeg" => {
+            let variant_lower = variant.as_deref().unwrap_or("").to_lowercase();
+            if is_nightly {
+                let url = if variant_lower.contains("essentials") {
+                    "https://www.gyan.dev/ffmpeg/builds/ffmpeg-git-essentials.7z"
+                } else {
+                    "https://www.gyan.dev/ffmpeg/builds/ffmpeg-git-full.7z"
+                };
+                let archive_path = dest.join("ffmpeg-update.7z");
+                download_file(&app_handle, "ffmpeg", url, &archive_path).await?;
+                emit_progress(&app_handle, "ffmpeg", 99.0, "Extracting ffmpeg.exe, ffprobe.exe from 7z...");
+                let extracted = extract_from_7z(&app_handle, "ffmpeg", &archive_path, &dest, vec!["ffmpeg.exe", "ffprobe.exe"])?;
+                emit_progress(&app_handle, "ffmpeg", 100.0, &format!("Extracted: {}", extracted.join(", ")));
+                if let Err(e) = fs::remove_file(&archive_path) {
+                    eprintln!("[tools] Warning: failed to clean up {:?}: {}", archive_path, e);
+                }
+            } else {
+                let url = if variant_lower.contains("shared") {
+                    "https://www.gyan.dev/ffmpeg/builds/ffmpeg-release-full-shared.zip"
+                } else if variant_lower.contains("essentials") {
+                    "https://www.gyan.dev/ffmpeg/builds/ffmpeg-release-essentials.zip"
+                } else {
+                    "https://www.gyan.dev/ffmpeg/builds/ffmpeg-release-full.zip"
+                };
+                let zip_path = dest.join("ffmpeg-update.zip");
+                download_file(&app_handle, "ffmpeg", url, &zip_path).await?;
+                emit_progress(&app_handle, "ffmpeg", 99.0, "Extracting ffmpeg.exe, ffprobe.exe...");
+                let extracted = extract_from_zip(&app_handle, "ffmpeg", &zip_path, &dest, vec!["ffmpeg.exe", "ffprobe.exe"])?;
+                emit_progress(&app_handle, "ffmpeg", 100.0, &format!("Extracted: {}", extracted.join(", ")));
+                if let Err(e) = fs::remove_file(&zip_path) {
+                    eprintln!("[tools] Warning: failed to clean up {:?}: {}", zip_path, e);
+                }
+            }
+        }
+        "aria2" => {
+            let url = match resolve_latest_aria2_zip_url(&app_handle).await {
+                Ok(u) => u,
+                Err(_) => "https://github.com/aria2/aria2/releases/download/release-1.37.0/aria2-1.37.0-win-64bit-build1.zip".to_string(),
+            };
+            let zip_path = dest.join("aria2-update.zip");
+            download_file(&app_handle, "aria2", &url, &zip_path).await?;
+            emit_progress(&app_handle, "aria2", 99.0, "Extracting aria2c.exe...");
+            let extracted = extract_from_zip(&app_handle, "aria2", &zip_path, &dest, vec!["aria2c.exe"])?;
+            emit_progress(&app_handle, "aria2", 100.0, &format!("Extracted: {}", extracted.join(", ")));
+            if let Err(e) = fs::remove_file(&zip_path) {
+                eprintln!("[tools] Warning: failed to clean up {:?}: {}", zip_path, e);
+            }
+        }
+        "deno" => {
+            let url = "https://github.com/denoland/deno/releases/latest/download/deno-x86_64-pc-windows-msvc.zip";
+            let zip_path = dest.join("deno-update.zip");
+            download_file(&app_handle, "deno", url, &zip_path).await?;
+            emit_progress(&app_handle, "deno", 99.0, "Extracting deno.exe...");
+            let extracted = extract_from_zip(&app_handle, "deno", &zip_path, &dest, vec!["deno.exe"])?;
+            emit_progress(&app_handle, "deno", 100.0, &format!("Extracted: {}", extracted.join(", ")));
+            if let Err(e) = fs::remove_file(&zip_path) {
+                eprintln!("[tools] Warning: failed to clean up {:?}: {}", zip_path, e);
+            }
+        }
+        _ => return Err(format!("Unknown tool: {}", tool)),
+    }
+
+    Ok(format!("{} updated at {}", tool, dest_dir))
+}
+
+#[tauri::command]
+async fn download_tools(app_handle: tauri::AppHandle, tools: Vec<String>, channels: Option<std::collections::HashMap<String, String>>) -> Result<String, String> {
     #[cfg(not(target_os = "windows"))]
     {
         let _ = app_handle;
         let _ = tools;
+        let _ = channels;
         return Err("download_tools is currently supported on Windows only".to_string());
     }
 
+    let ch = channels.unwrap_or_default();
     let bin_dir = app_handle.path().app_data_dir().map_err(|e: tauri::Error| e.to_string())?.join("bin");
     
     if !bin_dir.exists() {
@@ -165,20 +305,38 @@ async fn download_tools(app_handle: tauri::AppHandle, tools: Vec<String>) -> Res
 
     // 1. Download yt-dlp
     if tools.contains(&"yt-dlp".to_string()) {
-        let yt_dlp_url = "https://github.com/yt-dlp/yt-dlp/releases/latest/download/yt-dlp.exe";
+        let is_nightly = ch.get("yt-dlp").map(|s| s.as_str()) == Some("nightly");
+        let yt_dlp_url = if is_nightly {
+            "https://github.com/yt-dlp/yt-dlp-nightly-builds/releases/latest/download/yt-dlp.exe"
+        } else {
+            "https://github.com/yt-dlp/yt-dlp/releases/latest/download/yt-dlp.exe"
+        };
         download_file(&app_handle, "yt-dlp", yt_dlp_url, &bin_dir.join("yt-dlp.exe")).await?;
     }
 
-    // 2. Download FFmpeg (Full Build — all codecs)
+    // 2. Download FFmpeg
     if tools.contains(&"ffmpeg".to_string()) {
-        let ffmpeg_url = "https://www.gyan.dev/ffmpeg/builds/ffmpeg-release-full.zip";
-        let ffmpeg_zip_path = bin_dir.join("ffmpeg.zip");
-        download_file(&app_handle, "ffmpeg", ffmpeg_url, &ffmpeg_zip_path).await?;
-        emit_progress(&app_handle, "ffmpeg", 99.0, "Extracting ffmpeg.exe, ffprobe.exe...");
-        let extracted = extract_from_zip(&app_handle, "ffmpeg", &ffmpeg_zip_path, &bin_dir, vec!["ffmpeg.exe", "ffprobe.exe"])?;
-        emit_progress(&app_handle, "ffmpeg", 100.0, &format!("Extracted: {}", extracted.join(", ")));
-        if let Err(e) = fs::remove_file(&ffmpeg_zip_path) {
-            eprintln!("[tools] Warning: failed to clean up {:?}: {}", ffmpeg_zip_path, e);
+        let is_nightly = ch.get("ffmpeg").map(|s| s.as_str()) == Some("nightly");
+        if is_nightly {
+            let ffmpeg_url = "https://www.gyan.dev/ffmpeg/builds/ffmpeg-git-full.7z";
+            let ffmpeg_7z_path = bin_dir.join("ffmpeg.7z");
+            download_file(&app_handle, "ffmpeg", ffmpeg_url, &ffmpeg_7z_path).await?;
+            emit_progress(&app_handle, "ffmpeg", 99.0, "Extracting ffmpeg.exe, ffprobe.exe from 7z...");
+            let extracted = extract_from_7z(&app_handle, "ffmpeg", &ffmpeg_7z_path, &bin_dir, vec!["ffmpeg.exe", "ffprobe.exe"])?;
+            emit_progress(&app_handle, "ffmpeg", 100.0, &format!("Extracted: {}", extracted.join(", ")));
+            if let Err(e) = fs::remove_file(&ffmpeg_7z_path) {
+                eprintln!("[tools] Warning: failed to clean up {:?}: {}", ffmpeg_7z_path, e);
+            }
+        } else {
+            let ffmpeg_url = "https://www.gyan.dev/ffmpeg/builds/ffmpeg-release-full.zip";
+            let ffmpeg_zip_path = bin_dir.join("ffmpeg.zip");
+            download_file(&app_handle, "ffmpeg", ffmpeg_url, &ffmpeg_zip_path).await?;
+            emit_progress(&app_handle, "ffmpeg", 99.0, "Extracting ffmpeg.exe, ffprobe.exe...");
+            let extracted = extract_from_zip(&app_handle, "ffmpeg", &ffmpeg_zip_path, &bin_dir, vec!["ffmpeg.exe", "ffprobe.exe"])?;
+            emit_progress(&app_handle, "ffmpeg", 100.0, &format!("Extracted: {}", extracted.join(", ")));
+            if let Err(e) = fs::remove_file(&ffmpeg_zip_path) {
+                eprintln!("[tools] Warning: failed to clean up {:?}: {}", ffmpeg_zip_path, e);
+            }
         }
     }
 
@@ -441,6 +599,63 @@ fn extract_from_zip(app_handle: &tauri::AppHandle, tool_name: &str, zip_path: &P
     Ok(found_targets)
 }
 
+fn extract_from_7z(app_handle: &tauri::AppHandle, tool_name: &str, archive_path: &PathBuf, dest_dir: &PathBuf, targets: Vec<&str>) -> Result<Vec<String>, String> {
+    emit_progress(app_handle, tool_name, 99.0, "Opening 7z archive...");
+    let mut found_targets: Vec<String> = Vec::new();
+
+    let file = fs::File::open(archive_path).map_err(|e| format!("Failed to open 7z archive: {}", e))?;
+
+    fn to_7z_err(msg: String) -> sevenz_rust::Error {
+        sevenz_rust::Error::Other(std::borrow::Cow::Owned(msg))
+    }
+
+    sevenz_rust::decompress_with_extract_fn(file, dest_dir, |entry, reader, _dest| {
+        let entry_name = entry.name().to_string();
+        let file_name = Path::new(&entry_name)
+            .file_name()
+            .unwrap_or_default()
+            .to_string_lossy()
+            .to_string();
+
+        if !targets.iter().any(|&t| file_name.eq_ignore_ascii_case(t)) {
+            return Ok(true);
+        }
+
+        let target_name = file_name.clone();
+        let dest_file = dest_dir.join(&target_name);
+        let temp_dest = dest_file.with_file_name(format!("{}.new", target_name));
+
+        if temp_dest.exists() {
+            let _ = fs::remove_file(&temp_dest);
+        }
+
+        let mut outfile = fs::File::create(&temp_dest)
+            .map_err(|e| to_7z_err(format!("Failed to create {}: {}", target_name, e)))?;
+        std::io::copy(reader, &mut outfile)
+            .map_err(|e| to_7z_err(format!("Failed to extract {}: {}", target_name, e)))?;
+        outfile.flush()
+            .map_err(|e| to_7z_err(format!("Failed to flush {}: {}", target_name, e)))?;
+
+        let metadata = fs::metadata(&temp_dest)
+            .map_err(|e| to_7z_err(format!("Metadata read failed: {}", e)))?;
+        if metadata.len() == 0 {
+            return Err(to_7z_err(format!("Extracted file {} is empty", target_name)));
+        }
+
+        safe_replace_with_backup(&dest_file, &temp_dest)
+            .map_err(|e| to_7z_err(e))?;
+
+        found_targets.push(target_name);
+        Ok(true)
+    }).map_err(|e| format!("7z extraction failed: {}", e))?;
+
+    if found_targets.len() != targets.len() {
+        return Err(format!("Missing files from 7z. Found {:?}, expected {:?}", found_targets, targets));
+    }
+
+    Ok(found_targets)
+}
+
 fn emit_progress(app_handle: &tauri::AppHandle, tool: &str, percentage: f64, status: &str) {
     let _ = app_handle.emit("download-progress", DownloadProgress {
         tool: tool.to_string(),
@@ -539,14 +754,21 @@ fn read_text_file(path: String) -> Result<String, String> {
 }
 
 #[tauri::command]
-async fn fetch_latest_ytdlp_version(app_handle: tauri::AppHandle) -> Result<String, String> {
+async fn fetch_latest_ytdlp_version(app_handle: tauri::AppHandle, channel: Option<String>) -> Result<String, String> {
+    let is_nightly = channel.as_deref().unwrap_or("stable") == "nightly";
+    let repo = if is_nightly {
+        "yt-dlp/yt-dlp-nightly-builds"
+    } else {
+        "yt-dlp/yt-dlp"
+    };
+
     let client = reqwest::Client::builder()
         .user_agent(format!("HalalDL/{}", app_handle.package_info().version))
         .build()
         .map_err(|e| e.to_string())?;
 
     let res = client
-        .get("https://api.github.com/repos/yt-dlp/yt-dlp/releases/latest")
+        .get(format!("https://api.github.com/repos/{}/releases/latest", repo))
         .header("Accept", "application/vnd.github+json")
         .send()
         .await
@@ -635,14 +857,21 @@ async fn fetch_latest_deno_version(app_handle: tauri::AppHandle) -> Result<Strin
 }
 
 #[tauri::command]
-async fn fetch_latest_ffmpeg_version(app_handle: tauri::AppHandle) -> Result<String, String> {
+async fn fetch_latest_ffmpeg_version(app_handle: tauri::AppHandle, channel: Option<String>) -> Result<String, String> {
+    let is_nightly = channel.as_deref().unwrap_or("stable") == "nightly";
+    let url = if is_nightly {
+        "https://www.gyan.dev/ffmpeg/builds/git-version"
+    } else {
+        "https://www.gyan.dev/ffmpeg/builds/release-version"
+    };
+
     let client = reqwest::Client::builder()
         .user_agent(format!("HalalDL/{}", app_handle.package_info().version))
         .build()
         .map_err(|e| e.to_string())?;
 
     let res = client
-        .get("https://www.gyan.dev/ffmpeg/builds/release-version")
+        .get(url)
         .header("Accept", "text/plain,*/*")
         .send()
         .await
@@ -1072,27 +1301,45 @@ fn tool_id_for_binary(bin_name: &str) -> Option<&'static str> {
     None
 }
 
-#[tauri::command]
-fn list_tool_backups(app_handle: tauri::AppHandle) -> Result<Vec<String>, String> {
-    let bin_dir = app_handle
-        .path()
-        .app_data_dir()
-        .map_err(|e: tauri::Error| e.to_string())?
-        .join("bin");
+/// Collect directories to check for backups: app bin/ + parent dirs of any system paths.
+fn collect_backup_dirs(app_handle: &tauri::AppHandle, extra_paths: &Option<Vec<String>>) -> Vec<PathBuf> {
+    let mut dirs: Vec<PathBuf> = Vec::new();
 
-    if !bin_dir.exists() {
-        return Ok(vec![]);
+    if let Ok(bin_dir) = app_handle.path().app_data_dir().map(|d| d.join("bin")) {
+        if bin_dir.exists() {
+            dirs.push(bin_dir);
+        }
     }
 
+    if let Some(paths) = extra_paths {
+        for p in paths {
+            let path = Path::new(p);
+            if let Some(parent) = path.parent() {
+                if parent.exists() && !dirs.iter().any(|d| d == parent) {
+                    dirs.push(parent.to_path_buf());
+                }
+            }
+        }
+    }
+
+    dirs
+}
+
+#[tauri::command]
+fn list_tool_backups(app_handle: tauri::AppHandle, extra_paths: Option<Vec<String>>) -> Result<Vec<String>, String> {
+    let dirs = collect_backup_dirs(&app_handle, &extra_paths);
     let mut tool_ids: Vec<String> = Vec::new();
-    if let Ok(entries) = fs::read_dir(&bin_dir) {
-        for entry in entries.flatten() {
-            let name = entry.file_name().to_string_lossy().to_string();
-            if name.ends_with(".old") {
-                let original = name.trim_end_matches(".old");
-                if let Some(id) = tool_id_for_binary(original) {
-                    if !tool_ids.contains(&id.to_string()) {
-                        tool_ids.push(id.to_string());
+
+    for dir in &dirs {
+        if let Ok(entries) = fs::read_dir(dir) {
+            for entry in entries.flatten() {
+                let name = entry.file_name().to_string_lossy().to_string();
+                if name.ends_with(".old") {
+                    let original = name.trim_end_matches(".old");
+                    if let Some(id) = tool_id_for_binary(original) {
+                        if !tool_ids.contains(&id.to_string()) {
+                            tool_ids.push(id.to_string());
+                        }
                     }
                 }
             }
@@ -1103,12 +1350,8 @@ fn list_tool_backups(app_handle: tauri::AppHandle) -> Result<Vec<String>, String
 }
 
 #[tauri::command]
-fn rollback_tool(app_handle: tauri::AppHandle, tool: String) -> Result<String, String> {
-    let bin_dir = app_handle
-        .path()
-        .app_data_dir()
-        .map_err(|e: tauri::Error| e.to_string())?
-        .join("bin");
+fn rollback_tool(app_handle: tauri::AppHandle, tool: String, extra_paths: Option<Vec<String>>) -> Result<String, String> {
+    let dirs = collect_backup_dirs(&app_handle, &extra_paths);
 
     let binaries: &[&str] = TOOL_BINARIES
         .iter()
@@ -1117,37 +1360,35 @@ fn rollback_tool(app_handle: tauri::AppHandle, tool: String) -> Result<String, S
         .ok_or_else(|| format!("Unknown tool: {}", tool))?;
 
     let mut rolled_back = Vec::new();
-    for &bin_name in binaries {
-        let current = bin_dir.join(bin_name);
-        let backup = bin_dir.join(format!("{}.old", bin_name));
+    for dir in &dirs {
+        for &bin_name in binaries {
+            let current = dir.join(bin_name);
+            let backup = dir.join(format!("{}.old", bin_name));
 
-        if !backup.exists() {
-            continue;
-        }
-
-        // Move current out of the way
-        let temp = bin_dir.join(format!("{}.rollback-tmp", bin_name));
-        if current.exists() {
-            fs::rename(&current, &temp).map_err(|e| {
-                format!("Failed to move current {} aside: {}", bin_name, e)
-            })?;
-        }
-
-        // Restore backup as current
-        match fs::rename(&backup, &current) {
-            Ok(()) => {
-                // Delete the old current (now temp)
-                if temp.exists() {
-                    let _ = fs::remove_file(&temp);
-                }
-                rolled_back.push(bin_name.to_string());
+            if !backup.exists() {
+                continue;
             }
-            Err(e) => {
-                // Restore current from temp on failure
-                if temp.exists() {
-                    let _ = fs::rename(&temp, &current);
+
+            let temp = dir.join(format!("{}.rollback-tmp", bin_name));
+            if current.exists() {
+                fs::rename(&current, &temp).map_err(|e| {
+                    format!("Failed to move current {} aside: {}", bin_name, e)
+                })?;
+            }
+
+            match fs::rename(&backup, &current) {
+                Ok(()) => {
+                    if temp.exists() {
+                        let _ = fs::remove_file(&temp);
+                    }
+                    rolled_back.push(format!("{} ({})", bin_name, dir.display()));
                 }
-                return Err(format!("Failed to restore backup for {}: {}", bin_name, e));
+                Err(e) => {
+                    if temp.exists() {
+                        let _ = fs::rename(&temp, &current);
+                    }
+                    return Err(format!("Failed to restore backup for {}: {}", bin_name, e));
+                }
             }
         }
     }
@@ -1160,12 +1401,8 @@ fn rollback_tool(app_handle: tauri::AppHandle, tool: String) -> Result<String, S
 }
 
 #[tauri::command]
-fn cleanup_tool_backup(app_handle: tauri::AppHandle, tool: String) -> Result<String, String> {
-    let bin_dir = app_handle
-        .path()
-        .app_data_dir()
-        .map_err(|e: tauri::Error| e.to_string())?
-        .join("bin");
+fn cleanup_tool_backup(app_handle: tauri::AppHandle, tool: String, extra_paths: Option<Vec<String>>) -> Result<String, String> {
+    let dirs = collect_backup_dirs(&app_handle, &extra_paths);
 
     let binaries: &[&str] = TOOL_BINARIES
         .iter()
@@ -1174,13 +1411,15 @@ fn cleanup_tool_backup(app_handle: tauri::AppHandle, tool: String) -> Result<Str
         .ok_or_else(|| format!("Unknown tool: {}", tool))?;
 
     let mut cleaned = Vec::new();
-    for &bin_name in binaries {
-        let backup = bin_dir.join(format!("{}.old", bin_name));
-        if backup.exists() {
-            fs::remove_file(&backup).map_err(|e| {
-                format!("Failed to remove {}.old: {}", bin_name, e)
-            })?;
-            cleaned.push(bin_name.to_string());
+    for dir in &dirs {
+        for &bin_name in binaries {
+            let backup = dir.join(format!("{}.old", bin_name));
+            if backup.exists() {
+                fs::remove_file(&backup).map_err(|e| {
+                    format!("Failed to remove {}.old: {}", bin_name, e)
+                })?;
+                cleaned.push(format!("{} ({})", bin_name, dir.display()));
+            }
         }
     }
 
@@ -1188,26 +1427,23 @@ fn cleanup_tool_backup(app_handle: tauri::AppHandle, tool: String) -> Result<Str
 }
 
 #[tauri::command]
-fn cleanup_all_backups(app_handle: tauri::AppHandle) -> Result<String, String> {
-    let bin_dir = app_handle
-        .path()
-        .app_data_dir()
-        .map_err(|e: tauri::Error| e.to_string())?
-        .join("bin");
-
-    if !bin_dir.exists() {
-        return Ok("No bin directory".to_string());
-    }
+fn cleanup_all_backups(app_handle: tauri::AppHandle, extra_paths: Option<Vec<String>>) -> Result<String, String> {
+    let dirs = collect_backup_dirs(&app_handle, &extra_paths);
 
     let mut count = 0u32;
-    if let Ok(entries) = fs::read_dir(&bin_dir) {
-        for entry in entries.flatten() {
-            let name = entry.file_name().to_string_lossy().to_string();
-            if name.ends_with(".old") {
-                if let Err(e) = fs::remove_file(entry.path()) {
-                    eprintln!("[tools] Warning: failed to remove {}: {}", name, e);
-                } else {
-                    count += 1;
+    for dir in &dirs {
+        if let Ok(entries) = fs::read_dir(dir) {
+            for entry in entries.flatten() {
+                let name = entry.file_name().to_string_lossy().to_string();
+                if name.ends_with(".old") {
+                    let original = name.trim_end_matches(".old");
+                    if tool_id_for_binary(original).is_some() {
+                        if let Err(e) = fs::remove_file(entry.path()) {
+                            eprintln!("[tools] Warning: failed to remove {}: {}", name, e);
+                        } else {
+                            count += 1;
+                        }
+                    }
                 }
             }
         }
@@ -1244,6 +1480,8 @@ pub fn run() {
             rename_file,
             copy_files_to_clipboard,
             download_url_to_file,
+            resolve_system_tool_path,
+            update_tool_at_path,
             list_tool_backups,
             rollback_tool,
             cleanup_tool_backup,

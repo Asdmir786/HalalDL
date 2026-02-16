@@ -5,6 +5,7 @@ import { invoke } from "@tauri-apps/api/core";
 import { open as openDialog } from "@tauri-apps/plugin-dialog";
 import { revealItemInDir, openPath } from "@tauri-apps/plugin-opener";
 import { useLogsStore } from "@/store/logs";
+import { useToolsStore } from "@/store/tools";
 import { toast } from "sonner";
 
 type VersionParts = number[];
@@ -12,6 +13,7 @@ type VersionParts = number[];
 export interface ToolCheckResult {
   version: string;
   variant: string;
+  systemPath?: string;
 }
 
 type ToolResolution = {
@@ -73,8 +75,14 @@ export function isUpdateAvailable(currentVersion: string | undefined, latestVers
   if (currentVersion.trim() === latestVersion.trim()) return false;
   const currentParts = parseVersionParts(currentVersion);
   const latestParts = parseVersionParts(latestVersion);
-  if (!currentParts || !latestParts) return undefined;
-  return compareVersionParts(latestParts, currentParts) > 0;
+  // Both parseable → numeric comparison
+  if (currentParts && latestParts) {
+    return compareVersionParts(latestParts, currentParts) > 0;
+  }
+  // Current is unparseable (nightly/custom build) but latest is valid →
+  // treat as update available so user can switch to stable
+  if (!currentParts && latestParts) return true;
+  return undefined;
 }
 
 async function fetchText(url: string, timeoutMs = 10000): Promise<string> {
@@ -142,8 +150,12 @@ export async function checkYtDlpVersion(): Promise<ToolCheckResult | null> {
         }
       }
 
-      addLog({ level: "info", message: `yt-dlp ${version || "Detected"} (${variant}) at ${tool.path}` });
-      return { version, variant };
+      const systemPath = !tool.isLocal
+        ? await resolveSystemToolPath("yt-dlp").catch(() => null)
+        : tool.path;
+
+      addLog({ level: "info", message: `yt-dlp ${version || "Detected"} (${variant}) at ${systemPath || tool.path}` });
+      return { version, variant, systemPath: systemPath ?? undefined };
     }
     addLog({ level: "warn", message: `yt-dlp version check returned code ${output.code}` });
   } catch (e) {
@@ -161,22 +173,42 @@ export async function checkFfmpegVersion(): Promise<ToolCheckResult | null> {
     const output = await cmd.execute();
     if (output.code === 0) {
       const firstLine = output.stdout.split('\n')[0] || "";
-      const versionMatch = firstLine.match(/version\s+(\S+)/i);
-      const version = versionMatch ? versionMatch[1] : (firstLine || "Detected");
-
-      // Detect build variant from version string
-      const lower = firstLine.toLowerCase();
-      let variant = tool.isLocal ? "Bundled" : "System";
-      if (lower.includes("full_build") || lower.includes("full-build")) {
-        variant = "Full Build";
-      } else if (lower.includes("essentials_build") || lower.includes("essentials-build") || lower.includes("essentials")) {
-        variant = "Essentials";
-      } else if (lower.includes("shared")) {
-        variant = "Shared";
+      const rawMatch = firstLine.match(/version\s+(\S+)/i);
+      const rawVersion = rawMatch ? rawMatch[1] : "";
+      // Clean build metadata:
+      //   Release: "7.1-full_build-www.gyan.dev" → "7.1"
+      //   Nightly: "N-121437-gf4a87d8ca4-20251015" → "N-121437"
+      let version: string;
+      const releaseMatch = rawVersion.match(/^(\d+(?:\.\d+)*)/);
+      const nightlyMatch = rawVersion.match(/^(N-\d+)/i);
+      if (releaseMatch) {
+        version = releaseMatch[1];
+      } else if (nightlyMatch) {
+        version = nightlyMatch[1];
+      } else {
+        version = rawVersion || firstLine || "Detected";
       }
 
-      addLog({ level: "info", message: `ffmpeg ${version} (${variant}) at ${tool.path}` });
-      return { version, variant };
+      // Detect build variant from version string + path
+      const lower = firstLine.toLowerCase();
+      const pathLower = (tool.path || "").toLowerCase();
+      let variant = tool.isLocal ? "Bundled" : "System";
+      if (nightlyMatch) {
+        variant = "Nightly";
+      } else if (lower.includes("shared") || pathLower.includes("shared")) {
+        variant = "Shared";
+      } else if (lower.includes("full_build") || lower.includes("full-build") || pathLower.includes("-full")) {
+        variant = tool.isLocal ? "Bundled (Full)" : "Full Build";
+      } else if (lower.includes("essentials_build") || lower.includes("essentials-build") || lower.includes("essentials")) {
+        variant = "Essentials";
+      }
+
+      const systemPath = !tool.isLocal
+        ? await resolveSystemToolPath("ffmpeg").catch(() => null)
+        : tool.path;
+
+      addLog({ level: "info", message: `ffmpeg ${version} (${variant}) at ${systemPath || tool.path}` });
+      return { version, variant, systemPath: systemPath ?? undefined };
     }
     addLog({ level: "warn", message: `ffmpeg version check returned code ${output.code}` });
   } catch (e) {
@@ -198,8 +230,12 @@ export async function checkAria2Version(): Promise<ToolCheckResult | null> {
       const version = versionMatch ? versionMatch[1] : (firstLine || "Detected");
       const variant = tool.isLocal ? "Bundled" : "System";
 
-      addLog({ level: "info", message: `aria2c ${version} (${variant}) at ${tool.path}` });
-      return { version, variant };
+      const systemPath = !tool.isLocal
+        ? await resolveSystemToolPath("aria2").catch(() => null)
+        : tool.path;
+
+      addLog({ level: "info", message: `aria2c ${version} (${variant}) at ${systemPath || tool.path}` });
+      return { version, variant, systemPath: systemPath ?? undefined };
     }
     addLog({ level: "warn", message: `aria2c version check returned code ${output.code}` });
   } catch (e) {
@@ -221,8 +257,12 @@ export async function checkDenoVersion(): Promise<ToolCheckResult | null> {
       const version = versionMatch ? versionMatch[1] : (firstLine || "Detected");
       const variant = tool.isLocal ? "Bundled" : "System";
 
-      addLog({ level: "info", message: `deno ${version} (${variant}) at ${tool.path}` });
-      return { version, variant };
+      const systemPath = !tool.isLocal
+        ? await resolveSystemToolPath("deno").catch(() => null)
+        : tool.path;
+
+      addLog({ level: "info", message: `deno ${version} (${variant}) at ${systemPath || tool.path}` });
+      return { version, variant, systemPath: systemPath ?? undefined };
     }
     addLog({ level: "warn", message: `deno version check returned code ${output.code}` });
   } catch (e) {
@@ -252,21 +292,22 @@ export async function upgradeYtDlpViaPip(): Promise<boolean> {
   return false;
 }
 
-export async function fetchLatestYtDlpVersion(): Promise<string | null> {
+export async function fetchLatestYtDlpVersion(channel: string = "stable"): Promise<string | null> {
   const { addLog } = useLogsStore.getState();
   try {
     addLog({
       level: "command",
-      message: "Checking latest yt-dlp version...",
-      command: 'invoke("fetch_latest_ytdlp_version")',
+      message: `Checking latest yt-dlp version (${channel})...`,
+      command: `invoke("fetch_latest_ytdlp_version", { channel: "${channel}" })`,
     });
-    const version = await invoke<string>("fetch_latest_ytdlp_version");
+    const version = await invoke<string>("fetch_latest_ytdlp_version", { channel });
     return version.trim() || null;
   } catch (e) {
     addLog({ level: "warn", message: `yt-dlp latest version check failed: ${String(e)}` });
     try {
+      const repo = channel === "nightly" ? "yt-dlp/yt-dlp-nightly-builds" : "yt-dlp/yt-dlp";
       const data = await fetchJson<{ tag_name?: string }>(
-        "https://api.github.com/repos/yt-dlp/yt-dlp/releases/latest"
+        `https://api.github.com/repos/${repo}/releases/latest`
       );
       const version = data.tag_name ? data.tag_name.replace(/^v/i, "").trim() : null;
       if (!version) addLog({ level: "warn", message: "Latest yt-dlp version not found in GitHub response" });
@@ -331,20 +372,23 @@ export async function fetchLatestDenoVersion(): Promise<string | null> {
   }
 }
 
-export async function fetchLatestFfmpegVersion(): Promise<string | null> {
+export async function fetchLatestFfmpegVersion(channel: string = "stable"): Promise<string | null> {
   const { addLog } = useLogsStore.getState();
   try {
     addLog({
       level: "command",
-      message: "Checking latest ffmpeg version...",
-      command: 'invoke("fetch_latest_ffmpeg_version")',
+      message: `Checking latest ffmpeg version (${channel})...`,
+      command: `invoke("fetch_latest_ffmpeg_version", { channel: "${channel}" })`,
     });
-    const version = await invoke<string>("fetch_latest_ffmpeg_version");
+    const version = await invoke<string>("fetch_latest_ffmpeg_version", { channel });
     return version.trim() || null;
   } catch (e) {
     addLog({ level: "warn", message: `ffmpeg latest version check failed: ${String(e)}` });
     try {
-      const text = await fetchText("https://www.gyan.dev/ffmpeg/builds/release-version");
+      const url = channel === "nightly"
+        ? "https://www.gyan.dev/ffmpeg/builds/git-version"
+        : "https://www.gyan.dev/ffmpeg/builds/release-version";
+      const text = await fetchText(url);
       const first = text.trim().split(/\s+/)[0] || "";
       const version = first.replace(/^v/i, "").trim() || null;
       if (!version) addLog({ level: "warn", message: "Latest ffmpeg version not found in response" });
@@ -356,10 +400,20 @@ export async function fetchLatestFfmpegVersion(): Promise<string | null> {
   }
 }
 
-export async function downloadTools(tools: string[]): Promise<string> {
+export async function resolveSystemToolPath(tool: string): Promise<string | null> {
+  return invoke<string | null>("resolve_system_tool_path", { tool });
+}
+
+export async function updateToolAtPath(tool: string, destDir: string, variant?: string, channel?: string): Promise<string> {
+  const { addLog } = useLogsStore.getState();
+  addLog({ level: "command", message: `Updating ${tool} at ${destDir} (variant: ${variant || "default"}, channel: ${channel || "stable"})` });
+  return invoke<string>("update_tool_at_path", { tool, destDir, variant: variant ?? null, channel: channel ?? null });
+}
+
+export async function downloadTools(tools: string[], channels?: Record<string, string>): Promise<string> {
   const { addLog } = useLogsStore.getState();
   addLog({ level: "command", message: `Downloading tools: ${tools.join(", ") || "(none)"}`, command: `invoke("download_tools", { tools: ${JSON.stringify(tools)} })` });
-  return await invoke("download_tools", { tools });
+  return await invoke("download_tools", { tools, channels: channels ?? null });
 }
 
 export async function stageManualTool(tool: string, source: string): Promise<string> {
@@ -565,24 +619,30 @@ function stripAnsiSimple(input: string): string {
 
 // ── Tool backup / rollback commands ──
 
-/** Returns IDs of tools that have .old backups available */
+/** Collect system paths from the tools store to pass to backup commands */
+function getExtraBackupPaths(): string[] {
+  const { tools } = useToolsStore.getState();
+  return tools.filter((t) => t.systemPath).map((t) => t.systemPath!);
+}
+
+/** Returns IDs of tools that have .old backups available (checks bin/ + system paths) */
 export async function listToolBackups(): Promise<string[]> {
-  return invoke<string[]>("list_tool_backups");
+  return invoke<string[]>("list_tool_backups", { extraPaths: getExtraBackupPaths() });
 }
 
-/** Roll back a tool to its .old backup */
+/** Roll back a tool to its .old backup (checks bin/ + system paths) */
 export async function rollbackTool(tool: string): Promise<string> {
-  return invoke<string>("rollback_tool", { tool });
+  return invoke<string>("rollback_tool", { tool, extraPaths: getExtraBackupPaths() });
 }
 
-/** Delete the .old backup for a single tool */
+/** Delete the .old backup for a single tool (checks bin/ + system paths) */
 export async function cleanupToolBackup(tool: string): Promise<string> {
-  return invoke<string>("cleanup_tool_backup", { tool });
+  return invoke<string>("cleanup_tool_backup", { tool, extraPaths: getExtraBackupPaths() });
 }
 
-/** Delete all .old backups in the bin directory */
+/** Delete all .old backups (checks bin/ + system paths) */
 export async function cleanupAllBackups(): Promise<string> {
-  return invoke<string>("cleanup_all_backups");
+  return invoke<string>("cleanup_all_backups", { extraPaths: getExtraBackupPaths() });
 }
 
 /** Download a URL directly to a local file (bypasses yt-dlp) */

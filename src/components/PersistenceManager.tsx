@@ -36,7 +36,7 @@ export function PersistenceManager() {
     const checkTools = async () => {
       addLog({ level: "debug", message: "Checking tools..." });
       
-      const checkAndNotify = async (id: string, checkFn: () => Promise<{ version: string; variant?: string } | null>) => {
+      const checkAndNotify = async (id: string, checkFn: () => Promise<{ version: string; variant?: string; systemPath?: string } | null>) => {
         const currentTool = useToolsStore.getState().tools.find(t => t.id === id);
         const result = await checkFn();
         const version = result?.version ?? null;
@@ -96,6 +96,7 @@ export function PersistenceManager() {
           status: version ? "Detected" : "Missing", 
           version: version || undefined,
           variant: result?.variant,
+          systemPath: result?.systemPath,
           // Reset stale update info — will be refreshed below
           updateAvailable: undefined,
           latestVersion: undefined,
@@ -112,9 +113,12 @@ export function PersistenceManager() {
     const checkLatestVersions = async () => {
       addLog({ level: "debug", message: "Checking latest tool versions..." });
 
+      const toolsSnapshot = useToolsStore.getState().tools;
+      const getChannel = (id: string) => toolsSnapshot.find((t) => t.id === id)?.channel ?? "stable";
+
       const checks: Array<{ id: string; fetchFn: () => Promise<string | null> }> = [
-        { id: "yt-dlp", fetchFn: fetchLatestYtDlpVersion },
-        { id: "ffmpeg", fetchFn: fetchLatestFfmpegVersion },
+        { id: "yt-dlp", fetchFn: () => fetchLatestYtDlpVersion(getChannel("yt-dlp")) },
+        { id: "ffmpeg", fetchFn: () => fetchLatestFfmpegVersion(getChannel("ffmpeg")) },
         { id: "aria2", fetchFn: fetchLatestAria2Version },
         { id: "deno", fetchFn: fetchLatestDenoVersion },
       ];

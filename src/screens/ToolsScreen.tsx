@@ -1,4 +1,4 @@
-import { useToolsStore, type Tool } from "@/store/tools";
+import { useToolsStore, NIGHTLY_CAPABLE_TOOLS, type Tool, type ToolChannel } from "@/store/tools";
 import { MotionButton } from "@/components/motion/MotionButton";
 import { FadeInStagger, FadeInItem } from "@/components/motion/StaggerContainer";
 import { Badge } from "@/components/ui/badge";
@@ -36,6 +36,9 @@ import {
   AlertCircle,
   Undo2,
   Trash2,
+  MapPin,
+  Moon,
+  Sun,
 } from "lucide-react";
 
 import { cn } from "@/lib/utils";
@@ -61,6 +64,7 @@ import {
   rollbackTool,
   cleanupToolBackup,
   cleanupAllBackups,
+  updateToolAtPath,
   type ToolCheckResult,
 } from "@/lib/commands";
 import { toast } from "sonner";
@@ -190,15 +194,17 @@ export function ToolsScreen() {
         status: result ? "Detected" : "Missing",
         version: result?.version,
         variant: result?.variant,
+        systemPath: result?.systemPath,
       });
 
+      const toolChannel = useToolsStore.getState().tools.find((t) => t.id === id)?.channel ?? "stable";
       let latest: string | null = null;
       switch (id) {
         case "yt-dlp":
-          latest = await fetchLatestYtDlpVersion();
+          latest = await fetchLatestYtDlpVersion(toolChannel);
           break;
         case "ffmpeg":
-          latest = await fetchLatestFfmpegVersion();
+          latest = await fetchLatestFfmpegVersion(toolChannel);
           break;
         case "aria2":
           latest = await fetchLatestAria2Version();
@@ -249,10 +255,11 @@ export function ToolsScreen() {
     setBusyTools((prev) => ({ ...prev, [tool.id]: true }));
 
     try {
-      await downloadTools([tool.id]);
+      const ch = tool.channel !== "stable" ? { [tool.id]: tool.channel } : undefined;
+      await downloadTools([tool.id], ch);
       setModalProgress(100);
       setModalDone(true);
-      addLog({ level: "info", message: `${tool.id} installed/updated` });
+      addLog({ level: "info", message: `${tool.id} installed/updated (${tool.channel})` });
       void refreshBackups();
     } catch (e) {
       const message = e instanceof Error ? e.message : String(e);
@@ -292,6 +299,47 @@ export function ToolsScreen() {
     }
   };
 
+  /* ── Update at original (system) location ── */
+  const handleUpdateOriginal = async (tool: Tool) => {
+    if (!tool.systemPath) return;
+    const destDir = tool.systemPath.replace(/[/\\][^/\\]+$/, "");
+
+    resetModal();
+    setModalTitle(`Updating ${tool.name} at original location`);
+    setModalOpen(true);
+    setBusyTools((prev) => ({ ...prev, [tool.id]: true }));
+
+    try {
+      await updateToolAtPath(tool.id, destDir, tool.variant, tool.channel);
+      setModalProgress(100);
+      setModalDone(true);
+      addLog({ level: "info", message: `${tool.id} updated at ${destDir}` });
+      void refreshBackups();
+    } catch (e) {
+      const message = e instanceof Error ? e.message : String(e);
+      setModalError(message);
+      addLog({
+        level: "error",
+        message: `In-place update failed (${tool.id}): ${message}`,
+      });
+    } finally {
+      setBusyTools((prev) => ({ ...prev, [tool.id]: false }));
+    }
+  };
+
+  /* ── Switch channel (Stable / Nightly) ── */
+  const handleChannelChange = async (tool: Tool, newChannel: ToolChannel) => {
+    if (tool.channel === newChannel) return;
+    updateTool(tool.id, {
+      channel: newChannel,
+      latestVersion: undefined,
+      updateAvailable: undefined,
+      latestCheckedAt: undefined,
+    });
+    toast.success(`${tool.name} switched to ${newChannel} channel`);
+    await refreshTool(tool.id);
+  };
+
   /* ── Update All (with progress modal) ── */
   const updateAll = async () => {
     const toUpdate = tools.filter(
@@ -311,7 +359,11 @@ export function ToolsScreen() {
     });
 
     try {
-      await downloadTools(ids);
+      const ch: Record<string, string> = {};
+      for (const t of toUpdate) {
+        if (t.channel !== "stable") ch[t.id] = t.channel;
+      }
+      await downloadTools(ids, Object.keys(ch).length > 0 ? ch : undefined);
       setModalProgress(100);
       setModalDone(true);
       void refreshBackups();
@@ -486,11 +538,22 @@ export function ToolsScreen() {
                   {tool.variant}
                 </Badge>
               )}
+              {tool.channel === "nightly" && (
+                <Badge
+                  variant="outline"
+                  className="text-[9px] h-4 px-1.5 font-medium text-amber-400 border-amber-400/20 bg-amber-400/5"
+                >
+                  <Moon className="w-2.5 h-2.5 mr-0.5" />
+                  Nightly
+                </Badge>
+              )}
             </div>
-            <p className="text-[11px] text-muted-foreground truncate">
+            <p className="text-[11px] text-muted-foreground truncate" title={tool.systemPath || tool.path || ""}>
               {tool.mode === "Manual" && tool.path
                 ? tool.path
-                : TOOL_DESCRIPTIONS[tool.id]}
+                : tool.systemPath
+                  ? tool.systemPath
+                  : TOOL_DESCRIPTIONS[tool.id]}
             </p>
           </div>
         </div>
@@ -593,6 +656,36 @@ export function ToolsScreen() {
                   <RefreshCcw className="w-3.5 h-3.5 mr-2" />
                   Update via pip
                 </DropdownMenuItem>
+              )}
+              {tool.systemPath && !isPip && tool.variant !== "Bundled" && tool.variant !== "Bundled (Full)" && tool.updateAvailable && (
+                <DropdownMenuItem
+                  onClick={() => handleUpdateOriginal(tool)}
+                  disabled={isBusy}
+                >
+                  <MapPin className="w-3.5 h-3.5 mr-2" />
+                  Update at original location
+                </DropdownMenuItem>
+              )}
+              {(NIGHTLY_CAPABLE_TOOLS as readonly string[]).includes(tool.id) && (
+                <>
+                  <DropdownMenuSeparator />
+                  <DropdownMenuItem
+                    onClick={() => handleChannelChange(tool, tool.channel === "nightly" ? "stable" : "nightly")}
+                    disabled={isBusy}
+                  >
+                    {tool.channel === "nightly" ? (
+                      <>
+                        <Sun className="w-3.5 h-3.5 mr-2" />
+                        Switch to Stable
+                      </>
+                    ) : (
+                      <>
+                        <Moon className="w-3.5 h-3.5 mr-2" />
+                        Switch to Nightly
+                      </>
+                    )}
+                  </DropdownMenuItem>
+                </>
               )}
               <DropdownMenuSeparator />
               <DropdownMenuItem onClick={() => openUrl(TOOL_URLS[tool.id])}>
