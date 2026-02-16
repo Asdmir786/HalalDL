@@ -242,19 +242,19 @@ async fn update_tool_at_path(
                 }
             } else {
                 let url = if variant_lower.contains("shared") {
-                    "https://www.gyan.dev/ffmpeg/builds/ffmpeg-release-full-shared.zip"
+                    "https://www.gyan.dev/ffmpeg/builds/ffmpeg-release-full-shared.7z"
                 } else if variant_lower.contains("essentials") {
-                    "https://www.gyan.dev/ffmpeg/builds/ffmpeg-release-essentials.zip"
+                    "https://www.gyan.dev/ffmpeg/builds/ffmpeg-release-essentials.7z"
                 } else {
-                    "https://www.gyan.dev/ffmpeg/builds/ffmpeg-release-full.zip"
+                    "https://www.gyan.dev/ffmpeg/builds/ffmpeg-release-full.7z"
                 };
-                let zip_path = dest.join("ffmpeg-update.zip");
-                download_file(&app_handle, "ffmpeg", url, &zip_path).await?;
-                emit_progress(&app_handle, "ffmpeg", 99.0, "Extracting ffmpeg.exe, ffprobe.exe...");
-                let extracted = extract_from_zip(&app_handle, "ffmpeg", &zip_path, &dest, vec!["ffmpeg.exe", "ffprobe.exe"])?;
+                let archive_path = dest.join("ffmpeg-update.7z");
+                download_file(&app_handle, "ffmpeg", url, &archive_path).await?;
+                emit_progress(&app_handle, "ffmpeg", 99.0, "Extracting ffmpeg.exe, ffprobe.exe from 7z...");
+                let extracted = extract_from_7z(&app_handle, "ffmpeg", &archive_path, &dest, vec!["ffmpeg.exe", "ffprobe.exe"])?;
                 emit_progress(&app_handle, "ffmpeg", 100.0, &format!("Extracted: {}", extracted.join(", ")));
-                if let Err(e) = fs::remove_file(&zip_path) {
-                    eprintln!("[tools] Warning: failed to clean up {:?}: {}", zip_path, e);
+                if let Err(e) = fs::remove_file(&archive_path) {
+                    eprintln!("[tools] Warning: failed to clean up {:?}: {}", archive_path, e);
                 }
             }
         }
@@ -331,14 +331,14 @@ async fn download_tools(app_handle: tauri::AppHandle, tools: Vec<String>, channe
                 eprintln!("[tools] Warning: failed to clean up {:?}: {}", ffmpeg_7z_path, e);
             }
         } else {
-            let ffmpeg_url = "https://www.gyan.dev/ffmpeg/builds/ffmpeg-release-full.zip";
-            let ffmpeg_zip_path = bin_dir.join("ffmpeg.zip");
-            download_file(&app_handle, "ffmpeg", ffmpeg_url, &ffmpeg_zip_path).await?;
-            emit_progress(&app_handle, "ffmpeg", 99.0, "Extracting ffmpeg.exe, ffprobe.exe...");
-            let extracted = extract_from_zip(&app_handle, "ffmpeg", &ffmpeg_zip_path, &bin_dir, vec!["ffmpeg.exe", "ffprobe.exe"])?;
+            let ffmpeg_url = "https://www.gyan.dev/ffmpeg/builds/ffmpeg-release-full.7z";
+            let ffmpeg_7z_path = bin_dir.join("ffmpeg.7z");
+            download_file(&app_handle, "ffmpeg", ffmpeg_url, &ffmpeg_7z_path).await?;
+            emit_progress(&app_handle, "ffmpeg", 99.0, "Extracting ffmpeg.exe, ffprobe.exe from 7z...");
+            let extracted = extract_from_7z(&app_handle, "ffmpeg", &ffmpeg_7z_path, &bin_dir, vec!["ffmpeg.exe", "ffprobe.exe"])?;
             emit_progress(&app_handle, "ffmpeg", 100.0, &format!("Extracted: {}", extracted.join(", ")));
-            if let Err(e) = fs::remove_file(&ffmpeg_zip_path) {
-                eprintln!("[tools] Warning: failed to clean up {:?}: {}", ffmpeg_zip_path, e);
+            if let Err(e) = fs::remove_file(&ffmpeg_7z_path) {
+                eprintln!("[tools] Warning: failed to clean up {:?}: {}", ffmpeg_7z_path, e);
             }
         }
     }
