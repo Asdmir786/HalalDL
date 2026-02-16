@@ -80,24 +80,27 @@ export function Sidebar() {
       return {
         Icon: Download,
         count: activeCount,
-        badgeClassName: "bg-blue-500 text-white",
-        iconClassName: "text-blue-300",
+        badgeClassName: "border border-white/20 bg-white/10 text-foreground/90 backdrop-blur-xl shadow-sm",
+        iconClassName: "text-foreground/95",
+        pulse: true,
       };
     }
     if (queuedCount > 0) {
       return {
         Icon: Clock3,
         count: queuedCount,
-        badgeClassName: "bg-yellow-500 text-black",
-        iconClassName: "text-yellow-300",
+        badgeClassName: "border border-white/15 bg-white/5 text-foreground/80 backdrop-blur-xl",
+        iconClassName: "text-foreground/85",
+        pulse: false,
       };
     }
     if (failedCount > 0) {
       return {
         Icon: AlertTriangle,
         count: failedCount,
-        badgeClassName: "bg-destructive text-destructive-foreground",
-        iconClassName: "text-destructive",
+        badgeClassName: "border border-white/10 bg-background/70 text-foreground/75 backdrop-blur-xl",
+        iconClassName: "text-foreground/80",
+        pulse: false,
       };
     }
     if (doneCount > 0) {
@@ -105,18 +108,21 @@ export function Sidebar() {
         Icon: CheckCircle2,
         count: 0,
         badgeClassName: "",
-        iconClassName: "text-emerald-400",
+        iconClassName: "text-foreground/75",
+        pulse: false,
       };
     }
     return {
       Icon: Download,
       count: 0,
       badgeClassName: "",
-      iconClassName: "",
+      iconClassName: "text-muted-foreground",
+      pulse: false,
     };
   }, [activeCount, queuedCount, failedCount, doneCount]);
 
   const showGlobalProgress = activeCount > 0 && currentScreen !== "downloads";
+  const DownloadProgressIcon = downloadNavMeta.Icon;
 
   return (
     <aside className={cn(
@@ -173,9 +179,16 @@ export function Sidebar() {
                   isDownloadsItem && downloadNavMeta.iconClassName,
                   !isActive && "group-hover:scale-110 transition-transform duration-200"
                 )} />
+                {isDownloadsItem && downloadNavMeta.pulse && (
+                  <motion.span
+                    className="absolute -bottom-0.5 -left-0.5 h-2 w-2 rounded-full bg-foreground/70"
+                    animate={{ opacity: [0.35, 1, 0.35], scale: [0.85, 1, 0.85] }}
+                    transition={{ duration: 1.6, repeat: Infinity, ease: "easeInOut" }}
+                  />
+                )}
                 {isDownloadsItem && downloadNavMeta.count > 0 && (
                   <span className={cn(
-                    "absolute -top-1 -right-1 min-w-5 h-5 px-1 rounded-full text-[10px] font-bold flex items-center justify-center shadow",
+                    "absolute -top-1 -right-1 min-w-5 h-5 px-1.5 rounded-[10px] text-[10px] font-bold flex items-center justify-center",
                     downloadNavMeta.badgeClassName
                   )}>
                     {downloadNavMeta.count}
@@ -197,7 +210,7 @@ export function Sidebar() {
             {!sidebarCollapsed && (
               <div className="flex items-center justify-between mb-2">
                 <span className="inline-flex items-center gap-1.5 text-xs font-semibold text-foreground/90">
-                  <Download className="w-3.5 h-3.5 text-blue-300" />
+                  <DownloadProgressIcon className="w-3.5 h-3.5 text-foreground/80" />
                   Downloading
                 </span>
                 <span className="text-[10px] font-mono text-muted-foreground">{queueStatus}</span>
