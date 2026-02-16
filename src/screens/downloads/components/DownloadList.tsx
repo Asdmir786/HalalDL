@@ -3,7 +3,7 @@ import { useLayoutEffect, useRef, type UIEvent } from "react";
 import { DownloadItem } from "./DownloadItem";
 import { DownloadJob } from "@/store/downloads";
 import { MotionButton } from "@/components/motion/MotionButton";
-import { Download, Layers, Sparkles, Plus, Settings } from "lucide-react";
+import { CheckCircle2, Download, Layers, Play, Plus, Settings, Sparkles, X } from "lucide-react";
 import { FadeInItem } from "@/components/motion/StaggerContainer";
 import { useNavigationStore } from "@/store/navigation";
 
@@ -53,8 +53,8 @@ export function DownloadList({
         {jobs.length === 0 ? (
           <div className="flex-1 flex flex-col items-center justify-center p-8 relative overflow-hidden min-h-[400px]">
               {/* Background Effects */}
-              <div className="absolute inset-0 bg-gradient-to-b from-transparent via-background/50 to-background z-10" />
-              <div className="absolute inset-0 bg-[radial-gradient(circle_at_center,_var(--tw-gradient-stops))] from-primary/5 via-transparent to-transparent opacity-40 blur-3xl" />
+              <div className="absolute inset-0 bg-linear-to-b from-transparent via-background/50 to-background z-10" />
+              <div className="absolute inset-0 bg-[radial-gradient(circle_at_center,var(--tw-gradient-stops))] from-primary/5 via-transparent to-transparent opacity-40 blur-3xl" />
           
               {/* Content */}
               <motion.div 
@@ -77,7 +77,7 @@ export function DownloadList({
                       </div>
                   </div>
           
-                  <h3 className="text-2xl font-bold tracking-tight mb-2 bg-clip-text text-transparent bg-gradient-to-br from-foreground to-muted-foreground">
+                  <h3 className="text-2xl font-bold tracking-tight mb-2 bg-clip-text text-transparent bg-linear-to-br from-foreground to-muted-foreground">
                       Ready to Download
                   </h3>
                   <p className="text-muted-foreground text-sm mb-8 leading-relaxed">
@@ -142,18 +142,20 @@ export function DownloadList({
                               type="button"
                               variant="secondary"
                               size="sm"
-                              className="h-7 px-3 text-xs rounded-full shadow-sm"
+                              className="h-8 px-3.5 text-xs rounded-full shadow-sm border border-primary/20 bg-primary/10 text-primary hover:bg-primary/20 gap-1.5"
                               onClick={onStartSelected}
                           >
+                              <Play className="w-3.5 h-3.5" />
                               Start Selected
                           </MotionButton>
                           <MotionButton
                               type="button"
                               variant="ghost"
                               size="sm"
-                              className="h-7 px-3 text-xs rounded-full hover:bg-destructive/10 hover:text-destructive"
+                              className="h-8 px-3.5 text-xs rounded-full border border-destructive/20 bg-destructive/5 text-destructive/90 hover:bg-destructive/15 hover:text-destructive gap-1.5"
                               onClick={onRemoveSelected}
                           >
+                              <X className="w-3.5 h-3.5" />
                               Remove
                           </MotionButton>
                       </motion.div>
@@ -166,10 +168,11 @@ export function DownloadList({
                   type="button"
                   variant="ghost"
                   size="sm"
-                  className="h-7 px-3 text-xs rounded-full text-muted-foreground hover:text-destructive hover:bg-destructive/10 transition-colors"
+                  className="h-8 px-3.5 text-xs rounded-full text-muted-foreground border border-muted/60 bg-background/50 hover:text-foreground hover:border-muted transition-colors gap-1.5"
                   disabled={!hasCompleted}
                   onClick={onClearCompleted}
                 >
+                  <CheckCircle2 className="w-3.5 h-3.5" />
                   Clear Completed
                 </MotionButton>
             </div>

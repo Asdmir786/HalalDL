@@ -1,4 +1,4 @@
-import { Plus, Settings2, ChevronDown, ChevronUp } from "lucide-react";
+import { Clock3, Play, Plus, Settings2, ChevronDown, ChevronUp } from "lucide-react";
 import { useMemo } from "react";
 import { MotionButton } from "@/components/motion/MotionButton";
 import { Input } from "@/components/ui/input";
@@ -103,23 +103,27 @@ export function DownloadInputSection({
             </SelectContent>
           </Select>
 
-          <div className="flex rounded-lg border border-muted bg-background p-0.5 gap-0.5 h-10 items-center">
+          <div className="flex rounded-xl border border-muted bg-background/80 p-0.5 gap-0.5 h-10 items-center shadow-sm">
             <MotionButton
               type="button"
               variant={addMode === "queue" ? "secondary" : "ghost"}
               size="sm"
-              className="h-8 px-3 text-[10px] uppercase font-bold tracking-wider rounded-md"
+              className="h-8 px-3 text-[10px] uppercase font-bold tracking-wider rounded-lg gap-1.5 data-[state=active]:shadow-sm"
               onClick={() => setAddMode("queue")}
+              data-state={addMode === "queue" ? "active" : "inactive"}
             >
+              <Clock3 className="w-3 h-3" />
               Queue
             </MotionButton>
             <MotionButton
               type="button"
               variant={addMode === "start" ? "secondary" : "ghost"}
               size="sm"
-              className="h-8 px-3 text-[10px] uppercase font-bold tracking-wider rounded-md"
+              className="h-8 px-3 text-[10px] uppercase font-bold tracking-wider rounded-lg gap-1.5 data-[state=active]:shadow-sm"
               onClick={() => setAddMode("start")}
+              data-state={addMode === "start" ? "active" : "inactive"}
             >
+              <Play className="w-3 h-3" />
               Start now
             </MotionButton>
           </div>
@@ -127,7 +131,7 @@ export function DownloadInputSection({
           <MotionButton
             onClick={onAdd}
             disabled={!url.trim()}
-            className="shadow-sm h-10 px-4"
+            className="h-10 px-4 rounded-xl bg-linear-to-r from-primary/95 via-primary to-primary/85 hover:from-primary hover:to-primary shadow-md shadow-primary/20"
           >
             <Plus className="w-4 h-4 mr-2" />
             Add

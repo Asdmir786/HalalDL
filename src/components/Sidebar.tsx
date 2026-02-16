@@ -43,8 +43,8 @@ export function Sidebar() {
     [jobs]
   );
 
-  const doneCount = useMemo(
-    () => jobs.filter((job) => job.status === "Done").length,
+  const queuedCount = useMemo(
+    () => jobs.filter((job) => job.status === "Queued").length,
     [jobs]
   );
 
@@ -58,10 +58,9 @@ export function Sidebar() {
   }, [jobs]);
 
   const queueStatus = useMemo(() => {
-    const total = jobs.length;
-    const processed = doneCount + activeCount;
-    return `${String(processed).padStart(2, "0")}/${String(total).padStart(2, "0")}`;
-  }, [activeCount, doneCount, jobs.length]);
+    const total = activeCount + queuedCount;
+    return `${String(activeCount).padStart(2, "0")}/${String(total).padStart(2, "0")}`;
+  }, [activeCount, queuedCount]);
 
   const showGlobalProgress = activeCount > 0 && currentScreen !== "downloads";
 
@@ -114,7 +113,7 @@ export function Sidebar() {
 
               <span className="relative z-10">
                 <Icon className={cn(
-                  "w-5 h-5 flex-shrink-0",
+                  "w-5 h-5 shrink-0",
                   !isActive && "group-hover:scale-110 transition-transform duration-200"
                 )} />
                 {item.id === "downloads" && activeCount > 0 && (

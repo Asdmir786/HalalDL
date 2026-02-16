@@ -1,9 +1,9 @@
 import { useState } from "react";
 import { motion, Variants } from "framer-motion";
 import { 
-  X, FolderOpen, Download, Terminal, 
+  X, FolderOpen, Terminal, 
   Copy, RotateCcw, Play, Clock, 
-  CheckCircle2, AlertTriangle, Link 
+  CheckCircle2, AlertTriangle, Link, Loader2, Sparkles 
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { DownloadJob } from "@/store/downloads";
@@ -44,25 +44,39 @@ export function DownloadItem({
   const thumbnailLoading =
     !job.thumbnail && job.thumbnailStatus !== "failed" && job.thumbnailStatus !== "ready";
 
-  const statusIcon =
+  const statusMeta =
     job.status === "Queued"
-      ? Clock
+      ? {
+          Icon: Clock,
+          badgeClassName:
+            "text-yellow-300 border-yellow-500/20 bg-yellow-500/10 shadow-[0_0_0_1px_rgba(234,179,8,0.12)]",
+        }
       : job.status === "Failed"
-        ? AlertTriangle
-      : job.status === "Done"
-        ? CheckCircle2
-        : Download;
+        ? {
+            Icon: AlertTriangle,
+            badgeClassName:
+              "text-destructive border-destructive/25 bg-destructive/10 shadow-[0_0_0_1px_rgba(239,68,68,0.14)]",
+          }
+        : job.status === "Done"
+          ? {
+              Icon: CheckCircle2,
+              badgeClassName:
+                "text-emerald-300 border-emerald-500/20 bg-emerald-500/10 shadow-[0_0_0_1px_rgba(16,185,129,0.14)]",
+            }
+          : job.status === "Post-processing"
+            ? {
+                Icon: Sparkles,
+                badgeClassName:
+                  "text-violet-300 border-violet-500/20 bg-violet-500/10 shadow-[0_0_0_1px_rgba(139,92,246,0.14)]",
+              }
+            : {
+                Icon: Loader2,
+                iconClassName: "animate-spin",
+                badgeClassName:
+                  "text-blue-300 border-blue-500/20 bg-blue-500/10 shadow-[0_0_0_1px_rgba(59,130,246,0.14)]",
+              };
 
-  const statusColor =
-    job.status === "Queued"
-      ? "text-yellow-500 border-yellow-500/20 bg-yellow-500/10"
-      : job.status === "Failed"
-        ? "text-destructive border-destructive/20 bg-destructive/10"
-      : job.status === "Done"
-        ? "text-emerald-500 border-emerald-500/20 bg-emerald-500/10"
-        : "text-blue-500 border-blue-500/20 bg-blue-500/10";
-
-  const StatusIcon = statusIcon;
+  const StatusIcon = statusMeta.Icon;
   const phaseOrder = [
     "Resolving formats",
     "Downloading streams",
@@ -185,8 +199,8 @@ export function DownloadItem({
                     </div>
                 </div>
 
-                <div className={cn("flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[10px] font-semibold border shadow-sm backdrop-blur-sm transition-colors", statusColor)}>
-                    <StatusIcon className="w-3 h-3" />
+                <div className={cn("flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[10px] font-semibold border shadow-sm backdrop-blur-sm transition-colors", statusMeta.badgeClassName)}>
+                    <StatusIcon className={cn("w-3 h-3", statusMeta.iconClassName)} />
                     <span>{job.status}</span>
                 </div>
               </div>
@@ -300,21 +314,21 @@ export function DownloadItem({
                         <MotionButton
                           variant="ghost"
                           size="icon"
-                          className="w-8 h-8 rounded-full hover:bg-primary/10 hover:text-primary transition-colors"
+                          className="w-8 h-8 rounded-full border border-primary/20 bg-primary/5 hover:bg-primary/15 hover:text-primary transition-colors"
                           onClick={(e) => {
                             e.stopPropagation();
                             startDownload(job.id);
                           }}
                           title="Start Download"
                         >
-                          <Download className="w-4 h-4" />
+                          <Play className="w-4 h-4 fill-current" />
                         </MotionButton>
                       )}
 
                       <MotionButton
                         variant="ghost"
                         size="icon"
-                        className="w-8 h-8 rounded-full hover:bg-destructive/10 hover:text-destructive transition-colors"
+                        className="w-8 h-8 rounded-full border border-destructive/20 bg-destructive/5 hover:bg-destructive/15 hover:text-destructive transition-colors"
                         onClick={(e) => {
                           e.stopPropagation();
                           onRemove(job.id);

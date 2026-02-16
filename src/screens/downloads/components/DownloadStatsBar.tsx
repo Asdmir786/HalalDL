@@ -1,4 +1,4 @@
-import { Play } from "lucide-react";
+import { AlertTriangle, CheckCircle2, Clock3, Loader2, Play } from "lucide-react";
 import { MotionButton } from "@/components/motion/MotionButton";
 
 interface DownloadStatsBarProps {
@@ -18,25 +18,50 @@ export function DownloadStatsBar({
   onStartAll,
   canStartAll
 }: DownloadStatsBarProps) {
+  const stats = [
+    {
+      id: "queued",
+      label: `${queuedCount} queued`,
+      Icon: Clock3,
+      className:
+        "border-yellow-500/20 bg-yellow-500/10 text-yellow-300",
+    },
+    {
+      id: "active",
+      label: `${activeCount} active`,
+      Icon: Loader2,
+      iconClassName: "animate-spin",
+      className:
+        "border-blue-500/20 bg-blue-500/10 text-blue-300",
+    },
+    {
+      id: "failed",
+      label: `${failedCount} failed`,
+      Icon: AlertTriangle,
+      className:
+        "border-destructive/20 bg-destructive/10 text-destructive",
+    },
+    {
+      id: "done",
+      label: `${doneCount} done`,
+      Icon: CheckCircle2,
+      className:
+        "border-emerald-500/20 bg-emerald-500/10 text-emerald-300",
+    },
+  ];
+
   return (
-    <div className="flex items-center justify-between pt-2 border-t border-muted/50">
-      <div className="flex items-center gap-3 text-[11px] text-muted-foreground font-medium tabular-nums">
-        <div className="flex items-center gap-1.5">
-          <div className="w-1.5 h-1.5 rounded-full bg-yellow-500/70 shadow-[0_0_4px_rgba(234,179,8,0.3)]" />
-          <span>{queuedCount} queued</span>
-        </div>
-        <div className="flex items-center gap-1.5">
-          <div className="w-1.5 h-1.5 rounded-full bg-blue-500/70 shadow-[0_0_4px_rgba(59,130,246,0.3)]" />
-          <span>{activeCount} active</span>
-        </div>
-        <div className="flex items-center gap-1.5">
-          <div className="w-1.5 h-1.5 rounded-full bg-destructive/80 shadow-[0_0_4px_rgba(239,68,68,0.3)]" />
-          <span>{failedCount} failed</span>
-        </div>
-        <div className="flex items-center gap-1.5">
-          <div className="w-1.5 h-1.5 rounded-full bg-green-500/60 shadow-[0_0_4px_rgba(34,197,94,0.25)]" />
-          <span>{doneCount} done</span>
-        </div>
+    <div className="flex items-center justify-between pt-2 border-t border-muted/50 gap-3">
+      <div className="flex items-center gap-2 text-[11px] font-semibold tabular-nums flex-wrap">
+        {stats.map(({ id, label, Icon, className, iconClassName }) => (
+          <div
+            key={id}
+            className={`inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 backdrop-blur-sm transition-colors ${className}`}
+          >
+            <Icon className={`w-3 h-3 ${iconClassName ?? ""}`} />
+            <span>{label}</span>
+          </div>
+        ))}
       </div>
 
       <MotionButton
@@ -45,9 +70,9 @@ export function DownloadStatsBar({
         size="sm"
         onClick={onStartAll}
         disabled={!canStartAll}
-        className="h-8 px-4 text-xs font-semibold gap-1.5 bg-primary/90 hover:bg-primary shadow-sm disabled:opacity-40 transition-all"
+        className="h-8 px-4 text-xs font-semibold gap-1.5 rounded-full bg-linear-to-r from-primary/95 via-primary to-primary/85 hover:from-primary hover:to-primary shadow-md shadow-primary/20 disabled:opacity-40 transition-all"
       >
-        <Play className="w-3 h-3 fill-current" />
+        <Play className="w-3.5 h-3.5" />
         Start All
       </MotionButton>
     </div>
