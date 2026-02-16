@@ -23,6 +23,7 @@ export interface Settings {
   autoClearFinished: boolean;
   autoCopyFile: boolean;
   downloadsAddMode: DownloadsAddMode;
+  downloadsSelectedPreset: string;
 }
 
 interface SettingsState {
@@ -44,6 +45,7 @@ export const DEFAULT_SETTINGS: Settings = {
   autoClearFinished: false,
   autoCopyFile: true,
   downloadsAddMode: "queue",
+  downloadsSelectedPreset: "default",
 };
 
 export const SETTINGS_KEYS = Object.keys(DEFAULT_SETTINGS) as (keyof Settings)[];

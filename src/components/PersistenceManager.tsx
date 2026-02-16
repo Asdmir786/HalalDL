@@ -1,6 +1,6 @@
 import { useEffect, useRef } from "react";
 import { downloadDir } from "@tauri-apps/api/path";
-import { useSettingsStore, Settings } from "@/store/settings";
+import { useSettingsStore, Settings, DEFAULT_SETTINGS } from "@/store/settings";
 import { usePresetsStore, BUILT_IN_PRESETS, Preset } from "@/store/presets";
 import { useToolsStore, Tool } from "@/store/tools";
 import { useLogsStore } from "@/store/logs";
@@ -152,14 +152,15 @@ export function PersistenceManager() {
         const savedSettings = await storage.getSettings<Settings>();
         if (savedSettings) {
           // If defaultDownloadDir is empty, try to resolve it
-          if (!savedSettings.defaultDownloadDir) {
+          const mergedSettings = { ...DEFAULT_SETTINGS, ...savedSettings };
+          if (!mergedSettings.defaultDownloadDir) {
             try {
-              savedSettings.defaultDownloadDir = await downloadDir();
+              mergedSettings.defaultDownloadDir = await downloadDir();
             } catch (e) {
               addLog({ level: "warn", message: `Could not resolve download dir: ${String(e)}` });
             }
           }
-          setSettings(savedSettings);
+          setSettings(mergedSettings);
           addLog({ level: "info", message: "Settings loaded" });
         } else {
           // No settings found (first run), set default download dir

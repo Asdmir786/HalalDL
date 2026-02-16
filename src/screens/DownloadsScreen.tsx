@@ -19,7 +19,7 @@ import { getJobTs } from "./downloads/utils";
 export function DownloadsScreen() {
   const { settings, updateSettings } = useSettingsStore();
   const [url, setUrl] = useState("");
-  const [selectedPreset, setSelectedPreset] = useState("default");
+  const selectedPreset = settings.downloadsSelectedPreset || "default";
   
   // Derived state for addMode from settings
   const addMode = settings.downloadsAddMode;
@@ -71,7 +71,7 @@ export function DownloadsScreen() {
   };
 
   const handlePresetChange = (val: string) => {
-    setSelectedPreset(val);
+    updateSettings({ downloadsSelectedPreset: val });
     const isCustom = val === "custom";
     if (!isCustom) {
       setOutputFormat(inferOutputFormat(val));
@@ -89,6 +89,15 @@ export function DownloadsScreen() {
       }, 0);
     }
   }, [pendingUrl, setPendingUrl]);
+
+  // Keep a valid preset selection after preset edits/deletes.
+  useEffect(() => {
+    if (selectedPreset === "custom") return;
+    const exists = presets.some((p) => p.id === selectedPreset);
+    if (!exists) {
+      updateSettings({ downloadsSelectedPreset: "default" });
+    }
+  }, [presets, selectedPreset, updateSettings]);
 
   const prevJobsCountRef = useRef(jobs.length);
   useEffect(() => {
