@@ -55,6 +55,12 @@ function parseVersionParts(input: string): VersionParts | null {
   if (dashed) {
     return [Number(dashed[1]), Number(dashed[2]), Number(dashed[3])];
   }
+  // Fallback: compact date-based version with no separators (e.g. "20251015")
+  // Seen in ffmpeg nightly strings like: N-121437-gf4a87d8ca4-20251015
+  const compact = input.match(/(?:^|[^0-9])(20\d{2})(\d{2})(\d{2})(?:[^0-9]|$)/);
+  if (compact) {
+    return [Number(compact[1]), Number(compact[2]), Number(compact[3])];
+  }
   return null;
 }
 
@@ -77,7 +83,19 @@ export function isUpdateAvailable(currentVersion: string | undefined, latestVers
   const latestParts = parseVersionParts(latestVersion);
   // Both parseable → numeric comparison
   if (currentParts && latestParts) {
-    return compareVersionParts(latestParts, currentParts) > 0;
+    const cmp = compareVersionParts(latestParts, currentParts);
+    if (cmp > 0) return true;
+    if (cmp < 0) return false;
+    // Same parsed version (often same date). For git/nightly strings,
+    // a differing full string still likely means a newer build.
+    if (
+      /git/i.test(currentVersion) &&
+      /git/i.test(latestVersion) &&
+      currentVersion.trim() !== latestVersion.trim()
+    ) {
+      return true;
+    }
+    return false;
   }
   // Current is unparseable (nightly/custom build) but latest is valid →
   // treat as update available so user can switch to stable
@@ -175,13 +193,19 @@ export async function checkFfmpegVersion(): Promise<ToolCheckResult | null> {
       const firstLine = output.stdout.split('\n')[0] || "";
       const rawMatch = firstLine.match(/version\s+(\S+)/i);
       const rawVersion = rawMatch ? rawMatch[1] : "";
+      const dateGitMatch = rawVersion.match(/^(\d{4})-(\d{2})-(\d{2})-git-([0-9a-f]+)/i);
+      const nightlyWithDateMatch = rawVersion.match(/^N-\d+-g([0-9a-f]+)-(\d{4})(\d{2})(\d{2})$/i);
       // Clean build metadata:
       //   Release: "7.1-full_build-www.gyan.dev" → "7.1"
-      //   Nightly: "N-121437-gf4a87d8ca4-20251015" → "N-121437"
+      //   Nightly: "N-121437-gf4a87d8ca4-20251015" → "2025-10-15-git-f4a87d8ca4"
       let version: string;
       const releaseMatch = rawVersion.match(/^(\d+(?:\.\d+)*)/);
       const nightlyMatch = rawVersion.match(/^(N-\d+)/i);
-      if (releaseMatch) {
+      if (dateGitMatch) {
+        version = `${dateGitMatch[1]}-${dateGitMatch[2]}-${dateGitMatch[3]}-git-${dateGitMatch[4].toLowerCase()}`;
+      } else if (nightlyWithDateMatch) {
+        version = `${nightlyWithDateMatch[2]}-${nightlyWithDateMatch[3]}-${nightlyWithDateMatch[4]}-git-${nightlyWithDateMatch[1].toLowerCase()}`;
+      } else if (releaseMatch) {
         version = releaseMatch[1];
       } else if (nightlyMatch) {
         version = nightlyMatch[1];
@@ -193,7 +217,7 @@ export async function checkFfmpegVersion(): Promise<ToolCheckResult | null> {
       const lower = firstLine.toLowerCase();
       const pathLower = (tool.path || "").toLowerCase();
       let variant = tool.isLocal ? "Bundled" : "System";
-      if (nightlyMatch) {
+      if (nightlyMatch || dateGitMatch || nightlyWithDateMatch || lower.includes("-git-")) {
         variant = "Nightly";
       } else if (lower.includes("shared") || pathLower.includes("shared")) {
         variant = "Shared";

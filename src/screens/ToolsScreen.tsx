@@ -72,6 +72,7 @@ import {
   useCallback,
   useEffect,
   useLayoutEffect,
+  useMemo,
   useRef,
   useState,
   type UIEvent,
@@ -94,6 +95,31 @@ const TOOL_DESCRIPTIONS: Record<string, string> = {
   aria2: "Multi-connection downloads",
   deno: "JavaScript runtime for challenges",
 };
+
+function getLatestTrackForTool(toolId: string, channel: ToolChannel): ToolChannel | "stable" {
+  return (NIGHTLY_CAPABLE_TOOLS as readonly string[]).includes(toolId)
+    ? channel
+    : "stable";
+}
+
+function getLatestSourceForTool(toolId: string, track: ToolChannel | "stable"): string {
+  switch (toolId) {
+    case "yt-dlp":
+      return track === "nightly"
+        ? "https://api.github.com/repos/yt-dlp/yt-dlp-nightly-builds/releases/latest"
+        : "https://api.github.com/repos/yt-dlp/yt-dlp/releases/latest";
+    case "ffmpeg":
+      return track === "nightly"
+        ? "https://www.gyan.dev/ffmpeg/builds/git-version"
+        : "https://www.gyan.dev/ffmpeg/builds/release-version";
+    case "aria2":
+      return "https://api.github.com/repos/aria2/aria2/releases/latest";
+    case "deno":
+      return "https://dl.deno.land/release-latest.txt";
+    default:
+      return "unknown source";
+  }
+}
 
 interface DownloadProgress {
   tool: string;
@@ -120,6 +146,50 @@ export function ToolsScreen() {
   const [modalDone, setModalDone] = useState(false);
   const [isRestarting, setIsRestarting] = useState(false);
   const [modalTitle, setModalTitle] = useState("Updating Tools");
+  const [isTransferRunning, setIsTransferRunning] = useState(false);
+  const [modalTargetToolIds, setModalTargetToolIds] = useState<string[]>([]);
+  const [modalToolProgress, setModalToolProgress] = useState<Record<string, number>>({});
+  const [modalCurrentToolId, setModalCurrentToolId] = useState<string | null>(null);
+  const [modalCurrentStatus, setModalCurrentStatus] = useState("Preparing...");
+  const isTransferActive = isTransferRunning && !modalDone && !modalError;
+  const modalTargetToolIdsRef = useRef<string[]>([]);
+  const modalLastLogRef = useRef<Record<string, { status: string; bucket: number }>>({});
+  const modalClosedNoticeRef = useRef<{ done: boolean; error: string | null }>({
+    done: false,
+    error: null,
+  });
+
+  const toolNameById = useMemo(
+    () => Object.fromEntries(tools.map((t) => [t.id, t.name])) as Record<string, string>,
+    [tools]
+  );
+
+  useEffect(() => {
+    modalTargetToolIdsRef.current = modalTargetToolIds;
+  }, [modalTargetToolIds]);
+
+  useEffect(() => {
+    if (isTransferRunning && (modalDone || Boolean(modalError))) {
+      setIsTransferRunning(false);
+    }
+  }, [isTransferRunning, modalDone, modalError]);
+
+  useEffect(() => {
+    if (modalOpen) {
+      modalClosedNoticeRef.current = { done: false, error: null };
+      return;
+    }
+
+    if (modalDone && !modalClosedNoticeRef.current.done) {
+      toast.success("Tool update completed in background.");
+      modalClosedNoticeRef.current.done = true;
+    }
+
+    if (modalError && modalClosedNoticeRef.current.error !== modalError) {
+      toast.error(`Background update failed: ${modalError}`);
+      modalClosedNoticeRef.current.error = modalError;
+    }
+  }, [modalOpen, modalDone, modalError]);
 
   const resetModal = useCallback(() => {
     setModalProgress(0);
@@ -127,7 +197,29 @@ export function ToolsScreen() {
     setModalError(null);
     setModalDone(false);
     setIsRestarting(false);
+    setModalTargetToolIds([]);
+    setModalToolProgress({});
+    setModalCurrentToolId(null);
+    setModalCurrentStatus("Preparing...");
+    modalLastLogRef.current = {};
   }, []);
+
+  const beginTransferModal = useCallback(
+    (title: string, toolIds: string[], initialLogs: string[] = []) => {
+      resetModal();
+      setModalTitle(title);
+      setModalTargetToolIds(toolIds);
+      setModalToolProgress(
+        Object.fromEntries(toolIds.map((id) => [id, 0])) as Record<string, number>
+      );
+      setModalCurrentToolId(toolIds[0] ?? null);
+      setModalCurrentStatus("Preparing...");
+      setModalLogs(initialLogs);
+      setIsTransferRunning(true);
+      setModalOpen(true);
+    },
+    [resetModal]
+  );
 
   /* ── Listen to download-progress events ── */
   useEffect(() => {
@@ -136,15 +228,44 @@ export function ToolsScreen() {
 
     void listen<DownloadProgress>("download-progress", (event) => {
       if (disposed) return;
-      setModalProgress(event.payload.percentage);
+      const toolId = event.payload.tool;
+      const targets = modalTargetToolIdsRef.current;
+      if (targets.length > 0 && !targets.includes(toolId)) return;
 
-      if (event.payload.status && event.payload.status !== "Downloading...") {
-        setModalLogs((prev) => {
-          const newLog = `[${event.payload.tool}] ${event.payload.status}`;
-          if (prev[prev.length - 1] === newLog) return prev;
-          return [...prev, newLog];
-        });
-      }
+      const clamped = Math.max(0, Math.min(100, event.payload.percentage));
+      const status = event.payload.status?.trim() || "Working...";
+
+      setModalCurrentToolId(toolId);
+      setModalCurrentStatus(status);
+
+      setModalToolProgress((prev) => {
+        const next = { ...prev, [toolId]: clamped };
+        const effectiveTargets =
+          targets.length > 0 ? targets : Object.keys(next);
+        if (effectiveTargets.length > 0) {
+          const total = effectiveTargets.reduce(
+            (acc, id) => acc + (next[id] ?? 0),
+            0
+          );
+          setModalProgress(total / effectiveTargets.length);
+        } else {
+          setModalProgress(clamped);
+        }
+        return next;
+      });
+
+      setModalLogs((prev) => {
+        const bucket = Math.floor(clamped / 10) * 10;
+        const last = modalLastLogRef.current[toolId];
+        if (last && last.status === status && last.bucket === bucket) {
+          return prev;
+        }
+        modalLastLogRef.current[toolId] = { status, bucket };
+
+        const newLog = `[${toolNameById[toolId] ?? toolId}] ${status} (${Math.round(clamped)}%)`;
+        if (prev[prev.length - 1] === newLog) return prev;
+        return [...prev.slice(-49), newLog];
+      });
     }).then((fn) => {
       if (disposed) {
         fn();
@@ -157,7 +278,7 @@ export function ToolsScreen() {
       disposed = true;
       if (cleanup) cleanup();
     };
-  }, []);
+  }, [toolNameById]);
 
   /* ── Scroll preservation ── */
   useLayoutEffect(() => {
@@ -198,6 +319,12 @@ export function ToolsScreen() {
       });
 
       const toolChannel = useToolsStore.getState().tools.find((t) => t.id === id)?.channel ?? "stable";
+      const latestTrack = getLatestTrackForTool(id, toolChannel);
+      const latestSource = getLatestSourceForTool(id, latestTrack);
+      addLog({
+        level: "debug",
+        message: `Checking latest ${id} on ${latestTrack} track via ${latestSource}`,
+      });
       let latest: string | null = null;
       switch (id) {
         case "yt-dlp":
@@ -222,6 +349,10 @@ export function ToolsScreen() {
         ),
         latestCheckedAt: Date.now(),
       });
+      addLog({
+        level: "info",
+        message: `Latest ${id} (${latestTrack}) is ${latest ?? "unknown"} [${latestSource}]`,
+      });
     } catch (e) {
       addLog({
         level: "error",
@@ -245,13 +376,18 @@ export function ToolsScreen() {
 
   /* ── Install / Update (with progress modal) ── */
   const installOrUpdate = async (tool: Tool) => {
-    resetModal();
-    setModalTitle(
+    if (isTransferActive) {
+      toast.info("Wait for the current download to finish.");
+      return;
+    }
+
+    beginTransferModal(
       tool.status === "Missing"
         ? `Installing ${tool.name}`
-        : `Updating ${tool.name}`
+        : `Updating ${tool.name}`,
+      [tool.id],
+      [`Queued ${tool.name} (${tool.channel})`]
     );
-    setModalOpen(true);
     setBusyTools((prev) => ({ ...prev, [tool.id]: true }));
 
     try {
@@ -259,6 +395,7 @@ export function ToolsScreen() {
       await downloadTools([tool.id], ch);
       setModalProgress(100);
       setModalDone(true);
+      setModalCurrentStatus("Completed");
       addLog({ level: "info", message: `${tool.id} installed/updated (${tool.channel})` });
       void refreshBackups();
     } catch (e) {
@@ -275,17 +412,27 @@ export function ToolsScreen() {
 
   /* ── pip upgrade for yt-dlp (with progress modal) ── */
   const handlePipUpgrade = async (tool: Tool) => {
-    resetModal();
-    setModalTitle("Upgrading yt-dlp via pip");
-    setModalOpen(true);
+    if (isTransferActive) {
+      toast.info("Wait for the current download to finish.");
+      return;
+    }
+
+    beginTransferModal("Upgrading yt-dlp via pip", [tool.id], [
+      "Preparing pip upgrade...",
+      "Running pip install --upgrade yt-dlp...",
+    ]);
     setBusyTools((prev) => ({ ...prev, [tool.id]: true }));
-    setModalLogs(["Running pip install --upgrade yt-dlp..."]);
+    setModalCurrentStatus("Running pip command");
+    setModalProgress(15);
+    setModalToolProgress({ [tool.id]: 15 });
 
     try {
       const ok = await upgradeYtDlpViaPip();
       if (ok) {
         setModalProgress(100);
+        setModalToolProgress({ [tool.id]: 100 });
         setModalDone(true);
+        setModalCurrentStatus("Completed");
         setModalLogs((prev) => [...prev, "pip upgrade completed"]);
       } else {
         setModalError("pip upgrade failed — check logs for details");
@@ -301,18 +448,26 @@ export function ToolsScreen() {
 
   /* ── Update at original (system) location ── */
   const handleUpdateOriginal = async (tool: Tool) => {
+    if (isTransferActive) {
+      toast.info("Wait for the current download to finish.");
+      return;
+    }
+
     if (!tool.systemPath) return;
     const destDir = tool.systemPath.replace(/[/\\][^/\\]+$/, "");
 
-    resetModal();
-    setModalTitle(`Updating ${tool.name} at original location`);
-    setModalOpen(true);
+    beginTransferModal(
+      `Updating ${tool.name} at original location`,
+      [tool.id],
+      [`Queued in-place update for ${tool.name}`]
+    );
     setBusyTools((prev) => ({ ...prev, [tool.id]: true }));
 
     try {
       await updateToolAtPath(tool.id, destDir, tool.variant, tool.channel);
       setModalProgress(100);
       setModalDone(true);
+      setModalCurrentStatus("Completed");
       addLog({ level: "info", message: `${tool.id} updated at ${destDir}` });
       void refreshBackups();
     } catch (e) {
@@ -342,16 +497,22 @@ export function ToolsScreen() {
 
   /* ── Update All (with progress modal) ── */
   const updateAll = async () => {
+    if (isTransferActive) {
+      toast.info("Wait for the current download to finish.");
+      return;
+    }
+
     const toUpdate = tools.filter(
       (t) => t.updateAvailable || t.status === "Missing"
     );
     if (toUpdate.length === 0) return;
 
-    resetModal();
-    setModalTitle(`Updating ${toUpdate.length} tool${toUpdate.length > 1 ? "s" : ""}`);
-    setModalOpen(true);
-
     const ids = toUpdate.map((t) => t.id);
+    beginTransferModal(
+      `Updating ${toUpdate.length} tool${toUpdate.length > 1 ? "s" : ""}`,
+      ids,
+      [`Queued: ${toUpdate.map((t) => t.name).join(", ")}`]
+    );
     setBusyTools((prev) => {
       const next = { ...prev };
       for (const id of ids) next[id] = true;
@@ -365,7 +526,11 @@ export function ToolsScreen() {
       }
       await downloadTools(ids, Object.keys(ch).length > 0 ? ch : undefined);
       setModalProgress(100);
+      setModalToolProgress(
+        Object.fromEntries(ids.map((id) => [id, 100])) as Record<string, number>
+      );
       setModalDone(true);
+      setModalCurrentStatus("Completed");
       void refreshBackups();
     } catch (e) {
       setModalError(
@@ -499,12 +664,13 @@ export function ToolsScreen() {
   const ToolRow = ({ tool, isLast }: { tool: Tool; isLast: boolean }) => {
     const isBusy = busyTools[tool.id];
     const isPip = tool.variant === "pip";
+    const disableUpgradeActions = isTransferActive;
 
     return (
       <div
         className={cn(
           "flex items-center gap-4 px-5 py-4 transition-colors hover:bg-muted/30",
-          !isLast && "border-b border-white/[0.04]"
+          !isLast && "border-b border-white/4"
         )}
       >
         {/* Status indicator + info */}
@@ -559,9 +725,9 @@ export function ToolsScreen() {
         </div>
 
         {/* Version info */}
-        <div className="hidden sm:flex items-center gap-2 text-xs font-mono shrink-0">
+        <div className="hidden sm:flex flex-col items-end gap-0.5 text-xs font-mono shrink-0 min-w-[170px]">
           {tool.version ? (
-            <>
+            <div className="flex items-center gap-2">
               <span className="text-muted-foreground">{tool.version}</span>
               {tool.updateAvailable && tool.latestVersion && (
                 <>
@@ -571,7 +737,7 @@ export function ToolsScreen() {
                   </span>
                 </>
               )}
-            </>
+            </div>
           ) : tool.status === "Checking" ? (
             <span className="text-muted-foreground/50 text-[11px]">
               Checking...
@@ -579,6 +745,17 @@ export function ToolsScreen() {
           ) : (
             <span className="text-muted-foreground/40 italic text-[11px]">
               Not installed
+            </span>
+          )}
+          {tool.latestCheckedAt && (
+            <span
+              className="text-[10px] text-muted-foreground/70"
+              title={`Latest source: ${getLatestSourceForTool(
+                tool.id,
+                getLatestTrackForTool(tool.id, tool.channel)
+              )}`}
+            >
+              Latest track: {getLatestTrackForTool(tool.id, tool.channel)}
             </span>
           )}
         </div>
@@ -600,6 +777,7 @@ export function ToolsScreen() {
               size="sm"
               className="h-8 px-3 text-xs"
               onClick={() => installOrUpdate(tool)}
+              disabled={disableUpgradeActions}
             >
               <Download className="w-3.5 h-3.5 mr-1.5" />
               Install
@@ -611,6 +789,7 @@ export function ToolsScreen() {
               onClick={() =>
                 isPip ? handlePipUpgrade(tool) : installOrUpdate(tool)
               }
+              disabled={disableUpgradeActions}
             >
               <RefreshCcw className="w-3.5 h-3.5 mr-1.5" />
               {isPip ? "pip upgrade" : "Update"}
@@ -642,7 +821,7 @@ export function ToolsScreen() {
               {isPip && tool.updateAvailable && (
                 <DropdownMenuItem
                   onClick={() => installOrUpdate(tool)}
-                  disabled={isBusy}
+                  disabled={isBusy || disableUpgradeActions}
                 >
                   <Download className="w-3.5 h-3.5 mr-2" />
                   Download standalone instead
@@ -651,7 +830,7 @@ export function ToolsScreen() {
               {!isPip && tool.id === "yt-dlp" && tool.updateAvailable && (
                 <DropdownMenuItem
                   onClick={() => handlePipUpgrade(tool)}
-                  disabled={isBusy}
+                  disabled={isBusy || disableUpgradeActions}
                 >
                   <RefreshCcw className="w-3.5 h-3.5 mr-2" />
                   Update via pip
@@ -660,7 +839,7 @@ export function ToolsScreen() {
               {tool.systemPath && !isPip && tool.variant !== "Bundled" && tool.variant !== "Bundled (Full)" && tool.updateAvailable && (
                 <DropdownMenuItem
                   onClick={() => handleUpdateOriginal(tool)}
-                  disabled={isBusy}
+                  disabled={isBusy || disableUpgradeActions}
                 >
                   <MapPin className="w-3.5 h-3.5 mr-2" />
                   Update at original location
@@ -737,7 +916,14 @@ export function ToolsScreen() {
   };
 
   /* ── Progress Modal ── */
-  const isDownloading = modalOpen && !modalDone && !modalError;
+  const isDownloading = isTransferActive;
+  const modalCurrentToolName = modalCurrentToolId
+    ? toolNameById[modalCurrentToolId] ?? modalCurrentToolId
+    : null;
+  const orderedModalToolIds =
+    modalTargetToolIds.length > 0
+      ? modalTargetToolIds
+      : Object.keys(modalToolProgress);
 
   return (
     <div
@@ -789,7 +975,7 @@ export function ToolsScreen() {
                   <MotionButton
                     size="sm"
                     onClick={updateAll}
-                    disabled={anyBusy}
+                    disabled={anyBusy || isTransferActive}
                     className="h-9"
                   >
                     <Download className="w-4 h-4 mr-2" />
@@ -809,7 +995,7 @@ export function ToolsScreen() {
             className="h-full overflow-auto px-8 pb-8"
           >
             <div className="space-y-4">
-              <div className="rounded-xl border border-white/[0.06] bg-background/40 backdrop-blur-sm overflow-hidden shadow-sm">
+              <div className="rounded-xl border border-white/6 bg-background/40 backdrop-blur-sm overflow-hidden shadow-sm">
                 {tools.map((tool, i) => (
                   <ToolRow
                     key={tool.id}
@@ -838,17 +1024,25 @@ export function ToolsScreen() {
       <Dialog
         open={modalOpen}
         onOpenChange={(val) => {
-          if (isDownloading) return; // prevent closing during download
-          if (!val) handleDismiss();
+          if (!val) {
+            if (isDownloading) {
+              setModalOpen(false);
+              toast.info("Update is still running in background.");
+              return;
+            }
+            handleDismiss();
+            return;
+          }
+          setModalOpen(true);
         }}
       >
         <DialogContent
           className="sm:max-w-[440px] border-none bg-transparent shadow-2xl p-0 overflow-hidden"
-          onInteractOutside={(e) => {
-            if (isDownloading) e.preventDefault();
+          onInteractOutside={() => {
+            void 0;
           }}
-          onEscapeKeyDown={(e) => {
-            if (isDownloading) e.preventDefault();
+          onEscapeKeyDown={() => {
+            void 0;
           }}
         >
           <div className="relative bg-background/90 backdrop-blur-2xl border border-white/10 rounded-xl overflow-hidden">
@@ -873,7 +1067,9 @@ export function ToolsScreen() {
                         ? "Download complete — restart to apply"
                         : modalError
                           ? "Something went wrong"
-                          : "Downloading and extracting..."}
+                          : modalCurrentToolName
+                            ? `${modalCurrentToolName}: ${modalCurrentStatus}`
+                            : "Preparing transfer..."}
                     </p>
                   </div>
                 </div>
@@ -913,6 +1109,46 @@ export function ToolsScreen() {
                         className="h-1.5 bg-muted/50"
                       />
                     </div>
+
+                    <div className="grid grid-cols-2 gap-2 text-[11px]">
+                      <div className="rounded-lg border border-white/10 bg-muted/20 px-3 py-2">
+                        <div className="text-[10px] uppercase tracking-wide text-muted-foreground">
+                          Current Tool
+                        </div>
+                        <div className="truncate font-medium text-foreground/90">
+                          {modalCurrentToolName || "Waiting..."}
+                        </div>
+                      </div>
+                      <div className="rounded-lg border border-white/10 bg-muted/20 px-3 py-2">
+                        <div className="text-[10px] uppercase tracking-wide text-muted-foreground">
+                          Stage
+                        </div>
+                        <div className="truncate font-medium text-foreground/90">
+                          {modalCurrentStatus}
+                        </div>
+                      </div>
+                    </div>
+
+                    {orderedModalToolIds.length > 1 && (
+                      <div className="rounded-lg border border-white/10 bg-muted/15 p-3 space-y-2">
+                        {orderedModalToolIds.map((toolId) => {
+                          const pct = Math.round(modalToolProgress[toolId] ?? 0);
+                          return (
+                            <div key={toolId} className="space-y-1">
+                              <div className="flex items-center justify-between text-[11px]">
+                                <span className="text-foreground/85">
+                                  {toolNameById[toolId] ?? toolId}
+                                </span>
+                                <span className="font-mono text-muted-foreground">
+                                  {pct}%
+                                </span>
+                              </div>
+                              <Progress value={pct} className="h-1 bg-muted/50" />
+                            </div>
+                          );
+                        })}
+                      </div>
+                    )}
 
                     {/* Log output */}
                     <div className="bg-black/40 rounded-lg border border-white/5 p-4 font-mono text-[10px] space-y-2 h-[120px] overflow-hidden relative">
