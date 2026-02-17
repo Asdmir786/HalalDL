@@ -1,8 +1,12 @@
 import { useEffect } from "react";
 import { useSettingsStore } from "@/store/settings";
+import { ACCENT_COLORS } from "@/store/settings";
+
+const ACCENT_CLASSES = ACCENT_COLORS.map((c) => `accent-${c.id}`).filter((c) => c !== "accent-default");
 
 export function useApplyTheme() {
   const theme = useSettingsStore((s) => s.settings.theme);
+  const accentColor = useSettingsStore((s) => s.settings.accentColor);
 
   useEffect(() => {
     const root = window.document.documentElement;
@@ -28,4 +32,12 @@ export function useApplyTheme() {
       return () => mq.removeEventListener("change", apply);
     }
   }, [theme]);
+
+  useEffect(() => {
+    const root = window.document.documentElement;
+    root.classList.remove(...ACCENT_CLASSES);
+    if (accentColor && accentColor !== "default") {
+      root.classList.add(`accent-${accentColor}`);
+    }
+  }, [accentColor]);
 }

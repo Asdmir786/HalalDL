@@ -20,6 +20,8 @@ import {
 } from "@/lib/commands";
 import { toast } from "sonner";
 import { isPermissionGranted, requestPermission, sendNotification } from '@tauri-apps/plugin-notification';
+import { getVersion } from "@tauri-apps/api/app";
+import { useAppUpdateStore } from "@/store/app-update";
 
 export function usePersistenceInit(): MutableRefObject<boolean> {
   const { setSettings } = useSettingsStore();
@@ -214,12 +216,33 @@ export function usePersistenceInit(): MutableRefObject<boolean> {
         initialized.current = true;
 
         void checkLatestVersions();
+        void checkAppUpdate();
 
       } catch (e) {
         addLog({ level: "error", message: `Failed to load persistence: ${String(e)}` });
         toast.error("Failed to load settings");
       }
     };
+
+    async function checkAppUpdate() {
+      try {
+        const currentVersion = await getVersion();
+        const res = await fetch(
+          "https://api.github.com/repos/Asdmir786/HalalDL/releases/latest",
+          { headers: { Accept: "application/vnd.github.v3+json" } },
+        );
+        if (!res.ok) return;
+        const data = await res.json();
+        const tag: string = data.tag_name ?? "";
+        const latest = tag.replace(/^v/, "");
+        if (latest && latest !== currentVersion) {
+          useAppUpdateStore.getState().setUpdate(latest, data.html_url ?? "https://github.com/Asdmir786/HalalDL/releases");
+          addLog({ level: "info", message: `App update available: v${latest} (current: v${currentVersion})` });
+        }
+      } catch {
+        // silently ignore update check failures
+      }
+    }
 
     init();
   }, [setSettings, setPresets, setTools, updateTool, setDiscoveredToolId, addLog]);

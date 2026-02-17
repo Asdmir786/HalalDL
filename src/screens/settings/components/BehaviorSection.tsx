@@ -1,10 +1,9 @@
-import { Zap, FileWarning } from "lucide-react";
+import { Bell, Clipboard, Trash2, FileWarning } from "lucide-react";
 import { FadeInItem } from "@/components/motion/StaggerContainer";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import { Separator } from "@/components/ui/separator";
-import { Slider } from "@/components/ui/slider";
 import { 
   Select, 
   SelectContent, 
@@ -21,8 +20,6 @@ interface BehaviorSectionProps {
   onAutoClearChange: (val: boolean) => void;
   autoCopyFile: boolean;
   onAutoCopyChange: (val: boolean) => void;
-  maxConcurrency: number;
-  onMaxConcurrencyChange: (val: number) => void;
   fileCollision: FileCollisionAction;
   onFileCollisionChange: (val: FileCollisionAction) => void;
 }
@@ -31,7 +28,6 @@ export function BehaviorSection({
   notifications, onNotificationsChange,
   autoClearFinished, onAutoClearChange,
   autoCopyFile, onAutoCopyChange,
-  maxConcurrency, onMaxConcurrencyChange,
   fileCollision, onFileCollisionChange
 }: BehaviorSectionProps) {
   return (
@@ -39,15 +35,18 @@ export function BehaviorSection({
       <Card className="glass-card">
         <CardHeader>
           <CardTitle className="text-lg flex items-center gap-2">
-            <Zap className="w-5 h-5" />
+            <Bell className="w-5 h-5" />
             Behavior
           </CardTitle>
-          <CardDescription>App notifications and background tasks.</CardDescription>
+          <CardDescription>Notifications, clipboard, and file handling preferences.</CardDescription>
         </CardHeader>
         <CardContent className="space-y-6">
           <div className="flex items-center justify-between">
             <div className="space-y-0.5">
-              <Label>Desktop Notifications</Label>
+              <Label className="flex items-center gap-2">
+                <Bell className="w-3.5 h-3.5 text-muted-foreground" />
+                Desktop Notifications
+              </Label>
               <p className="text-sm text-muted-foreground">Show alerts when downloads complete or fail.</p>
             </div>
             <Switch
@@ -60,7 +59,10 @@ export function BehaviorSection({
 
           <div className="flex items-center justify-between">
             <div className="space-y-0.5">
-              <Label>Auto-Clear Completed</Label>
+              <Label className="flex items-center gap-2">
+                <Trash2 className="w-3.5 h-3.5 text-muted-foreground" />
+                Auto-Clear Completed
+              </Label>
               <p className="text-sm text-muted-foreground">Automatically remove finished downloads from the list.</p>
             </div>
             <Switch
@@ -73,8 +75,11 @@ export function BehaviorSection({
 
           <div className="flex items-center justify-between">
             <div className="space-y-0.5">
-              <Label>Auto-Copy File</Label>
-              <p className="text-sm text-muted-foreground">Automatically copy the downloaded file to clipboard.</p>
+              <Label className="flex items-center gap-2">
+                <Clipboard className="w-3.5 h-3.5 text-muted-foreground" />
+                Auto-Copy File
+              </Label>
+              <p className="text-sm text-muted-foreground">Copy downloaded file to clipboard when complete.</p>
             </div>
             <Switch
               checked={autoCopyFile}
@@ -86,35 +91,11 @@ export function BehaviorSection({
 
           <div className="flex items-center justify-between">
             <div className="space-y-0.5">
-              <Label>Max Concurrent Downloads</Label>
-              <p className="text-sm text-muted-foreground">
-                Limit how many downloads run at the same time.
-              </p>
-            </div>
-            <div className="flex items-center gap-3">
-              <span className="text-sm text-muted-foreground">
-                {maxConcurrency}
-              </span>
-              <Slider
-                className="w-40"
-                min={1}
-                max={8}
-                step={1}
-                value={[maxConcurrency]}
-                onValueChange={([value]) => onMaxConcurrencyChange(value)}
-              />
-            </div>
-          </div>
-
-          <Separator />
-
-          <div className="flex items-center justify-between">
-            <div className="space-y-0.5">
               <Label className="flex items-center gap-2">
-                <FileWarning className="w-4 h-4 text-yellow-500" />
+                <FileWarning className="w-3.5 h-3.5 text-yellow-500" />
                 File Collision
               </Label>
-              <p className="text-sm text-muted-foreground">What to do if a file already exists.</p>
+              <p className="text-sm text-muted-foreground">What to do when a file with the same name already exists.</p>
             </div>
             <Select 
               value={fileCollision} 

@@ -1,4 +1,4 @@
-import { Zap } from "lucide-react";
+import { Gauge } from "lucide-react";
 import { FadeInItem } from "@/components/motion/StaggerContainer";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Label } from "@/components/ui/label";
@@ -69,10 +69,10 @@ export function EngineSection({
       <Card className="glass-card">
         <CardHeader>
           <CardTitle className="text-lg flex items-center gap-2">
-            <Zap className="w-5 h-5" />
+            <Gauge className="w-5 h-5" />
             Download Engine
           </CardTitle>
-          <CardDescription>Control concurrency and retry logic for yt-dlp.</CardDescription>
+          <CardDescription>Concurrency, retries, and speed limits for yt-dlp.</CardDescription>
         </CardHeader>
         <CardContent className="space-y-8">
           <div className="space-y-4">

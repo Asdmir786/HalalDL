@@ -4,20 +4,23 @@ import { downloadDir } from "@tauri-apps/api/path";
 import {
   DEFAULT_SETTINGS,
   SETTINGS_KEYS,
+  ACCENT_COLORS,
   type Settings,
+  type AccentColor,
   useSettingsStore,
   Theme,
 } from "@/store/settings";
 import { FadeInStagger } from "@/components/motion/StaggerContainer";
 
-// Import Components
 import { SettingsHeader } from "./settings/components/SettingsHeader";
 import { AppearanceSection } from "./settings/components/AppearanceSection";
 import { StorageSection } from "./settings/components/StorageSection";
 import { BehaviorSection } from "./settings/components/BehaviorSection";
 import { EngineSection } from "./settings/components/EngineSection";
+import { AboutSection } from "./settings/components/AboutSection";
 
 const SETTINGS_KEY_SET = new Set(SETTINGS_KEYS as unknown as string[]);
+const ACCENT_CLASSES = ACCENT_COLORS.map((c) => `accent-${c.id}`).filter((c) => c !== "accent-default");
 
 const pickKnownSettings = (value: unknown): Settings => {
   const source = (value ?? {}) as Record<string, unknown>;
@@ -82,7 +85,6 @@ export function SettingsScreen() {
     return SETTINGS_KEYS.some((k) => {
       const current = savedSettings[k];
       const initial = resolvedDefaults[k];
-      // Special handling for arrays or objects if needed, but settings are mostly primitives
       return !Object.is(current, initial);
     });
   }, [hasExtraSavedKeys, resolvedDefaults, savedSettings]);
@@ -116,10 +118,23 @@ export function SettingsScreen() {
     }
   }, []);
 
+  const applyAccent = useCallback((accent: AccentColor) => {
+    const root = window.document.documentElement;
+    root.classList.remove(...ACCENT_CLASSES);
+    if (accent && accent !== "default") {
+      root.classList.add(`accent-${accent}`);
+    }
+  }, []);
+
   useEffect(() => {
     applyTheme(draftSettings.theme);
     return () => applyTheme(savedSettings.theme);
   }, [applyTheme, draftSettings.theme, savedSettings.theme]);
+
+  useEffect(() => {
+    applyAccent(draftSettings.accentColor);
+    return () => applyAccent(savedSettings.accentColor);
+  }, [applyAccent, draftSettings.accentColor, savedSettings.accentColor]);
 
   const handleSave = useCallback(() => {
     if (!isDirty) return;
@@ -135,11 +150,9 @@ export function SettingsScreen() {
     try {
       const defaults = resolvedDefaults ?? (await resolveDefaultSettings());
       
-      // Calculate what changed
       const changedKeys: string[] = [];
       for (const key of SETTINGS_KEYS) {
           if (!Object.is(settings[key], defaults[key])) {
-              // Convert camelCase to readable format
               const readable = key.replace(/([A-Z])/g, ' $1').replace(/^./, str => str.toUpperCase());
               changedKeys.push(readable);
           }
@@ -188,16 +201,20 @@ export function SettingsScreen() {
       const defaults = group === "storage" ? await resolveDefaultSettings() : DEFAULT_SETTINGS;
       const partial: Partial<Settings> =
         group === "appearance"
-          ? { theme: defaults.theme }
+          ? { theme: defaults.theme, accentColor: defaults.accentColor }
           : group === "storage"
           ? { defaultDownloadDir: defaults.defaultDownloadDir, tempDir: defaults.tempDir }
           : group === "behavior"
-          ? { notifications: defaults.notifications, autoClearFinished: defaults.autoClearFinished }
+          ? {
+              notifications: defaults.notifications,
+              autoClearFinished: defaults.autoClearFinished,
+              autoCopyFile: defaults.autoCopyFile,
+              fileCollision: defaults.fileCollision,
+            }
           : {
               maxConcurrency: defaults.maxConcurrency,
               maxRetries: defaults.maxRetries,
               maxSpeed: defaults.maxSpeed,
-              fileCollision: defaults.fileCollision,
             };
 
       setDraftFromSettings({ ...draftSettings, ...partial });
@@ -240,11 +257,15 @@ export function SettingsScreen() {
             <AppearanceSection
               theme={draftSettings.theme}
               onThemeChange={(v) => setDraftValue("theme", v)}
+              accentColor={draftSettings.accentColor}
+              onAccentColorChange={(v) => setDraftValue("accentColor", v)}
             />
 
             <StorageSection
               defaultDownloadDir={draftSettings.defaultDownloadDir || ""}
               onDirectoryChange={(v) => setDraftValue("defaultDownloadDir", v)}
+              tempDir={draftSettings.tempDir || ""}
+              onTempDirChange={(v) => setDraftValue("tempDir", v)}
             />
 
             <BehaviorSection
@@ -254,8 +275,6 @@ export function SettingsScreen() {
               onAutoClearChange={(v) => setDraftValue("autoClearFinished", v)}
               autoCopyFile={draftSettings.autoCopyFile}
               onAutoCopyChange={(v) => setDraftValue("autoCopyFile", v)}
-              maxConcurrency={draftSettings.maxConcurrency}
-              onMaxConcurrencyChange={(v) => setDraftValue("maxConcurrency", v)}
               fileCollision={draftSettings.fileCollision}
               onFileCollisionChange={(v) => setDraftValue("fileCollision", v)}
             />
@@ -268,6 +287,8 @@ export function SettingsScreen() {
               maxSpeed={draftSettings.maxSpeed}
               onMaxSpeedChange={(v) => setDraftValue("maxSpeed", v)}
             />
+
+            <AboutSection />
           </div>
         </div>
       </FadeInStagger>

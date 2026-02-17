@@ -18,6 +18,7 @@ import { MotionButton } from "@/components/motion/MotionButton";
 import { getVersion } from "@tauri-apps/api/app";
 import { useEffect, useMemo, useState } from "react";
 import { useDownloadsStore } from "@/store/downloads";
+import { useAppUpdateStore } from "@/store/app-update";
 import { Progress } from "@/components/ui/progress";
 
 const NAV_ITEMS: { id: Screen; label: string; icon: LucideIcon }[] = [
@@ -117,6 +118,10 @@ export function Sidebar() {
     };
   }, [activeCount, queuedCount, failedCount, doneCount]);
 
+  const updateAvailable = useAppUpdateStore((s) => s.updateAvailable);
+  const updateDismissed = useAppUpdateStore((s) => s.dismissed);
+  const showUpdateDot = updateAvailable && !updateDismissed;
+
   const showGlobalProgress = activeCount > 0 && currentScreen !== "downloads";
   const DownloadProgressIcon = downloadNavMeta.Icon;
 
@@ -144,6 +149,7 @@ export function Sidebar() {
           const Icon = item.icon;
           const isActive = currentScreen === item.id;
           const isDownloadsItem = item.id === "downloads";
+          const isSettingsItem = item.id === "settings";
           const NavIcon = isDownloadsItem ? downloadNavMeta.Icon : Icon;
           return (
             <MotionButton
@@ -183,6 +189,9 @@ export function Sidebar() {
                     {downloadNavMeta.count}
                   </span>
                 )}
+                {isSettingsItem && showUpdateDot && sidebarCollapsed && (
+                  <span className="absolute -top-1 -right-1 w-2.5 h-2.5 rounded-full bg-blue-500 ring-2 ring-background animate-pulse" />
+                )}
               </span>
               
               {!sidebarCollapsed && (
@@ -196,6 +205,12 @@ export function Sidebar() {
                       )}
                     >
                       {downloadNavMeta.count}
+                    </span>
+                  )}
+                  {isSettingsItem && showUpdateDot && (
+                    <span className="inline-flex items-center gap-1 rounded-full border border-blue-500/30 bg-blue-500/10 px-2 py-0.5 text-[9px] font-semibold text-blue-400">
+                      <span className="w-1.5 h-1.5 rounded-full bg-blue-500 animate-pulse" />
+                      Update
                     </span>
                   )}
                 </span>

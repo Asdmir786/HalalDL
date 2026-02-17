@@ -1,0 +1,35 @@
+---
+description: Keep code modular and reasonably sized — no monoliths, no micro-files
+alwaysApply: true
+---
+
+# Code Structure & Modularity
+
+## File size guidelines
+
+- **Aim for 150–400 lines per file.** This is a guideline, not a hard limit.
+- If a file exceeds ~500 lines, look for natural seams to split (distinct responsibilities, separable types, large data arrays).
+- Do **not** create a new file for every small helper, type, or constant. A handful of related one-liners belong together in a shared module.
+
+## When to split
+
+- A component file contains multiple large sub-components → extract into a `components/` subfolder.
+- A file mixes business logic hooks with UI rendering → separate hooks into a `hooks/` subfolder.
+- A large static data array (presets, constants >80 lines) lives inline → move to a dedicated data file.
+- A Rust module has multiple unrelated command groups → split by domain (e.g., `download.rs`, `version.rs`).
+
+## When NOT to split
+
+- A file is under ~300 lines and everything in it is closely related — leave it alone.
+- A helper is only used by one file and is <30 lines — keep it co-located.
+- Splitting would force circular imports or excessive prop-drilling.
+
+## Directory conventions
+
+- When splitting a file `foo.ts` into a folder, create `foo/index.ts` (barrel) that re-exports the public API so external imports stay unchanged.
+- Group by feature, not by file type (e.g., `screens/tools/{components,hooks,constants}` not `components/tools/`, `hooks/tools/`).
+
+## Imports
+
+- Prefer importing from barrel `index.ts` files, not deep internal paths from other features.
+- Internal helpers that are not part of the public API should **not** be exported from the barrel.

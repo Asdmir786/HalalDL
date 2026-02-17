@@ -93,6 +93,74 @@
   --background-size-gradient: 200% 200%;
 }
 
+/* ── Accent color overrides ────────────────────────── */
+
+.accent-blue {
+  --primary: oklch(0.50 0.22 260);
+  --primary-foreground: oklch(0.985 0 0);
+  --ring: oklch(0.50 0.22 260);
+}
+.accent-blue.dark {
+  --primary: oklch(0.65 0.22 260);
+  --primary-foreground: oklch(0.15 0 0);
+  --ring: oklch(0.65 0.22 260);
+}
+
+.accent-green {
+  --primary: oklch(0.50 0.19 155);
+  --primary-foreground: oklch(0.985 0 0);
+  --ring: oklch(0.50 0.19 155);
+}
+.accent-green.dark {
+  --primary: oklch(0.65 0.19 155);
+  --primary-foreground: oklch(0.15 0 0);
+  --ring: oklch(0.65 0.19 155);
+}
+
+.accent-purple {
+  --primary: oklch(0.48 0.24 290);
+  --primary-foreground: oklch(0.985 0 0);
+  --ring: oklch(0.48 0.24 290);
+}
+.accent-purple.dark {
+  --primary: oklch(0.65 0.24 290);
+  --primary-foreground: oklch(0.15 0 0);
+  --ring: oklch(0.65 0.24 290);
+}
+
+.accent-rose {
+  --primary: oklch(0.52 0.22 15);
+  --primary-foreground: oklch(0.985 0 0);
+  --ring: oklch(0.52 0.22 15);
+}
+.accent-rose.dark {
+  --primary: oklch(0.68 0.22 15);
+  --primary-foreground: oklch(0.15 0 0);
+  --ring: oklch(0.68 0.22 15);
+}
+
+.accent-orange {
+  --primary: oklch(0.55 0.20 50);
+  --primary-foreground: oklch(0.985 0 0);
+  --ring: oklch(0.55 0.20 50);
+}
+.accent-orange.dark {
+  --primary: oklch(0.72 0.19 55);
+  --primary-foreground: oklch(0.15 0 0);
+  --ring: oklch(0.72 0.19 55);
+}
+
+.accent-teal {
+  --primary: oklch(0.48 0.15 185);
+  --primary-foreground: oklch(0.985 0 0);
+  --ring: oklch(0.48 0.15 185);
+}
+.accent-teal.dark {
+  --primary: oklch(0.65 0.15 185);
+  --primary-foreground: oklch(0.15 0 0);
+  --ring: oklch(0.65 0.15 185);
+}
+
 @layer base {
   * {
     @apply border-border outline-ring/50;
