@@ -2,8 +2,8 @@ import { useState } from "react";
 import { motion, Variants } from "framer-motion";
 import { 
   X, FolderOpen, Terminal, 
-  Copy, RotateCcw, Play, Clock, 
-  CheckCircle2, AlertTriangle, Link, Download, Sparkles 
+  Copy, RotateCcw, Play,
+  Link, Clock,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { DownloadJob } from "@/store/downloads";
@@ -15,6 +15,7 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { ContextMenu, ContextMenuContent, ContextMenuItem, ContextMenuTrigger, ContextMenuSeparator } from "@/components/ui/context-menu";
 import { toast } from "sonner";
 import { getJobTs } from "../utils";
+import { getStatusMeta, PHASE_ORDER, type Phase } from "../constants";
 
 interface DownloadItemProps {
   job: DownloadJob;
@@ -44,46 +45,9 @@ export function DownloadItem({
   const thumbnailLoading =
     !job.thumbnail && job.thumbnailStatus !== "failed" && job.thumbnailStatus !== "ready";
 
-  const statusMeta =
-    job.status === "Queued"
-      ? {
-          Icon: Clock,
-          badgeClassName:
-            "text-yellow-300 border-yellow-500/20 bg-yellow-500/10 shadow-[0_0_0_1px_rgba(234,179,8,0.12)]",
-        }
-      : job.status === "Failed"
-        ? {
-            Icon: AlertTriangle,
-            badgeClassName:
-              "text-destructive border-destructive/25 bg-destructive/10 shadow-[0_0_0_1px_rgba(239,68,68,0.14)]",
-          }
-        : job.status === "Done"
-          ? {
-              Icon: CheckCircle2,
-              badgeClassName:
-                "text-emerald-300 border-emerald-500/20 bg-emerald-500/10 shadow-[0_0_0_1px_rgba(16,185,129,0.14)]",
-            }
-          : job.status === "Post-processing"
-            ? {
-                Icon: Sparkles,
-                badgeClassName:
-                  "text-violet-300 border-violet-500/20 bg-violet-500/10 shadow-[0_0_0_1px_rgba(139,92,246,0.14)]",
-              }
-            : {
-                Icon: Download,
-                badgeClassName:
-                  "text-blue-300 border-blue-500/20 bg-blue-500/10 shadow-[0_0_0_1px_rgba(59,130,246,0.14)]",
-              };
-
+  const statusMeta = getStatusMeta(job.status);
   const StatusIcon = statusMeta.Icon;
-  const phaseOrder = [
-    "Resolving formats",
-    "Downloading streams",
-    "Merging streams",
-    "Converting with FFmpeg",
-    "Generating thumbnail",
-  ] as const;
-  const phaseIndex = job.phase ? phaseOrder.indexOf(job.phase as (typeof phaseOrder)[number]) : -1;
+  const phaseIndex = job.phase ? PHASE_ORDER.indexOf(job.phase as Phase) : -1;
 
   const handleCopyLink = (url: string) => {
     navigator.clipboard.writeText(url);
@@ -213,7 +177,7 @@ export function DownloadItem({
                       <span className="truncate text-right">{job.statusDetail || "Working..."}</span>
                     </div>
                     <div className="flex items-center gap-1">
-                      {phaseOrder.map((phase, idx) => (
+                      {PHASE_ORDER.map((phase, idx) => (
                         <div
                           key={phase}
                           className={cn(

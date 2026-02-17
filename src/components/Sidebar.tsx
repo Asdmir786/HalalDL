@@ -3,13 +3,14 @@ import {
   AlertTriangle,
   CheckCircle2,
   Clock3,
-  Download, 
+  HardDriveDownload, 
   Settings, 
   ListMusic, 
   Wrench, 
   Terminal,
   ChevronLeft,
   ChevronRight,
+  ArrowDownToLine,
   type LucideIcon
 } from "lucide-react";
 import { cn } from "@/lib/utils";
@@ -20,7 +21,7 @@ import { useDownloadsStore } from "@/store/downloads";
 import { Progress } from "@/components/ui/progress";
 
 const NAV_ITEMS: { id: Screen; label: string; icon: LucideIcon }[] = [
-  { id: "downloads", label: "Downloads", icon: Download },
+  { id: "downloads", label: "Downloads", icon: HardDriveDownload },
   { id: "presets", label: "Presets", icon: ListMusic },
   { id: "tools", label: "Tools", icon: Wrench },
   { id: "logs", label: "Logs", icon: Terminal },
@@ -78,7 +79,7 @@ export function Sidebar() {
   const downloadNavMeta = useMemo(() => {
     if (activeCount > 0) {
       return {
-        Icon: Download,
+        Icon: ArrowDownToLine,
         count: activeCount,
         badgeClassName: "border border-white/20 bg-white/10 text-foreground/90 backdrop-blur-xl shadow-sm",
         iconClassName: "text-foreground/95",
@@ -109,7 +110,7 @@ export function Sidebar() {
       };
     }
     return {
-      Icon: Download,
+      Icon: HardDriveDownload,
       count: 0,
       badgeClassName: "",
       iconClassName: "text-muted-foreground",
