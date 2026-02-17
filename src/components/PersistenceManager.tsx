@@ -104,10 +104,12 @@ export function PersistenceManager() {
         });
       };
 
-      await checkAndNotify("yt-dlp", checkYtDlpVersion);
-      await checkAndNotify("ffmpeg", checkFfmpegVersion);
-      await checkAndNotify("aria2", checkAria2Version);
-      await checkAndNotify("deno", checkDenoVersion);
+      await Promise.allSettled([
+        checkAndNotify("yt-dlp", checkYtDlpVersion),
+        checkAndNotify("ffmpeg", checkFfmpegVersion),
+        checkAndNotify("aria2", checkAria2Version),
+        checkAndNotify("deno", checkDenoVersion),
+      ]);
     };
 
     const checkLatestVersions = async () => {

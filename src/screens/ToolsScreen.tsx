@@ -144,7 +144,6 @@ export function ToolsScreen() {
   const [modalLogs, setModalLogs] = useState<string[]>([]);
   const [modalError, setModalError] = useState<string | null>(null);
   const [modalDone, setModalDone] = useState(false);
-  const [isRestarting, setIsRestarting] = useState(false);
   const [modalTitle, setModalTitle] = useState("Updating Tools");
   const [isTransferRunning, setIsTransferRunning] = useState(false);
   const [modalTargetToolIds, setModalTargetToolIds] = useState<string[]>([]);
@@ -152,6 +151,7 @@ export function ToolsScreen() {
   const [modalCurrentToolId, setModalCurrentToolId] = useState<string | null>(null);
   const [modalCurrentStatus, setModalCurrentStatus] = useState("Preparing...");
   const isTransferActive = isTransferRunning && !modalDone && !modalError;
+  const transferLockRef = useRef(false);
   const modalTargetToolIdsRef = useRef<string[]>([]);
   const modalLastLogRef = useRef<Record<string, { status: string; bucket: number }>>({});
   const modalClosedNoticeRef = useRef<{ done: boolean; error: string | null }>({
@@ -169,6 +169,9 @@ export function ToolsScreen() {
   }, [modalTargetToolIds]);
 
   useEffect(() => {
+    if (transferLockRef.current && (modalDone || Boolean(modalError))) {
+      transferLockRef.current = false;
+    }
     if (isTransferRunning && (modalDone || Boolean(modalError))) {
       setIsTransferRunning(false);
     }
@@ -180,23 +183,17 @@ export function ToolsScreen() {
       return;
     }
 
-    if (modalDone && !modalClosedNoticeRef.current.done) {
-      toast.success("Tool update completed in background.");
-      modalClosedNoticeRef.current.done = true;
-    }
-
     if (modalError && modalClosedNoticeRef.current.error !== modalError) {
       toast.error(`Background update failed: ${modalError}`);
       modalClosedNoticeRef.current.error = modalError;
     }
-  }, [modalOpen, modalDone, modalError]);
+  }, [modalOpen, modalError]);
 
   const resetModal = useCallback(() => {
     setModalProgress(0);
     setModalLogs([]);
     setModalError(null);
     setModalDone(false);
-    setIsRestarting(false);
     setModalTargetToolIds([]);
     setModalToolProgress({});
     setModalCurrentToolId(null);
@@ -214,7 +211,9 @@ export function ToolsScreen() {
   }, []);
 
   const beginTransferModal = useCallback(
-    (title: string, toolIds: string[], initialLogs: string[] = []) => {
+    (title: string, toolIds: string[], initialLogs: string[] = []): boolean => {
+      if (transferLockRef.current) return false;
+      transferLockRef.current = true;
       resetModal();
       setModalTitle(title);
       setModalTargetToolIds(toolIds);
@@ -226,6 +225,7 @@ export function ToolsScreen() {
       setModalLogs(initialLogs);
       setIsTransferRunning(true);
       setModalOpen(true);
+      return true;
     },
     [resetModal]
   );
@@ -381,18 +381,21 @@ export function ToolsScreen() {
 
   /* ── Install / Update (with progress modal) ── */
   const installOrUpdate = async (tool: Tool) => {
-    if (isTransferActive) {
+    if (transferLockRef.current) {
       toast.info("Wait for the current download to finish.");
       return;
     }
 
-    beginTransferModal(
+    if (!beginTransferModal(
       tool.status === "Missing"
         ? `Installing ${tool.name}`
         : `Updating ${tool.name}`,
       [tool.id],
       [`Queued ${tool.name} (${tool.channel})`]
-    );
+    )) {
+      toast.info("Wait for the current download to finish.");
+      return;
+    }
     pushModalLog(
       `[${tool.name}] Starting ${tool.status === "Missing" ? "install" : "update"} on ${tool.channel} track`
     );
@@ -403,11 +406,10 @@ export function ToolsScreen() {
       await downloadTools([tool.id], ch);
       setModalProgress(100);
       setModalToolProgress({ [tool.id]: 100 });
-      setModalDone(true);
-      setModalCurrentStatus("Completed");
       pushModalLog(`[${tool.name}] Completed successfully`);
       addLog({ level: "info", message: `${tool.id} installed/updated (${tool.channel})` });
       void refreshBackups();
+      await autoRestartAfterUpdate([tool.id]);
     } catch (e) {
       const message = e instanceof Error ? e.message : String(e);
       setModalError(message);
@@ -423,15 +425,18 @@ export function ToolsScreen() {
 
   /* ── pip upgrade for yt-dlp (with progress modal) ── */
   const handlePipUpgrade = async (tool: Tool) => {
-    if (isTransferActive) {
+    if (transferLockRef.current) {
       toast.info("Wait for the current download to finish.");
       return;
     }
 
-    beginTransferModal("Upgrading yt-dlp via pip", [tool.id], [
+    if (!beginTransferModal("Upgrading yt-dlp via pip", [tool.id], [
       "Preparing pip upgrade...",
       "Running pip install --upgrade yt-dlp...",
-    ]);
+    ])) {
+      toast.info("Wait for the current download to finish.");
+      return;
+    }
     setBusyTools((prev) => ({ ...prev, [tool.id]: true }));
     setModalCurrentStatus("Running pip command");
     setModalProgress(15);
@@ -442,9 +447,8 @@ export function ToolsScreen() {
       if (ok) {
         setModalProgress(100);
         setModalToolProgress({ [tool.id]: 100 });
-        setModalDone(true);
-        setModalCurrentStatus("Completed");
         pushModalLog("[yt-dlp] pip upgrade completed");
+        await autoRestartAfterUpdate([tool.id]);
       } else {
         setModalError("pip upgrade failed — check logs for details");
         pushModalLog("[yt-dlp] pip upgrade failed");
@@ -460,7 +464,7 @@ export function ToolsScreen() {
 
   /* ── Update at original (system) location ── */
   const handleUpdateOriginal = async (tool: Tool) => {
-    if (isTransferActive) {
+    if (transferLockRef.current) {
       toast.info("Wait for the current download to finish.");
       return;
     }
@@ -468,11 +472,14 @@ export function ToolsScreen() {
     if (!tool.systemPath) return;
     const destDir = tool.systemPath.replace(/[/\\][^/\\]+$/, "");
 
-    beginTransferModal(
+    if (!beginTransferModal(
       `Updating ${tool.name} at original location`,
       [tool.id],
       [`Queued in-place update for ${tool.name}`]
-    );
+    )) {
+      toast.info("Wait for the current download to finish.");
+      return;
+    }
     pushModalLog(`[${tool.name}] Updating original location: ${destDir}`);
     setBusyTools((prev) => ({ ...prev, [tool.id]: true }));
 
@@ -480,11 +487,10 @@ export function ToolsScreen() {
       await updateToolAtPath(tool.id, destDir, tool.variant, tool.channel);
       setModalProgress(100);
       setModalToolProgress({ [tool.id]: 100 });
-      setModalDone(true);
-      setModalCurrentStatus("Completed");
       pushModalLog(`[${tool.name}] In-place update completed`);
       addLog({ level: "info", message: `${tool.id} updated at ${destDir}` });
       void refreshBackups();
+      await autoRestartAfterUpdate([tool.id]);
     } catch (e) {
       const message = e instanceof Error ? e.message : String(e);
       setModalError(message);
@@ -513,7 +519,7 @@ export function ToolsScreen() {
 
   /* ── Update All (with progress modal) ── */
   const updateAll = async () => {
-    if (isTransferActive) {
+    if (transferLockRef.current) {
       toast.info("Wait for the current download to finish.");
       return;
     }
@@ -524,11 +530,14 @@ export function ToolsScreen() {
     if (toUpdate.length === 0) return;
 
     const ids = toUpdate.map((t) => t.id);
-    beginTransferModal(
+    if (!beginTransferModal(
       `Updating ${toUpdate.length} tool${toUpdate.length > 1 ? "s" : ""}`,
       ids,
       [`Queued: ${toUpdate.map((t) => t.name).join(", ")}`]
-    );
+    )) {
+      toast.info("Wait for the current download to finish.");
+      return;
+    }
     for (const t of toUpdate) {
       pushModalLog(`[${t.name}] Queued on ${t.channel} track`);
     }
@@ -548,10 +557,9 @@ export function ToolsScreen() {
       setModalToolProgress(
         Object.fromEntries(ids.map((id) => [id, 100])) as Record<string, number>
       );
-      setModalDone(true);
-      setModalCurrentStatus("Completed");
       pushModalLog("All selected tool updates completed.");
       void refreshBackups();
+      await autoRestartAfterUpdate(ids);
     } catch (e) {
       const message = e instanceof Error ? e.message : String(e);
       setModalError(`Update failed: ${message}`);
@@ -565,17 +573,33 @@ export function ToolsScreen() {
     }
   };
 
-  /* ── Modal: restart app ── */
-  const handleRestart = async () => {
-    setIsRestarting(true);
+  /* ── Auto-restart after successful update ── */
+  const autoRestartAfterUpdate = async (toolIds: string[]) => {
+    setModalDone(true);
+    setModalCurrentStatus("Restarting...");
+    pushModalLog("Restarting app to apply changes...");
+
+    try {
+      const existing = (() => {
+        try {
+          const raw = localStorage.getItem("halaldl:pendingToolCongrats");
+          if (!raw) return [];
+          const parsed = JSON.parse(raw);
+          return Array.isArray(parsed) ? parsed.filter((x: unknown) => typeof x === "string") : [];
+        } catch { return []; }
+      })();
+      const merged = Array.from(new Set([...existing, ...toolIds]));
+      localStorage.setItem("halaldl:pendingToolCongrats", JSON.stringify(merged));
+    } catch {
+      // Best-effort — congrats just won't show
+    }
+
     try {
       await relaunch();
     } catch (e) {
       toast.error(
         `Restart failed: ${e instanceof Error ? e.message : String(e)}`
       );
-      setIsRestarting(false);
-      // Restart failed — refresh all tools so UI reflects new binaries
       handleDismiss();
       toast.info("Refreshing tool status...");
       await checkAll();
@@ -838,13 +862,13 @@ export function ToolsScreen() {
                 <RefreshCcw className="w-3.5 h-3.5 mr-2" />
                 Refresh status
               </DropdownMenuItem>
-              {isPip && tool.updateAvailable && (
+              {isPip && tool.id === "yt-dlp" && tool.status === "Detected" && (
                 <DropdownMenuItem
                   onClick={() => installOrUpdate(tool)}
                   disabled={isBusy || disableUpgradeActions}
                 >
                   <Download className="w-3.5 h-3.5 mr-2" />
-                  Download standalone instead
+                  Switch to GitHub standalone
                 </DropdownMenuItem>
               )}
               {!isPip && tool.id === "yt-dlp" && tool.updateAvailable && (
@@ -1202,19 +1226,10 @@ export function ToolsScreen() {
 
             <DialogFooter className="p-6 pt-2 flex-col sm:flex-row gap-2 bg-muted/5">
               {modalDone && (
-                <MotionButton
-                  type="button"
-                  onClick={handleRestart}
-                  disabled={isRestarting}
-                  className="w-full gap-2 h-12 rounded-xl bg-green-600 hover:bg-green-700 text-white shadow-lg shadow-green-500/20"
-                >
-                  {isRestarting ? (
-                    <Loader2 className="w-4 h-4 animate-spin" />
-                  ) : (
-                    <CheckCircle2 className="w-4 h-4" />
-                  )}
-                  {isRestarting ? "Restarting..." : "Restart to Apply"}
-                </MotionButton>
+                <div className="w-full flex items-center justify-center gap-2 h-12 rounded-xl bg-green-600/10 border border-green-500/20 text-green-400 text-sm font-medium">
+                  <Loader2 className="w-4 h-4 animate-spin" />
+                  Restarting...
+                </div>
               )}
               {modalError && (
                 <MotionButton
