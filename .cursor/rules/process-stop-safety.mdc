@@ -1,0 +1,13 @@
+---
+description: Prevent premature termination of long-running commands
+alwaysApply: true
+---
+
+# Process Stop Safety
+
+- Do not terminate or interrupt a running process unless both conditions are true:
+  - At least 3 minutes have elapsed since the process started.
+  - No new output/progress has appeared during that period.
+- Before stopping any process, re-read the terminal output to confirm it is truly stalled.
+- Prefer continued polling with reasonable backoff when status is uncertain.
+- If termination is necessary, explain the stall evidence before stopping.

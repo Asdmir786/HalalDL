@@ -204,6 +204,15 @@ export function ToolsScreen() {
     modalLastLogRef.current = {};
   }, []);
 
+  const pushModalLog = useCallback((message: string) => {
+    const trimmed = message.trim();
+    if (!trimmed) return;
+    setModalLogs((prev) => {
+      if (prev[prev.length - 1] === trimmed) return prev;
+      return [...prev.slice(-79), trimmed];
+    });
+  }, []);
+
   const beginTransferModal = useCallback(
     (title: string, toolIds: string[], initialLogs: string[] = []) => {
       resetModal();
@@ -254,18 +263,14 @@ export function ToolsScreen() {
         return next;
       });
 
-      setModalLogs((prev) => {
-        const bucket = Math.floor(clamped / 10) * 10;
-        const last = modalLastLogRef.current[toolId];
-        if (last && last.status === status && last.bucket === bucket) {
-          return prev;
-        }
+      const bucket = Math.floor(clamped / 10) * 10;
+      const last = modalLastLogRef.current[toolId];
+      if (!(last && last.status === status && last.bucket === bucket)) {
         modalLastLogRef.current[toolId] = { status, bucket };
-
-        const newLog = `[${toolNameById[toolId] ?? toolId}] ${status} (${Math.round(clamped)}%)`;
-        if (prev[prev.length - 1] === newLog) return prev;
-        return [...prev.slice(-49), newLog];
-      });
+        pushModalLog(
+          `[${toolNameById[toolId] ?? toolId}] ${status} (${Math.round(clamped)}%)`
+        );
+      }
     }).then((fn) => {
       if (disposed) {
         fn();
@@ -278,7 +283,7 @@ export function ToolsScreen() {
       disposed = true;
       if (cleanup) cleanup();
     };
-  }, [toolNameById]);
+  }, [pushModalLog, toolNameById]);
 
   /* ── Scroll preservation ── */
   useLayoutEffect(() => {
@@ -388,19 +393,25 @@ export function ToolsScreen() {
       [tool.id],
       [`Queued ${tool.name} (${tool.channel})`]
     );
+    pushModalLog(
+      `[${tool.name}] Starting ${tool.status === "Missing" ? "install" : "update"} on ${tool.channel} track`
+    );
     setBusyTools((prev) => ({ ...prev, [tool.id]: true }));
 
     try {
       const ch = tool.channel !== "stable" ? { [tool.id]: tool.channel } : undefined;
       await downloadTools([tool.id], ch);
       setModalProgress(100);
+      setModalToolProgress({ [tool.id]: 100 });
       setModalDone(true);
       setModalCurrentStatus("Completed");
+      pushModalLog(`[${tool.name}] Completed successfully`);
       addLog({ level: "info", message: `${tool.id} installed/updated (${tool.channel})` });
       void refreshBackups();
     } catch (e) {
       const message = e instanceof Error ? e.message : String(e);
       setModalError(message);
+      pushModalLog(`[${tool.name}] Failed: ${message}`);
       addLog({
         level: "error",
         message: `Install failed (${tool.id}): ${message}`,
@@ -433,14 +444,15 @@ export function ToolsScreen() {
         setModalToolProgress({ [tool.id]: 100 });
         setModalDone(true);
         setModalCurrentStatus("Completed");
-        setModalLogs((prev) => [...prev, "pip upgrade completed"]);
+        pushModalLog("[yt-dlp] pip upgrade completed");
       } else {
         setModalError("pip upgrade failed — check logs for details");
+        pushModalLog("[yt-dlp] pip upgrade failed");
       }
     } catch (e) {
-      setModalError(
-        `pip upgrade error: ${e instanceof Error ? e.message : String(e)}`
-      );
+      const message = e instanceof Error ? e.message : String(e);
+      setModalError(`pip upgrade error: ${message}`);
+      pushModalLog(`[yt-dlp] pip upgrade error: ${message}`);
     } finally {
       setBusyTools((prev) => ({ ...prev, [tool.id]: false }));
     }
@@ -461,18 +473,22 @@ export function ToolsScreen() {
       [tool.id],
       [`Queued in-place update for ${tool.name}`]
     );
+    pushModalLog(`[${tool.name}] Updating original location: ${destDir}`);
     setBusyTools((prev) => ({ ...prev, [tool.id]: true }));
 
     try {
       await updateToolAtPath(tool.id, destDir, tool.variant, tool.channel);
       setModalProgress(100);
+      setModalToolProgress({ [tool.id]: 100 });
       setModalDone(true);
       setModalCurrentStatus("Completed");
+      pushModalLog(`[${tool.name}] In-place update completed`);
       addLog({ level: "info", message: `${tool.id} updated at ${destDir}` });
       void refreshBackups();
     } catch (e) {
       const message = e instanceof Error ? e.message : String(e);
       setModalError(message);
+      pushModalLog(`[${tool.name}] In-place update failed: ${message}`);
       addLog({
         level: "error",
         message: `In-place update failed (${tool.id}): ${message}`,
@@ -513,6 +529,9 @@ export function ToolsScreen() {
       ids,
       [`Queued: ${toUpdate.map((t) => t.name).join(", ")}`]
     );
+    for (const t of toUpdate) {
+      pushModalLog(`[${t.name}] Queued on ${t.channel} track`);
+    }
     setBusyTools((prev) => {
       const next = { ...prev };
       for (const id of ids) next[id] = true;
@@ -531,11 +550,12 @@ export function ToolsScreen() {
       );
       setModalDone(true);
       setModalCurrentStatus("Completed");
+      pushModalLog("All selected tool updates completed.");
       void refreshBackups();
     } catch (e) {
-      setModalError(
-        `Update failed: ${e instanceof Error ? e.message : String(e)}`
-      );
+      const message = e instanceof Error ? e.message : String(e);
+      setModalError(`Update failed: ${message}`);
+      pushModalLog(`Batch update failed: ${message}`);
     } finally {
       setBusyTools((prev) => {
         const next = { ...prev };
