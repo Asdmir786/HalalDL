@@ -139,14 +139,14 @@ export function DownloadItem({
                     {job.title || job.url}
                     </h4>
                     <div className="flex items-center gap-2 text-[10px] text-muted-foreground font-medium">
-                        <span className="flex items-center gap-1" title={absolute}>
+                        <span className="flex items-center gap-1 shrink-0 whitespace-nowrap" title={absolute}>
                             <Clock className="w-3 h-3 opacity-70" /> {relative}
                         </span>
                         {job.fallbackUsed && (
                             <>
                               <span className="w-0.5 h-0.5 rounded-full bg-muted-foreground/50" />
                               <span
-                                className="rounded-full border border-blue-500/30 bg-blue-500/10 px-1.5 py-0.5 text-[9px] font-semibold text-blue-300"
+                                className="whitespace-nowrap shrink-0 rounded-full border border-blue-500/30 bg-blue-500/10 px-1.5 py-0.5 text-[9px] font-semibold text-blue-300"
                                 title={job.fallbackFormat ? `Fallback format: ${job.fallbackFormat}` : "Adaptive fallback used"}
                               >
                                 Adaptive fallback
