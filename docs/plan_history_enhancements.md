@@ -52,5 +52,3 @@ Transform the History screen from a simple log into a full-featured Media Librar
 1.  **Implement "Delete File"**: This is a common user frustration (removing history but file remains).
 2.  **Implement "Favorites"**: Simple high-value organization tool.
 3.  **Implement "In-App Player"**: The "wow" factor feature.
-
-*Docs generated for HalalDL v0.3.6*

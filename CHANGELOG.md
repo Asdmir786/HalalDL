@@ -1,5 +1,15 @@
 # Changelog
 
+## 0.3.7 - 2026-03-01
+- **History**: Added a brand new **History Screen** with a complete media library view, file management, and playback integration.
+- **UI/UX**: Added **Accent Color** customization in Settings to personalize the app's appearance.
+- **Sidebar**: Enhanced Sidebar with improved styling and a pulse effect to indicate active download status.
+- **Tools**: Updated FFmpeg download method to use **7z archives** for better reliability and smaller downloads.
+- **Tools**: Enhanced tool version parsing, update logic, and logging for better troubleshooting.
+- **Settings**: Improved settings management and preset handling.
+- **Refactor**: Streamlined `PersistenceManager` and optimized tool version checks for better performance.
+- **Refactor**: Improved `DownloadItem` styling and overall UI responsiveness.
+
 ## 0.3.6 - 2026-02-15
 - **Downloads**: Completely reworked fallback download logic — fallback now downloads the best available quality with yt-dlp first, then runs a separate FFmpeg conversion step to match the preset's intended codec/container (e.g. H.264 + AAC for WhatsApp). Much simpler and more reliable than the previous in-pipeline approach.
 - **Downloads**: Fixed WhatsApp-incompatible output when using the "WhatsApp Optimized" preset on sites like Instagram — videos with VP9 codecs are now properly converted to H.264/AAC/MP4 with `yuv420p` and `faststart`.

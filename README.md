@@ -1,6 +1,23 @@
-# Tauri + React + Typescript
+# HalalDL
 
-This template should help get you started developing with Tauri, React and Typescript in Vite.
+A modern, powerful, and privacy-focused media downloader.
+
+## Features
+
+- **Downloads**: High-quality video and audio downloads from various platforms.
+- **History**: Keep track of your downloads with a built-in media library.
+- **Tools**: Automatic management of yt-dlp, ffmpeg, and other dependencies.
+- **Presets**: Customizable download presets for different devices and formats.
+- **Privacy**: Local-first architecture with no tracking.
+
+## Tech Stack
+
+- [Tauri](https://tauri.app/) (v2)
+- [React](https://react.dev/)
+- [TypeScript](https://www.typescriptlang.org/)
+- [Vite](https://vitejs.dev/)
+- [Tailwind CSS](https://tailwindcss.com/)
+- [shadcn/ui](https://ui.shadcn.com/)
 
 ## Recommended IDE Setup
 
