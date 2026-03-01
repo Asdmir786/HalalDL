@@ -17,6 +17,7 @@ const PresetsScreen = lazy(() => import("@/screens/PresetsScreen").then(module =
 const ToolsScreen = lazy(() => import("@/screens/ToolsScreen").then(module => ({ default: module.ToolsScreen })));
 const LogsScreen = lazy(() => import("@/screens/LogsScreen").then(module => ({ default: module.LogsScreen })));
 const SettingsScreen = lazy(() => import("@/screens/SettingsScreen").then(module => ({ default: module.SettingsScreen })));
+const HistoryScreen = lazy(() => import("@/screens/HistoryScreen").then(module => ({ default: module.HistoryScreen })));
 
 const LoadingFallback = () => (
   <div className="flex h-full w-full items-center justify-center bg-transparent">
@@ -115,6 +116,7 @@ export default function App() {
       case "presets": return <PresetsScreen />;
       case "tools": return <ToolsScreen />;
       case "logs": return <LogsScreen />;
+      case "history": return <HistoryScreen />;
       case "settings": return <SettingsScreen />;
       default: return <DownloadsScreen />;
     }

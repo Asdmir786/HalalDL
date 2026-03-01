@@ -8,6 +8,7 @@ import {
   ListMusic, 
   Wrench, 
   Terminal,
+  History,
   ChevronLeft,
   ChevronRight,
   ArrowDownToLine,
@@ -26,6 +27,7 @@ const NAV_ITEMS: { id: Screen; label: string; icon: LucideIcon }[] = [
   { id: "presets", label: "Presets", icon: ListMusic },
   { id: "tools", label: "Tools", icon: Wrench },
   { id: "logs", label: "Logs", icon: Terminal },
+  { id: "history", label: "History", icon: History },
   { id: "settings", label: "Settings", icon: Settings },
 ];
 

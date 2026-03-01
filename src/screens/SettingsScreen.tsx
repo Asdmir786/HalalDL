@@ -10,9 +10,10 @@ import {
   useSettingsStore,
   Theme,
 } from "@/store/settings";
-import { FadeInStagger } from "@/components/motion/StaggerContainer";
 
 import { SettingsHeader } from "./settings/components/SettingsHeader";
+import { SettingsNav } from "./settings/components/SettingsNav";
+import { SaveBar } from "./settings/components/SaveBar";
 import { AppearanceSection } from "./settings/components/AppearanceSection";
 import { StorageSection } from "./settings/components/StorageSection";
 import { BehaviorSection } from "./settings/components/BehaviorSection";
@@ -149,26 +150,26 @@ export function SettingsScreen() {
     setIsResetting(true);
     try {
       const defaults = resolvedDefaults ?? (await resolveDefaultSettings());
-      
+
       const changedKeys: string[] = [];
       for (const key of SETTINGS_KEYS) {
-          if (!Object.is(settings[key], defaults[key])) {
-              const readable = key.replace(/([A-Z])/g, ' $1').replace(/^./, str => str.toUpperCase());
-              changedKeys.push(readable);
-          }
+        if (!Object.is(settings[key], defaults[key])) {
+          const readable = key.replace(/([A-Z])/g, ' $1').replace(/^./, str => str.toUpperCase());
+          changedKeys.push(readable);
+        }
       }
 
       setSettings(defaults);
       setEdits({});
-      
+
       if (changedKeys.length > 0) {
-          toast.info("Settings restored to defaults", {
-              description: `Reset: ${changedKeys.join(", ")}`
-          });
+        toast.info("Settings restored to defaults", {
+          description: `Reset: ${changedKeys.join(", ")}`
+        });
       } else {
-          toast.info("Settings restored to defaults", {
-              description: "No changes were needed."
-          });
+        toast.info("Settings restored to defaults", {
+          description: "No changes were needed."
+        });
       }
     } finally {
       setIsResetting(false);
@@ -210,6 +211,7 @@ export function SettingsScreen() {
               autoClearFinished: defaults.autoClearFinished,
               autoCopyFile: defaults.autoCopyFile,
               fileCollision: defaults.fileCollision,
+              historyRetention: defaults.historyRetention,
             }
           : {
               maxConcurrency: defaults.maxConcurrency,
@@ -234,26 +236,35 @@ export function SettingsScreen() {
   };
 
   return (
-    <div className="flex flex-col h-full bg-background max-w-6xl mx-auto w-full" role="main">
-      <FadeInStagger className="flex flex-col h-full">
-        <div className="p-8 pb-6 flex flex-col gap-6">
-          <SettingsHeader
-            isGlobalDirty={isGlobalDirty}
-            isDirty={isDirty}
-            isResetting={isResetting}
-            onGlobalReset={handleGlobalReset}
-            onResetAll={resetAllDraft}
-            onResetGroup={resetGroupDraft}
-            onSave={handleSave}
-          />
+    <div className="relative flex flex-col h-full bg-background max-w-6xl mx-auto w-full" role="main">
+      {/* Header */}
+      <div className="p-8 pb-4">
+        <SettingsHeader
+          isGlobalDirty={isGlobalDirty}
+          isResetting={isResetting}
+          onGlobalReset={handleGlobalReset}
+        />
+      </div>
+
+      {/* Mobile nav pills */}
+      <div className="px-8 md:hidden">
+        <SettingsNav scrollContainerRef={scrollRef} />
+      </div>
+
+      {/* Two-column layout */}
+      <div className="flex-1 flex overflow-hidden px-8 pb-8 gap-6">
+        {/* Left: sticky nav (desktop only) */}
+        <div className="hidden md:block w-44 shrink-0 pt-2">
+          <SettingsNav scrollContainerRef={scrollRef} />
         </div>
 
+        {/* Right: scrollable content */}
         <div
           ref={scrollRef}
           onScroll={handleScroll}
-          className="flex-1 overflow-auto px-8 pb-8"
+          className="flex-1 overflow-auto pr-1"
         >
-          <div className="grid gap-6">
+          <div className="flex flex-col gap-8 pb-20">
             <AppearanceSection
               theme={draftSettings.theme}
               onThemeChange={(v) => setDraftValue("theme", v)}
@@ -277,6 +288,8 @@ export function SettingsScreen() {
               onAutoCopyChange={(v) => setDraftValue("autoCopyFile", v)}
               fileCollision={draftSettings.fileCollision}
               onFileCollisionChange={(v) => setDraftValue("fileCollision", v)}
+              historyRetention={draftSettings.historyRetention}
+              onHistoryRetentionChange={(v) => setDraftValue("historyRetention", v)}
             />
 
             <EngineSection
@@ -291,7 +304,15 @@ export function SettingsScreen() {
             <AboutSection />
           </div>
         </div>
-      </FadeInStagger>
+      </div>
+
+      {/* Sticky save bar */}
+      <SaveBar
+        isDirty={isDirty}
+        onSave={handleSave}
+        onResetAll={resetAllDraft}
+        onResetGroup={resetGroupDraft}
+      />
     </div>
   );
 }

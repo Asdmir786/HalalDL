@@ -1,4 +1,4 @@
-import { AlertTriangle, CheckCircle2, Clock3, Download, Play } from "lucide-react";
+import { AlertTriangle, CheckCircle2, Clock3, Download, Play, RotateCcw, ArrowUpDown } from "lucide-react";
 import { MotionButton } from "@/components/motion/MotionButton";
 
 interface DownloadStatsBarProps {
@@ -8,6 +8,10 @@ interface DownloadStatsBarProps {
   doneCount: number;
   onStartAll: () => void;
   canStartAll: boolean;
+  onRetryFailed: () => void;
+  canRetryFailed: boolean;
+  sortMode: "newest" | "status";
+  onSortModeChange: (mode: "newest" | "status") => void;
 }
 
 export function DownloadStatsBar({
@@ -16,7 +20,11 @@ export function DownloadStatsBar({
   failedCount,
   doneCount,
   onStartAll,
-  canStartAll
+  canStartAll,
+  onRetryFailed,
+  canRetryFailed,
+  sortMode,
+  onSortModeChange
 }: DownloadStatsBarProps) {
   const stats = [
     {
@@ -50,7 +58,7 @@ export function DownloadStatsBar({
   ];
 
   return (
-    <div className="flex items-center justify-between pt-2 border-t border-muted/50 gap-3">
+    <div className="flex items-center justify-between pt-2 border-t border-muted/50 gap-3 flex-wrap">
       <div className="flex items-center gap-2 text-[11px] font-semibold tabular-nums flex-wrap">
         {stats.map(({ id, label, Icon, className }) => (
           <div
@@ -63,17 +71,56 @@ export function DownloadStatsBar({
         ))}
       </div>
 
-      <MotionButton
-        type="button"
-        variant="default"
-        size="sm"
-        onClick={onStartAll}
-        disabled={!canStartAll}
-        className="h-8 px-4 text-xs font-semibold gap-1.5 rounded-full bg-linear-to-r from-primary/95 via-primary to-primary/85 hover:from-primary hover:to-primary shadow-md shadow-primary/20 disabled:opacity-40 transition-all"
-      >
-        <Play className="w-3.5 h-3.5" />
-        Start All
-      </MotionButton>
+      <div className="flex items-center gap-2 flex-wrap justify-end">
+        <div className="flex items-center gap-1.5 rounded-full border border-border/50 bg-muted/20 px-2 py-1">
+          <ArrowUpDown className="w-3 h-3 text-muted-foreground" />
+          <button
+            type="button"
+            onClick={() => onSortModeChange("newest")}
+            className={`px-2 py-0.5 rounded-full text-[11px] font-medium transition-colors ${
+              sortMode === "newest"
+                ? "bg-primary text-primary-foreground shadow-sm"
+                : "text-muted-foreground hover:text-foreground"
+            }`}
+          >
+            Newest
+          </button>
+          <button
+            type="button"
+            onClick={() => onSortModeChange("status")}
+            className={`px-2 py-0.5 rounded-full text-[11px] font-medium transition-colors ${
+              sortMode === "status"
+                ? "bg-primary text-primary-foreground shadow-sm"
+                : "text-muted-foreground hover:text-foreground"
+            }`}
+          >
+            Status
+          </button>
+        </div>
+
+        <MotionButton
+          type="button"
+          variant="outline"
+          size="sm"
+          onClick={onRetryFailed}
+          disabled={!canRetryFailed}
+          className="h-8 px-3 text-xs font-semibold gap-1.5 rounded-full border-destructive/30 text-destructive hover:bg-destructive/10 disabled:opacity-40 transition-all"
+        >
+          <RotateCcw className="w-3.5 h-3.5" />
+          Retry Failed
+        </MotionButton>
+        <MotionButton
+          type="button"
+          variant="default"
+          size="sm"
+          onClick={onStartAll}
+          disabled={!canStartAll}
+          className="h-8 px-4 text-xs font-semibold gap-1.5 rounded-full bg-linear-to-r from-primary/95 via-primary to-primary/85 hover:from-primary hover:to-primary shadow-md shadow-primary/20 disabled:opacity-40 transition-all"
+        >
+          <Play className="w-3.5 h-3.5" />
+          Start All
+        </MotionButton>
+      </div>
     </div>
   );
 }

@@ -9,6 +9,9 @@ import { useNavigationStore } from "@/store/navigation";
 
 interface DownloadListProps {
   jobs: DownloadJob[];
+  totalJobs: number;
+  overflowCount: number;
+  hasCompletedJobs: boolean;
   selectedIds: string[];
   onToggleSelection: (id: string) => void;
   onStartSelected: () => void;
@@ -22,6 +25,9 @@ interface DownloadListProps {
 
 export function DownloadList({
   jobs,
+  totalJobs,
+  overflowCount,
+  hasCompletedJobs,
   selectedIds,
   onToggleSelection,
   onStartSelected,
@@ -32,7 +38,6 @@ export function DownloadList({
   itemVariants,
   formatRelativeTime
 }: DownloadListProps) {
-  const hasCompleted = jobs.some((job) => job.status === "Done" || job.status === "Failed");
   const { setScreen } = useNavigationStore();
   const scrollRef = useRef<HTMLDivElement>(null);
   const scrollTopRef = useRef(0);
@@ -50,7 +55,7 @@ export function DownloadList({
   return (
     <FadeInItem className="flex-1 overflow-hidden flex flex-col px-8 pb-8">
       <div className="bg-black/5 rounded-2xl border border-white/5 flex-1 flex flex-col overflow-hidden shadow-inner backdrop-blur-sm relative">
-        {jobs.length === 0 ? (
+        {totalJobs === 0 ? (
           <div className="flex-1 flex flex-col items-center justify-center p-8 relative overflow-hidden min-h-[400px]">
               {/* Background Effects */}
               <div className="absolute inset-0 bg-linear-to-b from-transparent via-background/50 to-background z-10" />
@@ -164,12 +169,24 @@ export function DownloadList({
                 
                 <div className="flex-1" />
 
+                {overflowCount > 0 && (
+                  <MotionButton
+                    type="button"
+                    variant="ghost"
+                    size="sm"
+                    className="h-8 px-3.5 text-xs rounded-full text-muted-foreground border border-muted/60 bg-background/50 hover:text-foreground hover:border-muted transition-colors gap-1.5"
+                    onClick={() => setScreen("history")}
+                  >
+                    +{overflowCount} more in History
+                  </MotionButton>
+                )}
+
                 <MotionButton
                   type="button"
                   variant="ghost"
                   size="sm"
                   className="h-8 px-3.5 text-xs rounded-full text-muted-foreground border border-muted/60 bg-background/50 hover:text-foreground hover:border-muted transition-colors gap-1.5"
-                  disabled={!hasCompleted}
+                  disabled={!hasCompletedJobs}
                   onClick={onClearCompleted}
                 >
                   <CheckCircle2 className="w-3.5 h-3.5" />

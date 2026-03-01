@@ -75,6 +75,12 @@ export function LogsScreen() {
   }, [jobs]);
 
   const activeJobsCount = activeJobIds.size;
+  const selectedJob = React.useMemo(() => {
+    if (jobFilter === "all" || jobFilter === "active") return undefined;
+    return jobs.find((job) => job.id === jobFilter);
+  }, [jobFilter, jobs]);
+
+  const canCopyErrors = Boolean(selectedJob && selectedJob.status === "Failed");
 
   const jobTitleById = React.useMemo(() => {
     const map = new Map<string, string>();
@@ -233,6 +239,27 @@ export function LogsScreen() {
     copyToClipboard(content, "Logs");
   }, [filteredLogs, copyToClipboard]);
 
+  const handleCopyErrors = React.useCallback(() => {
+    if (!canCopyErrors || jobFilter === "all" || jobFilter === "active") {
+      toast.info("Select a failed job to copy error lines");
+      return;
+    }
+    const errorLogs = logs.filter((l) => l.level === "error" && l.jobId === jobFilter);
+    if (!errorLogs.length) {
+      toast.info("No error lines found for this job");
+      return;
+    }
+    const content = errorLogs
+      .map(
+        (l) =>
+          `[${l.timestamp}] [${l.level.toUpperCase()}] ${l.message}${
+            l.command ? ` | ${l.command}` : ""
+          }`
+      )
+      .join("\n");
+    copyToClipboard(content, "Error lines");
+  }, [canCopyErrors, jobFilter, logs, copyToClipboard]);
+
   const handleClear = React.useCallback(() => {
     clearLogs();
     toast.success("Logs cleared");
@@ -294,6 +321,17 @@ export function LogsScreen() {
                 >
                   <Copy className="w-3.5 h-3.5 mr-2" />
                   Copy
+                </MotionButton>
+                <MotionButton
+                  variant="outline"
+                  size="sm"
+                  onClick={handleCopyErrors}
+                  disabled={loadStatus !== "ready" || !canCopyErrors}
+                  whileHover={{ scale: 1.02 }}
+                  whileTap={{ scale: 0.98 }}
+                >
+                  <AlertCircle className="w-3.5 h-3.5 mr-2" />
+                  Copy Errors
                 </MotionButton>
                 <MotionButton
                   variant="ghost"

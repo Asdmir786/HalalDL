@@ -5,6 +5,7 @@ import { usePresetsStore, BUILT_IN_PRESETS, type Preset } from "@/store/presets"
 import { useToolsStore, type Tool } from "@/store/tools";
 import { useLogsStore } from "@/store/logs";
 import { useDownloadsStore, type DownloadJob } from "@/store/downloads";
+import { useHistoryStore, type HistoryEntry } from "@/store/history";
 import { storage } from "@/lib/storage";
 import {
   checkYtDlpVersion,
@@ -182,6 +183,12 @@ export function usePersistenceInit(): MutableRefObject<boolean> {
         if (savedDownloads && Array.isArray(savedDownloads)) {
           useDownloadsStore.setState({ jobs: savedDownloads });
           addLog({ level: "info", message: `Downloads loaded (${savedDownloads.length})` });
+        }
+
+        const savedHistory = await storage.getHistory<HistoryEntry[]>();
+        if (savedHistory && Array.isArray(savedHistory)) {
+          useHistoryStore.setState({ entries: savedHistory });
+          addLog({ level: "info", message: `History loaded (${savedHistory.length})` });
         }
 
         const savedTools = await storage.getTools<Tool[]>();

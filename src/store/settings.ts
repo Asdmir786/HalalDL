@@ -36,6 +36,9 @@ export interface Settings {
   autoCopyFile: boolean;
   downloadsAddMode: DownloadsAddMode;
   downloadsSelectedPreset: string;
+
+  // History
+  historyRetention: number; // max entries to keep, 0 = unlimited
 }
 
 interface SettingsState {
@@ -59,6 +62,7 @@ export const DEFAULT_SETTINGS: Settings = {
   autoCopyFile: true,
   downloadsAddMode: "queue",
   downloadsSelectedPreset: "default",
+  historyRetention: 0,
 };
 
 export const SETTINGS_KEYS = Object.keys(DEFAULT_SETTINGS) as (keyof Settings)[];

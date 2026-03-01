@@ -133,14 +133,44 @@ export function DownloadsScreen() {
     return new Date(ts).toLocaleDateString();
   };
 
-  const sortedJobs = useMemo(
-    () =>
-      [...jobs].sort((a, b) => {
-        const tsA = getJobTs(a);
-        const tsB = getJobTs(b);
-        return tsB - tsA; // Newest first
-      }),
-    [jobs]
+  const [sortMode, setSortMode] = useState<"newest" | "status">("newest");
+
+  const getStatusRank = (status: string) => {
+    if (status === "Downloading" || status === "Post-processing") return 0;
+    if (status === "Queued") return 1;
+    if (status === "Failed") return 2;
+    if (status === "Done") return 3;
+    return 4;
+  };
+
+  const sortedJobs = useMemo(() => {
+    const copy = [...jobs];
+    if (sortMode === "newest") {
+      return copy.sort((a, b) => getJobTs(b) - getJobTs(a));
+    }
+    return copy.sort((a, b) => {
+      const rankDiff = getStatusRank(a.status) - getStatusRank(b.status);
+      if (rankDiff !== 0) return rankDiff;
+      return getJobTs(b) - getJobTs(a);
+    });
+  }, [jobs, sortMode]);
+
+  const MAX_VISIBLE = 5;
+  const visibleJobs = useMemo(() => {
+    const priority = sortedJobs.filter(
+      (job) =>
+        job.status === "Downloading" ||
+        job.status === "Post-processing" ||
+        job.status === "Queued"
+    );
+    const priorityIds = new Set(priority.map((job) => job.id));
+    const rest = sortedJobs.filter((job) => !priorityIds.has(job.id));
+    return [...priority, ...rest].slice(0, MAX_VISIBLE);
+  }, [sortedJobs]);
+
+  const overflowCount = Math.max(0, jobs.length - visibleJobs.length);
+  const hasCompletedJobs = jobs.some(
+    (job) => job.status === "Done" || job.status === "Failed"
   );
 
   const queuedCount = useMemo(
@@ -220,6 +250,20 @@ export function DownloadsScreen() {
     }
   };
 
+  const handleRetryFailed = () => {
+    const max = settings.maxConcurrency || 1;
+    const failedJobs = jobs.filter((job) => job.status === "Failed");
+    let active = jobs.filter(
+      (job) => job.status === "Downloading" || job.status === "Post-processing"
+    ).length;
+
+    for (const job of failedJobs) {
+      if (active >= max) break;
+      startDownload(job.id);
+      active += 1;
+    }
+  };
+
   const handleToggleSelection = (id: string) => {
     setSelectedIds((prev) =>
       prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]
@@ -274,9 +318,11 @@ export function DownloadsScreen() {
         <FadeInItem>
           <header className="p-6 pb-4 space-y-4">
             <div className="flex flex-col gap-1">
-              <h2 className="text-2xl font-bold tracking-tight">Downloads</h2>
+              <div className="flex items-center gap-2">
+                <h2 className="text-2xl font-bold tracking-tight">Downloads</h2>
+              </div>
               <p className="text-muted-foreground text-sm">
-                Add URLs to start downloading your media.
+                Live queue for active and pending downloads.
               </p>
             </div>
             
@@ -308,12 +354,19 @@ export function DownloadsScreen() {
               doneCount={doneCount}
               onStartAll={handleStartAll}
               canStartAll={jobs.some((job) => job.status === "Queued" || job.status === "Failed")}
+              onRetryFailed={handleRetryFailed}
+              canRetryFailed={jobs.some((job) => job.status === "Failed")}
+              sortMode={sortMode}
+              onSortModeChange={setSortMode}
             />
           </header>
         </FadeInItem>
 
         <DownloadList 
-          jobs={sortedJobs}
+          jobs={visibleJobs}
+          totalJobs={jobs.length}
+          overflowCount={overflowCount}
+          hasCompletedJobs={hasCompletedJobs}
           selectedIds={selectedIds}
           onToggleSelection={handleToggleSelection}
           onStartSelected={handleStartSelected}

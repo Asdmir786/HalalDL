@@ -4,6 +4,7 @@ import { usePresetsStore } from "@/store/presets";
 import { useToolsStore } from "@/store/tools";
 import { useLogsStore } from "@/store/logs";
 import { useDownloadsStore } from "@/store/downloads";
+import { useHistoryStore } from "@/store/history";
 import { storage } from "@/lib/storage";
 
 export function useAutoSave(initialized: MutableRefObject<boolean>) {
@@ -12,6 +13,7 @@ export function useAutoSave(initialized: MutableRefObject<boolean>) {
   const tools = useToolsStore((s) => s.tools);
   const logs = useLogsStore((s) => s.logs);
   const jobs = useDownloadsStore((s) => s.jobs);
+  const historyEntries = useHistoryStore((s) => s.entries);
 
   useEffect(() => {
     if (!initialized.current) return;
@@ -65,4 +67,19 @@ export function useAutoSave(initialized: MutableRefObject<boolean>) {
     }, 500);
     return () => clearTimeout(timer);
   }, [tools, initialized]);
+
+  useEffect(() => {
+    if (!initialized.current) return;
+    const timer = setTimeout(() => {
+      const retention = useSettingsStore.getState().settings.historyRetention;
+      if (retention > 0) {
+        useHistoryStore.getState().trimToRetention(retention);
+      }
+      const entries = useHistoryStore.getState().entries;
+      storage.saveHistory(entries).catch((e) => {
+        useLogsStore.getState().addLog({ level: "error", message: `Failed to save history: ${String(e)}` });
+      });
+    }, 500);
+    return () => clearTimeout(timer);
+  }, [historyEntries, initialized]);
 }

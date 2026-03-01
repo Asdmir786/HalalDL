@@ -1,9 +1,10 @@
 import { Clock3, Play, Plus, Settings2, ChevronDown, ChevronUp } from "lucide-react";
-import { useMemo } from "react";
+import { useCallback, useMemo, useState } from "react";
 import { MotionButton } from "@/components/motion/MotionButton";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectGroup, SelectItem, SelectLabel, SelectSeparator, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { DownloadOutputOptions } from "./DownloadOutputOptions";
+import { DuplicateWarning } from "./DuplicateWarning";
 import { Preset } from "@/store/presets";
 
 interface DownloadInputSectionProps {
@@ -64,6 +65,12 @@ export function DownloadInputSection({
     return { grouped: groupedMap, orderedGroups: ordered };
   }, [presets]);
 
+  const [dupDismissed, setDupDismissed] = useState(false);
+  const handleUrlChange = useCallback((val: string) => {
+    setUrl(val);
+    setDupDismissed(false);
+  }, [setUrl]);
+
   return (
     <div className="flex flex-col gap-3 bg-muted/30 p-3 rounded-xl border border-muted/50 shadow-sm glass-card">
       <div className="flex flex-col lg:flex-row gap-3">
@@ -71,7 +78,7 @@ export function DownloadInputSection({
           <Input
             placeholder="Paste video or playlist URL here..."
             value={url}
-            onChange={(e) => setUrl(e.target.value)}
+            onChange={(e) => handleUrlChange(e.target.value)}
             onKeyDown={(e) => e.key === "Enter" && onAdd()}
             className="bg-background border-muted shadow-sm focus-visible:ring-1 h-10"
           />
@@ -138,6 +145,10 @@ export function DownloadInputSection({
           </MotionButton>
         </div>
       </div>
+
+      {url.trim() && !dupDismissed && (
+        <DuplicateWarning key={url.trim()} url={url.trim()} onDismiss={() => setDupDismissed(true)} />
+      )}
 
       <div className="flex justify-center -mt-1">
         <MotionButton

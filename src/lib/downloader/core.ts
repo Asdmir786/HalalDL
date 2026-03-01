@@ -9,6 +9,8 @@ import { copyFilesToClipboard, deleteFile, renameFile } from "@/lib/commands";
 import { resolveTool, ytDlpEnv, sendDownloadCompleteNotification } from "./tool-env";
 import { cleanupThumbnailByJobId } from "./thumbnails";
 import { fetchMetadata } from "./metadata";
+import { useHistoryStore, extractDomain, type HistoryEntry } from "@/store/history";
+import { stat } from "@tauri-apps/plugin-fs";
 
 export async function startDownload(jobId: string) {
   const { jobs, updateJob, removeJob } = useDownloadsStore.getState();
@@ -528,16 +530,69 @@ export async function startDownload(jobId: string) {
     }
 
     updateJob(jobId, { status: "Done", statusDetail: "Completed" });
+
+    // Record to history
+    const doneJob = useDownloadsStore.getState().jobs.find((j) => j.id === jobId);
+    if (doneJob) {
+      const finalPath = result.lastKnownOutputPath || doneJob.outputPath;
+      let fileSize: number | undefined;
+      if (finalPath) {
+        try {
+          const info = await stat(finalPath);
+          fileSize = info.size;
+        } catch { /* file may not exist yet */ }
+      }
+      const entry: HistoryEntry = {
+        id: `hist-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+        url: doneJob.url,
+        title: doneJob.title || doneJob.url,
+        thumbnail: doneJob.thumbnail,
+        format: doneJob.overrides?.format || doneJob.fallbackFormat,
+        fileSize,
+        outputPath: finalPath,
+        presetId: doneJob.presetId,
+        presetName: preset?.name,
+        downloadedAt: Date.now(),
+        duration: doneJob.createdAt ? Date.now() - doneJob.createdAt : undefined,
+        domain: extractDomain(doneJob.url),
+        status: "completed",
+        overrides: doneJob.overrides,
+      };
+      useHistoryStore.getState().addEntry(entry);
+    }
   } else {
     if (result.formatUnavailable) {
       addLog({ level: "error", message: "Fallback failed: format unavailable after retry", jobId });
     }
+    const failDetail = result.formatUnavailable
+      ? "Failed to resolve a compatible format"
+      : "Download failed (see logs)";
     updateJob(jobId, {
       status: "Failed",
       phase: "Resolving formats",
-      statusDetail: result.formatUnavailable
-        ? "Failed to resolve a compatible format"
-        : "Download failed (see logs)",
+      statusDetail: failDetail,
     });
+
+    // Record failed download to history
+    const failedJob = useDownloadsStore.getState().jobs.find((j) => j.id === jobId);
+    if (failedJob) {
+      const entry: HistoryEntry = {
+        id: `hist-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+        url: failedJob.url,
+        title: failedJob.title || failedJob.url,
+        thumbnail: failedJob.thumbnail,
+        format: failedJob.overrides?.format,
+        outputPath: failedJob.outputPath,
+        presetId: failedJob.presetId,
+        presetName: preset?.name,
+        downloadedAt: Date.now(),
+        duration: failedJob.createdAt ? Date.now() - failedJob.createdAt : undefined,
+        domain: extractDomain(failedJob.url),
+        status: "failed",
+        failReason: failDetail,
+        overrides: failedJob.overrides,
+      };
+      useHistoryStore.getState().addEntry(entry);
+    }
   }
 }

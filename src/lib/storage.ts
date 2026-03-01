@@ -6,6 +6,7 @@ class StorageManager {
   private logsStore: Store | null = null;
   private downloadsStore: Store | null = null;
   private toolsStore: Store | null = null;
+  private historyStore: Store | null = null;
   private initPromise: Promise<void> | null = null;
   private initError: string | null = null;
 
@@ -15,7 +16,8 @@ class StorageManager {
       this.presetsStore &&
       this.logsStore &&
       this.downloadsStore &&
-      this.toolsStore
+      this.toolsStore &&
+      this.historyStore
     ) {
       return;
     }
@@ -31,6 +33,7 @@ class StorageManager {
         this.logsStore = await load("logs.json", { autoSave: true, defaults: {} });
         this.downloadsStore = await load("downloads.json", { autoSave: true, defaults: {} });
         this.toolsStore = await load("tools.json", { autoSave: true, defaults: {} });
+        this.historyStore = await load("history.json", { autoSave: true, defaults: {} });
         this.initError = null;
         console.log("Storage initialized successfully");
       } catch (error) {
@@ -115,6 +118,18 @@ class StorageManager {
     this.ensureReady();
     await this.toolsStore?.set("data", data);
     await this.toolsStore?.save();
+  }
+  async getHistory<T>(): Promise<T | null> {
+    if (!this.historyStore) await this.init();
+    this.ensureReady();
+    return (await this.historyStore?.get<T>("data")) || null;
+  }
+
+  async saveHistory<T>(data: T) {
+    if (!this.historyStore) await this.init();
+    this.ensureReady();
+    await this.historyStore?.set("data", data);
+    await this.historyStore?.save();
   }
 }
 

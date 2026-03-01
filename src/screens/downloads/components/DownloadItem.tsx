@@ -258,6 +258,18 @@ export function DownloadItem({
                       {job.statusDetail || ""}
                     </div>
                     <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-all duration-300 transform translate-x-4 group-hover:translate-x-0">
+                      <MotionButton
+                        variant="ghost"
+                        size="icon"
+                        className="w-8 h-8 rounded-full hover:bg-primary/10 hover:text-primary transition-colors"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleCopyLink(job.url);
+                        }}
+                        title="Copy URL"
+                      >
+                        <Link className="w-4 h-4" />
+                      </MotionButton>
                       {job.status === "Done" && (
                         <MotionButton
                           variant="ghost"

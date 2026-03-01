@@ -1,0 +1,61 @@
+import { useState } from "react";
+import { ChevronDown } from "lucide-react";
+import { motion, AnimatePresence } from "framer-motion";
+import { type LucideIcon } from "lucide-react";
+
+interface SettingsSectionProps {
+  id: string;
+  icon: LucideIcon;
+  title: string;
+  description: string;
+  children: React.ReactNode;
+  defaultOpen?: boolean;
+}
+
+export function SettingsSection({ id, icon: Icon, title, description, children, defaultOpen = true }: SettingsSectionProps) {
+  const [open, setOpen] = useState(defaultOpen);
+
+  return (
+    <section id={id} className="scroll-mt-8">
+      <button
+        type="button"
+        onClick={() => setOpen((p) => !p)}
+        className="w-full flex items-center justify-between gap-3 py-3 px-1 cursor-pointer group"
+      >
+        <div className="flex items-center gap-3">
+          <div className="p-2.5 rounded-xl bg-primary/8 text-primary group-hover:bg-primary/12 transition-colors">
+            <Icon className="w-5 h-5" />
+          </div>
+          <div className="text-left">
+            <h3 className="text-base font-semibold tracking-tight">{title}</h3>
+            <p className="text-xs text-muted-foreground">{description}</p>
+          </div>
+        </div>
+        <motion.div
+          animate={{ rotate: open ? 0 : -90 }}
+          transition={{ duration: 0.2 }}
+          className="text-muted-foreground"
+        >
+          <ChevronDown className="w-4 h-4" />
+        </motion.div>
+      </button>
+
+      <AnimatePresence initial={false}>
+        {open && (
+          <motion.div
+            key="content"
+            initial={{ height: 0, opacity: 0 }}
+            animate={{ height: "auto", opacity: 1 }}
+            exit={{ height: 0, opacity: 0 }}
+            transition={{ duration: 0.25, ease: "easeInOut" }}
+            className="overflow-hidden"
+          >
+            <div className="flex flex-col gap-2.5 pb-2 pt-1">
+              {children}
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+    </section>
+  );
+}
