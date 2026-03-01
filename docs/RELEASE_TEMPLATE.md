@@ -1,3 +1,17 @@
+<!--
+AI GENERATION INSTRUCTIONS:
+When asked to generate release notes based on this template, ALWAYS format your final response exactly as follows:
+
+**Version**: vX.Y.Z
+**Title**: vX.Y.Z - The [Theme] Update
+
+**Description**:
+```markdown
+## ⚡ The "[Theme]" Update!
+[...Rest of the release notes content...]
+```
+-->
+
 # v[VERSION] - The [Theme] Update
 
 ## ⚡ The "[Theme]" Update!
