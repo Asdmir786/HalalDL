@@ -242,7 +242,8 @@ export function usePersistenceInit(): MutableRefObject<boolean> {
         const data = await res.json();
         const tag: string = data.tag_name ?? "";
         const latest = tag.replace(/^v/, "");
-        if (latest && latest !== currentVersion) {
+        const updateAvailable = isUpdateAvailable(currentVersion, latest);
+        if (updateAvailable) {
           useAppUpdateStore.getState().setUpdate(latest, data.html_url ?? "https://github.com/Asdmir786/HalalDL/releases");
           addLog({ level: "info", message: `App update available: v${latest} (current: v${currentVersion})` });
         }

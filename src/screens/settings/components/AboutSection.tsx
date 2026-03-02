@@ -8,6 +8,7 @@ import { open } from "@tauri-apps/plugin-shell";
 import { MotionButton } from "@/components/motion/MotionButton";
 import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
+import { isUpdateAvailable } from "@/lib/commands/version-utils";
 import { useAppUpdateStore } from "@/store/app-update";
 import { SettingsSection } from "./SettingsSection";
 
@@ -60,14 +61,15 @@ export function AboutSection() {
       setReleaseUrl(data.html_url ?? RELEASES_URL);
 
       if (latest && version !== "..." && version !== "unknown") {
-        if (latest === version) {
+        const updateAvailable = isUpdateAvailable(version, latest);
+        if (updateAvailable) {
+          setUpdateStatus("update-available");
+          storeUpdate.setUpdate(latest, data.html_url ?? RELEASES_URL);
+        } else {
           setUpdateStatus("up-to-date");
           if (storeUpdate.updateAvailable) {
             useAppUpdateStore.setState({ updateAvailable: false, dismissed: false });
           }
-        } else {
-          setUpdateStatus("update-available");
-          storeUpdate.setUpdate(latest, data.html_url ?? RELEASES_URL);
         }
       } else {
         setUpdateStatus("up-to-date");
