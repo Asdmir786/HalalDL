@@ -32,6 +32,8 @@ export function AboutSection() {
   const [latestVersion, setLatestVersion] = useState<string | null>(null);
   const [releaseUrl, setReleaseUrl] = useState<string>(RELEASES_URL);
   const [updateStatus, setUpdateStatus] = useState<UpdateStatus>("idle");
+  const appMode = String(import.meta.env.VITE_APP_MODE ?? "").trim().toUpperCase();
+  const appModeLabel = appMode === "FULL" ? "Full" : "Lite";
 
   const storeUpdate = useAppUpdateStore();
 
@@ -89,6 +91,17 @@ export function AboutSection() {
               <span className="text-2xl font-bold tracking-tight">HalalDL</span>
               <Badge variant="secondary" className="font-mono text-xs">
                 v{version}
+              </Badge>
+              <Badge
+                variant="outline"
+                className={cn(
+                  "text-[10px] h-5 px-2 font-semibold tracking-wide border-white/10",
+                  appModeLabel === "Full"
+                    ? "text-primary"
+                    : "text-muted-foreground",
+                )}
+              >
+                {appModeLabel}
               </Badge>
             </div>
             <p className="text-xs text-muted-foreground">

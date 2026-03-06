@@ -17,7 +17,8 @@ import { useToolActions } from "./hooks/useToolActions";
 
 export function ToolsScreen() {
   const { tools } = useToolsStore();
-  const isLite = import.meta.env.VITE_APP_MODE !== "FULL";
+  const appMode = String(import.meta.env.VITE_APP_MODE ?? "").trim().toUpperCase();
+  const isLite = appMode !== "FULL";
 
   const scrollRef = useRef<HTMLDivElement>(null);
   const scrollTopRef = useRef(0);

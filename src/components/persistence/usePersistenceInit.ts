@@ -146,7 +146,8 @@ export function usePersistenceInit(): MutableRefObject<boolean> {
       if (initialized.current) return;
 
       try {
-        const currentMode = import.meta.env.VITE_APP_MODE === "FULL" ? "FULL" : "LITE";
+        const appMode = String(import.meta.env.VITE_APP_MODE ?? "").trim().toUpperCase();
+        const currentMode = appMode === "FULL" ? "FULL" : "LITE";
         const lastModeKey = "halaldl:lastAppMode";
         const fullSwitchKey = "halaldl:fullSwitchAutoInstall";
         try {

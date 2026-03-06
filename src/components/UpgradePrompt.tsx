@@ -52,7 +52,8 @@ export function UpgradePrompt() {
   
   const { tools, updateTool } = useToolsStore();
   const { addLog } = useLogsStore();
-  const isFullMode = import.meta.env.VITE_APP_MODE === 'FULL';
+  const appMode = String(import.meta.env.VITE_APP_MODE ?? "").trim().toUpperCase();
+  const isFullMode = appMode === "FULL";
   const fullSwitchKey = "halaldl:fullSwitchAutoInstall";
   
   const missingTools = tools.filter((t) => t.status === "Missing");
@@ -401,9 +402,10 @@ export function UpgradePrompt() {
                   ) : (
                     <div className="grid grid-cols-1 gap-2">
                       {tools.map(tool => {
-                        const isMissing = tool.status === "Missing";
-                        const isSelected = selectedTools.includes(tool.id);
-                        const isRequiredMissing = isMissing && tool.required;
+                        const needsLocal = needsLocalToolIds.includes(tool.id);
+                        const isMissing = tool.status === "Missing" || needsLocal;
+                        const isForcedMissing = isMissing && (tool.required || needsLocal);
+                        const isSelected = isForcedMissing ? true : selectedTools.includes(tool.id);
                         
                         return (
                           <div 
@@ -415,16 +417,16 @@ export function UpgradePrompt() {
                             } ${
                               !isMissing
                                 ? "opacity-50 pointer-events-none grayscale"
-                                : isRequiredMissing
+                                : isForcedMissing
                                   ? "cursor-not-allowed"
                                   : "cursor-pointer hover:bg-muted/40"
                             }`}
-                            onClick={() => isMissing && !isRequiredMissing && toggleTool(tool.id)}
+                            onClick={() => isMissing && !isForcedMissing && toggleTool(tool.id)}
                           >
                             <div className="flex items-center gap-3">
                               <Checkbox 
                                 checked={!isMissing ? true : isSelected}
-                                disabled={isRequiredMissing}
+                                disabled={isForcedMissing}
                                 className="border-white/20 data-[state=checked]:bg-primary data-[state=checked]:border-primary"
                               />
                               <div className="flex flex-col">
