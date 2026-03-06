@@ -46,13 +46,9 @@ jobs:
         shell: pwsh
         run: pnpm check
 
-      - name: Build Lite
+      - name: Build All
         shell: pwsh
-        run: pnpm build:lite
-
-      - name: Build Full
-        shell: pwsh
-        run: pnpm build:full
+        run: pnpm build:all
 
       - name: Upload build artifacts
         if: success()
