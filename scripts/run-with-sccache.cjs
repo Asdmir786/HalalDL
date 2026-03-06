@@ -47,8 +47,10 @@ const sccachePath = findSccache();
 if (sccachePath) {
   env.RUSTC_WRAPPER = sccachePath;
   const binDir = path.dirname(sccachePath);
-  const currentPath = env.PATH || "";
-  env.PATH = `${binDir}${path.delimiter}${currentPath}`;
+  const currentPath = env.PATH ?? env.Path ?? "";
+  const nextPath = `${binDir}${path.delimiter}${currentPath}`;
+  env.PATH = nextPath;
+  env.Path = nextPath;
 }
 
 const child = spawn(command, args, {

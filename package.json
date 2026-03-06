@@ -10,7 +10,7 @@
     "dev": "vite",
     "build": "tsc && vite build",
     "preview": "vite preview",
-    "tauri": "node scripts/run-with-sccache.cjs tauri",
+    "tauri": "node scripts/run-with-sccache.cjs pnpm exec tauri",
     "lint": "eslint .",
     "format": "prettier --write .",
     "typecheck": "tsc --noEmit",
