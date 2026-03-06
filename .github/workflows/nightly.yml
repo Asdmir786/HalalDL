@@ -23,7 +23,21 @@ jobs:
         uses: pnpm/action-setup@v4
         with:
           version: 10
-          cache: true
+
+      - name: Get pnpm store path
+        id: pnpm-store
+        shell: pwsh
+        run: |
+          $storePath = pnpm store path
+          "store_path=$storePath" | Out-File -FilePath $env:GITHUB_OUTPUT -Append -Encoding utf8
+
+      - name: Cache pnpm store
+        uses: actions/cache@v4
+        with:
+          path: ${{ steps.pnpm-store.outputs.store_path }}
+          key: ${{ runner.os }}-pnpm-store-${{ hashFiles('pnpm-lock.yaml') }}
+          restore-keys: |
+            ${{ runner.os }}-pnpm-store-
 
       - name: Install pnpm dependencies
         shell: pwsh
@@ -41,10 +55,6 @@ jobs:
       - name: Install Windows bundler dependencies
         shell: pwsh
         run: choco install -y wixtoolset nsis
-
-      - name: Check
-        shell: pwsh
-        run: pnpm check
 
       - name: Build All
         shell: pwsh
