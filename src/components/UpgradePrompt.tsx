@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useMemo } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
 import { relaunch } from "@tauri-apps/plugin-process";
@@ -58,7 +58,22 @@ export function UpgradePrompt() {
   const missingTools = tools.filter((t) => t.status === "Missing");
   const hasMissingRequired = missingTools.some((t) => t.required);
   const allToolsChecked = tools.length > 0 && tools.every((t) => t.status !== "Checking");
-  const hasMissingForMode = isFullMode ? missingTools.length > 0 : hasMissingRequired;
+  const isAppBinPath = (p: string | undefined) => {
+    if (!p) return false;
+    const lower = p.toLowerCase();
+    return lower.includes("appdata") && /[\\/]+bin[\\/]+/i.test(p);
+  };
+
+  const needsLocalToolIds = useMemo(() => {
+    if (!isFullMode) return [];
+    return tools
+      .filter((t) => t.status === "Detected" && !isAppBinPath(t.systemPath))
+      .map((t) => t.id);
+  }, [isFullMode, tools]);
+
+  const hasMissingForMode = isFullMode
+    ? (missingTools.length > 0 || needsLocalToolIds.length > 0)
+    : hasMissingRequired;
   const isMandatory = hasMissingForMode;
   const showFullModeReadyState =
     isFullMode &&
@@ -120,8 +135,10 @@ export function UpgradePrompt() {
   useEffect(() => {
     if (!allToolsChecked) return;
 
-    if (missingTools.length > 0) {
-      const missingIds = missingTools.map((t) => t.id);
+    const baseMissingIds = missingTools.map((t) => t.id);
+    const missingIds = Array.from(new Set([...baseMissingIds, ...needsLocalToolIds]));
+
+    if (missingIds.length > 0) {
       const shouldAutoInstallFull = isFullMode && localStorage.getItem(fullSwitchKey) === "1";
 
       if (shouldAutoInstallFull) {
@@ -144,7 +161,8 @@ export function UpgradePrompt() {
           if (prev.length === 0) return missingIds;
           const stillMissing = prev.filter((id) => missingIds.includes(id));
           const requiredMissing = missingTools.filter((t) => t.required).map((t) => t.id);
-          return Array.from(new Set([...stillMissing, ...requiredMissing]));
+          const next = Array.from(new Set([...stillMissing, ...requiredMissing, ...needsLocalToolIds]));
+          return next;
         });
         setOpen(true);
       }, 2500);
@@ -169,7 +187,7 @@ export function UpgradePrompt() {
       }, 500);
       return () => clearTimeout(timer);
     }
-  }, [allToolsChecked, handleUpgrade, hasShownFullReadyPrompt, isFullMode, missingTools]);
+  }, [allToolsChecked, handleUpgrade, hasShownFullReadyPrompt, isFullMode, missingTools, needsLocalToolIds]);
 
   useEffect(() => {
     let disposed = false;
@@ -249,6 +267,7 @@ export function UpgradePrompt() {
   };
 
   const toggleTool = (id: string) => {
+    if (needsLocalToolIds.includes(id)) return;
     const tool = tools.find((t) => t.id === id);
     if (tool?.required && tool.status === "Missing") return;
 
@@ -435,7 +454,7 @@ export function UpgradePrompt() {
           <DialogFooter className="p-6 pt-2 flex-col sm:flex-row gap-2 bg-muted/5">
             {!isDownloading && (
               <>
-                {!isMandatory && (
+                {!isMandatory && !showFullModeReadyState && (
                   <MotionButton type="button" variant="ghost" onClick={() => setOpen(false)} className="flex-1 h-11 rounded-xl text-muted-foreground hover:text-foreground">
                     Skip
                   </MotionButton>
