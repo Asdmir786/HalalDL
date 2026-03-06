@@ -1,0 +1,77 @@
+name: release
+
+on:
+  workflow_dispatch:
+    inputs:
+      draft:
+        type: boolean
+        default: true
+  push:
+    tags:
+      - "app-v*"
+
+jobs:
+  build-windows:
+    runs-on: windows-latest
+    timeout-minutes: 90
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+
+      - name: Enable corepack
+        shell: pwsh
+        run: corepack enable
+
+      - name: Install pnpm dependencies
+        shell: pwsh
+        run: pnpm install --frozen-lockfile
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Rust cache
+        uses: swatinem/rust-cache@v2
+        with:
+          workspaces: |
+            src-tauri -> target
+
+      - name: Install Windows bundler dependencies
+        shell: pwsh
+        run: choco install -y wixtoolset nsis
+
+      - name: Check
+        shell: pwsh
+        run: pnpm check
+
+      - name: Build Lite
+        shell: pwsh
+        run: pnpm build:lite
+
+      - name: Build Full
+        shell: pwsh
+        run: pnpm build:full
+
+      - name: Upload release assets
+        uses: softprops/action-gh-release@v2
+        with:
+          files: out/*
+          draft: ${{ github.event_name == 'workflow_dispatch' && inputs.draft || true }}
+          prerelease: false
+          generate_release_notes: true
+
+      - name: Upload logs (always)
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: HalalDL-release-logs-${{ github.run_id }}
+          path: |
+            out/*
+            src-tauri/target/release/bundle/**
+            src-tauri/target/release/build/**
+          if-no-files-found: ignore
