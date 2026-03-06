@@ -70,6 +70,7 @@ async fn fetch_text(app_handle: &tauri::AppHandle, url: &str) -> Result<String, 
 
 fn find_checksum_for_names(text: &str, filenames: &[&str]) -> Option<String> {
     let targets: Vec<String> = filenames.iter().map(|f| f.to_lowercase()).collect();
+    let mut best: Option<(usize, String)> = None;
     for raw in text.lines() {
         let line = raw.trim().trim_end_matches('\r');
         if line.is_empty() {
@@ -79,11 +80,17 @@ fn find_checksum_for_names(text: &str, filenames: &[&str]) -> Option<String> {
             if let Some(start) = line.find('(') {
                 if let Some(end) = line.find(')') {
                     let name = line[start + 1..end].trim().to_lowercase();
-                    if targets.iter().any(|t| t == &name) {
+                    if let Some(idx) = targets.iter().position(|t| t == &name) {
                         if let Some(eq) = line.find('=') {
                             let hash = line[eq + 1..].trim();
                             if !hash.is_empty() {
-                                return Some(hash.to_lowercase());
+                                let hash = hash.to_lowercase();
+                                if idx == 0 {
+                                    return Some(hash);
+                                }
+                                if best.as_ref().map(|(b, _)| idx < *b).unwrap_or(true) {
+                                    best = Some((idx, hash));
+                                }
                             }
                         }
                     }
@@ -92,10 +99,16 @@ fn find_checksum_for_names(text: &str, filenames: &[&str]) -> Option<String> {
         }
         if let Some((name, hash)) = line.split_once(':') {
             let name = name.trim().to_lowercase();
-            if targets.iter().any(|t| t == &name) {
+            if let Some(idx) = targets.iter().position(|t| t == &name) {
                 let hash = hash.trim();
                 if !hash.is_empty() {
-                    return Some(hash.to_lowercase());
+                    let hash = hash.to_lowercase();
+                    if idx == 0 {
+                        return Some(hash);
+                    }
+                    if best.as_ref().map(|(b, _)| idx < *b).unwrap_or(true) {
+                        best = Some((idx, hash));
+                    }
                 }
             }
         }
@@ -105,14 +118,20 @@ fn find_checksum_for_names(text: &str, filenames: &[&str]) -> Option<String> {
             let mut name = parts[1].trim();
             name = name.trim_start_matches('*');
             let name = name.to_lowercase();
-            if targets.iter().any(|t| t == &name) {
+            if let Some(idx) = targets.iter().position(|t| t == &name) {
                 if !hash.is_empty() {
-                    return Some(hash.to_lowercase());
+                    let hash = hash.to_lowercase();
+                    if idx == 0 {
+                        return Some(hash);
+                    }
+                    if best.as_ref().map(|(b, _)| idx < *b).unwrap_or(true) {
+                        best = Some((idx, hash));
+                    }
                 }
             }
         }
     }
-    None
+    best.map(|(_, h)| h)
 }
 
 fn filename_from_url(url: &str) -> Option<String> {
@@ -211,7 +230,7 @@ async fn download_deno(app_handle: &tauri::AppHandle, dest: &PathBuf) -> Result<
     let url = "https://github.com/denoland/deno/releases/latest/download/deno-x86_64-pc-windows-msvc.zip";
     let checksum_url = format!("{}.sha256sum", url);
     let checksum = fetch_text(app_handle, &checksum_url).await.ok()
-        .and_then(|text| find_checksum_for_names(&text, &["deno", "deno.exe"]));
+        .and_then(|text| find_checksum_for_names(&text, &["deno.exe", "deno"]));
     let zip_path = dest.join("deno-update.zip");
     let temp = download_to_temp(app_handle, "deno", url, &zip_path).await?;
     safe_replace_with_backup(&zip_path, &temp)?;
@@ -317,7 +336,7 @@ pub async fn download_tools(app_handle: tauri::AppHandle, tools: Vec<String>, ch
         let deno_url = "https://github.com/denoland/deno/releases/latest/download/deno-x86_64-pc-windows-msvc.zip";
         let checksum_url = format!("{}.sha256sum", deno_url);
         let checksum = fetch_text(&app_handle, &checksum_url).await.ok()
-            .and_then(|text| find_checksum_for_names(&text, &["deno", "deno.exe"]));
+            .and_then(|text| find_checksum_for_names(&text, &["deno.exe", "deno"]));
         let deno_zip_path = bin_dir.join("deno.zip");
         let temp = download_to_temp(&app_handle, "deno", deno_url, &deno_zip_path).await?;
         safe_replace_with_backup(&deno_zip_path, &temp)?;
