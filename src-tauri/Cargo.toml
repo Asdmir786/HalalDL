@@ -36,6 +36,7 @@ indicator = "0.4.4"
 sevenz-rust = "0.6"
 tauri-plugin-process = "2.3.1"
 windows-sys = { version = "0.61.2", features = ["Win32_Foundation", "Win32_System_DataExchange", "Win32_System_Memory", "Win32_UI_WindowsAndMessaging"] }
+sha2 = "0.10"
 
 [profile.release]
 lto = "thin"        # Fast Link Time Optimization (huge speedup vs true)

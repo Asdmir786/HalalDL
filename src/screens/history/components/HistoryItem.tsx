@@ -1,7 +1,7 @@
 import {
   RotateCcw, FolderOpen, Copy, Link, Trash2,
   FileText, CheckCircle2, XCircle, Clock, Globe, Play,
-  Star, FileMinus, Info
+  Star, Pencil, FileMinus
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { type HistoryEntry, useHistoryStore } from "@/store/history";
@@ -223,7 +223,7 @@ export function HistoryItem({
               className="p-1.5 rounded-md hover:bg-primary/10 text-muted-foreground hover:text-primary transition-colors"
               title="Details & Notes"
             >
-              <Info className="w-3.5 h-3.5" />
+              <Pencil className="w-3.5 h-3.5" />
             </button>
             <button
               onClick={() => onRemove(entry.id)}
@@ -267,7 +267,7 @@ export function HistoryItem({
         )}
         <ContextMenuSeparator />
         <ContextMenuItem onClick={() => setDetailsOpen(true)}>
-          <Info className="w-3.5 h-3.5 mr-2" /> Details & Notes
+          <Pencil className="w-3.5 h-3.5 mr-2" /> Details & Notes
         </ContextMenuItem>
         <ContextMenuSeparator />
         <ContextMenuItem onClick={() => toggleFavorite(entry.id)}>

@@ -1,10 +1,11 @@
+use std::collections::HashMap;
 use std::fs;
 use std::path::{Path, PathBuf};
 use tauri::Manager;
 
 use crate::fs_utils::{temp_path_for, safe_replace_with_backup};
-use crate::download::{download_file, emit_progress, resolve_latest_aria2_zip_url};
-use crate::extract::{extract_from_zip, extract_from_7z};
+use crate::download::{download_file, download_to_temp, emit_progress, resolve_latest_aria2_zip_url, sha256_of_path};
+use crate::extract::{extract_from_zip, extract_from_zip_with_hashes, extract_from_7z};
 
 /// Resolve the full system path of a tool using `where` (Windows).
 #[tauri::command]
@@ -55,6 +56,182 @@ pub fn resolve_system_tool_path(tool: String) -> Result<Option<String>, String> 
     Ok(None)
 }
 
+async fn fetch_text(app_handle: &tauri::AppHandle, url: &str) -> Result<String, String> {
+    let client = reqwest::Client::builder()
+        .user_agent(format!("HalalDL/{}", app_handle.package_info().version))
+        .build()
+        .map_err(|e| e.to_string())?;
+    let res = client.get(url).send().await.map_err(|e| e.to_string())?;
+    if !res.status().is_success() {
+        return Err(format!("HTTP {}: {}", res.status(), url));
+    }
+    res.text().await.map_err(|e| e.to_string())
+}
+
+fn find_checksum_for_names(text: &str, filenames: &[&str]) -> Option<String> {
+    let targets: Vec<String> = filenames.iter().map(|f| f.to_lowercase()).collect();
+    for raw in text.lines() {
+        let line = raw.trim().trim_end_matches('\r');
+        if line.is_empty() {
+            continue;
+        }
+        if line.starts_with("SHA256") {
+            if let Some(start) = line.find('(') {
+                if let Some(end) = line.find(')') {
+                    let name = line[start + 1..end].trim().to_lowercase();
+                    if targets.iter().any(|t| t == &name) {
+                        if let Some(eq) = line.find('=') {
+                            let hash = line[eq + 1..].trim();
+                            if !hash.is_empty() {
+                                return Some(hash.to_lowercase());
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        if let Some((name, hash)) = line.split_once(':') {
+            let name = name.trim().to_lowercase();
+            if targets.iter().any(|t| t == &name) {
+                let hash = hash.trim();
+                if !hash.is_empty() {
+                    return Some(hash.to_lowercase());
+                }
+            }
+        }
+        let parts: Vec<&str> = line.split_whitespace().collect();
+        if parts.len() >= 2 {
+            let hash = parts[0].trim();
+            let mut name = parts[1].trim();
+            name = name.trim_start_matches('*');
+            let name = name.to_lowercase();
+            if targets.iter().any(|t| t == &name) {
+                if !hash.is_empty() {
+                    return Some(hash.to_lowercase());
+                }
+            }
+        }
+    }
+    None
+}
+
+fn filename_from_url(url: &str) -> Option<String> {
+    url.split('/').last().map(|s| s.to_string())
+}
+
+fn verify_hash(path: &Path, expected: &str) -> Result<(), String> {
+    let actual = sha256_of_path(path)?;
+    if actual.to_lowercase() != expected.to_lowercase() {
+        return Err(format!("Checksum mismatch (expected {}, got {})", expected, actual));
+    }
+    Ok(())
+}
+
+async fn download_ytdlp(app_handle: &tauri::AppHandle, dest: &PathBuf, is_nightly: bool) -> Result<(), String> {
+    let url = if is_nightly {
+        "https://github.com/yt-dlp/yt-dlp-nightly-builds/releases/latest/download/yt-dlp.exe"
+    } else {
+        "https://github.com/yt-dlp/yt-dlp/releases/latest/download/yt-dlp.exe"
+    };
+    let checksum_url = if is_nightly {
+        "https://github.com/yt-dlp/yt-dlp-nightly-builds/releases/latest/download/SHA2-256SUMS"
+    } else {
+        "https://github.com/yt-dlp/yt-dlp/releases/latest/download/SHA2-256SUMS"
+    };
+    let checksum = fetch_text(app_handle, checksum_url).await.ok()
+        .and_then(|text| find_checksum_for_names(&text, &["yt-dlp.exe", "yt-dlp"]));
+
+    let dest_file = dest.join("yt-dlp.exe");
+    let temp = download_to_temp(app_handle, "yt-dlp", url, &dest_file).await?;
+    if let Some(expected) = checksum {
+        emit_progress(app_handle, "yt-dlp", 99.0, "Verifying checksum...");
+        verify_hash(&temp, &expected)?;
+    } else {
+        emit_progress(app_handle, "yt-dlp", 99.0, "Checksum unavailable, skipping validation");
+    }
+    safe_replace_with_backup(&dest_file, &temp)?;
+    Ok(())
+}
+
+async fn download_ffmpeg(app_handle: &tauri::AppHandle, dest: &PathBuf, variant: Option<String>, is_nightly: bool) -> Result<(), String> {
+    let variant_lower = variant.as_deref().unwrap_or("").to_lowercase();
+    let url = if is_nightly {
+        if variant_lower.contains("essentials") {
+            "https://www.gyan.dev/ffmpeg/builds/ffmpeg-git-essentials.7z"
+        } else {
+            "https://www.gyan.dev/ffmpeg/builds/ffmpeg-git-full.7z"
+        }
+    } else if variant_lower.contains("shared") {
+        "https://www.gyan.dev/ffmpeg/builds/ffmpeg-release-full-shared.7z"
+    } else if variant_lower.contains("essentials") {
+        "https://www.gyan.dev/ffmpeg/builds/ffmpeg-release-essentials.7z"
+    } else {
+        "https://www.gyan.dev/ffmpeg/builds/ffmpeg-release-full.7z"
+    };
+    let checksum_url = format!("{}.sha256", url);
+    let checksum = fetch_text(app_handle, &checksum_url).await.ok()
+        .and_then(|text| filename_from_url(url).and_then(|name| find_checksum_for_names(&text, &[&name])));
+
+    let archive_path = dest.join("ffmpeg-update.7z");
+    let temp = download_to_temp(app_handle, "ffmpeg", url, &archive_path).await?;
+    if let Some(expected) = checksum {
+        emit_progress(app_handle, "ffmpeg", 99.0, "Verifying checksum...");
+        verify_hash(&temp, &expected)?;
+    } else {
+        emit_progress(app_handle, "ffmpeg", 99.0, "Checksum unavailable, skipping validation");
+    }
+    safe_replace_with_backup(&archive_path, &temp)?;
+    emit_progress(app_handle, "ffmpeg", 99.0, "Extracting ffmpeg.exe, ffprobe.exe from 7z...");
+    let extracted = extract_from_7z(app_handle, "ffmpeg", &archive_path, dest, vec!["ffmpeg.exe", "ffprobe.exe"])?;
+    emit_progress(app_handle, "ffmpeg", 100.0, &format!("Extracted: {}", extracted.join(", ")));
+    if let Err(e) = fs::remove_file(&archive_path) {
+        eprintln!("[tools] Warning: failed to clean up {:?}: {}", archive_path, e);
+    }
+    Ok(())
+}
+
+async fn download_aria2(app_handle: &tauri::AppHandle, dest: &PathBuf) -> Result<(), String> {
+    let url = match resolve_latest_aria2_zip_url(app_handle).await {
+        Ok(u) => u,
+        Err(_) => "https://github.com/aria2/aria2/releases/download/release-1.37.0/aria2-1.37.0-win-64bit-build1.zip".to_string(),
+    };
+    let zip_path = dest.join("aria2-update.zip");
+    emit_progress(app_handle, "aria2", 99.0, "Checksum unavailable, skipping validation");
+    download_file(app_handle, "aria2", &url, &zip_path).await?;
+    emit_progress(app_handle, "aria2", 99.0, "Extracting aria2c.exe...");
+    let extracted = extract_from_zip(app_handle, "aria2", &zip_path, dest, vec!["aria2c.exe"])?;
+    emit_progress(app_handle, "aria2", 100.0, &format!("Extracted: {}", extracted.join(", ")));
+    if let Err(e) = fs::remove_file(&zip_path) {
+        eprintln!("[tools] Warning: failed to clean up {:?}: {}", zip_path, e);
+    }
+    Ok(())
+}
+
+async fn download_deno(app_handle: &tauri::AppHandle, dest: &PathBuf) -> Result<(), String> {
+    let url = "https://github.com/denoland/deno/releases/latest/download/deno-x86_64-pc-windows-msvc.zip";
+    let checksum_url = format!("{}.sha256sum", url);
+    let checksum = fetch_text(app_handle, &checksum_url).await.ok()
+        .and_then(|text| find_checksum_for_names(&text, &["deno", "deno.exe"]));
+    let zip_path = dest.join("deno-update.zip");
+    let temp = download_to_temp(app_handle, "deno", url, &zip_path).await?;
+    safe_replace_with_backup(&zip_path, &temp)?;
+    emit_progress(app_handle, "deno", 99.0, "Extracting deno.exe...");
+    if let Some(expected) = checksum {
+        let mut map = HashMap::new();
+        map.insert("deno.exe".to_string(), expected);
+        let extracted = extract_from_zip_with_hashes(app_handle, "deno", &zip_path, dest, vec!["deno.exe"], Some(map))?;
+        emit_progress(app_handle, "deno", 100.0, &format!("Extracted: {}", extracted.join(", ")));
+    } else {
+        emit_progress(app_handle, "deno", 99.0, "Checksum unavailable, skipping validation");
+        let extracted = extract_from_zip(app_handle, "deno", &zip_path, dest, vec!["deno.exe"])?;
+        emit_progress(app_handle, "deno", 100.0, &format!("Extracted: {}", extracted.join(", ")));
+    }
+    if let Err(e) = fs::remove_file(&zip_path) {
+        eprintln!("[tools] Warning: failed to clean up {:?}: {}", zip_path, e);
+    }
+    Ok(())
+}
+
 /// Update a tool at its original (system) location instead of the app bin dir.
 /// `variant` controls which FFmpeg build to download (Full Build / Essentials / Shared).
 /// `channel` controls stable vs nightly (only yt-dlp and ffmpeg support nightly).
@@ -75,71 +252,16 @@ pub async fn update_tool_at_path(
 
     match tool.as_str() {
         "yt-dlp" => {
-            let url = if is_nightly {
-                "https://github.com/yt-dlp/yt-dlp-nightly-builds/releases/latest/download/yt-dlp.exe"
-            } else {
-                "https://github.com/yt-dlp/yt-dlp/releases/latest/download/yt-dlp.exe"
-            };
-            download_file(&app_handle, "yt-dlp", url, &dest.join("yt-dlp.exe")).await?;
+            download_ytdlp(&app_handle, &dest, is_nightly).await?;
         }
         "ffmpeg" => {
-            let variant_lower = variant.as_deref().unwrap_or("").to_lowercase();
-            if is_nightly {
-                let url = if variant_lower.contains("essentials") {
-                    "https://www.gyan.dev/ffmpeg/builds/ffmpeg-git-essentials.7z"
-                } else {
-                    "https://www.gyan.dev/ffmpeg/builds/ffmpeg-git-full.7z"
-                };
-                let archive_path = dest.join("ffmpeg-update.7z");
-                download_file(&app_handle, "ffmpeg", url, &archive_path).await?;
-                emit_progress(&app_handle, "ffmpeg", 99.0, "Extracting ffmpeg.exe, ffprobe.exe from 7z...");
-                let extracted = extract_from_7z(&app_handle, "ffmpeg", &archive_path, &dest, vec!["ffmpeg.exe", "ffprobe.exe"])?;
-                emit_progress(&app_handle, "ffmpeg", 100.0, &format!("Extracted: {}", extracted.join(", ")));
-                if let Err(e) = fs::remove_file(&archive_path) {
-                    eprintln!("[tools] Warning: failed to clean up {:?}: {}", archive_path, e);
-                }
-            } else {
-                let url = if variant_lower.contains("shared") {
-                    "https://www.gyan.dev/ffmpeg/builds/ffmpeg-release-full-shared.7z"
-                } else if variant_lower.contains("essentials") {
-                    "https://www.gyan.dev/ffmpeg/builds/ffmpeg-release-essentials.7z"
-                } else {
-                    "https://www.gyan.dev/ffmpeg/builds/ffmpeg-release-full.7z"
-                };
-                let archive_path = dest.join("ffmpeg-update.7z");
-                download_file(&app_handle, "ffmpeg", url, &archive_path).await?;
-                emit_progress(&app_handle, "ffmpeg", 99.0, "Extracting ffmpeg.exe, ffprobe.exe from 7z...");
-                let extracted = extract_from_7z(&app_handle, "ffmpeg", &archive_path, &dest, vec!["ffmpeg.exe", "ffprobe.exe"])?;
-                emit_progress(&app_handle, "ffmpeg", 100.0, &format!("Extracted: {}", extracted.join(", ")));
-                if let Err(e) = fs::remove_file(&archive_path) {
-                    eprintln!("[tools] Warning: failed to clean up {:?}: {}", archive_path, e);
-                }
-            }
+            download_ffmpeg(&app_handle, &dest, variant, is_nightly).await?;
         }
         "aria2" => {
-            let url = match resolve_latest_aria2_zip_url(&app_handle).await {
-                Ok(u) => u,
-                Err(_) => "https://github.com/aria2/aria2/releases/download/release-1.37.0/aria2-1.37.0-win-64bit-build1.zip".to_string(),
-            };
-            let zip_path = dest.join("aria2-update.zip");
-            download_file(&app_handle, "aria2", &url, &zip_path).await?;
-            emit_progress(&app_handle, "aria2", 99.0, "Extracting aria2c.exe...");
-            let extracted = extract_from_zip(&app_handle, "aria2", &zip_path, &dest, vec!["aria2c.exe"])?;
-            emit_progress(&app_handle, "aria2", 100.0, &format!("Extracted: {}", extracted.join(", ")));
-            if let Err(e) = fs::remove_file(&zip_path) {
-                eprintln!("[tools] Warning: failed to clean up {:?}: {}", zip_path, e);
-            }
+            download_aria2(&app_handle, &dest).await?;
         }
         "deno" => {
-            let url = "https://github.com/denoland/deno/releases/latest/download/deno-x86_64-pc-windows-msvc.zip";
-            let zip_path = dest.join("deno-update.zip");
-            download_file(&app_handle, "deno", url, &zip_path).await?;
-            emit_progress(&app_handle, "deno", 99.0, "Extracting deno.exe...");
-            let extracted = extract_from_zip(&app_handle, "deno", &zip_path, &dest, vec!["deno.exe"])?;
-            emit_progress(&app_handle, "deno", 100.0, &format!("Extracted: {}", extracted.join(", ")));
-            if let Err(e) = fs::remove_file(&zip_path) {
-                eprintln!("[tools] Warning: failed to clean up {:?}: {}", zip_path, e);
-            }
+            download_deno(&app_handle, &dest).await?;
         }
         _ => return Err(format!("Unknown tool: {}", tool)),
     }
@@ -166,46 +288,23 @@ pub async fn download_tools(app_handle: tauri::AppHandle, tools: Vec<String>, ch
 
     if tools.contains(&"yt-dlp".to_string()) {
         let is_nightly = ch.get("yt-dlp").map(|s| s.as_str()) == Some("nightly");
-        let yt_dlp_url = if is_nightly {
-            "https://github.com/yt-dlp/yt-dlp-nightly-builds/releases/latest/download/yt-dlp.exe"
-        } else {
-            "https://github.com/yt-dlp/yt-dlp/releases/latest/download/yt-dlp.exe"
-        };
-        download_file(&app_handle, "yt-dlp", yt_dlp_url, &bin_dir.join("yt-dlp.exe")).await?;
+        download_ytdlp(&app_handle, &bin_dir, is_nightly).await?;
     }
 
     if tools.contains(&"ffmpeg".to_string()) {
         let is_nightly = ch.get("ffmpeg").map(|s| s.as_str()) == Some("nightly");
-        if is_nightly {
-            let ffmpeg_url = "https://www.gyan.dev/ffmpeg/builds/ffmpeg-git-full.7z";
-            let ffmpeg_7z_path = bin_dir.join("ffmpeg.7z");
-            download_file(&app_handle, "ffmpeg", ffmpeg_url, &ffmpeg_7z_path).await?;
-            emit_progress(&app_handle, "ffmpeg", 99.0, "Extracting ffmpeg.exe, ffprobe.exe from 7z...");
-            let extracted = extract_from_7z(&app_handle, "ffmpeg", &ffmpeg_7z_path, &bin_dir, vec!["ffmpeg.exe", "ffprobe.exe"])?;
-            emit_progress(&app_handle, "ffmpeg", 100.0, &format!("Extracted: {}", extracted.join(", ")));
-            if let Err(e) = fs::remove_file(&ffmpeg_7z_path) {
-                eprintln!("[tools] Warning: failed to clean up {:?}: {}", ffmpeg_7z_path, e);
-            }
-        } else {
-            let ffmpeg_url = "https://www.gyan.dev/ffmpeg/builds/ffmpeg-release-full.7z";
-            let ffmpeg_7z_path = bin_dir.join("ffmpeg.7z");
-            download_file(&app_handle, "ffmpeg", ffmpeg_url, &ffmpeg_7z_path).await?;
-            emit_progress(&app_handle, "ffmpeg", 99.0, "Extracting ffmpeg.exe, ffprobe.exe from 7z...");
-            let extracted = extract_from_7z(&app_handle, "ffmpeg", &ffmpeg_7z_path, &bin_dir, vec!["ffmpeg.exe", "ffprobe.exe"])?;
-            emit_progress(&app_handle, "ffmpeg", 100.0, &format!("Extracted: {}", extracted.join(", ")));
-            if let Err(e) = fs::remove_file(&ffmpeg_7z_path) {
-                eprintln!("[tools] Warning: failed to clean up {:?}: {}", ffmpeg_7z_path, e);
-            }
-        }
+        let variant = None;
+        download_ffmpeg(&app_handle, &bin_dir, variant, is_nightly).await?;
     }
 
     if tools.contains(&"aria2".to_string()) {
-        let aria2_url = match resolve_latest_aria2_zip_url(&app_handle).await {
-            Ok(url) => url,
+        let url = match resolve_latest_aria2_zip_url(&app_handle).await {
+            Ok(u) => u,
             Err(_) => "https://github.com/aria2/aria2/releases/download/release-1.37.0/aria2-1.37.0-win-64bit-build1.zip".to_string(),
         };
         let aria2_zip_path = bin_dir.join("aria2.zip");
-        download_file(&app_handle, "aria2", &aria2_url, &aria2_zip_path).await?;
+        emit_progress(&app_handle, "aria2", 99.0, "Checksum unavailable, skipping validation");
+        download_file(&app_handle, "aria2", &url, &aria2_zip_path).await?;
         emit_progress(&app_handle, "aria2", 99.0, "Extracting aria2c.exe...");
         let extracted = extract_from_zip(&app_handle, "aria2", &aria2_zip_path, &bin_dir, vec!["aria2c.exe"])?;
         emit_progress(&app_handle, "aria2", 100.0, &format!("Extracted: {}", extracted.join(", ")));
@@ -216,11 +315,23 @@ pub async fn download_tools(app_handle: tauri::AppHandle, tools: Vec<String>, ch
 
     if tools.contains(&"deno".to_string()) {
         let deno_url = "https://github.com/denoland/deno/releases/latest/download/deno-x86_64-pc-windows-msvc.zip";
+        let checksum_url = format!("{}.sha256sum", deno_url);
+        let checksum = fetch_text(&app_handle, &checksum_url).await.ok()
+            .and_then(|text| find_checksum_for_names(&text, &["deno", "deno.exe"]));
         let deno_zip_path = bin_dir.join("deno.zip");
-        download_file(&app_handle, "deno", deno_url, &deno_zip_path).await?;
+        let temp = download_to_temp(&app_handle, "deno", deno_url, &deno_zip_path).await?;
+        safe_replace_with_backup(&deno_zip_path, &temp)?;
         emit_progress(&app_handle, "deno", 99.0, "Extracting deno.exe...");
-        let extracted = extract_from_zip(&app_handle, "deno", &deno_zip_path, &bin_dir, vec!["deno.exe"])?;
-        emit_progress(&app_handle, "deno", 100.0, &format!("Extracted: {}", extracted.join(", ")));
+        if let Some(expected) = checksum {
+            let mut map = HashMap::new();
+            map.insert("deno.exe".to_string(), expected);
+            let extracted = extract_from_zip_with_hashes(&app_handle, "deno", &deno_zip_path, &bin_dir, vec!["deno.exe"], Some(map))?;
+            emit_progress(&app_handle, "deno", 100.0, &format!("Extracted: {}", extracted.join(", ")));
+        } else {
+            emit_progress(&app_handle, "deno", 99.0, "Checksum unavailable, skipping validation");
+            let extracted = extract_from_zip(&app_handle, "deno", &deno_zip_path, &bin_dir, vec!["deno.exe"])?;
+            emit_progress(&app_handle, "deno", 100.0, &format!("Extracted: {}", extracted.join(", ")));
+        }
         if let Err(e) = fs::remove_file(&deno_zip_path) {
             eprintln!("[tools] Warning: failed to clean up {:?}: {}", deno_zip_path, e);
         }

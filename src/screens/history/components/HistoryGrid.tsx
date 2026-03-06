@@ -1,7 +1,8 @@
 import {
   RotateCcw, FolderOpen, Copy, Link, Trash2,
   FileText, CheckCircle2, XCircle, Clock, Play,
-  Star, FileMinus, Info
+  Star, FileMinus,
+  Pencil
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { type HistoryEntry, useHistoryStore } from "@/store/history";
@@ -221,7 +222,7 @@ export function HistoryGrid({
         )}
         <ContextMenuSeparator />
         <ContextMenuItem onClick={() => setDetailsOpen(true)}>
-          <Info className="w-3.5 h-3.5 mr-2" /> Details & Notes
+          <Pencil className="w-3.5 h-3.5 mr-2" /> Details & Notes
         </ContextMenuItem>
         <ContextMenuSeparator />
         <ContextMenuItem onClick={() => toggleFavorite(entry.id)}>

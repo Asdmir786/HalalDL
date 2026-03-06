@@ -1,16 +1,34 @@
+use std::collections::HashMap;
 use std::fs;
 use std::io::Write;
 use std::path::{Path, PathBuf};
 
 use crate::fs_utils::{temp_path_for, safe_replace_with_backup};
 use crate::download::emit_progress;
+use crate::download::sha256_of_path;
 
 pub fn extract_from_zip(app_handle: &tauri::AppHandle, tool_name: &str, zip_path: &PathBuf, dest_dir: &PathBuf, targets: Vec<&str>) -> Result<Vec<String>, String> {
+    extract_from_zip_with_hashes(app_handle, tool_name, zip_path, dest_dir, targets, None)
+}
+
+pub fn extract_from_zip_with_hashes(
+    app_handle: &tauri::AppHandle,
+    tool_name: &str,
+    zip_path: &PathBuf,
+    dest_dir: &PathBuf,
+    targets: Vec<&str>,
+    expected_hashes: Option<HashMap<String, String>>,
+) -> Result<Vec<String>, String> {
     emit_progress(app_handle, tool_name, 99.0, "Opening archive...");
     let file = fs::File::open(zip_path).map_err(|e| format!("Failed to open zip: {}", e))?;
     let mut archive = zip::ZipArchive::new(file).map_err(|e| format!("Failed to read zip archive: {}", e))?;
 
     let mut found_targets = Vec::new();
+    let expected = expected_hashes.map(|map| {
+        map.into_iter()
+            .map(|(k, v)| (k.to_lowercase(), v.to_lowercase()))
+            .collect::<HashMap<String, String>>()
+    });
 
     emit_progress(app_handle, tool_name, 99.0, &format!("Scanning {} files...", archive.len()));
 
@@ -40,6 +58,19 @@ pub fn extract_from_zip(app_handle: &tauri::AppHandle, tool_name: &str, zip_path
             let metadata = fs::metadata(&temp_dest).map_err(|e| format!("Failed to read metadata for {}: {}", target_name, e))?;
             if metadata.len() == 0 {
                 return Err(format!("Extracted file {} is empty", target_name));
+            }
+
+            if let Some(map) = &expected {
+                if let Some(expected_hash) = map.get(&target_name.to_lowercase()) {
+                    let actual = sha256_of_path(&temp_dest)?;
+                    if actual.to_lowercase() != expected_hash.to_lowercase() {
+                        let _ = fs::remove_file(&temp_dest);
+                        return Err(format!(
+                            "Checksum mismatch for {} (expected {}, got {})",
+                            target_name, expected_hash, actual
+                        ));
+                    }
+                }
             }
 
             #[cfg(unix)]

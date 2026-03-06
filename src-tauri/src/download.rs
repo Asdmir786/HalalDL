@@ -1,9 +1,10 @@
 use std::fs;
-use std::io::Write;
+use std::io::{Read, Write};
 use std::path::Path;
 use std::path::PathBuf;
 use futures_util::StreamExt;
 use tauri::Emitter;
+use sha2::{Digest, Sha256};
 
 use crate::fs_utils::{temp_path_for, safe_replace_with_backup};
 
@@ -67,6 +68,21 @@ pub async fn download_url_to_file(url: String, dest: String, referer: Option<Str
     Ok(dest)
 }
 
+pub fn sha256_of_path(path: &Path) -> Result<String, String> {
+    let mut file = fs::File::open(path).map_err(|e| e.to_string())?;
+    let mut hasher = Sha256::new();
+    let mut buffer = [0u8; 8192];
+    loop {
+        let read = file.read(&mut buffer).map_err(|e| e.to_string())?;
+        if read == 0 {
+            break;
+        }
+        hasher.update(&buffer[..read]);
+    }
+    let hash = hasher.finalize();
+    Ok(hash.iter().map(|b| format!("{:02x}", b)).collect::<String>())
+}
+
 pub async fn resolve_latest_aria2_zip_url(app_handle: &tauri::AppHandle) -> Result<String, String> {
     let client = reqwest::Client::builder()
         .user_agent(format!("HalalDL/{}", app_handle.package_info().version))
@@ -111,6 +127,17 @@ pub async fn download_file(
     url: &str,
     dest: &PathBuf,
 ) -> Result<(), String> {
+    let temp_dest = download_to_temp(app_handle, tool_name, url, dest).await?;
+    safe_replace_with_backup(dest, &temp_dest)?;
+    Ok(())
+}
+
+pub async fn download_to_temp(
+    app_handle: &tauri::AppHandle,
+    tool_name: &str,
+    url: &str,
+    dest: &PathBuf,
+) -> Result<PathBuf, String> {
     let client = reqwest::Client::builder()
         .user_agent(format!("HalalDL/{}", app_handle.package_info().version))
         .build()
@@ -121,7 +148,7 @@ pub async fn download_file(
     for attempt in 1..=MAX_DOWNLOAD_RETRIES {
         let result = download_file_once(&client, app_handle, tool_name, url, dest).await;
         match result {
-            Ok(()) => return Ok(()),
+            Ok(temp_dest) => return Ok(temp_dest),
             Err(e) => {
                 last_error = Some(e);
                 if attempt < MAX_DOWNLOAD_RETRIES {
@@ -149,7 +176,7 @@ async fn download_file_once(
     tool_name: &str,
     url: &str,
     dest: &PathBuf,
-) -> Result<(), String> {
+) -> Result<PathBuf, String> {
     let response = client.get(url).send().await.map_err(|e| e.to_string())?;
     
     if !response.status().is_success() {
@@ -192,7 +219,5 @@ async fn download_file_once(
         return Err("Downloaded file is empty".to_string());
     }
 
-    safe_replace_with_backup(dest, &temp_dest)?;
-
-    Ok(())
+    Ok(temp_dest)
 }
