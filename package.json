@@ -15,6 +15,8 @@
     "format": "prettier --write .",
     "typecheck": "tsc --noEmit",
     "cargo:check": "node scripts/run-with-sccache.cjs cargo check --manifest-path src-tauri/Cargo.toml",
+    "sccache:install": "cargo install sccache --locked --force",
+    "sccache:stats": "sccache --show-stats",
     "check": "pnpm lint && pnpm typecheck && pnpm build && pnpm cargo:check",
     "build:lite": "cross-env VITE_APP_MODE=LITE pnpm tauri build && node scripts/rename-release.js LITE",
     "build:full": "cross-env VITE_APP_MODE=FULL pnpm tauri build && node scripts/rename-release.js FULL",

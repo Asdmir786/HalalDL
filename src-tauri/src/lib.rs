@@ -45,7 +45,8 @@ pub fn run() {
             tools::list_tool_backups,
             tools::rollback_tool,
             tools::cleanup_tool_backup,
-            tools::cleanup_all_backups
+            tools::cleanup_all_backups,
+            tools::cleanup_bin_tools
         ])
         .setup(|app| {
             use tauri::Manager;

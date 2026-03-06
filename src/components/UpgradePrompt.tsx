@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
 import { relaunch } from "@tauri-apps/plugin-process";
@@ -53,6 +53,7 @@ export function UpgradePrompt() {
   const { tools, updateTool } = useToolsStore();
   const { addLog } = useLogsStore();
   const isFullMode = import.meta.env.VITE_APP_MODE === 'FULL';
+  const fullSwitchKey = "halaldl:fullSwitchAutoInstall";
   
   const missingTools = tools.filter((t) => t.status === "Missing");
   const hasMissingRequired = missingTools.some((t) => t.required);
@@ -68,6 +69,39 @@ export function UpgradePrompt() {
     !error;
 
   const totalSize = selectedTools.reduce((acc, id) => acc + (TOOL_SIZES[id] || 0), 0);
+
+  const handleUpgrade = useCallback(async (overrideTools?: string[]) => {
+    const toolsToInstall = overrideTools ?? selectedTools;
+    if (toolsToInstall.length === 0) {
+      if (!isMandatory) {
+        setOpen(false);
+      }
+      return;
+    }
+
+    setIsDownloading(true);
+    setDownloadComplete(false);
+    setError(null);
+    try {
+      await invoke("download_tools", { tools: toolsToInstall });
+      setProgress(100);
+      setDownloadComplete(true);
+      addLog({
+        level: "info",
+        message: "All selected tools downloaded and ready",
+      });
+    } catch (error: unknown) {
+      const message =
+        error instanceof Error ? error.message : String(error);
+      setError(message);
+      setIsDownloading(false);
+      setDownloadComplete(false);
+      addLog({
+        level: "error",
+        message: `Tool download failed: ${message}`,
+      });
+    }
+  }, [addLog, isMandatory, selectedTools]);
 
   // Reset state when dialog closes
   useEffect(() => {
@@ -87,18 +121,44 @@ export function UpgradePrompt() {
     if (!allToolsChecked) return;
 
     if (missingTools.length > 0) {
-       const timer = setTimeout(() => {
-         const missingIds = missingTools.map((t) => t.id);
-         setSelectedTools((prev) => {
-           if (prev.length === 0) return missingIds;
-           // Keep previous user picks only if still missing; add any newly-missing required tools.
-           const stillMissing = prev.filter((id) => missingIds.includes(id));
-           const requiredMissing = missingTools.filter((t) => t.required).map((t) => t.id);
-           return Array.from(new Set([...stillMissing, ...requiredMissing]));
-         });
-         setOpen(true);
-       }, 2500);
-       return () => clearTimeout(timer);
+      const missingIds = missingTools.map((t) => t.id);
+      const shouldAutoInstallFull = isFullMode && localStorage.getItem(fullSwitchKey) === "1";
+
+      if (shouldAutoInstallFull) {
+        setSelectedTools(missingIds);
+        setOpen(true);
+        void (async () => {
+          await new Promise((r) => setTimeout(r, 250));
+          await handleUpgrade(missingIds);
+          try {
+            localStorage.removeItem(fullSwitchKey);
+          } catch {
+            void 0;
+          }
+        })();
+        return;
+      }
+
+      const timer = setTimeout(() => {
+        setSelectedTools((prev) => {
+          if (prev.length === 0) return missingIds;
+          const stillMissing = prev.filter((id) => missingIds.includes(id));
+          const requiredMissing = missingTools.filter((t) => t.required).map((t) => t.id);
+          return Array.from(new Set([...stillMissing, ...requiredMissing]));
+        });
+        setOpen(true);
+      }, 2500);
+      return () => clearTimeout(timer);
+    }
+
+    if (isFullMode) {
+      try {
+        if (localStorage.getItem(fullSwitchKey) === "1") {
+          localStorage.removeItem(fullSwitchKey);
+        }
+      } catch {
+        void 0;
+      }
     }
 
     if (isFullMode && !hasShownFullReadyPrompt) {
@@ -109,7 +169,7 @@ export function UpgradePrompt() {
       }, 500);
       return () => clearTimeout(timer);
     }
-  }, [allToolsChecked, hasShownFullReadyPrompt, isFullMode, missingTools]);
+  }, [allToolsChecked, handleUpgrade, hasShownFullReadyPrompt, isFullMode, missingTools]);
 
   useEffect(() => {
     let disposed = false;
@@ -181,38 +241,6 @@ export function UpgradePrompt() {
       window.location.reload();
     } finally {
       setIsFinishing(false);
-    }
-  };
-
-  const handleUpgrade = async () => {
-    if (selectedTools.length === 0) {
-      if (!isMandatory) {
-        setOpen(false);
-      }
-      return;
-    }
-
-    setIsDownloading(true);
-    setDownloadComplete(false);
-    setError(null);
-    try {
-      await invoke("download_tools", { tools: selectedTools });
-      setProgress(100);
-      setDownloadComplete(true);
-      addLog({
-        level: "info",
-        message: "All selected tools downloaded and ready",
-      });
-    } catch (error: unknown) {
-      const message =
-        error instanceof Error ? error.message : String(error);
-      setError(message);
-      setIsDownloading(false);
-      setDownloadComplete(false);
-      addLog({
-        level: "error",
-        message: `Tool download failed: ${message}`,
-      });
     }
   };
 
@@ -424,7 +452,7 @@ export function UpgradePrompt() {
                 ) : (
                   <MotionButton 
                     type="button" 
-                    onClick={handleUpgrade} 
+                    onClick={() => void handleUpgrade()} 
                     disabled={selectedTools.length === 0} 
                     className="flex-1 gap-2 h-11 rounded-xl bg-primary text-primary-foreground hover:bg-primary/90 shadow-lg shadow-primary/20"
                   >

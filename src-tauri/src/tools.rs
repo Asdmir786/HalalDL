@@ -582,3 +582,49 @@ pub fn cleanup_all_backups(app_handle: tauri::AppHandle, extra_paths: Option<Vec
 
     Ok(format!("Removed {} backup file(s)", count))
 }
+
+#[tauri::command]
+pub fn cleanup_bin_tools(app_handle: tauri::AppHandle, tools: Vec<String>) -> Result<String, String> {
+    let bin_dir = app_handle
+        .path()
+        .app_data_dir()
+        .map_err(|e: tauri::Error| e.to_string())?
+        .join("bin");
+
+    if !bin_dir.exists() {
+        return Ok("No bin directory to clean".to_string());
+    }
+
+    let mut removed = 0u32;
+
+    for tool in tools {
+        let binaries: &[&str] = TOOL_BINARIES
+            .iter()
+            .find(|&&(id, _)| id == tool.as_str())
+            .map(|&(_, bins)| bins)
+            .ok_or_else(|| format!("Unknown tool: {}", tool))?;
+
+        for &bin_name in binaries {
+            let current = bin_dir.join(bin_name);
+            if current.exists() {
+                fs::remove_file(&current).map_err(|e| format!("Failed to remove {}: {}", current.display(), e))?;
+                removed += 1;
+            }
+
+            let backup = bin_dir.join(format!("{}.old", bin_name));
+            if backup.exists() {
+                fs::remove_file(&backup).map_err(|e| format!("Failed to remove {}: {}", backup.display(), e))?;
+                removed += 1;
+            }
+        }
+    }
+
+    for extra in ["aria2.zip", "aria2-update.zip", "deno.zip", "deno-update.zip"] {
+        let p = bin_dir.join(extra);
+        if p.exists() {
+            let _ = fs::remove_file(&p);
+        }
+    }
+
+    Ok(format!("Removed {} file(s) from bin", removed))
+}

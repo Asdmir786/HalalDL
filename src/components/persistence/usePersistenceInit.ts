@@ -7,6 +7,7 @@ import { useLogsStore } from "@/store/logs";
 import { useDownloadsStore, type DownloadJob } from "@/store/downloads";
 import { useHistoryStore, type HistoryEntry } from "@/store/history";
 import { storage } from "@/lib/storage";
+import { invoke } from "@tauri-apps/api/core";
 import {
   checkYtDlpVersion,
   checkFfmpegVersion,
@@ -145,6 +146,23 @@ export function usePersistenceInit(): MutableRefObject<boolean> {
       if (initialized.current) return;
 
       try {
+        const currentMode = import.meta.env.VITE_APP_MODE === "FULL" ? "FULL" : "LITE";
+        const lastModeKey = "halaldl:lastAppMode";
+        const fullSwitchKey = "halaldl:fullSwitchAutoInstall";
+        try {
+          const lastMode = localStorage.getItem(lastModeKey);
+          if (lastMode && lastMode !== currentMode) {
+            if (currentMode === "LITE") {
+              await invoke("cleanup_bin_tools", { tools: ["yt-dlp", "ffmpeg", "aria2", "deno"] });
+            } else {
+              localStorage.setItem(fullSwitchKey, "1");
+            }
+          }
+          localStorage.setItem(lastModeKey, currentMode);
+        } catch {
+          void 0;
+        }
+
         await storage.init();
         addLog({ level: "debug", message: "Storage initialized" });
         await useLogsStore.getState().loadLogs();

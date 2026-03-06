@@ -16,6 +16,9 @@ jobs:
     timeout-minutes: 90
     permissions:
       contents: write
+    env:
+      SCCACHE_GHA_ENABLED: "true"
+      RUSTC_WRAPPER: sccache
     steps:
       - uses: actions/checkout@v4
 
@@ -27,6 +30,13 @@ jobs:
         uses: pnpm/action-setup@v4
         with:
           version: 10
+
+      - name: Show tool versions
+        shell: pwsh
+        run: |
+          node -v
+          npm -v
+          pnpm -v
 
       - name: Get pnpm store path
         id: pnpm-store
@@ -50,6 +60,14 @@ jobs:
       - name: Install Rust toolchain
         uses: dtolnay/rust-toolchain@stable
 
+      - name: Setup sccache
+        uses: mozilla-actions/sccache-action@v0.0.9
+
+      - name: sccache stats (pre)
+        shell: pwsh
+        run: |
+          if ($env:SCCACHE_PATH) { & $env:SCCACHE_PATH --show-stats } else { sccache --show-stats }
+
       - name: Rust cache
         uses: swatinem/rust-cache@v2
         with:
@@ -63,6 +81,12 @@ jobs:
       - name: Build All
         shell: pwsh
         run: pnpm build:all
+
+      - name: sccache stats (post)
+        if: always()
+        shell: pwsh
+        run: |
+          if ($env:SCCACHE_PATH) { & $env:SCCACHE_PATH --show-stats } else { sccache --show-stats }
 
       - name: Upload release assets
         uses: softprops/action-gh-release@v2
