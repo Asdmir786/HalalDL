@@ -3,9 +3,10 @@ import { useLayoutEffect, useRef, type UIEvent } from "react";
 import { DownloadItem } from "./DownloadItem";
 import { DownloadJob } from "@/store/downloads";
 import { MotionButton } from "@/components/motion/MotionButton";
-import { CheckCircle2, Download, Layers, Play, Plus, Settings, Sparkles, X } from "lucide-react";
+import { CheckCircle2, Download, Layers, Play, Plus, Settings, Sparkles, X, Upload } from "lucide-react";
 import { FadeInItem } from "@/components/motion/StaggerContainer";
 import { useNavigationStore } from "@/store/navigation";
+import { exportJobTemplate, importJobTemplate } from "@/lib/job-templates";
 
 interface DownloadListProps {
   jobs: DownloadJob[];
@@ -168,6 +169,27 @@ export function DownloadList({
                 </AnimatePresence>
                 
                 <div className="flex-1" />
+
+                <MotionButton
+                  type="button"
+                  variant="ghost"
+                  size="sm"
+                  className="h-8 px-3.5 text-xs rounded-full text-muted-foreground border border-muted/60 bg-background/50 hover:text-foreground hover:border-muted transition-colors gap-1.5"
+                  onClick={() => void importJobTemplate()}
+                >
+                  <Upload className="w-3.5 h-3.5" />
+                  Import
+                </MotionButton>
+                <MotionButton
+                  type="button"
+                  variant="ghost"
+                  size="sm"
+                  className="h-8 px-3.5 text-xs rounded-full text-muted-foreground border border-muted/60 bg-background/50 hover:text-foreground hover:border-muted transition-colors gap-1.5"
+                  onClick={() => void exportJobTemplate(selectedIds)}
+                >
+                  <Download className="w-3.5 h-3.5" />
+                  Export
+                </MotionButton>
 
                 {overflowCount > 0 && (
                   <MotionButton

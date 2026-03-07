@@ -5,7 +5,7 @@ use tauri::Manager;
 
 use crate::fs_utils::{temp_path_for, safe_replace_with_backup};
 use crate::download::{download_file, download_to_temp, emit_progress, resolve_latest_aria2_zip_url, sha256_of_path};
-use crate::extract::{extract_from_zip, extract_from_zip_with_hashes, extract_from_7z};
+use crate::extract::{extract_from_zip, extract_from_7z};
 
 /// Resolve the full system path of a tool using `where` (Windows).
 #[tauri::command]
@@ -146,6 +146,42 @@ fn verify_hash(path: &Path, expected: &str) -> Result<(), String> {
     Ok(())
 }
 
+async fn download_with_optional_checksum(
+    app_handle: &tauri::AppHandle,
+    tool: &str,
+    url: &str,
+    checksum_url: Option<&str>,
+    checksum_names: &[&str],
+    dest_path: &PathBuf,
+) -> Result<(), String> {
+    for attempt in 1..=3u8 {
+        let checksum = match checksum_url {
+            Some(u) => fetch_text(app_handle, u).await.ok().and_then(|text| find_checksum_for_names(&text, checksum_names)),
+            None => None,
+        };
+
+        let temp = download_to_temp(app_handle, tool, url, dest_path).await?;
+
+        if let Some(expected) = checksum {
+            emit_progress(app_handle, tool, 99.0, "Verifying checksum...");
+            if let Err(e) = verify_hash(&temp, &expected) {
+                let _ = fs::remove_file(&temp);
+                if attempt < 3 {
+                    emit_progress(app_handle, tool, 0.0, &format!("Checksum mismatch, retrying ({}/3)...", attempt + 1));
+                    continue;
+                }
+                return Err(e);
+            }
+        } else {
+            emit_progress(app_handle, tool, 99.0, "Checksum unavailable, skipping validation");
+        }
+
+        safe_replace_with_backup(dest_path, &temp)?;
+        return Ok(());
+    }
+    Err(format!("{} download failed", tool))
+}
+
 async fn download_ytdlp(app_handle: &tauri::AppHandle, dest: &PathBuf, is_nightly: bool) -> Result<(), String> {
     let url = if is_nightly {
         "https://github.com/yt-dlp/yt-dlp-nightly-builds/releases/latest/download/yt-dlp.exe"
@@ -159,27 +195,7 @@ async fn download_ytdlp(app_handle: &tauri::AppHandle, dest: &PathBuf, is_nightl
     };
 
     let dest_file = dest.join("yt-dlp.exe");
-    for attempt in 1..=3u8 {
-        let checksum = fetch_text(app_handle, checksum_url).await.ok()
-            .and_then(|text| find_checksum_for_names(&text, &["yt-dlp.exe", "yt-dlp"]));
-        let temp = download_to_temp(app_handle, "yt-dlp", url, &dest_file).await?;
-        if let Some(expected) = checksum {
-            emit_progress(app_handle, "yt-dlp", 99.0, "Verifying checksum...");
-            if let Err(e) = verify_hash(&temp, &expected) {
-                let _ = fs::remove_file(&temp);
-                if attempt < 3 {
-                    emit_progress(app_handle, "yt-dlp", 0.0, &format!("Checksum mismatch, retrying ({}/3)...", attempt + 1));
-                    continue;
-                }
-                return Err(e);
-            }
-        } else {
-            emit_progress(app_handle, "yt-dlp", 99.0, "Checksum unavailable, skipping validation");
-        }
-        safe_replace_with_backup(&dest_file, &temp)?;
-        return Ok(());
-    }
-    Err("yt-dlp download failed".to_string())
+    download_with_optional_checksum(app_handle, "yt-dlp", url, Some(checksum_url), &["yt-dlp.exe", "yt-dlp"], &dest_file).await
 }
 
 async fn download_ffmpeg(app_handle: &tauri::AppHandle, dest: &PathBuf, variant: Option<String>, is_nightly: bool) -> Result<(), String> {
@@ -200,26 +216,8 @@ async fn download_ffmpeg(app_handle: &tauri::AppHandle, dest: &PathBuf, variant:
     let checksum_url = format!("{}.sha256", url);
 
     let archive_path = dest.join("ffmpeg-update.7z");
-    for attempt in 1..=3u8 {
-        let checksum = fetch_text(app_handle, &checksum_url).await.ok()
-            .and_then(|text| filename_from_url(url).and_then(|name| find_checksum_for_names(&text, &[&name])));
-        let temp = download_to_temp(app_handle, "ffmpeg", url, &archive_path).await?;
-        if let Some(expected) = checksum {
-            emit_progress(app_handle, "ffmpeg", 99.0, "Verifying checksum...");
-            if let Err(e) = verify_hash(&temp, &expected) {
-                let _ = fs::remove_file(&temp);
-                if attempt < 3 {
-                    emit_progress(app_handle, "ffmpeg", 0.0, &format!("Checksum mismatch, retrying ({}/3)...", attempt + 1));
-                    continue;
-                }
-                return Err(e);
-            }
-        } else {
-            emit_progress(app_handle, "ffmpeg", 99.0, "Checksum unavailable, skipping validation");
-        }
-        safe_replace_with_backup(&archive_path, &temp)?;
-        break;
-    }
+    let file_name = filename_from_url(url).ok_or_else(|| "Invalid ffmpeg url".to_string())?;
+    download_with_optional_checksum(app_handle, "ffmpeg", url, Some(&checksum_url), &[&file_name], &archive_path).await?;
     emit_progress(app_handle, "ffmpeg", 99.0, "Extracting ffmpeg.exe, ffprobe.exe from 7z...");
     let extracted = extract_from_7z(app_handle, "ffmpeg", &archive_path, dest, vec!["ffmpeg.exe", "ffprobe.exe"])?;
     emit_progress(app_handle, "ffmpeg", 100.0, &format!("Extracted: {}", extracted.join(", ")));
@@ -235,8 +233,7 @@ async fn download_aria2(app_handle: &tauri::AppHandle, dest: &PathBuf) -> Result
         Err(_) => "https://github.com/aria2/aria2/releases/download/release-1.37.0/aria2-1.37.0-win-64bit-build1.zip".to_string(),
     };
     let zip_path = dest.join("aria2-update.zip");
-    emit_progress(app_handle, "aria2", 99.0, "Checksum unavailable, skipping validation");
-    download_file(app_handle, "aria2", &url, &zip_path).await?;
+    download_with_optional_checksum(app_handle, "aria2", &url, None, &[], &zip_path).await?;
     emit_progress(app_handle, "aria2", 99.0, "Extracting aria2c.exe...");
     let extracted = extract_from_zip(app_handle, "aria2", &zip_path, dest, vec!["aria2c.exe"])?;
     emit_progress(app_handle, "aria2", 100.0, &format!("Extracted: {}", extracted.join(", ")));
@@ -249,22 +246,12 @@ async fn download_aria2(app_handle: &tauri::AppHandle, dest: &PathBuf) -> Result
 async fn download_deno(app_handle: &tauri::AppHandle, dest: &PathBuf) -> Result<(), String> {
     let url = "https://github.com/denoland/deno/releases/latest/download/deno-x86_64-pc-windows-msvc.zip";
     let checksum_url = format!("{}.sha256sum", url);
-    let checksum = fetch_text(app_handle, &checksum_url).await.ok()
-        .and_then(|text| find_checksum_for_names(&text, &["deno.exe", "deno"]));
     let zip_path = dest.join("deno-update.zip");
-    let temp = download_to_temp(app_handle, "deno", url, &zip_path).await?;
-    safe_replace_with_backup(&zip_path, &temp)?;
+    let file_name = filename_from_url(url).ok_or_else(|| "Invalid deno url".to_string())?;
+    download_with_optional_checksum(app_handle, "deno", url, Some(&checksum_url), &[&file_name], &zip_path).await?;
     emit_progress(app_handle, "deno", 99.0, "Extracting deno.exe...");
-    if let Some(expected) = checksum {
-        let mut map = HashMap::new();
-        map.insert("deno.exe".to_string(), expected);
-        let extracted = extract_from_zip_with_hashes(app_handle, "deno", &zip_path, dest, vec!["deno.exe"], Some(map))?;
-        emit_progress(app_handle, "deno", 100.0, &format!("Extracted: {}", extracted.join(", ")));
-    } else {
-        emit_progress(app_handle, "deno", 99.0, "Checksum unavailable, skipping validation");
-        let extracted = extract_from_zip(app_handle, "deno", &zip_path, dest, vec!["deno.exe"])?;
-        emit_progress(app_handle, "deno", 100.0, &format!("Extracted: {}", extracted.join(", ")));
-    }
+    let extracted = extract_from_zip(app_handle, "deno", &zip_path, dest, vec!["deno.exe"])?;
+    emit_progress(app_handle, "deno", 100.0, &format!("Extracted: {}", extracted.join(", ")));
     if let Err(e) = fs::remove_file(&zip_path) {
         eprintln!("[tools] Warning: failed to clean up {:?}: {}", zip_path, e);
     }
@@ -337,43 +324,11 @@ pub async fn download_tools(app_handle: tauri::AppHandle, tools: Vec<String>, ch
     }
 
     if tools.contains(&"aria2".to_string()) {
-        let url = match resolve_latest_aria2_zip_url(&app_handle).await {
-            Ok(u) => u,
-            Err(_) => "https://github.com/aria2/aria2/releases/download/release-1.37.0/aria2-1.37.0-win-64bit-build1.zip".to_string(),
-        };
-        let aria2_zip_path = bin_dir.join("aria2.zip");
-        emit_progress(&app_handle, "aria2", 99.0, "Checksum unavailable, skipping validation");
-        download_file(&app_handle, "aria2", &url, &aria2_zip_path).await?;
-        emit_progress(&app_handle, "aria2", 99.0, "Extracting aria2c.exe...");
-        let extracted = extract_from_zip(&app_handle, "aria2", &aria2_zip_path, &bin_dir, vec!["aria2c.exe"])?;
-        emit_progress(&app_handle, "aria2", 100.0, &format!("Extracted: {}", extracted.join(", ")));
-        if let Err(e) = fs::remove_file(&aria2_zip_path) {
-            eprintln!("[tools] Warning: failed to clean up {:?}: {}", aria2_zip_path, e);
-        }
+        download_aria2(&app_handle, &bin_dir).await?;
     }
 
     if tools.contains(&"deno".to_string()) {
-        let deno_url = "https://github.com/denoland/deno/releases/latest/download/deno-x86_64-pc-windows-msvc.zip";
-        let checksum_url = format!("{}.sha256sum", deno_url);
-        let checksum = fetch_text(&app_handle, &checksum_url).await.ok()
-            .and_then(|text| find_checksum_for_names(&text, &["deno.exe", "deno"]));
-        let deno_zip_path = bin_dir.join("deno.zip");
-        let temp = download_to_temp(&app_handle, "deno", deno_url, &deno_zip_path).await?;
-        safe_replace_with_backup(&deno_zip_path, &temp)?;
-        emit_progress(&app_handle, "deno", 99.0, "Extracting deno.exe...");
-        if let Some(expected) = checksum {
-            let mut map = HashMap::new();
-            map.insert("deno.exe".to_string(), expected);
-            let extracted = extract_from_zip_with_hashes(&app_handle, "deno", &deno_zip_path, &bin_dir, vec!["deno.exe"], Some(map))?;
-            emit_progress(&app_handle, "deno", 100.0, &format!("Extracted: {}", extracted.join(", ")));
-        } else {
-            emit_progress(&app_handle, "deno", 99.0, "Checksum unavailable, skipping validation");
-            let extracted = extract_from_zip(&app_handle, "deno", &deno_zip_path, &bin_dir, vec!["deno.exe"])?;
-            emit_progress(&app_handle, "deno", 100.0, &format!("Extracted: {}", extracted.join(", ")));
-        }
-        if let Err(e) = fs::remove_file(&deno_zip_path) {
-            eprintln!("[tools] Warning: failed to clean up {:?}: {}", deno_zip_path, e);
-        }
+        download_deno(&app_handle, &bin_dir).await?;
     }
 
     Ok("Selected tools downloaded successfully".to_string())

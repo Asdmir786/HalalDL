@@ -6,6 +6,7 @@ mod version;
 mod shell;
 mod clipboard;
 mod file_commands;
+mod diagnostics;
 
 #[tauri::command]
 fn greet(name: &str) -> String {
@@ -46,12 +47,14 @@ pub fn run() {
             tools::rollback_tool,
             tools::cleanup_tool_backup,
             tools::cleanup_all_backups,
-            tools::cleanup_bin_tools
+            tools::cleanup_bin_tools,
+            diagnostics::export_diagnostics_zip
         ])
         .setup(|app| {
             use tauri::Manager;
-            let win = app.get_webview_window("main").unwrap();
-            win.set_focus().unwrap();
+            if let Some(win) = app.get_webview_window("main") {
+                let _ = win.set_focus();
+            }
             Ok(())
         })
         .run(tauri::generate_context!())

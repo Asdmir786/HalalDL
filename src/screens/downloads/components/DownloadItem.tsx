@@ -4,10 +4,12 @@ import {
   X, FolderOpen, Terminal, 
   Copy, RotateCcw, Play,
   Link, Clock,
+  ArrowUp, ArrowDown,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { DownloadJob } from "@/store/downloads";
 import { useLogsStore } from "@/store/logs";
+import { useDownloadsStore } from "@/store/downloads";
 import { MotionButton } from "@/components/motion/MotionButton";
 import { revealInExplorer, deleteFile, openFile, copyFilesToClipboard } from "@/lib/commands";
 import { startDownload } from "@/lib/downloader";
@@ -37,6 +39,7 @@ export function DownloadItem({
   formatRelativeTime
 }: DownloadItemProps) {
   const { addLog } = useLogsStore();
+  const moveJob = useDownloadsStore((s) => s.moveJob);
   const [thumbError, setThumbError] = useState(false);
   const ts = getJobTs(job);
   const relative = formatRelativeTime(ts);
@@ -258,6 +261,34 @@ export function DownloadItem({
                       {job.statusDetail || ""}
                     </div>
                     <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-all duration-300 transform translate-x-4 group-hover:translate-x-0">
+                      {job.status === "Queued" && (
+                        <>
+                          <MotionButton
+                            variant="ghost"
+                            size="icon"
+                            className="w-8 h-8 rounded-full hover:bg-primary/10 hover:text-primary transition-colors"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              moveJob(job.id, "up");
+                            }}
+                            title="Move up"
+                          >
+                            <ArrowUp className="w-4 h-4" />
+                          </MotionButton>
+                          <MotionButton
+                            variant="ghost"
+                            size="icon"
+                            className="w-8 h-8 rounded-full hover:bg-primary/10 hover:text-primary transition-colors"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              moveJob(job.id, "down");
+                            }}
+                            title="Move down"
+                          >
+                            <ArrowDown className="w-4 h-4" />
+                          </MotionButton>
+                        </>
+                      )}
                       <MotionButton
                         variant="ghost"
                         size="icon"
@@ -321,6 +352,19 @@ export function DownloadItem({
         </ContextMenuTrigger>
 
         <ContextMenuContent className="w-48">
+          {job.status === "Queued" && (
+            <>
+              <ContextMenuItem onClick={() => moveJob(job.id, "up")}>
+                <ArrowUp className="mr-2 h-3.5 w-3.5" />
+                Move Up
+              </ContextMenuItem>
+              <ContextMenuItem onClick={() => moveJob(job.id, "down")}>
+                <ArrowDown className="mr-2 h-3.5 w-3.5" />
+                Move Down
+              </ContextMenuItem>
+              <ContextMenuSeparator />
+            </>
+          )}
           {job.status === "Done" && job.outputPath && (
             <>
               <ContextMenuItem onClick={() => openFile(job.outputPath!)}>

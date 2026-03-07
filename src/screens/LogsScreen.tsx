@@ -29,6 +29,7 @@ import {
 } from "@/components/ui/select";
 import { cn } from "@/lib/utils";
 import { Separator } from "@/components/ui/separator";
+import { buildDiagnosticsPayload } from "@/lib/diagnostics";
 
 const LEVEL_STYLES: Record<LogLevel, string> = {
   info: "text-blue-400",
@@ -182,6 +183,7 @@ export function LogsScreen() {
   }, [filteredLogs.length, autoScroll, rowVirtualizer]);
 
   const [isExporting, setIsExporting] = React.useState(false);
+  const [isExportingDiagnostics, setIsExportingDiagnostics] = React.useState(false);
 
   const handleExport = React.useCallback(async () => {
     if (!filteredLogs.length) {
@@ -217,6 +219,29 @@ export function LogsScreen() {
       setIsExporting(false);
     }
   }, [filteredLogs]);
+
+  const handleExportDiagnostics = React.useCallback(async () => {
+    setIsExportingDiagnostics(true);
+    try {
+      const now = new Date();
+      const pad2 = (n: number) => String(n).padStart(2, "0");
+      const stamp = `${now.getFullYear()}-${pad2(now.getMonth() + 1)}-${pad2(now.getDate())}_${pad2(now.getHours())}-${pad2(now.getMinutes())}-${pad2(now.getSeconds())}`;
+      const path = await save({
+        filters: [{ name: "Zip", extensions: ["zip"] }],
+        defaultPath: `HalalDL-diagnostics-${stamp}.zip`,
+      });
+      if (!path) return;
+      const payload = buildDiagnosticsPayload({ redactUrls: true, redactPaths: true });
+      await invoke("export_diagnostics_zip", { output_path: path, payload });
+      toast.success("Diagnostics exported successfully");
+    } catch (error: unknown) {
+      const message = error instanceof Error ? error.message : String(error);
+      useLogsStore.getState().addLog({ level: "error", message: `Diagnostics export failed: ${message}` });
+      toast.error(`Diagnostics export failed: ${message}`);
+    } finally {
+      setIsExportingDiagnostics(false);
+    }
+  }, []);
 
   const copyToClipboard = React.useCallback((text: string, label: string) => {
     navigator.clipboard.writeText(text);
@@ -296,6 +321,21 @@ export function LogsScreen() {
               </div>
               
               <div className="flex items-center gap-2">
+                 <MotionButton
+                  variant="outline"
+                  size="sm"
+                  onClick={handleExportDiagnostics}
+                  disabled={loadStatus !== "ready" || isExportingDiagnostics}
+                  whileHover={{ scale: 1.02 }}
+                  whileTap={{ scale: 0.98 }}
+                >
+                  {isExportingDiagnostics ? (
+                    <LoaderCircle className="w-3.5 h-3.5 mr-2 animate-spin" />
+                  ) : (
+                    <Download className="w-3.5 h-3.5 mr-2" />
+                  )}
+                  Diagnostics
+                </MotionButton>
                  <MotionButton
                   variant="outline"
                   size="sm"

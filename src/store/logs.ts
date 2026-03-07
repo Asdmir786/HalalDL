@@ -1,5 +1,6 @@
 import { create } from "zustand";
 import { storage } from "@/lib/storage";
+import { createId } from "@/lib/id";
 
 export type LogLevel = "info" | "warn" | "error" | "debug" | "command";
 export type LogsLoadStatus = "idle" | "loading" | "ready" | "error";
@@ -34,7 +35,7 @@ export const useLogsStore = create<LogsState>((set) => ({
     set((state) => {
       const newLog = {
         ...log,
-        id: Math.random().toString(36).substring(7),
+        id: createId(),
         timestamp: new Date().toISOString(),
       };
       // Optimization: Avoid full array copy if possible, but for Zustand immutability we need a new reference.
@@ -66,7 +67,7 @@ export const useLogsStore = create<LogsState>((set) => ({
         logs: [
           ...state.logs.slice(-999),
           {
-            id: Math.random().toString(36).substring(7),
+            id: createId(),
             timestamp: new Date().toISOString(),
             level: "error",
             message: `Failed to load logs: ${message}`,

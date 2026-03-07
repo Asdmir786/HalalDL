@@ -11,6 +11,7 @@ import { cleanupThumbnailByJobId } from "./thumbnails";
 import { fetchMetadata } from "./metadata";
 import { useHistoryStore, extractDomain, type HistoryEntry } from "@/store/history";
 import { stat } from "@tauri-apps/plugin-fs";
+import { createId } from "@/lib/id";
 
 export async function startDownload(jobId: string) {
   const { jobs, updateJob, removeJob } = useDownloadsStore.getState();
@@ -543,7 +544,7 @@ export async function startDownload(jobId: string) {
         } catch { /* file may not exist yet */ }
       }
       const entry: HistoryEntry = {
-        id: `hist-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+        id: createId(),
         url: doneJob.url,
         title: doneJob.title || doneJob.url,
         thumbnail: doneJob.thumbnail,
@@ -577,7 +578,7 @@ export async function startDownload(jobId: string) {
     const failedJob = useDownloadsStore.getState().jobs.find((j) => j.id === jobId);
     if (failedJob) {
       const entry: HistoryEntry = {
-        id: `hist-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+        id: createId(),
         url: failedJob.url,
         title: failedJob.title || failedJob.url,
         thumbnail: failedJob.thumbnail,

@@ -148,6 +148,18 @@ export function DownloadsScreen() {
     if (sortMode === "newest") {
       return copy.sort((a, b) => getJobTs(b) - getJobTs(a));
     }
+    if (sortMode === "status") {
+      return copy.sort((a, b) => {
+        const rankDiff = getStatusRank(a.status) - getStatusRank(b.status);
+        if (rankDiff !== 0) return rankDiff;
+        if (a.status === "Queued" && b.status === "Queued") {
+          const ao = typeof a.queueOrder === "number" ? a.queueOrder : a.createdAt;
+          const bo = typeof b.queueOrder === "number" ? b.queueOrder : b.createdAt;
+          return bo - ao;
+        }
+        return getJobTs(b) - getJobTs(a);
+      });
+    }
     return copy.sort((a, b) => {
       const rankDiff = getStatusRank(a.status) - getStatusRank(b.status);
       if (rankDiff !== 0) return rankDiff;

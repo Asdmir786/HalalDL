@@ -8,6 +8,7 @@ import { useDownloadsStore, type DownloadJob } from "@/store/downloads";
 import { useHistoryStore, type HistoryEntry } from "@/store/history";
 import { storage } from "@/lib/storage";
 import { invoke } from "@tauri-apps/api/core";
+import { createId } from "@/lib/id";
 import {
   checkYtDlpVersion,
   checkFfmpegVersion,
@@ -200,8 +201,48 @@ export function usePersistenceInit(): MutableRefObject<boolean> {
 
         const savedDownloads = await storage.getDownloads<DownloadJob[]>();
         if (savedDownloads && Array.isArray(savedDownloads)) {
-          useDownloadsStore.setState({ jobs: savedDownloads });
-          addLog({ level: "info", message: `Downloads loaded (${savedDownloads.length})` });
+          const uuidRe = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+          const needsMigration = savedDownloads.some((j) => !uuidRe.test(j.id));
+
+          if (!needsMigration) {
+            useDownloadsStore.setState({ jobs: savedDownloads });
+            addLog({ level: "info", message: `Downloads loaded (${savedDownloads.length})` });
+          } else {
+            const idMap = new Map<string, string>();
+            const migratedDownloads: DownloadJob[] = savedDownloads.map((job) => {
+              const nextId = createId();
+              idMap.set(job.id, nextId);
+              return {
+                ...job,
+                id: nextId,
+                thumbnail: undefined,
+                thumbnailStatus: "pending" as const,
+                thumbnailError: undefined,
+              };
+            });
+
+            useDownloadsStore.setState({ jobs: migratedDownloads });
+            addLog({ level: "info", message: `Downloads loaded (${migratedDownloads.length})` });
+
+            const logsState = useLogsStore.getState();
+            const migratedLogs = logsState.logs.map((l) => {
+              if (!l.jobId) return l;
+              const next = idMap.get(l.jobId);
+              if (!next) return l;
+              return { ...l, jobId: next };
+            });
+            const migratedActiveJobId = logsState.activeJobId
+              ? idMap.get(logsState.activeJobId) ?? undefined
+              : undefined;
+            useLogsStore.setState({ logs: migratedLogs, activeJobId: migratedActiveJobId });
+
+            try {
+              await storage.saveDownloads<DownloadJob[]>(migratedDownloads);
+              await storage.saveLogs(migratedLogs);
+            } catch (e) {
+              addLog({ level: "warn", message: `Failed to persist job id migration: ${String(e)}` });
+            }
+          }
         }
 
         const savedHistory = await storage.getHistory<HistoryEntry[]>();
