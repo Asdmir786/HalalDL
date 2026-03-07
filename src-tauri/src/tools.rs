@@ -157,19 +157,29 @@ async fn download_ytdlp(app_handle: &tauri::AppHandle, dest: &PathBuf, is_nightl
     } else {
         "https://github.com/yt-dlp/yt-dlp/releases/latest/download/SHA2-256SUMS"
     };
-    let checksum = fetch_text(app_handle, checksum_url).await.ok()
-        .and_then(|text| find_checksum_for_names(&text, &["yt-dlp.exe", "yt-dlp"]));
 
     let dest_file = dest.join("yt-dlp.exe");
-    let temp = download_to_temp(app_handle, "yt-dlp", url, &dest_file).await?;
-    if let Some(expected) = checksum {
-        emit_progress(app_handle, "yt-dlp", 99.0, "Verifying checksum...");
-        verify_hash(&temp, &expected)?;
-    } else {
-        emit_progress(app_handle, "yt-dlp", 99.0, "Checksum unavailable, skipping validation");
+    for attempt in 1..=3u8 {
+        let checksum = fetch_text(app_handle, checksum_url).await.ok()
+            .and_then(|text| find_checksum_for_names(&text, &["yt-dlp.exe", "yt-dlp"]));
+        let temp = download_to_temp(app_handle, "yt-dlp", url, &dest_file).await?;
+        if let Some(expected) = checksum {
+            emit_progress(app_handle, "yt-dlp", 99.0, "Verifying checksum...");
+            if let Err(e) = verify_hash(&temp, &expected) {
+                let _ = fs::remove_file(&temp);
+                if attempt < 3 {
+                    emit_progress(app_handle, "yt-dlp", 0.0, &format!("Checksum mismatch, retrying ({}/3)...", attempt + 1));
+                    continue;
+                }
+                return Err(e);
+            }
+        } else {
+            emit_progress(app_handle, "yt-dlp", 99.0, "Checksum unavailable, skipping validation");
+        }
+        safe_replace_with_backup(&dest_file, &temp)?;
+        return Ok(());
     }
-    safe_replace_with_backup(&dest_file, &temp)?;
-    Ok(())
+    Err("yt-dlp download failed".to_string())
 }
 
 async fn download_ffmpeg(app_handle: &tauri::AppHandle, dest: &PathBuf, variant: Option<String>, is_nightly: bool) -> Result<(), String> {
@@ -188,18 +198,28 @@ async fn download_ffmpeg(app_handle: &tauri::AppHandle, dest: &PathBuf, variant:
         "https://www.gyan.dev/ffmpeg/builds/ffmpeg-release-full.7z"
     };
     let checksum_url = format!("{}.sha256", url);
-    let checksum = fetch_text(app_handle, &checksum_url).await.ok()
-        .and_then(|text| filename_from_url(url).and_then(|name| find_checksum_for_names(&text, &[&name])));
 
     let archive_path = dest.join("ffmpeg-update.7z");
-    let temp = download_to_temp(app_handle, "ffmpeg", url, &archive_path).await?;
-    if let Some(expected) = checksum {
-        emit_progress(app_handle, "ffmpeg", 99.0, "Verifying checksum...");
-        verify_hash(&temp, &expected)?;
-    } else {
-        emit_progress(app_handle, "ffmpeg", 99.0, "Checksum unavailable, skipping validation");
+    for attempt in 1..=3u8 {
+        let checksum = fetch_text(app_handle, &checksum_url).await.ok()
+            .and_then(|text| filename_from_url(url).and_then(|name| find_checksum_for_names(&text, &[&name])));
+        let temp = download_to_temp(app_handle, "ffmpeg", url, &archive_path).await?;
+        if let Some(expected) = checksum {
+            emit_progress(app_handle, "ffmpeg", 99.0, "Verifying checksum...");
+            if let Err(e) = verify_hash(&temp, &expected) {
+                let _ = fs::remove_file(&temp);
+                if attempt < 3 {
+                    emit_progress(app_handle, "ffmpeg", 0.0, &format!("Checksum mismatch, retrying ({}/3)...", attempt + 1));
+                    continue;
+                }
+                return Err(e);
+            }
+        } else {
+            emit_progress(app_handle, "ffmpeg", 99.0, "Checksum unavailable, skipping validation");
+        }
+        safe_replace_with_backup(&archive_path, &temp)?;
+        break;
     }
-    safe_replace_with_backup(&archive_path, &temp)?;
     emit_progress(app_handle, "ffmpeg", 99.0, "Extracting ffmpeg.exe, ffprobe.exe from 7z...");
     let extracted = extract_from_7z(app_handle, "ffmpeg", &archive_path, dest, vec!["ffmpeg.exe", "ffprobe.exe"])?;
     emit_progress(app_handle, "ffmpeg", 100.0, &format!("Extracted: {}", extracted.join(", ")));

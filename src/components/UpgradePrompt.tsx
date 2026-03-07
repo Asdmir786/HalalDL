@@ -12,7 +12,7 @@ import {
 import { MotionButton } from "@/components/motion/MotionButton";
 import { Progress } from "@/components/ui/progress";
 import { Checkbox } from "@/components/ui/checkbox";
-import { Download, CheckCircle2, AlertCircle, Terminal, Sparkles, ChevronRight, Loader2 } from "lucide-react";
+import { Download, CheckCircle2, AlertCircle, Terminal, Sparkles, ChevronRight } from "lucide-react";
 import { useToolsStore } from "@/store/tools";
 import { useLogsStore } from "@/store/logs";
 import { AnimatePresence, motion } from "framer-motion";
@@ -30,18 +30,9 @@ const TOOL_SIZES: Record<string, number> = {
   "deno": 31
 };
 
-import { 
-  checkYtDlpVersion, 
-  checkFfmpegVersion, 
-  checkAria2Version, 
-  checkDenoVersion 
-} from "@/lib/commands";
-
 export function UpgradePrompt() {
   const [open, setOpen] = useState(false);
   const [isDownloading, setIsDownloading] = useState(false);
-  const [downloadComplete, setDownloadComplete] = useState(false);
-  const [isFinishing, setIsFinishing] = useState(false);
   const [progress, setProgress] = useState(0);
   const [logs, setLogs] = useState<string[]>([]);
   const [error, setError] = useState<string | null>(null);
@@ -50,7 +41,7 @@ export function UpgradePrompt() {
   // Track which tools are selected for download
   const [selectedTools, setSelectedTools] = useState<string[]>([]);
   
-  const { tools, updateTool } = useToolsStore();
+  const { tools } = useToolsStore();
   const { addLog } = useLogsStore();
   const appMode = String(import.meta.env.VITE_APP_MODE ?? "").trim().toUpperCase();
   const isFullMode = appMode === "FULL";
@@ -81,7 +72,6 @@ export function UpgradePrompt() {
     allToolsChecked &&
     !hasMissingForMode &&
     !isDownloading &&
-    !downloadComplete &&
     !error;
 
   const totalSize = selectedTools.reduce((acc, id) => acc + (TOOL_SIZES[id] || 0), 0);
@@ -96,22 +86,31 @@ export function UpgradePrompt() {
     }
 
     setIsDownloading(true);
-    setDownloadComplete(false);
     setError(null);
     try {
       await invoke("download_tools", { tools: toolsToInstall });
       setProgress(100);
-      setDownloadComplete(true);
       addLog({
         level: "info",
         message: "All selected tools downloaded and ready",
       });
+      try {
+        await invoke("add_to_user_path");
+      } catch (error) {
+        addLog({ level: "warn", message: `Failed to add to PATH: ${String(error)}` });
+      }
+      try {
+        localStorage.setItem("halaldl:pendingToolCongrats", JSON.stringify(toolsToInstall));
+      } catch {
+        void 0;
+      }
+      setOpen(false);
+      await relaunch();
     } catch (error: unknown) {
       const message =
         error instanceof Error ? error.message : String(error);
       setError(message);
       setIsDownloading(false);
-      setDownloadComplete(false);
       addLog({
         level: "error",
         message: `Tool download failed: ${message}`,
@@ -124,7 +123,6 @@ export function UpgradePrompt() {
     if (!open) {
       const timer = setTimeout(() => {
         setIsDownloading(false);
-        setDownloadComplete(false);
         setProgress(0);
         setLogs([]);
         setError(null);
@@ -143,8 +141,10 @@ export function UpgradePrompt() {
       const shouldAutoInstallFull = isFullMode && localStorage.getItem(fullSwitchKey) === "1";
 
       if (shouldAutoInstallFull) {
-        setSelectedTools(missingIds);
-        setOpen(true);
+        setTimeout(() => {
+          setSelectedTools(missingIds);
+          setOpen(true);
+        }, 0);
         void (async () => {
           await new Promise((r) => setTimeout(r, 250));
           await handleUpgrade(missingIds);
@@ -222,46 +222,6 @@ export function UpgradePrompt() {
       if (cleanup) cleanup();
     };
   }, [addLog]);
-
-  const handleFinish = async () => {
-    setIsFinishing(true);
-    try {
-      const checkTool = async (id: string, checkFn: () => Promise<{ version: string; variant?: string } | null>) => {
-        const result = await checkFn();
-        if (result) {
-          updateTool(id, { status: "Detected", version: result.version, variant: result.variant });
-          return true;
-        }
-        return false;
-      };
-
-      const results = await Promise.all([
-        checkTool("yt-dlp", checkYtDlpVersion),
-        checkTool("ffmpeg", checkFfmpegVersion),
-        checkTool("aria2", checkAria2Version),
-        checkTool("deno", checkDenoVersion),
-      ]);
-      try {
-        await invoke("add_to_user_path");
-      } catch (error) {
-        addLog({ level: "warn", message: `Failed to add to PATH: ${String(error)}` });
-      }
-      if (results.some(Boolean)) {
-        try {
-          localStorage.setItem("halaldl:pendingToolCongrats", JSON.stringify(selectedTools));
-        } catch (e) {
-          addLog({ level: "warn", message: `Failed to persist pending tool congrats: ${String(e)}` });
-        }
-      }
-      setOpen(false);
-      await relaunch();
-    } catch (error) {
-      addLog({ level: "error", message: `Failed to finish setup: ${String(error)}` });
-      window.location.reload();
-    } finally {
-      setIsFinishing(false);
-    }
-  };
 
   const handleStartNow = () => {
     setOpen(false);
@@ -482,21 +442,6 @@ export function UpgradePrompt() {
                   </MotionButton>
                 )}
               </>
-            )}
-            {isDownloading && downloadComplete && (
-              <MotionButton 
-                type="button" 
-                onClick={handleFinish} 
-                disabled={isFinishing}
-                className="w-full gap-2 h-12 rounded-xl bg-green-600 hover:bg-green-700 text-white shadow-lg shadow-green-500/20"
-              >
-                {isFinishing ? (
-                  <Loader2 className="w-4 h-4 animate-spin" />
-                ) : (
-                  <CheckCircle2 className="w-4 h-4" />
-                )}
-                {isFinishing ? "Finalizing Setup..." : "Complete Setup"}
-              </MotionButton>
             )}
           </DialogFooter>
         </div>
