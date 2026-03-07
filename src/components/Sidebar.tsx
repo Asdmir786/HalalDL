@@ -37,6 +37,8 @@ export function Sidebar() {
   const { currentScreen, setScreen, sidebarCollapsed, toggleSidebar } = useNavigationStore();
   const jobs = useDownloadsStore((s) => s.jobs);
   const [version, setVersion] = useState("...");
+  const appMode = String(import.meta.env.VITE_APP_MODE ?? "").trim().toUpperCase();
+  const appModeLabel = appMode === "FULL" ? "Full" : "Lite";
 
   useEffect(() => {
     getVersion().then(setVersion).catch(() => setVersion("0.3.0"));
@@ -263,7 +265,7 @@ export function Sidebar() {
 
       {!sidebarCollapsed && (
         <div className="p-4 text-[10px] text-muted-foreground/60 text-center font-mono tracking-widest uppercase">
-          v{version} Lite
+          v{version} {appModeLabel}
         </div>
       )}
     </aside>
