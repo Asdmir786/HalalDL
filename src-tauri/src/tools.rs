@@ -1,10 +1,9 @@
-use std::collections::HashMap;
 use std::fs;
 use std::path::{Path, PathBuf};
 use tauri::Manager;
 
 use crate::fs_utils::{temp_path_for, safe_replace_with_backup};
-use crate::download::{download_file, download_to_temp, emit_progress, resolve_latest_aria2_zip_url, sha256_of_path};
+use crate::download::{download_to_temp, emit_progress, resolve_latest_aria2_zip_url, sha256_of_path};
 use crate::extract::{extract_from_zip, extract_from_7z};
 
 /// Resolve the full system path of a tool using `where` (Windows).

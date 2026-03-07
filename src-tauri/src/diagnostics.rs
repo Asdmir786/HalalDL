@@ -11,7 +11,7 @@ fn normalize_output_path(path: String) -> String {
 }
 
 fn write_json(zip: &mut zip::ZipWriter<File>, name: &str, value: &Value) -> Result<(), String> {
-    let options = zip::write::FileOptions::default()
+    let options = zip::write::FileOptions::<()>::default()
         .compression_method(zip::CompressionMethod::Deflated)
         .unix_permissions(0o644);
     zip.start_file(name, options)
@@ -23,7 +23,7 @@ fn write_json(zip: &mut zip::ZipWriter<File>, name: &str, value: &Value) -> Resu
 }
 
 fn write_text(zip: &mut zip::ZipWriter<File>, name: &str, contents: &str) -> Result<(), String> {
-    let options = zip::write::FileOptions::default()
+    let options = zip::write::FileOptions::<()>::default()
         .compression_method(zip::CompressionMethod::Deflated)
         .unix_permissions(0o644);
     zip.start_file(name, options)
@@ -102,4 +102,3 @@ pub fn export_diagnostics_zip(app_handle: tauri::AppHandle, output_path: String,
     zip.finish().map_err(|e| format!("Zip finish failed: {}", e))?;
     Ok(output_path)
 }
-
