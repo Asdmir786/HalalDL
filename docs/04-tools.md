@@ -4,40 +4,38 @@
 - yt-dlp (required)
 - ffmpeg (recommended)
 - aria2 (optional)
-- Deno (optional JS runtime; Full includes it)
+- Deno (optional JS runtime)
 
 ## Tool Modes
-- Bundled (Full only)
-- System (PATH)
-- Custom path (user-selected)
+- App-managed (downloaded into `AppData/bin`)
+- System (PATH / OS install / pip)
+- Manual (user-selected executable copied into `AppData/bin`)
 
 ## Detection Order
-1. Bundled (if Full)
+1. App-managed (`AppData/bin`)
 2. System PATH
-3. Custom path (if configured)
 
 ## Behavior by Tool
 
 ### yt-dlp
 - Required
-- Full: update supported (in-app)
-- Lite: may guide user for updates (optional v1)
+- Full: enforced app-managed copy (even if pip exists)
+- Lite: required, app can install it into `AppData/bin`
 
 ### ffmpeg
 - Recommended
-- Lite: update button disabled, show guide only
-- Full: bundled (update optional later)
+- Full: enforced app-managed copy (installed into `AppData/bin`)
+- Lite: optional, can be installed into `AppData/bin` or provided via PATH
 
 ### aria2
 - Optional
-- Lite: update button disabled, show guide only
-- Full: bundled
-- Toggle: “Use aria2 if available” (off by default)
+- Full: enforced app-managed copy (installed into `AppData/bin`)
+- Lite: optional, can be installed into `AppData/bin` or provided via PATH
 
 ### Deno
 - Optional runtime
-- Full: bundled, allow “Download/Replace” optional
-- Lite: show guide + browse path
+- Full: enforced app-managed copy (installed into `AppData/bin`)
+- Lite: optional, can be installed into `AppData/bin` or provided via PATH
 
 ## Feature Enablement Rules
 - Missing tools disable dependent features with clear UI notice

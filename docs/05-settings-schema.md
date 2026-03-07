@@ -6,39 +6,27 @@
 ## Structure
 
 {
-  "ui": {
-    "theme": "dark",
-    "notifications": {
-      "enabled": true,
-      "onComplete": true,
-      "onFail": true
-    }
-  },
+  "theme": "system",
+  "accentColor": "default",
+  "notifications": true,
 
-  "downloads": {
-    "defaultFolder": "",
-    "concurrency": 1,
-    "retryCount": 2,
-    "fileCollision": "skip"
-  },
+  "maxConcurrency": 2,
+  "maxRetries": 3,
+  "maxSpeed": 0,
+  "fileCollision": "rename",
 
-  "presets": {
-    "defaultPresetId": "global-default"
-  },
+  "defaultDownloadDir": "",
+  "tempDir": "",
 
-  "tools": {
-    "mode": "system",
-    "paths": {
-      "ytDlp": "",
-      "ffmpeg": "",
-      "ffprobe": "",
-      "aria2": "",
-      "deno": ""
-    },
-    "useAria2": false
-  }
+  "autoClearFinished": false,
+  "autoCopyFile": true,
+  "downloadsAddMode": "queue",
+  "downloadsSelectedPreset": "default",
+
+  "historyRetention": 0
 }
 
 ## Notes
-- tool mode values: "bundled" | "system" | "custom"
+- maxSpeed is in KB/s (0 = unlimited)
+- downloadsAddMode values: "queue" | "start"
 - fileCollision values: "skip" | "rename" | "overwrite"

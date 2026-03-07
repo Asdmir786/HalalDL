@@ -41,7 +41,7 @@ export function Sidebar() {
   const appModeLabel = appMode === "FULL" ? "Full" : "Lite";
 
   useEffect(() => {
-    getVersion().then(setVersion).catch(() => setVersion("0.3.0"));
+    getVersion().then(setVersion).catch(() => setVersion("unknown"));
   }, []);
 
   const activeCount = useMemo(

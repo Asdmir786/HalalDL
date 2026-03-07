@@ -34,10 +34,10 @@ This batch moves HalalDL from a static UI to a functional, state-persisting appl
 - **Frontend**: Uses React 19 + TypeScript 5.9.
 
 ### Dependencies
-- `@tauri-apps/plugin-store`: ~2.4.1
-- `@tauri-apps/plugin-shell`: ~2.3.3
-- `@tauri-apps/plugin-dialog`: ~2.4.2
-- `@tauri-apps/plugin-fs`: ~2.4.4
+- `@tauri-apps/plugin-store`: ~2.4.2
+- `@tauri-apps/plugin-shell`: ~2.3.5
+- `@tauri-apps/plugin-dialog`: ~2.6.0
+- `@tauri-apps/plugin-fs`: ~2.4.5
 
 ## Testing Protocols
 

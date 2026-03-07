@@ -132,7 +132,7 @@ export function ToolsScreen() {
                   <Info className="w-4 h-4 shrink-0 text-primary" />
                   <span>
                     <strong className="text-foreground">Lite Mode</strong>{" "}
-                    &mdash; Tools are downloaded to the app directory. Use the
+                    &mdash; Tools are downloaded to your AppData bin folder. Use the
                     overflow menu to set custom paths or visit tool websites.
                   </span>
                 </div>
