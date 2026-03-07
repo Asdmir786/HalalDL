@@ -121,17 +121,6 @@ pub async fn resolve_latest_aria2_zip_url(app_handle: &tauri::AppHandle) -> Resu
     Err("No matching aria2 Windows zip asset found".to_string())
 }
 
-pub async fn download_file(
-    app_handle: &tauri::AppHandle,
-    tool_name: &str,
-    url: &str,
-    dest: &PathBuf,
-) -> Result<(), String> {
-    let temp_dest = download_to_temp(app_handle, tool_name, url, dest).await?;
-    safe_replace_with_backup(dest, &temp_dest)?;
-    Ok(())
-}
-
 pub async fn download_to_temp(
     app_handle: &tauri::AppHandle,
     tool_name: &str,
