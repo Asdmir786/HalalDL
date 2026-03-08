@@ -29,6 +29,7 @@ export {
   openFolder,
   openFile,
   copyFilesToClipboard,
+  readTextFromClipboard,
   deleteFile,
   renameFile,
 } from "./file-commands";

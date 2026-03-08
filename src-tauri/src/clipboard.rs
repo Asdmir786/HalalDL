@@ -274,3 +274,70 @@ pub fn copy_files_to_clipboard(paths: Vec<String>) -> Result<(), String> {
         Err("copy_files_to_clipboard is only supported on Windows".to_string())
     }
 }
+
+#[tauri::command]
+pub fn read_text_from_clipboard() -> Result<String, String> {
+    #[cfg(target_os = "windows")]
+    {
+        use std::mem::size_of;
+        use windows_sys::Win32::Foundation::GetLastError;
+        use windows_sys::Win32::System::DataExchange::{CloseClipboard, GetClipboardData, IsClipboardFormatAvailable, OpenClipboard};
+        use windows_sys::Win32::System::Memory::{GlobalLock, GlobalUnlock};
+
+        const CF_UNICODETEXT: u32 = 13;
+
+        let mut opened = false;
+        for _ in 0..5 {
+            if unsafe { OpenClipboard(std::ptr::null_mut()) } != 0 {
+                opened = true;
+                break;
+            }
+            std::thread::sleep(std::time::Duration::from_millis(100));
+        }
+
+        if !opened {
+            return Err(format!("OpenClipboard failed: {}", unsafe { GetLastError() }));
+        }
+
+        let out = (|| unsafe {
+            if IsClipboardFormatAvailable(CF_UNICODETEXT) == 0 {
+                return Ok(String::new());
+            }
+
+            let handle = GetClipboardData(CF_UNICODETEXT);
+            if handle.is_null() {
+                return Ok(String::new());
+            }
+
+            let locked = GlobalLock(handle) as *const u16;
+            if locked.is_null() {
+                return Err(format!("GlobalLock failed: {}", GetLastError()));
+            }
+
+            let mut len: usize = 0;
+            let max_units: usize = 1024 * 1024;
+            while len < max_units {
+                let v = *locked.add(len);
+                if v == 0 {
+                    break;
+                }
+                len += 1;
+            }
+
+            let bytes_len = len.saturating_mul(size_of::<u16>());
+            let slice = std::slice::from_raw_parts(locked, bytes_len / size_of::<u16>());
+            let text = String::from_utf16_lossy(slice);
+
+            let _ = GlobalUnlock(handle);
+            Ok(text)
+        })();
+
+        unsafe { CloseClipboard() };
+        out
+    }
+
+    #[cfg(not(target_os = "windows"))]
+    {
+        Err("read_text_from_clipboard is only supported on Windows".to_string())
+    }
+}

@@ -6,10 +6,12 @@ import { Select, SelectContent, SelectGroup, SelectItem, SelectLabel, SelectSepa
 import { DownloadOutputOptions } from "./DownloadOutputOptions";
 import { DuplicateWarning } from "./DuplicateWarning";
 import { Preset } from "@/store/presets";
+import { readTextFromClipboard } from "@/lib/commands";
 
 interface DownloadInputSectionProps {
   url: string;
   setUrl: (val: string) => void;
+  autoPasteLinks: boolean;
   onAdd: () => void;
   selectedPreset: string;
   onPresetChange: (val: string) => void;
@@ -32,8 +34,45 @@ interface DownloadInputSectionProps {
 
 const GROUP_ORDER = ["Recommended", "Compatibility", "Editors", "Editors Pro", "Web", "Video", "Audio", "Other", "Custom"] as const;
 
+const SUPPORTED_AUTO_PASTE_HOSTS = [
+  "youtube.com",
+  "youtu.be",
+  "tiktok.com",
+  "instagram.com",
+  "facebook.com",
+  "fb.watch",
+  "x.com",
+  "twitter.com",
+  "twitch.tv",
+  "vimeo.com",
+  "soundcloud.com",
+];
+
+function pickSupportedUrlFromText(raw: string): string | null {
+  const trimmed = raw.trim();
+  if (!trimmed) return null;
+
+  const match = trimmed.match(/https?:\/\/\S+/i);
+  const candidate = (match ? match[0] : trimmed).replace(/[)\].,;]+$/, "");
+
+  let url: URL;
+  try {
+    url = new URL(candidate);
+  } catch {
+    return null;
+  }
+
+  if (url.protocol !== "http:" && url.protocol !== "https:") return null;
+
+  const host = url.hostname.toLowerCase();
+  const supported = SUPPORTED_AUTO_PASTE_HOSTS.some((h) => host === h || host.endsWith(`.${h}`));
+  if (!supported) return null;
+
+  return url.toString();
+}
+
 export function DownloadInputSection({
-  url, setUrl, onAdd,
+  url, setUrl, autoPasteLinks, onAdd,
   selectedPreset, onPresetChange, presets,
   addMode, setAddMode,
   showOutputConfig, onToggleOutputConfig,
@@ -71,6 +110,23 @@ export function DownloadInputSection({
     setDupDismissed(false);
   }, [setUrl]);
 
+  const handleUrlFocus = useCallback((el: HTMLInputElement | null) => {
+    if (!autoPasteLinks) return;
+    if (url.trim()) return;
+
+    readTextFromClipboard()
+      .then((text) => {
+        if (!el) return;
+        if (el.value.trim()) return;
+        const supportedUrl = pickSupportedUrlFromText(text);
+        if (!supportedUrl) return;
+        handleUrlChange(supportedUrl);
+      })
+      .catch(() => {
+        void 0;
+      });
+  }, [autoPasteLinks, handleUrlChange, url]);
+
   return (
     <div className="flex flex-col gap-3 bg-muted/30 p-3 rounded-xl border border-muted/50 shadow-sm glass-card">
       <div className="flex flex-col lg:flex-row gap-3">
@@ -79,6 +135,7 @@ export function DownloadInputSection({
             placeholder="Paste video or playlist URL here..."
             value={url}
             onChange={(e) => handleUrlChange(e.target.value)}
+            onFocus={(e) => handleUrlFocus(e.currentTarget)}
             onKeyDown={(e) => e.key === "Enter" && onAdd()}
             className="bg-background border-muted shadow-sm focus-visible:ring-1 h-10"
           />

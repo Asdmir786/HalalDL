@@ -341,6 +341,7 @@ export function DownloadsScreen() {
             <DownloadInputSection 
               url={url}
               setUrl={setUrl}
+              autoPasteLinks={settings.autoPasteLinks}
               onAdd={handleAdd}
               selectedPreset={selectedPreset}
               onPresetChange={handlePresetChange}

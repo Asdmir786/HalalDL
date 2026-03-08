@@ -34,6 +34,7 @@ export interface Settings {
   // Behavior
   autoClearFinished: boolean;
   autoCopyFile: boolean;
+  autoPasteLinks: boolean;
   downloadsAddMode: DownloadsAddMode;
   downloadsSelectedPreset: string;
 
@@ -60,6 +61,7 @@ export const DEFAULT_SETTINGS: Settings = {
   tempDir: "",
   autoClearFinished: false,
   autoCopyFile: true,
+  autoPasteLinks: true,
   downloadsAddMode: "queue",
   downloadsSelectedPreset: "default",
   historyRetention: 0,

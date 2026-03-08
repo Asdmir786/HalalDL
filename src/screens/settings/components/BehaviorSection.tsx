@@ -1,4 +1,4 @@
-import { Bell, Clipboard, Trash2, FileWarning, History } from "lucide-react";
+import { Bell, Clipboard, Trash2, FileWarning, History, Link2 } from "lucide-react";
 import { Switch } from "@/components/ui/switch";
 import {
   Select,
@@ -18,6 +18,8 @@ interface BehaviorSectionProps {
   onAutoClearChange: (val: boolean) => void;
   autoCopyFile: boolean;
   onAutoCopyChange: (val: boolean) => void;
+  autoPasteLinks: boolean;
+  onAutoPasteLinksChange: (val: boolean) => void;
   fileCollision: FileCollisionAction;
   onFileCollisionChange: (val: FileCollisionAction) => void;
   historyRetention: number;
@@ -28,6 +30,7 @@ export function BehaviorSection({
   notifications, onNotificationsChange,
   autoClearFinished, onAutoClearChange,
   autoCopyFile, onAutoCopyChange,
+  autoPasteLinks, onAutoPasteLinksChange,
   fileCollision, onFileCollisionChange,
   historyRetention, onHistoryRetentionChange,
 }: BehaviorSectionProps) {
@@ -43,6 +46,10 @@ export function BehaviorSection({
 
       <SettingRow icon={Clipboard} label="Auto-Copy File" description="Copy downloaded file to clipboard when complete.">
         <Switch checked={autoCopyFile} onCheckedChange={onAutoCopyChange} />
+      </SettingRow>
+
+      <SettingRow icon={Link2} label="Auto-Paste Links" description="When the URL box is focused, paste a supported link from clipboard.">
+        <Switch checked={autoPasteLinks} onCheckedChange={onAutoPasteLinksChange} />
       </SettingRow>
 
       <SettingRow icon={FileWarning} label="File Collision" description="What to do when a file with the same name exists.">

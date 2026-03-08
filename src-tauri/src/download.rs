@@ -6,7 +6,7 @@ use futures_util::StreamExt;
 use tauri::Emitter;
 use sha2::{Digest, Sha256};
 
-use crate::fs_utils::{temp_path_for, safe_replace_with_backup};
+use crate::fs_utils::temp_path_for;
 
 #[derive(Clone, serde::Serialize)]
 pub struct DownloadProgress {

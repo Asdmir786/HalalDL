@@ -148,6 +148,10 @@ export async function copyFilesToClipboard(paths: string[]) {
   await invoke("copy_files_to_clipboard", { paths: resolved });
 }
 
+export async function readTextFromClipboard(): Promise<string> {
+  return await invoke<string>("read_text_from_clipboard");
+}
+
 export async function deleteFile(path: string) {
   await invoke("delete_file", { path });
 }

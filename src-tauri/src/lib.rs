@@ -40,6 +40,7 @@ pub fn run() {
             file_commands::delete_file,
             file_commands::rename_file,
             clipboard::copy_files_to_clipboard,
+            clipboard::read_text_from_clipboard,
             download::download_url_to_file,
             tools::resolve_system_tool_path,
             tools::update_tool_at_path,

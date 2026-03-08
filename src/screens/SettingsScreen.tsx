@@ -210,6 +210,7 @@ export function SettingsScreen() {
               notifications: defaults.notifications,
               autoClearFinished: defaults.autoClearFinished,
               autoCopyFile: defaults.autoCopyFile,
+              autoPasteLinks: defaults.autoPasteLinks,
               fileCollision: defaults.fileCollision,
               historyRetention: defaults.historyRetention,
             }
@@ -286,6 +287,8 @@ export function SettingsScreen() {
               onAutoClearChange={(v) => setDraftValue("autoClearFinished", v)}
               autoCopyFile={draftSettings.autoCopyFile}
               onAutoCopyChange={(v) => setDraftValue("autoCopyFile", v)}
+              autoPasteLinks={draftSettings.autoPasteLinks}
+              onAutoPasteLinksChange={(v) => setDraftValue("autoPasteLinks", v)}
               fileCollision={draftSettings.fileCollision}
               onFileCollisionChange={(v) => setDraftValue("fileCollision", v)}
               historyRetention={draftSettings.historyRetention}
