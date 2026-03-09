@@ -1,5 +1,5 @@
 import { Clock3, Play, Plus, Settings2, ChevronDown, ChevronUp } from "lucide-react";
-import { useCallback, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { MotionButton } from "@/components/motion/MotionButton";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectGroup, SelectItem, SelectLabel, SelectSeparator, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -7,6 +7,7 @@ import { DownloadOutputOptions } from "./DownloadOutputOptions";
 import { DuplicateWarning } from "./DuplicateWarning";
 import { Preset } from "@/store/presets";
 import { readTextFromClipboard } from "@/lib/commands";
+import { probeMediaUrl, type UrlProbeResult } from "@/lib/downloader";
 
 interface DownloadInputSectionProps {
   url: string;
@@ -82,6 +83,11 @@ export function DownloadInputSection({
   isCustomPreset,
   defaultDownloadDir
 }: DownloadInputSectionProps) {
+  const [probeState, setProbeState] = useState<{ url: string; result: UrlProbeResult | null }>({
+    url: "",
+    result: null,
+  });
+
   const getGroupAndLabel = (preset: Preset): { group: string; label: string } => {
     const parts = preset.name.split(" — ");
     if (parts.length >= 2) return { group: parts[0], label: parts.slice(1).join(" — ") };
@@ -109,6 +115,36 @@ export function DownloadInputSection({
     setUrl(val);
     setDupDismissed(false);
   }, [setUrl]);
+
+  useEffect(() => {
+    const trimmed = url.trim();
+    if (!trimmed) return;
+
+    let cancelled = false;
+
+    const timer = window.setTimeout(() => {
+      probeMediaUrl(trimmed)
+        .then((result) => {
+          if (!cancelled) setProbeState({ url: trimmed, result });
+        })
+        .catch(() => {
+          if (!cancelled) setProbeState({ url: trimmed, result: "unknown" });
+        });
+    }, 450);
+
+    return () => {
+      cancelled = true;
+      window.clearTimeout(timer);
+    };
+  }, [url]);
+
+  const trimmedUrl = url.trim();
+  const probeStatus: "idle" | "checking" | UrlProbeResult =
+    !trimmedUrl
+      ? "idle"
+      : probeState.url !== trimmedUrl || probeState.result === null
+        ? "checking"
+        : probeState.result;
 
   const handleUrlFocus = useCallback((el: HTMLInputElement | null) => {
     if (!autoPasteLinks) return;
@@ -205,6 +241,26 @@ export function DownloadInputSection({
 
       {url.trim() && !dupDismissed && (
         <DuplicateWarning key={url.trim()} url={url.trim()} onDismiss={() => setDupDismissed(true)} />
+      )}
+
+      {probeStatus !== "idle" && (
+        <div
+          className={
+            probeStatus === "supported"
+              ? "text-[11px] text-emerald-600"
+              : probeStatus === "checking"
+                ? "text-[11px] text-muted-foreground"
+                : "text-[11px] text-amber-600"
+          }
+        >
+          {probeStatus === "checking"
+            ? "Checking link..."
+            : probeStatus === "supported"
+              ? "Link looks supported."
+              : probeStatus === "unsupported"
+                ? "This link may not be supported."
+                : "Could not verify this link right now. It may still work or may require login."}
+        </div>
       )}
 
       <div className="flex justify-center -mt-1">
