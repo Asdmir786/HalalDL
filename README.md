@@ -37,13 +37,21 @@ The project tries to keep the strong parts of the CLI ecosystem while making the
 
 ![HalalDL downloads screen](./docs/assets/screenshots/halaldl-downloads.png)
 
-### Presets And Tools
+### Presets
 
-![HalalDL presets and tools screens](./docs/assets/screenshots/halaldl-presets-tools.png)
+![HalalDL presets screen](./docs/assets/screenshots/halaldl-presets.png)
 
-### History And Logs
+### Tools
 
-![HalalDL history and logs screens](./docs/assets/screenshots/halaldl-history-logs.png)
+![HalalDL tools screen](./docs/assets/screenshots/halaldl-tools.png)
+
+### History
+
+![HalalDL history screen](./docs/assets/screenshots/halaldl-history.png)
+
+### Logs
+
+![HalalDL logs screen](./docs/assets/screenshots/halaldl-logs.png)
 
 ## Download Flow
 
