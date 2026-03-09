@@ -78,6 +78,15 @@ jobs:
         shell: pwsh
         run: pnpm build:all
 
+      - name: Generate SHA256 checksums
+        shell: pwsh
+        run: |
+          $hashLines = Get-ChildItem -Path out -File | ForEach-Object {
+            $hash = Get-FileHash -Path $_.FullName -Algorithm SHA256
+            "{0} *{1}" -f $hash.Hash.ToLowerInvariant(), $_.Name
+          }
+          $hashLines | Set-Content -Path out/SHA256SUMS.txt -Encoding ascii
+
       - name: sccache stats (post)
         if: always()
         shell: pwsh
