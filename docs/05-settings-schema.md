@@ -20,7 +20,7 @@
 
   "autoClearFinished": false,
   "autoCopyFile": true,
-  "downloadsAddMode": "queue",
+  "downloadsAddMode": "start",
   "downloadsSelectedPreset": "default",
 
   "historyRetention": 0

@@ -62,7 +62,7 @@ export const DEFAULT_SETTINGS: Settings = {
   autoClearFinished: false,
   autoCopyFile: true,
   autoPasteLinks: true,
-  downloadsAddMode: "queue",
+  downloadsAddMode: "start",
   downloadsSelectedPreset: "default",
   historyRetention: 0,
 };

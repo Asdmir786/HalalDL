@@ -117,6 +117,18 @@ export function usePersistenceInit(): MutableRefObject<boolean> {
         const savedSettings = await storage.getSettings<Settings>();
         if (savedSettings) {
           const mergedSettings = { ...DEFAULT_SETTINGS, ...savedSettings };
+          try {
+            const addModeMigrationKey = "halaldl:addModeDefaultMigrated";
+            if (
+              localStorage.getItem(addModeMigrationKey) !== "1" &&
+              mergedSettings.downloadsAddMode === "queue"
+            ) {
+              mergedSettings.downloadsAddMode = "start";
+              localStorage.setItem(addModeMigrationKey, "1");
+            }
+          } catch {
+            void 0;
+          }
           if (!mergedSettings.defaultDownloadDir) {
             try {
               mergedSettings.defaultDownloadDir = await downloadDir();
