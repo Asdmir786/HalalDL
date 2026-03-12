@@ -3,13 +3,55 @@ import { resolveTool, ytDlpEnv } from "./tool-env";
 
 export type UrlProbeResult = "supported" | "unsupported" | "unknown";
 
-export async function probeMediaUrl(url: string): Promise<UrlProbeResult> {
+const FAST_SUPPORTED_HOSTS = [
+  "youtube.com",
+  "youtu.be",
+  "tiktok.com",
+  "instagram.com",
+  "facebook.com",
+  "fb.watch",
+  "x.com",
+  "twitter.com",
+  "twitch.tv",
+  "vimeo.com",
+  "soundcloud.com",
+];
+
+function parseProbeUrl(url: string): URL | null {
   try {
     const parsed = new URL(url);
     if (parsed.protocol !== "http:" && parsed.protocol !== "https:") {
-      return "unsupported";
+      return null;
     }
+    return parsed;
   } catch {
+    return null;
+  }
+}
+
+export function getProbeHostLabel(url: string): string | null {
+  const parsed = parseProbeUrl(url);
+  if (!parsed) return null;
+  return parsed.hostname.replace(/^www\./i, "").toLowerCase();
+}
+
+export function quickProbeMediaUrl(url: string): UrlProbeResult {
+  const parsed = parseProbeUrl(url);
+  if (!parsed) {
+    return "unsupported";
+  }
+
+  const host = parsed.hostname.toLowerCase();
+  const isKnownHost = FAST_SUPPORTED_HOSTS.some(
+    (candidate) => host === candidate || host.endsWith(`.${candidate}`)
+  );
+
+  return isKnownHost ? "supported" : "unknown";
+}
+
+export async function probeMediaUrl(url: string): Promise<UrlProbeResult> {
+  const quickResult = quickProbeMediaUrl(url);
+  if (quickResult === "unsupported") {
     return "unsupported";
   }
 

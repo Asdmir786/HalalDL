@@ -1,5 +1,16 @@
-import { Clock3, Play, Plus, Settings2, ChevronDown, ChevronUp } from "lucide-react";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import {
+  AlertTriangle,
+  CheckCircle2,
+  ChevronDown,
+  ChevronUp,
+  Clock3,
+  LoaderCircle,
+  Play,
+  Plus,
+  Settings2,
+  Sparkles,
+} from "lucide-react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { MotionButton } from "@/components/motion/MotionButton";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectGroup, SelectItem, SelectLabel, SelectSeparator, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -7,7 +18,12 @@ import { DownloadOutputOptions } from "./DownloadOutputOptions";
 import { DuplicateWarning } from "./DuplicateWarning";
 import { Preset } from "@/store/presets";
 import { readTextFromClipboard } from "@/lib/commands";
-import { probeMediaUrl, type UrlProbeResult } from "@/lib/downloader";
+import {
+  getProbeHostLabel,
+  probeMediaUrl,
+  quickProbeMediaUrl,
+  type UrlProbeResult,
+} from "@/lib/downloader";
 
 interface DownloadInputSectionProps {
   url: string;
@@ -83,10 +99,21 @@ export function DownloadInputSection({
   isCustomPreset,
   defaultDownloadDir
 }: DownloadInputSectionProps) {
-  const [probeState, setProbeState] = useState<{ url: string; result: UrlProbeResult | null }>({
+  const [probeState, setProbeState] = useState<{
+    url: string;
+    result: UrlProbeResult | null;
+    pending: boolean;
+    verified: boolean;
+    host: string | null;
+  }>({
     url: "",
     result: null,
+    pending: false,
+    verified: false,
+    host: null,
   });
+  const probeCacheRef = useRef(new Map<string, UrlProbeResult>());
+  const probeRequestRef = useRef(0);
 
   const getGroupAndLabel = (preset: Preset): { group: string; label: string } => {
     const parts = preset.name.split(" — ");
@@ -118,22 +145,80 @@ export function DownloadInputSection({
 
   useEffect(() => {
     const trimmed = url.trim();
-    if (!trimmed) return;
+    if (!trimmed) {
+      setProbeState({
+        url: "",
+        result: null,
+        pending: false,
+        verified: false,
+        host: null,
+      });
+      return;
+    }
 
-    let cancelled = false;
+    const host = getProbeHostLabel(trimmed);
+    const quickResult = quickProbeMediaUrl(trimmed);
+    const cachedResult = probeCacheRef.current.get(trimmed);
+
+    if (cachedResult) {
+      setProbeState({
+        url: trimmed,
+        result: cachedResult,
+        pending: false,
+        verified: true,
+        host,
+      });
+      return;
+    }
+
+    if (quickResult === "unsupported") {
+      setProbeState({
+        url: trimmed,
+        result: "unsupported",
+        pending: false,
+        verified: false,
+        host,
+      });
+      return;
+    }
+
+    const requestId = probeRequestRef.current + 1;
+    probeRequestRef.current = requestId;
+
+    setProbeState({
+      url: trimmed,
+      result: quickResult,
+      pending: true,
+      verified: false,
+      host,
+    });
 
     const timer = window.setTimeout(() => {
       probeMediaUrl(trimmed)
         .then((result) => {
-          if (!cancelled) setProbeState({ url: trimmed, result });
+          probeCacheRef.current.set(trimmed, result);
+          if (probeRequestRef.current !== requestId) return;
+          setProbeState({
+            url: trimmed,
+            result,
+            pending: false,
+            verified: true,
+            host,
+          });
         })
         .catch(() => {
-          if (!cancelled) setProbeState({ url: trimmed, result: "unknown" });
+          if (probeRequestRef.current !== requestId) return;
+          setProbeState({
+            url: trimmed,
+            result: "unknown",
+            pending: false,
+            verified: true,
+            host,
+          });
         });
-    }, 450);
+    }, quickResult === "supported" ? 120 : 180);
 
     return () => {
-      cancelled = true;
       window.clearTimeout(timer);
     };
   }, [url]);
@@ -142,9 +227,83 @@ export function DownloadInputSection({
   const probeStatus: "idle" | "checking" | UrlProbeResult =
     !trimmedUrl
       ? "idle"
-      : probeState.url !== trimmedUrl || probeState.result === null
+      : probeState.url !== trimmedUrl || probeState.pending || probeState.result === null
         ? "checking"
         : probeState.result;
+
+  const probeMessage = useMemo(() => {
+    if (probeStatus === "idle") return null;
+
+    const hostLabel = probeState.host ?? "this link";
+    const hostText = probeState.host ? ` for ${probeState.host}` : "";
+
+    if (probeStatus === "checking") {
+      if (probeState.result === "supported") {
+        return {
+          title: "Link looks good",
+          description: `${hostLabel} was recognized instantly. Running a quick yt-dlp check now.`,
+          tone:
+            "border-emerald-500/25 bg-emerald-500/8 text-emerald-700 dark:text-emerald-300",
+          iconTone: "bg-emerald-500/15 text-emerald-600 dark:text-emerald-300",
+          badge: "Verifying",
+          icon: Sparkles,
+          spin: false,
+        };
+      }
+
+      return {
+        title: "Checking link",
+        description: `Running a quick compatibility check${hostText}.`,
+        tone:
+          "border-sky-500/25 bg-sky-500/8 text-sky-700 dark:text-sky-300",
+        iconTone: "bg-sky-500/15 text-sky-600 dark:text-sky-300",
+        badge: "Live",
+        icon: LoaderCircle,
+        spin: true,
+      };
+    }
+
+    if (probeStatus === "supported") {
+      return {
+        title: "Ready to download",
+        description: probeState.verified
+          ? `Verified with yt-dlp${hostText}.`
+          : `${hostLabel} looks supported.`,
+        tone:
+          "border-emerald-500/25 bg-emerald-500/8 text-emerald-700 dark:text-emerald-300",
+        iconTone: "bg-emerald-500/15 text-emerald-600 dark:text-emerald-300",
+        badge: probeState.verified ? "Verified" : "Fast match",
+        icon: CheckCircle2,
+        spin: false,
+      };
+    }
+
+    if (probeStatus === "unsupported") {
+      return {
+        title: "Link looks invalid",
+        description: probeState.host
+          ? `This URL on ${probeState.host} does not look compatible.`
+          : "Paste a full http or https media URL.",
+        tone:
+          "border-amber-500/25 bg-amber-500/8 text-amber-700 dark:text-amber-300",
+        iconTone: "bg-amber-500/15 text-amber-600 dark:text-amber-300",
+        badge: "Needs fix",
+        icon: AlertTriangle,
+        spin: false,
+      };
+    }
+
+    return {
+      title: "Could not verify yet",
+      description: `This link may still work, but it could require login, cookies, or a slower extractor${hostText}.`,
+      tone:
+        "border-zinc-500/20 bg-zinc-500/8 text-muted-foreground",
+      iconTone: "bg-zinc-500/15 text-foreground/80",
+      badge: "Unknown",
+      icon: AlertTriangle,
+      spin: false,
+    };
+  }, [probeState.host, probeState.result, probeState.verified, probeStatus]);
 
   const handleUrlFocus = useCallback((el: HTMLInputElement | null) => {
     if (!autoPasteLinks) return;
@@ -243,23 +402,27 @@ export function DownloadInputSection({
         <DuplicateWarning key={url.trim()} url={url.trim()} onDismiss={() => setDupDismissed(true)} />
       )}
 
-      {probeStatus !== "idle" && (
+      {probeMessage && (
         <div
-          className={
-            probeStatus === "supported"
-              ? "text-[11px] text-emerald-600"
-              : probeStatus === "checking"
-                ? "text-[11px] text-muted-foreground"
-                : "text-[11px] text-amber-600"
-          }
+          aria-live="polite"
+          className={`rounded-xl border px-3 py-2.5 shadow-sm transition-colors ${probeMessage.tone}`}
         >
-          {probeStatus === "checking"
-            ? "Checking link..."
-            : probeStatus === "supported"
-              ? "Link looks supported."
-              : probeStatus === "unsupported"
-                ? "This link may not be supported."
-                : "Could not verify this link right now. It may still work or may require login."}
+          <div className="flex items-start gap-2.5">
+            <div className={`mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-full ${probeMessage.iconTone}`}>
+              <probeMessage.icon className={`h-4 w-4 ${probeMessage.spin ? "animate-spin" : ""}`} />
+            </div>
+            <div className="min-w-0 flex-1">
+              <div className="flex items-center gap-2">
+                <p className="truncate text-[12px] font-semibold">{probeMessage.title}</p>
+                <span className="rounded-full border border-current/15 bg-background/50 px-2 py-0.5 text-[9px] font-bold uppercase tracking-[0.18em]">
+                  {probeMessage.badge}
+                </span>
+              </div>
+              <p className="mt-1 text-[11px] leading-5 opacity-90">
+                {probeMessage.description}
+              </p>
+            </div>
+          </div>
         </div>
       )}
 
