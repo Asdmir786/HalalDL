@@ -101,7 +101,7 @@ jobs:
         uses: softprops/action-gh-release@v2
         with:
           files: out/*
-          draft: ${{ github.event_name == 'workflow_dispatch' && inputs.draft || true }}
+          draft: ${{ github.event_name != 'workflow_dispatch' || inputs.draft }}
           prerelease: false
 
       - name: Upload logs (always)

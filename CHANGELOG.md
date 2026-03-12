@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.3.8 - 2026-03-12
+- **Downloads**: Added a non-blocking link verification hint in the URL box. Pasted or typed links now show `Checking link...` and then a lightweight support status without blocking the Add flow.
+- **Clipboard**: Kept instant auto-paste for supported hosts while making the UX clearer when a link cannot be verified immediately or may require login.
+- **Release**: Fixed the GitHub release workflow to trigger on `v*` tags, generate `SHA256SUMS.txt`, and stop overwriting manual release notes.
+- **Project**: Polished the GitHub landing page with better README onboarding, screenshots, community files, issue templates, PR template, and security guidance via GitHub private vulnerability reporting.
+
 ## 0.3.7 - 2026-03-01
 - **History**: Added a brand new **History Screen** with a complete media library view, file management, and playback integration.
 - **UI/UX**: Added **Accent Color** customization in Settings to personalize the app's appearance.
