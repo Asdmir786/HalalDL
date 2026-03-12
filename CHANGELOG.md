@@ -5,7 +5,12 @@
 - **Tools**: Removed the duplicate per-tool success popup after installs/updates. Tool setup now stays in a single modal flow instead of stacking a second congratulations dialog on restart.
 - **Tools**: Unified startup setup and Tools-screen transfers around the same progress UI, with cleaner per-tool rows, shared logs, and a faster overall dialog flow.
 - **Tools**: Batch installs and updates now return per-tool backend results, so mixed success/failure states can be shown in one modal instead of collapsing into a generic single error.
+- **Downloads**: `Start now` is now the default add mode for new installs instead of `Queue`.
+- **Downloads**: Existing installs are migrated once from the old `Queue` default so the Downloads screen picks up the new default behavior immediately.
+- **Downloads/UI**: Reworked the URL link-check experience with a proper status card, clearer states, and better messaging for supported, unsupported, and unknown links.
+- **Downloads/UI**: Made link validation feel faster with instant host recognition, shorter debounce, and cached repeat checks for the same URL.
 - **UX**: Reduced the startup splash delay so setup appears faster in practice.
+- **Release**: Fixed stale Tauri app version metadata so `0.3.9` release builds and artifacts no longer fall back to `0.3.8`.
 - **Refactor**: Centralized Lite vs Full tool-mode helpers and local app-managed tool detection to make the setup/update flow easier to maintain.
 
 ## 0.3.8 - 2026-03-12
