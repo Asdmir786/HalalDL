@@ -10,8 +10,11 @@ HalalDL is a privacy-focused Windows desktop app for downloading video or audio 
 
 - **Best for most users:** download the latest release and choose `HalalDL-Full-...-setup.exe`
 - **Best for power users:** choose `HalalDL-Lite-...-setup.exe` if you want to manage `yt-dlp`, `ffmpeg`, and optional tools yourself
+- **WinGet:** `winget install --id Asdmir786.HalalDL`
 - **Platform today:** Windows 10 and Windows 11, x64
 - **Use it responsibly:** only download content you are allowed to access and save; respect platform rules, copyright, and local law
+
+WinGet catalog updates can lag behind GitHub Releases, so the latest GitHub release is the fastest path to a new version.
 
 ## Why People Try HalalDL
 

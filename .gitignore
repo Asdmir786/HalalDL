@@ -31,3 +31,4 @@ dist-ssr
 # Build/Output
 out/
 tsconfig.tsbuildinfo
+manifests/
