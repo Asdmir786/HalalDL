@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.3.9 - 2026-03-12
+- **Tools**: Full Mode setup no longer waits for the four-tool startup scan before opening the install flow. Startup now checks the local app-managed bin first and can go straight into setup.
+- **Tools**: Removed the duplicate per-tool success popup after installs/updates. Tool setup now stays in a single modal flow instead of stacking a second congratulations dialog on restart.
+- **Tools**: Unified startup setup and Tools-screen transfers around the same progress UI, with cleaner per-tool rows, shared logs, and a faster overall dialog flow.
+- **Tools**: Batch installs and updates now return per-tool backend results, so mixed success/failure states can be shown in one modal instead of collapsing into a generic single error.
+- **UX**: Reduced the startup splash delay so setup appears faster in practice.
+- **Refactor**: Centralized Lite vs Full tool-mode helpers and local app-managed tool detection to make the setup/update flow easier to maintain.
+
 ## 0.3.8 - 2026-03-12
 - **Downloads**: Added a non-blocking link verification hint in the URL box. Pasted or typed links now show `Checking link...` and then a lightweight support status without blocking the Add flow.
 - **Clipboard**: Kept instant auto-paste for supported hosts while making the UX clearer when a link cannot be verified immediately or may require login.
