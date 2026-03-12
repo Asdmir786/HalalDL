@@ -5,6 +5,7 @@ import { open as openDialog } from "@tauri-apps/plugin-dialog";
 import { useLogsStore } from "@/store/logs";
 import { useToolsStore } from "@/store/tools";
 import { revealInExplorer } from "./file-commands";
+import type { ToolBatchResult } from "@/lib/tools/tool-batch";
 
 export async function updateToolAtPath(tool: string, destDir: string, variant?: string, channel?: string): Promise<string> {
   const { addLog } = useLogsStore.getState();
@@ -12,10 +13,10 @@ export async function updateToolAtPath(tool: string, destDir: string, variant?: 
   return invoke<string>("update_tool_at_path", { tool, destDir, variant: variant ?? null, channel: channel ?? null });
 }
 
-export async function downloadTools(tools: string[], channels?: Record<string, string>): Promise<string> {
+export async function downloadTools(tools: string[], channels?: Record<string, string>): Promise<ToolBatchResult> {
   const { addLog } = useLogsStore.getState();
   addLog({ level: "command", message: `Downloading tools: ${tools.join(", ") || "(none)"}`, command: `invoke("download_tools", { tools: ${JSON.stringify(tools)} })` });
-  return await invoke("download_tools", { tools, channels: channels ?? null });
+  return await invoke<ToolBatchResult>("download_tools", { tools, channels: channels ?? null });
 }
 
 export async function stageManualTool(tool: string, source: string): Promise<string> {

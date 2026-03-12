@@ -26,6 +26,11 @@ import { toast } from "sonner";
 import { relaunch } from "@tauri-apps/plugin-process";
 import { getLatestTrackForTool, getLatestSourceForTool } from "../constants";
 import type { ModalApi } from "./useDownloadProgressModal";
+import {
+  buildToolBatchErrorMessage,
+  getFailedToolResults,
+  getSuccessfulToolResults,
+} from "@/lib/tools/tool-batch";
 
 export function useToolActions(modalApi: ModalApi) {
   const { tools, updateTool } = useToolsStore();
@@ -41,6 +46,7 @@ export function useToolActions(modalApi: ModalApi) {
     setModalDone,
     setModalCurrentStatus,
     setModalError,
+    setModalBatchResult,
     handleDismiss,
     transferLockRef,
   } = modalApi;
@@ -149,25 +155,10 @@ export function useToolActions(modalApi: ModalApi) {
   };
 
   /* ── Auto-restart after successful update ── */
-  const autoRestartAfterUpdate = async (toolIds: string[]) => {
+  const autoRestartAfterUpdate = async () => {
     setModalDone(true);
     setModalCurrentStatus("Restarting...");
     pushModalLog("Restarting app to apply changes...");
-
-    try {
-      const existing = (() => {
-        try {
-          const raw = localStorage.getItem("halaldl:pendingToolCongrats");
-          if (!raw) return [];
-          const parsed = JSON.parse(raw);
-          return Array.isArray(parsed) ? parsed.filter((x: unknown) => typeof x === "string") : [];
-        } catch { return []; }
-      })();
-      const merged = Array.from(new Set([...existing, ...toolIds]));
-      localStorage.setItem("halaldl:pendingToolCongrats", JSON.stringify(merged));
-    } catch {
-      // Best-effort
-    }
 
     try {
       await relaunch();
@@ -205,13 +196,28 @@ export function useToolActions(modalApi: ModalApi) {
 
     try {
       const ch = tool.channel !== "stable" ? { [tool.id]: tool.channel } : undefined;
-      await downloadTools([tool.id], ch);
-      setModalProgress(100);
-      setModalToolProgress({ [tool.id]: 100 });
-      pushModalLog(`[${tool.name}] Completed successfully`);
-      addLog({ level: "info", message: `${tool.id} installed/updated (${tool.channel})` });
-      void refreshBackups();
-      await autoRestartAfterUpdate([tool.id]);
+      const result = await downloadTools([tool.id], ch);
+      setModalBatchResult(result);
+
+      if (result.allSucceeded) {
+        setModalProgress(100);
+        setModalToolProgress({ [tool.id]: 100 });
+        pushModalLog(`[${tool.name}] Completed successfully`);
+        addLog({ level: "info", message: `${tool.id} installed/updated (${tool.channel})` });
+        void refreshBackups();
+        await autoRestartAfterUpdate();
+      } else {
+        const message = buildToolBatchErrorMessage(result, { [tool.id]: tool.name });
+        setModalError(message);
+        for (const item of getSuccessfulToolResults(result)) {
+          pushModalLog(`[${tool.name}] ${item.message}`);
+        }
+        for (const item of getFailedToolResults(result)) {
+          pushModalLog(`[${tool.name}] Failed: ${item.message}`);
+        }
+        await checkAll();
+        void refreshBackups();
+      }
     } catch (e) {
       const message = e instanceof Error ? e.message : String(e);
       setModalError(message);
@@ -250,7 +256,7 @@ export function useToolActions(modalApi: ModalApi) {
         setModalProgress(100);
         setModalToolProgress({ [tool.id]: 100 });
         pushModalLog("[yt-dlp] pip upgrade completed");
-        await autoRestartAfterUpdate([tool.id]);
+        await autoRestartAfterUpdate();
       } else {
         setModalError("pip upgrade failed — check logs for details");
         pushModalLog("[yt-dlp] pip upgrade failed");
@@ -292,7 +298,7 @@ export function useToolActions(modalApi: ModalApi) {
       pushModalLog(`[${tool.name}] In-place update completed`);
       addLog({ level: "info", message: `${tool.id} updated at ${destDir}` });
       void refreshBackups();
-      await autoRestartAfterUpdate([tool.id]);
+      await autoRestartAfterUpdate();
     } catch (e) {
       const message = e instanceof Error ? e.message : String(e);
       setModalError(message);
@@ -354,14 +360,36 @@ export function useToolActions(modalApi: ModalApi) {
       for (const t of toUpdate) {
         if (t.channel !== "stable") ch[t.id] = t.channel;
       }
-      await downloadTools(ids, Object.keys(ch).length > 0 ? ch : undefined);
-      setModalProgress(100);
-      setModalToolProgress(
-        Object.fromEntries(ids.map((id) => [id, 100])) as Record<string, number>
-      );
-      pushModalLog("All selected tool updates completed.");
-      void refreshBackups();
-      await autoRestartAfterUpdate(ids);
+      const result = await downloadTools(ids, Object.keys(ch).length > 0 ? ch : undefined);
+      setModalBatchResult(result);
+
+      const succeeded = getSuccessfulToolResults(result);
+      const failed = getFailedToolResults(result);
+
+      if (succeeded.length > 0) {
+        setModalToolProgress((prev) => ({
+          ...prev,
+          ...Object.fromEntries(succeeded.map((item) => [item.tool, 100])),
+        }));
+      }
+
+      if (result.allSucceeded) {
+        setModalProgress(100);
+        pushModalLog("All selected tool updates completed.");
+        void refreshBackups();
+        await autoRestartAfterUpdate();
+      } else {
+        const toolNameById = Object.fromEntries(tools.map((tool) => [tool.id, tool.name])) as Record<string, string>;
+        setModalError(buildToolBatchErrorMessage(result, toolNameById));
+        for (const item of succeeded) {
+          pushModalLog(`[${toolNameById[item.tool] ?? item.tool}] ${item.message}`);
+        }
+        for (const item of failed) {
+          pushModalLog(`[${toolNameById[item.tool] ?? item.tool}] Failed: ${item.message}`);
+        }
+        await checkAll();
+        void refreshBackups();
+      }
     } catch (e) {
       const message = e instanceof Error ? e.message : String(e);
       setModalError(`Update failed: ${message}`);

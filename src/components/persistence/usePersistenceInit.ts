@@ -22,81 +22,27 @@ import {
   listToolBackups,
 } from "@/lib/commands";
 import { toast } from "sonner";
-import { isPermissionGranted, requestPermission, sendNotification } from '@tauri-apps/plugin-notification';
 import { getVersion } from "@tauri-apps/api/app";
 import { useAppUpdateStore } from "@/store/app-update";
+import { getAppMode } from "@/lib/tools/app-mode";
 
 export function usePersistenceInit(): MutableRefObject<boolean> {
   const { setSettings } = useSettingsStore();
   const { setPresets } = usePresetsStore();
-  const { updateTool, setTools, setDiscoveredToolId } = useToolsStore();
+  const { updateTool, setTools } = useToolsStore();
   const { addLog } = useLogsStore();
 
   const initialized = useRef(false);
-  const pendingCongratsKey = "halaldl:pendingToolCongrats";
 
   useEffect(() => {
     const checkTools = async () => {
       addLog({ level: "debug", message: "Checking tools..." });
 
       const checkAndNotify = async (id: string, checkFn: () => Promise<{ version: string; variant?: string; systemPath?: string } | null>) => {
-        const currentTool = useToolsStore.getState().tools.find(t => t.id === id);
         const result = await checkFn();
-        const version = result?.version ?? null;
-        const discoveredAlready = useToolsStore.getState().discoveredToolId;
-
-        const readPending = (): string[] => {
-          try {
-            const raw = localStorage.getItem(pendingCongratsKey);
-            if (!raw) return [];
-            const parsed = JSON.parse(raw);
-            return Array.isArray(parsed) ? parsed.filter((x) => typeof x === "string") : [];
-          } catch {
-            return [];
-          }
-        };
-
-        const writePending = (next: string[]) => {
-          try {
-            if (next.length === 0) localStorage.removeItem(pendingCongratsKey);
-            else localStorage.setItem(pendingCongratsKey, JSON.stringify(next));
-          } catch (e) {
-            addLog({ level: "warn", message: `Failed to persist pending tool congrats: ${String(e)}` });
-          }
-        };
-
-        const pending = readPending();
-        const isPending = pending.includes(id);
-        const shouldOpenForPending = Boolean(version) && isPending && !discoveredAlready;
-
-        if (shouldOpenForPending) {
-          setDiscoveredToolId(id);
-          writePending(pending.filter((x) => x !== id));
-        } else if (version && currentTool?.status === "Missing") {
-          if (!discoveredAlready) {
-            setDiscoveredToolId(id);
-          } else if (!isPending) {
-            writePending([...pending, id]);
-          }
-
-          let permissionGranted = await isPermissionGranted();
-          if (!permissionGranted) {
-            const permission = await requestPermission();
-            permissionGranted = permission === 'granted';
-          }
-
-          if (permissionGranted) {
-            sendNotification({
-              title: 'Tool Discovered!',
-              body: `${currentTool.name} has been detected and is ready to use.`,
-              icon: 'info'
-            });
-          }
-        }
-
         updateTool(id, {
-          status: version ? "Detected" : "Missing",
-          version: version || undefined,
+          status: result?.version ? "Detected" : "Missing",
+          version: result?.version || undefined,
           variant: result?.variant,
           systemPath: result?.systemPath,
           updateAvailable: undefined,
@@ -147,8 +93,7 @@ export function usePersistenceInit(): MutableRefObject<boolean> {
       if (initialized.current) return;
 
       try {
-        const appMode = String(import.meta.env.VITE_APP_MODE ?? "").trim().toUpperCase();
-        const currentMode = appMode === "FULL" ? "FULL" : "LITE";
+        const currentMode = getAppMode();
         const lastModeKey = "halaldl:lastAppMode";
         const fullSwitchKey = "halaldl:fullSwitchAutoInstall";
         try {
@@ -313,7 +258,7 @@ export function usePersistenceInit(): MutableRefObject<boolean> {
     }
 
     init();
-  }, [setSettings, setPresets, setTools, updateTool, setDiscoveredToolId, addLog]);
+  }, [setSettings, setPresets, setTools, updateTool, addLog]);
 
   return initialized;
 }

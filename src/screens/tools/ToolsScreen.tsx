@@ -150,6 +150,7 @@ export function ToolsScreen() {
         modalTitle={modal.modalTitle}
         modalDone={modal.modalDone}
         modalError={modal.modalError}
+        modalBatchResult={modal.modalBatchResult}
         modalCurrentToolName={modal.modalCurrentToolName}
         modalCurrentStatus={modal.modalCurrentStatus}
         modalProgress={modal.modalProgress}

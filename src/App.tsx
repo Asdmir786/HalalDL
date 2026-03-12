@@ -3,7 +3,6 @@ import { useNavigationStore } from "@/store/navigation";
 import { Toaster } from "@/components/ui/sonner";
 import { PersistenceManager } from "@/components/PersistenceManager";
 import { UpgradePrompt } from "@/components/UpgradePrompt";
-import { ToolSuccessModal } from "@/components/ToolSuccessModal";
 import { AnimatePresence, motion } from "framer-motion";
 import { PageTransition } from "@/components/motion/PageTransition";
 import { DownloadsScreen } from "@/screens/DownloadsScreen"; // Keep critical path eager
@@ -106,7 +105,7 @@ export default function App() {
   useEffect(() => {
     const timer = setTimeout(() => {
       setIsBooting(false);
-    }, 2000); // 2 seconds boot time for 2026 aesthetic
+    }, 350);
     return () => clearTimeout(timer);
   }, []);
 
@@ -149,7 +148,6 @@ export default function App() {
       </main>
       <Toaster />
       <UpgradePrompt />
-      <ToolSuccessModal />
     </div>
   );
 }

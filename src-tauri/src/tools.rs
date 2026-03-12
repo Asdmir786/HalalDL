@@ -1,5 +1,6 @@
 use std::fs;
 use std::path::{Path, PathBuf};
+use std::collections::HashSet;
 use tauri::Manager;
 
 use crate::fs_utils::{temp_path_for, safe_replace_with_backup};
@@ -257,6 +258,52 @@ async fn download_deno(app_handle: &tauri::AppHandle, dest: &PathBuf) -> Result<
     Ok(())
 }
 
+#[derive(Clone, serde::Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ToolBatchItemResult {
+    pub tool: String,
+    pub success: bool,
+    pub message: String,
+}
+
+#[derive(Clone, serde::Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ToolBatchResult {
+    pub results: Vec<ToolBatchItemResult>,
+    pub summary: String,
+    pub all_succeeded: bool,
+}
+
+async fn download_single_tool(
+    app_handle: &tauri::AppHandle,
+    bin_dir: &PathBuf,
+    tool: &str,
+    channels: &std::collections::HashMap<String, String>,
+) -> Result<String, String> {
+    match tool {
+        "yt-dlp" => {
+            let is_nightly = channels.get("yt-dlp").map(|s| s.as_str()) == Some("nightly");
+            download_ytdlp(app_handle, bin_dir, is_nightly).await?;
+            Ok("Installed successfully".to_string())
+        }
+        "ffmpeg" => {
+            let is_nightly = channels.get("ffmpeg").map(|s| s.as_str()) == Some("nightly");
+            let variant = None;
+            download_ffmpeg(app_handle, bin_dir, variant, is_nightly).await?;
+            Ok("Installed successfully".to_string())
+        }
+        "aria2" => {
+            download_aria2(app_handle, bin_dir).await?;
+            Ok("Installed successfully".to_string())
+        }
+        "deno" => {
+            download_deno(app_handle, bin_dir).await?;
+            Ok("Installed successfully".to_string())
+        }
+        _ => Err(format!("Unknown tool: {}", tool)),
+    }
+}
+
 /// Update a tool at its original (system) location instead of the app bin dir.
 /// `variant` controls which FFmpeg build to download (Full Build / Essentials / Shared).
 /// `channel` controls stable vs nightly (only yt-dlp and ffmpeg support nightly).
@@ -295,7 +342,7 @@ pub async fn update_tool_at_path(
 }
 
 #[tauri::command]
-pub async fn download_tools(app_handle: tauri::AppHandle, tools: Vec<String>, channels: Option<std::collections::HashMap<String, String>>) -> Result<String, String> {
+pub async fn download_tools(app_handle: tauri::AppHandle, tools: Vec<String>, channels: Option<std::collections::HashMap<String, String>>) -> Result<ToolBatchResult, String> {
     #[cfg(not(target_os = "windows"))]
     {
         let _ = app_handle;
@@ -311,26 +358,47 @@ pub async fn download_tools(app_handle: tauri::AppHandle, tools: Vec<String>, ch
         fs::create_dir_all(&bin_dir).map_err(|e| e.to_string())?;
     }
 
-    if tools.contains(&"yt-dlp".to_string()) {
-        let is_nightly = ch.get("yt-dlp").map(|s| s.as_str()) == Some("nightly");
-        download_ytdlp(&app_handle, &bin_dir, is_nightly).await?;
+    let mut seen = HashSet::new();
+    let mut results: Vec<ToolBatchItemResult> = Vec::new();
+
+    for tool in tools {
+        if !seen.insert(tool.clone()) {
+            continue;
+        }
+
+        match download_single_tool(&app_handle, &bin_dir, &tool, &ch).await {
+            Ok(message) => results.push(ToolBatchItemResult {
+                tool,
+                success: true,
+                message,
+            }),
+            Err(message) => results.push(ToolBatchItemResult {
+                tool,
+                success: false,
+                message,
+            }),
+        }
     }
 
-    if tools.contains(&"ffmpeg".to_string()) {
-        let is_nightly = ch.get("ffmpeg").map(|s| s.as_str()) == Some("nightly");
-        let variant = None;
-        download_ffmpeg(&app_handle, &bin_dir, variant, is_nightly).await?;
-    }
+    let success_count = results.iter().filter(|item| item.success).count();
+    let failure_count = results.len().saturating_sub(success_count);
+    let all_succeeded = failure_count == 0;
 
-    if tools.contains(&"aria2".to_string()) {
-        download_aria2(&app_handle, &bin_dir).await?;
-    }
+    let summary = if results.is_empty() {
+        "No tools were selected".to_string()
+    } else if all_succeeded {
+        format!("{} tool(s) completed successfully", success_count)
+    } else if success_count == 0 {
+        format!("All {} tool(s) failed", failure_count)
+    } else {
+        format!("{} succeeded, {} failed", success_count, failure_count)
+    };
 
-    if tools.contains(&"deno".to_string()) {
-        download_deno(&app_handle, &bin_dir).await?;
-    }
-
-    Ok("Selected tools downloaded successfully".to_string())
+    Ok(ToolBatchResult {
+        results,
+        summary,
+        all_succeeded,
+    })
 }
 
 #[tauri::command]

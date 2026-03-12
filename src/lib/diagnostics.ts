@@ -90,7 +90,6 @@ export function buildDiagnosticsPayload(redaction: DiagnosticsRedaction) {
 
   const toolsStatus = {
     tools: toolsState.tools.map((t: Tool) => sanitizeTool(t, redaction)),
-    discoveredToolId: toolsState.discoveredToolId,
   };
 
   const downloadQueue = {
@@ -124,4 +123,3 @@ export function buildDiagnosticsPayload(redaction: DiagnosticsRedaction) {
     logsText,
   };
 }
-

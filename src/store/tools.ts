@@ -23,10 +23,8 @@ export interface Tool {
 
 interface ToolsState {
   tools: Tool[];
-  discoveredToolId: string | null;
   updateTool: (id: string, updates: Partial<Tool>) => void;
   setTools: (tools: Tool[]) => void;
-  setDiscoveredToolId: (id: string | null) => void;
 }
 
 /** Tools that support a nightly channel */
@@ -69,10 +67,8 @@ const INITIAL_TOOLS: Tool[] = [
 
 export const useToolsStore = create<ToolsState>((set) => ({
   tools: INITIAL_TOOLS,
-  discoveredToolId: null,
   updateTool: (id, updates) => set((state) => ({
     tools: state.tools.map((t) => t.id === id ? { ...t, ...updates } : t),
   })),
   setTools: (tools) => set({ tools }),
-  setDiscoveredToolId: (id) => set({ discoveredToolId: id }),
 }));

@@ -12,6 +12,7 @@ import type { Tool } from "@/store/tools";
 import { listen } from "@tauri-apps/api/event";
 import { toast } from "sonner";
 import type { DownloadProgress } from "../constants";
+import type { ToolBatchResult } from "@/lib/tools/tool-batch";
 
 export interface ModalApi {
   beginTransferModal: (title: string, toolIds: string[], initialLogs?: string[]) => boolean;
@@ -21,6 +22,7 @@ export interface ModalApi {
   setModalDone: Dispatch<SetStateAction<boolean>>;
   setModalCurrentStatus: Dispatch<SetStateAction<string>>;
   setModalError: Dispatch<SetStateAction<string | null>>;
+  setModalBatchResult: Dispatch<SetStateAction<ToolBatchResult | null>>;
   handleDismiss: () => void;
   transferLockRef: MutableRefObject<boolean>;
   isTransferActive: boolean;
@@ -31,6 +33,7 @@ export function useDownloadProgressModal(tools: Tool[]) {
   const [modalProgress, setModalProgress] = useState(0);
   const [modalLogs, setModalLogs] = useState<string[]>([]);
   const [modalError, setModalError] = useState<string | null>(null);
+  const [modalBatchResult, setModalBatchResult] = useState<ToolBatchResult | null>(null);
   const [modalDone, setModalDone] = useState(false);
   const [modalTitle, setModalTitle] = useState("Updating Tools");
   const [isTransferRunning, setIsTransferRunning] = useState(false);
@@ -81,6 +84,7 @@ export function useDownloadProgressModal(tools: Tool[]) {
     setModalProgress(0);
     setModalLogs([]);
     setModalError(null);
+    setModalBatchResult(null);
     setModalDone(false);
     setModalTargetToolIds([]);
     setModalToolProgress({});
@@ -196,6 +200,7 @@ export function useDownloadProgressModal(tools: Tool[]) {
       setModalDone,
       setModalCurrentStatus,
       setModalError,
+      setModalBatchResult,
       handleDismiss,
       transferLockRef,
       isTransferActive,
@@ -209,6 +214,7 @@ export function useDownloadProgressModal(tools: Tool[]) {
     modalProgress,
     modalLogs,
     modalError,
+    modalBatchResult,
     modalDone,
     modalTitle,
     modalToolProgress,
