@@ -58,11 +58,11 @@ export function ToolsScreen() {
               <div className="flex items-center gap-2">
                 {actions.hasAnyBackup && (
                   <MotionButton
-                    variant="ghost"
+                    variant="outline"
                     size="sm"
                     onClick={actions.handleCleanupAll}
                     disabled={actions.anyBusy}
-                    className="h-9 text-muted-foreground hover:text-foreground"
+                    className="h-9"
                   >
                     <Trash2 className="w-4 h-4 mr-2" />
                     Clean up backups

@@ -72,7 +72,7 @@ export function useToolActions(modalApi: ModalApi) {
   }, [refreshBackups]);
 
   /* ── Per-tool: detect installed + check latest ── */
-  const refreshTool = async (id: string) => {
+  const refreshTool = useCallback(async (id: string) => {
     setBusyTools((prev) => ({ ...prev, [id]: true }));
     updateTool(id, { status: "Checking" });
     try {
@@ -143,7 +143,17 @@ export function useToolActions(modalApi: ModalApi) {
     } finally {
       setBusyTools((prev) => ({ ...prev, [id]: false }));
     }
-  };
+  }, [addLog, updateTool]);
+
+  const refreshToolIds = useCallback(
+    async (ids: string[]) => {
+      const uniqueIds = Array.from(new Set(ids.filter(Boolean)));
+      if (uniqueIds.length === 0) return;
+      await Promise.all(uniqueIds.map((id) => refreshTool(id)));
+      await refreshBackups();
+    },
+    [refreshBackups, refreshTool]
+  );
 
   const checkAll = async () => {
     setIsCheckingAll(true);
@@ -204,7 +214,7 @@ export function useToolActions(modalApi: ModalApi) {
         setModalToolProgress({ [tool.id]: 100 });
         pushModalLog(`[${tool.name}] Completed successfully`);
         addLog({ level: "info", message: `${tool.id} installed/updated (${tool.channel})` });
-        void refreshBackups();
+        await refreshToolIds([tool.id]);
         await autoRestartAfterUpdate();
       } else {
         const message = buildToolBatchErrorMessage(result, { [tool.id]: tool.name });
@@ -215,8 +225,7 @@ export function useToolActions(modalApi: ModalApi) {
         for (const item of getFailedToolResults(result)) {
           pushModalLog(`[${tool.name}] Failed: ${item.message}`);
         }
-        await checkAll();
-        void refreshBackups();
+        await refreshToolIds([tool.id]);
       }
     } catch (e) {
       const message = e instanceof Error ? e.message : String(e);
@@ -297,7 +306,7 @@ export function useToolActions(modalApi: ModalApi) {
       setModalToolProgress({ [tool.id]: 100 });
       pushModalLog(`[${tool.name}] In-place update completed`);
       addLog({ level: "info", message: `${tool.id} updated at ${destDir}` });
-      void refreshBackups();
+      await refreshToolIds([tool.id]);
       await autoRestartAfterUpdate();
     } catch (e) {
       const message = e instanceof Error ? e.message : String(e);
@@ -376,7 +385,7 @@ export function useToolActions(modalApi: ModalApi) {
       if (result.allSucceeded) {
         setModalProgress(100);
         pushModalLog("All selected tool updates completed.");
-        void refreshBackups();
+        await refreshToolIds(ids);
         await autoRestartAfterUpdate();
       } else {
         const toolNameById = Object.fromEntries(tools.map((tool) => [tool.id, tool.name])) as Record<string, string>;
@@ -387,8 +396,7 @@ export function useToolActions(modalApi: ModalApi) {
         for (const item of failed) {
           pushModalLog(`[${toolNameById[item.tool] ?? item.tool}] Failed: ${item.message}`);
         }
-        await checkAll();
-        void refreshBackups();
+        await refreshToolIds(ids);
       }
     } catch (e) {
       const message = e instanceof Error ? e.message : String(e);

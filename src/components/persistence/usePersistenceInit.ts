@@ -28,13 +28,10 @@ import {
   fetchLatestDenoVersion,
   isUpdateAvailable,
   listToolBackups,
-  getInstallContext,
-  resolveLatestAppUpdate,
 } from "@/lib/commands";
 import { toast } from "sonner";
-import { getVersion } from "@tauri-apps/api/app";
-import { useAppUpdateStore } from "@/store/app-update";
 import { getAppMode } from "@/lib/tools/app-mode";
+import { checkAndStoreAppUpdate, logAvailableAppUpdate } from "@/lib/app-updates/service";
 
 export function usePersistenceInit(): MutableRefObject<boolean> {
   const { setSettings } = useSettingsStore();
@@ -325,28 +322,8 @@ export function usePersistenceInit(): MutableRefObject<boolean> {
 
     async function checkAppUpdate() {
       try {
-        const installContext = await getInstallContext();
-        useAppUpdateStore.getState().setInstallContext(installContext);
-
-        const currentVersion = await getVersion();
-        const result = await resolveLatestAppUpdate(
-          currentVersion,
-          installContext
-        );
-        const updateAvailable = result.updateAvailable;
-        if (updateAvailable) {
-          useAppUpdateStore.getState().setUpdate({
-            version: result.latestVersion,
-            releaseUrl: result.releaseUrl,
-            downloadUrl: result.downloadUrl,
-            assetName: result.assetName,
-            checksumUrl: result.checksumUrl,
-          });
-          addLog({
-            level: "info",
-            message: `App update available: v${result.latestVersion} (current: v${currentVersion}, installer: ${installContext.installerType})`,
-          });
-        }
+        const appUpdate = await checkAndStoreAppUpdate();
+        logAvailableAppUpdate(appUpdate);
       } catch {
         // silently ignore update check failures
       }

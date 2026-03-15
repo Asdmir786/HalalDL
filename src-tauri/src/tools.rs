@@ -4,7 +4,7 @@ use std::collections::HashSet;
 use tauri::Manager;
 
 use crate::fs_utils::{temp_path_for, safe_replace_with_backup};
-use crate::download::{download_to_temp, emit_progress, resolve_latest_aria2_zip_url, sha256_of_path};
+use crate::download::{download_to_temp, emit_progress, resolve_latest_aria2_zip_url};
 use crate::extract::{extract_from_zip, extract_from_7z};
 
 /// Resolve the full system path of a tool using `where` (Windows).
@@ -56,130 +56,15 @@ pub fn resolve_system_tool_path(tool: String) -> Result<Option<String>, String> 
     Ok(None)
 }
 
-async fn fetch_text(app_handle: &tauri::AppHandle, url: &str) -> Result<String, String> {
-    let client = reqwest::Client::builder()
-        .user_agent(format!("HalalDL/{}", app_handle.package_info().version))
-        .build()
-        .map_err(|e| e.to_string())?;
-    let res = client.get(url).send().await.map_err(|e| e.to_string())?;
-    if !res.status().is_success() {
-        return Err(format!("HTTP {}: {}", res.status(), url));
-    }
-    res.text().await.map_err(|e| e.to_string())
-}
-
-fn find_checksum_for_names(text: &str, filenames: &[&str]) -> Option<String> {
-    let targets: Vec<String> = filenames.iter().map(|f| f.to_lowercase()).collect();
-    let mut best: Option<(usize, String)> = None;
-    for raw in text.lines() {
-        let line = raw.trim().trim_end_matches('\r');
-        if line.is_empty() {
-            continue;
-        }
-        if line.starts_with("SHA256") {
-            if let Some(start) = line.find('(') {
-                if let Some(end) = line.find(')') {
-                    let name = line[start + 1..end].trim().to_lowercase();
-                    if let Some(idx) = targets.iter().position(|t| t == &name) {
-                        if let Some(eq) = line.find('=') {
-                            let hash = line[eq + 1..].trim();
-                            if !hash.is_empty() {
-                                let hash = hash.to_lowercase();
-                                if idx == 0 {
-                                    return Some(hash);
-                                }
-                                if best.as_ref().map(|(b, _)| idx < *b).unwrap_or(true) {
-                                    best = Some((idx, hash));
-                                }
-                            }
-                        }
-                    }
-                }
-            }
-        }
-        if let Some((name, hash)) = line.split_once(':') {
-            let name = name.trim().to_lowercase();
-            if let Some(idx) = targets.iter().position(|t| t == &name) {
-                let hash = hash.trim();
-                if !hash.is_empty() {
-                    let hash = hash.to_lowercase();
-                    if idx == 0 {
-                        return Some(hash);
-                    }
-                    if best.as_ref().map(|(b, _)| idx < *b).unwrap_or(true) {
-                        best = Some((idx, hash));
-                    }
-                }
-            }
-        }
-        let parts: Vec<&str> = line.split_whitespace().collect();
-        if parts.len() >= 2 {
-            let hash = parts[0].trim();
-            let mut name = parts[1].trim();
-            name = name.trim_start_matches('*');
-            let name = name.to_lowercase();
-            if let Some(idx) = targets.iter().position(|t| t == &name) {
-                if !hash.is_empty() {
-                    let hash = hash.to_lowercase();
-                    if idx == 0 {
-                        return Some(hash);
-                    }
-                    if best.as_ref().map(|(b, _)| idx < *b).unwrap_or(true) {
-                        best = Some((idx, hash));
-                    }
-                }
-            }
-        }
-    }
-    best.map(|(_, h)| h)
-}
-
-fn filename_from_url(url: &str) -> Option<String> {
-    url.split('/').last().map(|s| s.to_string())
-}
-
-fn verify_hash(path: &Path, expected: &str) -> Result<(), String> {
-    let actual = sha256_of_path(path)?;
-    if actual.to_lowercase() != expected.to_lowercase() {
-        return Err(format!("Checksum mismatch (expected {}, got {})", expected, actual));
-    }
-    Ok(())
-}
-
-async fn download_with_optional_checksum(
+async fn download_tool_payload(
     app_handle: &tauri::AppHandle,
     tool: &str,
     url: &str,
-    checksum_url: Option<&str>,
-    checksum_names: &[&str],
     dest_path: &PathBuf,
 ) -> Result<(), String> {
-    for attempt in 1..=3u8 {
-        let checksum = match checksum_url {
-            Some(u) => fetch_text(app_handle, u).await.ok().and_then(|text| find_checksum_for_names(&text, checksum_names)),
-            None => None,
-        };
-
-        let temp = download_to_temp(app_handle, tool, url, dest_path).await?;
-
-        if let Some(expected) = checksum {
-            emit_progress(app_handle, tool, 99.0, "Verifying checksum...");
-            if let Err(e) = verify_hash(&temp, &expected) {
-                let _ = fs::remove_file(&temp);
-                if attempt < 3 {
-                    emit_progress(app_handle, tool, 0.0, &format!("Checksum mismatch, retrying ({}/3)...", attempt + 1));
-                    continue;
-                }
-                return Err(e);
-            }
-        } else {
-            emit_progress(app_handle, tool, 99.0, "Checksum unavailable, skipping validation");
-        }
-
-        safe_replace_with_backup(dest_path, &temp)?;
-        return Ok(());
-    }
-    Err(format!("{} download failed", tool))
+    let temp = download_to_temp(app_handle, tool, url, dest_path).await?;
+    safe_replace_with_backup(dest_path, &temp)?;
+    Ok(())
 }
 
 async fn download_ytdlp(app_handle: &tauri::AppHandle, dest: &PathBuf, is_nightly: bool) -> Result<(), String> {
@@ -188,14 +73,8 @@ async fn download_ytdlp(app_handle: &tauri::AppHandle, dest: &PathBuf, is_nightl
     } else {
         "https://github.com/yt-dlp/yt-dlp/releases/latest/download/yt-dlp.exe"
     };
-    let checksum_url = if is_nightly {
-        "https://github.com/yt-dlp/yt-dlp-nightly-builds/releases/latest/download/SHA2-256SUMS"
-    } else {
-        "https://github.com/yt-dlp/yt-dlp/releases/latest/download/SHA2-256SUMS"
-    };
-
     let dest_file = dest.join("yt-dlp.exe");
-    download_with_optional_checksum(app_handle, "yt-dlp", url, Some(checksum_url), &["yt-dlp.exe", "yt-dlp"], &dest_file).await
+    download_tool_payload(app_handle, "yt-dlp", url, &dest_file).await
 }
 
 async fn download_ffmpeg(app_handle: &tauri::AppHandle, dest: &PathBuf, variant: Option<String>, is_nightly: bool) -> Result<(), String> {
@@ -213,11 +92,8 @@ async fn download_ffmpeg(app_handle: &tauri::AppHandle, dest: &PathBuf, variant:
     } else {
         "https://www.gyan.dev/ffmpeg/builds/ffmpeg-release-full.7z"
     };
-    let checksum_url = format!("{}.sha256", url);
-
     let archive_path = dest.join("ffmpeg-update.7z");
-    let file_name = filename_from_url(url).ok_or_else(|| "Invalid ffmpeg url".to_string())?;
-    download_with_optional_checksum(app_handle, "ffmpeg", url, Some(&checksum_url), &[&file_name], &archive_path).await?;
+    download_tool_payload(app_handle, "ffmpeg", url, &archive_path).await?;
     emit_progress(app_handle, "ffmpeg", 99.0, "Extracting ffmpeg.exe, ffprobe.exe from 7z...");
     let extracted = extract_from_7z(app_handle, "ffmpeg", &archive_path, dest, vec!["ffmpeg.exe", "ffprobe.exe"])?;
     emit_progress(app_handle, "ffmpeg", 100.0, &format!("Extracted: {}", extracted.join(", ")));
@@ -233,7 +109,7 @@ async fn download_aria2(app_handle: &tauri::AppHandle, dest: &PathBuf) -> Result
         Err(_) => "https://github.com/aria2/aria2/releases/download/release-1.37.0/aria2-1.37.0-win-64bit-build1.zip".to_string(),
     };
     let zip_path = dest.join("aria2-update.zip");
-    download_with_optional_checksum(app_handle, "aria2", &url, None, &[], &zip_path).await?;
+    download_tool_payload(app_handle, "aria2", &url, &zip_path).await?;
     emit_progress(app_handle, "aria2", 99.0, "Extracting aria2c.exe...");
     let extracted = extract_from_zip(app_handle, "aria2", &zip_path, dest, vec!["aria2c.exe"])?;
     emit_progress(app_handle, "aria2", 100.0, &format!("Extracted: {}", extracted.join(", ")));
@@ -245,10 +121,8 @@ async fn download_aria2(app_handle: &tauri::AppHandle, dest: &PathBuf) -> Result
 
 async fn download_deno(app_handle: &tauri::AppHandle, dest: &PathBuf) -> Result<(), String> {
     let url = "https://github.com/denoland/deno/releases/latest/download/deno-x86_64-pc-windows-msvc.zip";
-    let checksum_url = format!("{}.sha256sum", url);
     let zip_path = dest.join("deno-update.zip");
-    let file_name = filename_from_url(url).ok_or_else(|| "Invalid deno url".to_string())?;
-    download_with_optional_checksum(app_handle, "deno", url, Some(&checksum_url), &[&file_name], &zip_path).await?;
+    download_tool_payload(app_handle, "deno", url, &zip_path).await?;
     emit_progress(app_handle, "deno", 99.0, "Extracting deno.exe...");
     let extracted = extract_from_zip(app_handle, "deno", &zip_path, dest, vec!["deno.exe"])?;
     emit_progress(app_handle, "deno", 100.0, &format!("Extracted: {}", extracted.join(", ")));

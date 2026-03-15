@@ -304,7 +304,7 @@ export function ToolRow({
                 <DropdownMenuItem
                   onClick={() => onCleanupBackup(tool)}
                   disabled={isBusy}
-                  className="text-muted-foreground"
+                  className="text-foreground"
                 >
                   <Trash2 className="w-3.5 h-3.5 mr-2" />
                   Delete old version

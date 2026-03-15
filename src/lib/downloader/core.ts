@@ -395,22 +395,33 @@ export async function startDownload(jobId: string) {
     });
   };
 
-  const hadExternalDownloader = args.includes("--external-downloader") || args.includes("--downloader");
-  let activeArgs = [...args];
-  let result = await runDownload(activeArgs);
+  const runAttemptWithDownloaderFallback = async (runArgs: string[]) => {
+    let effectiveArgs = [...runArgs];
+    let attemptResult = await runDownload(effectiveArgs);
 
-  if (result.code !== 0 && hadExternalDownloader && result.aria2Error) {
-    const nativeArgs = stripExternalDownloaderArgs(activeArgs);
-    const nativeQuoted = nativeArgs.map(arg => arg.includes(" ") ? `"${arg}"` : arg).join(" ");
-    addLog({ level: "warn", message: "aria2c error detected, retrying with native downloader", jobId });
-    addLog({ level: "info", message: `Retrying without external downloader:\n${ytDlp.path} ${nativeQuoted}`, jobId });
-    updateJob(jobId, {
-      phase: "Downloading streams",
-      statusDetail: "Retrying with native downloader",
-    });
-    activeArgs = nativeArgs;
-    result = await runDownload(activeArgs);
-  }
+    const usesExternalDownloader =
+      effectiveArgs.includes("--external-downloader") || effectiveArgs.includes("--downloader");
+
+    if (attemptResult.code !== 0 && usesExternalDownloader && attemptResult.aria2Error) {
+      const nativeArgs = stripExternalDownloaderArgs(effectiveArgs);
+      const nativeQuoted = nativeArgs.map(arg => arg.includes(" ") ? `"${arg}"` : arg).join(" ");
+      addLog({ level: "warn", message: "aria2c error detected, retrying with native downloader", jobId });
+      addLog({ level: "info", message: `Retrying without external downloader:\n${ytDlp.path} ${nativeQuoted}`, jobId });
+      updateJob(jobId, {
+        phase: "Downloading streams",
+        statusDetail: "Retrying with native downloader",
+      });
+      effectiveArgs = nativeArgs;
+      attemptResult = await runDownload(effectiveArgs);
+    }
+
+    return { effectiveArgs, attemptResult };
+  };
+
+  let activeArgs = [...args];
+  let { effectiveArgs: resolvedInitialArgs, attemptResult: result } =
+    await runAttemptWithDownloaderFallback(activeArgs);
+  activeArgs = resolvedInitialArgs;
 
   let didFallback = false;
 
@@ -425,7 +436,9 @@ export async function startDownload(jobId: string) {
       const fallbackQuoted = attempt.args.map(arg => arg.includes(" ") ? `"${arg}"` : arg).join(" ");
       addLog({ level: "warn", message: `Falling back to format: ${attempt.format}`, jobId });
       addLog({ level: "info", message: `Retrying with fallback format:\n${ytDlp.path} ${fallbackQuoted}`, jobId });
-      result = await runDownload(attempt.args);
+      const fallbackRun = await runAttemptWithDownloaderFallback(attempt.args);
+      activeArgs = fallbackRun.effectiveArgs;
+      result = fallbackRun.attemptResult;
       if (result.code === 0) {
         didFallback = true;
         addLog({ level: "info", message: `Fallback succeeded with format: ${attempt.format}`, jobId });

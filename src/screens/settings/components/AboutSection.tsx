@@ -15,8 +15,6 @@ import { MotionButton } from "@/components/motion/MotionButton";
 import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
 import {
-  getInstallContext,
-  resolveLatestAppUpdate,
   downloadAndVerifyAppUpdate,
   openFile,
   revealInExplorer,
@@ -26,6 +24,7 @@ import { useAppUpdateStore } from "@/store/app-update";
 import { SettingsSection } from "./SettingsSection";
 import { toast } from "sonner";
 import { useDownloadsStore } from "@/store/downloads";
+import { checkAndStoreAppUpdate } from "@/lib/app-updates/service";
 import {
   Dialog,
   DialogContent,
@@ -113,11 +112,8 @@ export function AboutSection() {
   const checkForUpdates = useCallback(async () => {
     setUpdateStatus("checking");
     try {
-      const installContext =
-        storeUpdate.installContext ?? (await getInstallContext());
-      storeUpdate.setInstallContext(installContext);
-
-      const result = await resolveLatestAppUpdate(version, installContext);
+      const appUpdate = await checkAndStoreAppUpdate(version);
+      const result = appUpdate.resolved;
       setLatestVersion(result.latestVersion);
       setReleaseUrl(result.releaseUrl);
       setDownloadUrl(result.downloadUrl);
@@ -127,26 +123,8 @@ export function AboutSection() {
       if (result.latestVersion && version !== "..." && version !== "unknown") {
         if (result.updateAvailable) {
           setUpdateStatus("update-available");
-          storeUpdate.setUpdate({
-            version: result.latestVersion,
-            releaseUrl: result.releaseUrl,
-            downloadUrl: result.downloadUrl,
-            assetName: result.assetName,
-            checksumUrl: result.checksumUrl,
-          });
         } else {
           setUpdateStatus("up-to-date");
-          if (storeUpdate.updateAvailable) {
-            useAppUpdateStore.setState({
-              updateAvailable: false,
-              dismissed: false,
-              latestVersion: null,
-              releaseUrl: null,
-              downloadUrl: null,
-              assetName: null,
-              checksumUrl: null,
-            });
-          }
         }
       } else {
         setUpdateStatus("up-to-date");
