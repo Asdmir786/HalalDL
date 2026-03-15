@@ -1,5 +1,18 @@
 export { isUpdateAvailable } from "./version-utils";
 export {
+  getInstallContext,
+  resolveLatestAppUpdate,
+  downloadAndVerifyAppUpdate,
+  buildPreferredAssetName,
+  selectPreferredReleaseAsset,
+  type InstallerType,
+  type InstallScope,
+  type InstallContext,
+  type GitHubRelease,
+  type GitHubReleaseAsset,
+  type ResolvedAppUpdate,
+} from "./app-update";
+export {
   checkYtDlpVersion,
   checkFfmpegVersion,
   checkAria2Version,

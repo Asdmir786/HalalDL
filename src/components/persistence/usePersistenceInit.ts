@@ -1,7 +1,15 @@
 import { useEffect, useRef, type MutableRefObject } from "react";
 import { downloadDir } from "@tauri-apps/api/path";
-import { useSettingsStore, type Settings, DEFAULT_SETTINGS } from "@/store/settings";
-import { usePresetsStore, BUILT_IN_PRESETS, type Preset } from "@/store/presets";
+import {
+  useSettingsStore,
+  type Settings,
+  DEFAULT_SETTINGS,
+} from "@/store/settings";
+import {
+  usePresetsStore,
+  BUILT_IN_PRESETS,
+  type Preset,
+} from "@/store/presets";
 import { useToolsStore, type Tool } from "@/store/tools";
 import { useLogsStore } from "@/store/logs";
 import { useDownloadsStore, type DownloadJob } from "@/store/downloads";
@@ -20,6 +28,8 @@ import {
   fetchLatestDenoVersion,
   isUpdateAvailable,
   listToolBackups,
+  getInstallContext,
+  resolveLatestAppUpdate,
 } from "@/lib/commands";
 import { toast } from "sonner";
 import { getVersion } from "@tauri-apps/api/app";
@@ -38,7 +48,14 @@ export function usePersistenceInit(): MutableRefObject<boolean> {
     const checkTools = async () => {
       addLog({ level: "debug", message: "Checking tools..." });
 
-      const checkAndNotify = async (id: string, checkFn: () => Promise<{ version: string; variant?: string; systemPath?: string } | null>) => {
+      const checkAndNotify = async (
+        id: string,
+        checkFn: () => Promise<{
+          version: string;
+          variant?: string;
+          systemPath?: string;
+        } | null>
+      ) => {
         const result = await checkFn();
         updateTool(id, {
           status: result?.version ? "Detected" : "Missing",
@@ -63,11 +80,21 @@ export function usePersistenceInit(): MutableRefObject<boolean> {
       addLog({ level: "debug", message: "Checking latest tool versions..." });
 
       const toolsSnapshot = useToolsStore.getState().tools;
-      const getChannel = (id: string) => toolsSnapshot.find((t) => t.id === id)?.channel ?? "stable";
+      const getChannel = (id: string) =>
+        toolsSnapshot.find((t) => t.id === id)?.channel ?? "stable";
 
-      const checks: Array<{ id: string; fetchFn: () => Promise<string | null> }> = [
-        { id: "yt-dlp", fetchFn: () => fetchLatestYtDlpVersion(getChannel("yt-dlp")) },
-        { id: "ffmpeg", fetchFn: () => fetchLatestFfmpegVersion(getChannel("ffmpeg")) },
+      const checks: Array<{
+        id: string;
+        fetchFn: () => Promise<string | null>;
+      }> = [
+        {
+          id: "yt-dlp",
+          fetchFn: () => fetchLatestYtDlpVersion(getChannel("yt-dlp")),
+        },
+        {
+          id: "ffmpeg",
+          fetchFn: () => fetchLatestFfmpegVersion(getChannel("ffmpeg")),
+        },
         { id: "aria2", fetchFn: fetchLatestAria2Version },
         { id: "deno", fetchFn: fetchLatestDenoVersion },
       ];
@@ -76,14 +103,22 @@ export function usePersistenceInit(): MutableRefObject<boolean> {
         checks.map(async ({ id, fetchFn }) => {
           try {
             const latest = await fetchFn();
-            const tool = useToolsStore.getState().tools.find((t) => t.id === id);
+            const tool = useToolsStore
+              .getState()
+              .tools.find((t) => t.id === id);
             updateTool(id, {
               latestVersion: latest || undefined,
-              updateAvailable: isUpdateAvailable(tool?.version, latest || undefined),
+              updateAvailable: isUpdateAvailable(
+                tool?.version,
+                latest || undefined
+              ),
               latestCheckedAt: Date.now(),
             });
           } catch (e) {
-            addLog({ level: "warn", message: `Latest version check failed (${id}): ${String(e)}` });
+            addLog({
+              level: "warn",
+              message: `Latest version check failed (${id}): ${String(e)}`,
+            });
           }
         })
       );
@@ -100,7 +135,9 @@ export function usePersistenceInit(): MutableRefObject<boolean> {
           const lastMode = localStorage.getItem(lastModeKey);
           if (lastMode && lastMode !== currentMode) {
             if (currentMode === "LITE") {
-              await invoke("cleanup_bin_tools", { tools: ["yt-dlp", "ffmpeg", "aria2", "deno"] });
+              await invoke("cleanup_bin_tools", {
+                tools: ["yt-dlp", "ffmpeg", "aria2", "deno"],
+              });
             } else {
               localStorage.setItem(fullSwitchKey, "1");
             }
@@ -133,7 +170,10 @@ export function usePersistenceInit(): MutableRefObject<boolean> {
             try {
               mergedSettings.defaultDownloadDir = await downloadDir();
             } catch (e) {
-              addLog({ level: "warn", message: `Could not resolve download dir: ${String(e)}` });
+              addLog({
+                level: "warn",
+                message: `Could not resolve download dir: ${String(e)}`,
+              });
             }
           }
           setSettings(mergedSettings);
@@ -144,42 +184,57 @@ export function usePersistenceInit(): MutableRefObject<boolean> {
             const currentSettings = useSettingsStore.getState().settings;
             setSettings({ ...currentSettings, defaultDownloadDir: defaultDir });
           } catch (e) {
-            addLog({ level: "warn", message: `Could not resolve download dir: ${String(e)}` });
+            addLog({
+              level: "warn",
+              message: `Could not resolve download dir: ${String(e)}`,
+            });
           }
         }
 
         const savedUserPresets = await storage.getPresets<Preset[]>();
         if (savedUserPresets && Array.isArray(savedUserPresets)) {
-          const userOnly = savedUserPresets.filter(p => !p.isBuiltIn);
+          const userOnly = savedUserPresets.filter((p) => !p.isBuiltIn);
           const merged = [...BUILT_IN_PRESETS, ...userOnly];
           setPresets(merged);
-          addLog({ level: "info", message: `Presets loaded (${merged.length})` });
+          addLog({
+            level: "info",
+            message: `Presets loaded (${merged.length})`,
+          });
         }
 
         const savedDownloads = await storage.getDownloads<DownloadJob[]>();
         if (savedDownloads && Array.isArray(savedDownloads)) {
-          const uuidRe = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+          const uuidRe =
+            /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
           const needsMigration = savedDownloads.some((j) => !uuidRe.test(j.id));
 
           if (!needsMigration) {
             useDownloadsStore.setState({ jobs: savedDownloads });
-            addLog({ level: "info", message: `Downloads loaded (${savedDownloads.length})` });
+            addLog({
+              level: "info",
+              message: `Downloads loaded (${savedDownloads.length})`,
+            });
           } else {
             const idMap = new Map<string, string>();
-            const migratedDownloads: DownloadJob[] = savedDownloads.map((job) => {
-              const nextId = createId();
-              idMap.set(job.id, nextId);
-              return {
-                ...job,
-                id: nextId,
-                thumbnail: undefined,
-                thumbnailStatus: "pending" as const,
-                thumbnailError: undefined,
-              };
-            });
+            const migratedDownloads: DownloadJob[] = savedDownloads.map(
+              (job) => {
+                const nextId = createId();
+                idMap.set(job.id, nextId);
+                return {
+                  ...job,
+                  id: nextId,
+                  thumbnail: undefined,
+                  thumbnailStatus: "pending" as const,
+                  thumbnailError: undefined,
+                };
+              }
+            );
 
             useDownloadsStore.setState({ jobs: migratedDownloads });
-            addLog({ level: "info", message: `Downloads loaded (${migratedDownloads.length})` });
+            addLog({
+              level: "info",
+              message: `Downloads loaded (${migratedDownloads.length})`,
+            });
 
             const logsState = useLogsStore.getState();
             const migratedLogs = logsState.logs.map((l) => {
@@ -189,15 +244,21 @@ export function usePersistenceInit(): MutableRefObject<boolean> {
               return { ...l, jobId: next };
             });
             const migratedActiveJobId = logsState.activeJobId
-              ? idMap.get(logsState.activeJobId) ?? undefined
+              ? (idMap.get(logsState.activeJobId) ?? undefined)
               : undefined;
-            useLogsStore.setState({ logs: migratedLogs, activeJobId: migratedActiveJobId });
+            useLogsStore.setState({
+              logs: migratedLogs,
+              activeJobId: migratedActiveJobId,
+            });
 
             try {
               await storage.saveDownloads<DownloadJob[]>(migratedDownloads);
               await storage.saveLogs(migratedLogs);
             } catch (e) {
-              addLog({ level: "warn", message: `Failed to persist job id migration: ${String(e)}` });
+              addLog({
+                level: "warn",
+                message: `Failed to persist job id migration: ${String(e)}`,
+              });
             }
           }
         }
@@ -205,7 +266,10 @@ export function usePersistenceInit(): MutableRefObject<boolean> {
         const savedHistory = await storage.getHistory<HistoryEntry[]>();
         if (savedHistory && Array.isArray(savedHistory)) {
           useHistoryStore.setState({ entries: savedHistory });
-          addLog({ level: "info", message: `History loaded (${savedHistory.length})` });
+          addLog({
+            level: "info",
+            message: `History loaded (${savedHistory.length})`,
+          });
         }
 
         const savedTools = await storage.getTools<Tool[]>();
@@ -221,7 +285,10 @@ export function usePersistenceInit(): MutableRefObject<boolean> {
             };
           });
           setTools(mergedTools);
-          addLog({ level: "info", message: `Tools loaded (${mergedTools.length})` });
+          addLog({
+            level: "info",
+            message: `Tools loaded (${mergedTools.length})`,
+          });
         }
 
         await checkTools();
@@ -232,37 +299,53 @@ export function usePersistenceInit(): MutableRefObject<boolean> {
           for (const t of currentTools) {
             updateTool(t.id, { hasBackup: backupIds.includes(t.id) });
           }
-          addLog({ level: "debug", message: `Backups found: ${backupIds.length > 0 ? backupIds.join(", ") : "none"}` });
+          addLog({
+            level: "debug",
+            message: `Backups found: ${backupIds.length > 0 ? backupIds.join(", ") : "none"}`,
+          });
         } catch (e) {
-          addLog({ level: "warn", message: `Failed to list backups: ${String(e)}` });
+          addLog({
+            level: "warn",
+            message: `Failed to list backups: ${String(e)}`,
+          });
         }
 
         initialized.current = true;
 
         void checkLatestVersions();
         void checkAppUpdate();
-
       } catch (e) {
-        addLog({ level: "error", message: `Failed to load persistence: ${String(e)}` });
+        addLog({
+          level: "error",
+          message: `Failed to load persistence: ${String(e)}`,
+        });
         toast.error("Failed to load settings");
       }
     };
 
     async function checkAppUpdate() {
       try {
+        const installContext = await getInstallContext();
+        useAppUpdateStore.getState().setInstallContext(installContext);
+
         const currentVersion = await getVersion();
-        const res = await fetch(
-          "https://api.github.com/repos/Asdmir786/HalalDL/releases/latest",
-          { headers: { Accept: "application/vnd.github.v3+json" } },
+        const result = await resolveLatestAppUpdate(
+          currentVersion,
+          installContext
         );
-        if (!res.ok) return;
-        const data = await res.json();
-        const tag: string = data.tag_name ?? "";
-        const latest = tag.replace(/^v/, "");
-        const updateAvailable = isUpdateAvailable(currentVersion, latest);
+        const updateAvailable = result.updateAvailable;
         if (updateAvailable) {
-          useAppUpdateStore.getState().setUpdate(latest, data.html_url ?? "https://github.com/Asdmir786/HalalDL/releases");
-          addLog({ level: "info", message: `App update available: v${latest} (current: v${currentVersion})` });
+          useAppUpdateStore.getState().setUpdate({
+            version: result.latestVersion,
+            releaseUrl: result.releaseUrl,
+            downloadUrl: result.downloadUrl,
+            assetName: result.assetName,
+            checksumUrl: result.checksumUrl,
+          });
+          addLog({
+            level: "info",
+            message: `App update available: v${result.latestVersion} (current: v${currentVersion}, installer: ${installContext.installerType})`,
+          });
         }
       } catch {
         // silently ignore update check failures

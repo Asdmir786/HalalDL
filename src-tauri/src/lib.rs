@@ -1,12 +1,13 @@
-mod fs_utils;
+mod app_update;
+mod clipboard;
+mod diagnostics;
 mod download;
 mod extract;
+mod file_commands;
+mod fs_utils;
+mod shell;
 mod tools;
 mod version;
-mod shell;
-mod clipboard;
-mod file_commands;
-mod diagnostics;
 
 #[tauri::command]
 fn greet(name: &str) -> String {
@@ -42,6 +43,8 @@ pub fn run() {
             clipboard::copy_files_to_clipboard,
             clipboard::read_text_from_clipboard,
             download::download_url_to_file,
+            app_update::get_install_context,
+            app_update::download_and_verify_app_update,
             tools::resolve_system_tool_path,
             tools::update_tool_at_path,
             tools::list_tool_backups,
