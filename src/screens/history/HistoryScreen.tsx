@@ -13,6 +13,7 @@ import { HistoryExport } from "./components/HistoryExport";
 import { exists, readDir } from "@tauri-apps/plugin-fs";
 import { toast } from "sonner";
 import { History as HistoryIcon } from "lucide-react";
+import { copyFilesToClipboard } from "@/lib/commands";
 
 type PathParts = {
   dir: string;
@@ -406,6 +407,59 @@ export function HistoryScreen() {
     toast.success(`Queued ${selectedEntries.length} download${selectedEntries.length === 1 ? "" : "s"}`);
   }, [addJob, entries, selectedIdsFiltered, setScreen]);
 
+  const filteredCopyablePaths = useMemo(
+    () =>
+      filtered
+        .filter(
+          (entry) =>
+            entry.status === "completed" &&
+            Boolean(entry.outputPath) &&
+            fileExistsMap[entry.id] === true
+        )
+        .map((entry) => entry.outputPath!),
+    [filtered, fileExistsMap]
+  );
+
+  const selectedCopyablePaths = useMemo(
+    () =>
+      entries
+        .filter(
+          (entry) =>
+            selectedIdsFiltered.includes(entry.id) &&
+            entry.status === "completed" &&
+            Boolean(entry.outputPath) &&
+            fileExistsMap[entry.id] === true
+        )
+        .map((entry) => entry.outputPath!),
+    [entries, fileExistsMap, selectedIdsFiltered]
+  );
+
+  const handleCopyFilteredFiles = useCallback(async () => {
+    if (filteredCopyablePaths.length === 0) return;
+    try {
+      await copyFilesToClipboard(filteredCopyablePaths);
+      toast.success(
+        `${filteredCopyablePaths.length} file${filteredCopyablePaths.length === 1 ? "" : "s"} copied to clipboard`
+      );
+    } catch (e) {
+      const message = e instanceof Error ? e.message : String(e);
+      toast.error(`Failed to copy files: ${message}`);
+    }
+  }, [filteredCopyablePaths]);
+
+  const handleCopySelectedFiles = useCallback(async () => {
+    if (selectedCopyablePaths.length === 0) return;
+    try {
+      await copyFilesToClipboard(selectedCopyablePaths);
+      toast.success(
+        `${selectedCopyablePaths.length} file${selectedCopyablePaths.length === 1 ? "" : "s"} copied to clipboard`
+      );
+    } catch (e) {
+      const message = e instanceof Error ? e.message : String(e);
+      toast.error(`Failed to copy files: ${message}`);
+    }
+  }, [selectedCopyablePaths]);
+
   useLayoutEffect(() => {
     const el = scrollRef.current;
     if (!el) return;
@@ -452,8 +506,30 @@ export function HistoryScreen() {
                 >
                   Clear
                 </button>
+                <button
+                  onClick={() => void handleCopySelectedFiles()}
+                  disabled={selectedCopyablePaths.length === 0}
+                  className={`text-xs px-2 py-1 rounded-md ${
+                    selectedCopyablePaths.length === 0
+                      ? "text-muted-foreground/50 cursor-not-allowed"
+                      : "text-muted-foreground hover:text-foreground hover:bg-muted"
+                  }`}
+                >
+                  Copy selected files {selectedCopyablePaths.length > 0 ? `(${selectedCopyablePaths.length})` : ""}
+                </button>
               </>
             )}
+            <button
+              onClick={() => void handleCopyFilteredFiles()}
+              disabled={filteredCopyablePaths.length === 0}
+              className={`text-xs font-semibold px-3 py-1.5 rounded-full transition-colors ${
+                filteredCopyablePaths.length === 0
+                  ? "text-muted-foreground/60 bg-muted/40 cursor-not-allowed"
+                  : "bg-blue-500/10 text-blue-300 hover:bg-blue-500/20"
+              }`}
+            >
+              Copy filtered files {filteredCopyablePaths.length > 0 ? `(${filteredCopyablePaths.length})` : ""}
+            </button>
             <button
               onClick={handleBulkRedownload}
               disabled={selectedIdsFiltered.length === 0}

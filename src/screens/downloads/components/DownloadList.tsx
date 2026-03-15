@@ -3,7 +3,7 @@ import { useLayoutEffect, useRef, type UIEvent } from "react";
 import { DownloadItem } from "./DownloadItem";
 import { DownloadJob } from "@/store/downloads";
 import { MotionButton } from "@/components/motion/MotionButton";
-import { CheckCircle2, Download, Layers, Play, Plus, Settings, Sparkles, X, Upload } from "lucide-react";
+import { CheckCircle2, Copy, Download, Layers, Play, Plus, Settings, Sparkles, X, Upload } from "lucide-react";
 import { FadeInItem } from "@/components/motion/StaggerContainer";
 import { useNavigationStore } from "@/store/navigation";
 import { exportJobTemplate, importJobTemplate } from "@/lib/job-templates";
@@ -16,6 +16,8 @@ interface DownloadListProps {
   selectedIds: string[];
   onToggleSelection: (id: string) => void;
   onStartSelected: () => void;
+  onCopySelected: () => void;
+  canCopySelected: boolean;
   onRemoveSelected: () => void;
   onClearCompleted: () => void;
   onRemoveJob: (id: string) => void;
@@ -32,6 +34,8 @@ export function DownloadList({
   selectedIds,
   onToggleSelection,
   onStartSelected,
+  onCopySelected,
+  canCopySelected,
   onRemoveSelected,
   onClearCompleted,
   onRemoveJob,
@@ -153,6 +157,17 @@ export function DownloadList({
                           >
                               <Play className="w-3.5 h-3.5" />
                               Start Selected
+                          </MotionButton>
+                          <MotionButton
+                              type="button"
+                              variant="secondary"
+                              size="sm"
+                              className="h-8 px-3.5 text-xs rounded-full shadow-sm border border-blue-500/20 bg-blue-500/10 text-blue-300 hover:bg-blue-500/20 gap-1.5"
+                              onClick={onCopySelected}
+                              disabled={!canCopySelected}
+                          >
+                              <Copy className="w-3.5 h-3.5" />
+                              Copy Files
                           </MotionButton>
                           <MotionButton
                               type="button"

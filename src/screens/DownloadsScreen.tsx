@@ -10,6 +10,8 @@ import { useNavigationStore } from "@/store/navigation";
 
 import { FadeInStagger, FadeInItem } from "@/components/motion/StaggerContainer";
 import { startDownload, fetchMetadata, cleanupThumbnailByJobId } from "@/lib/downloader";
+import { copyFilesToClipboard } from "@/lib/commands";
+import { toast } from "sonner";
 
 import { DownloadInputSection } from "./downloads/components/DownloadInputSection";
 import { DownloadStatsBar } from "./downloads/components/DownloadStatsBar";
@@ -35,6 +37,7 @@ export function DownloadsScreen() {
 
   const { presets } = usePresetsStore();
   const { jobs, addJob, removeJob, pendingUrl, setPendingUrl } = useDownloadsStore();
+  const updateJob = useDownloadsStore((s) => s.updateJob);
   const { setActiveJobId } = useLogsStore();
   const { setScreen } = useNavigationStore();
 
@@ -247,33 +250,58 @@ export function DownloadsScreen() {
 
   const handleStartAll = () => {
     const max = settings.maxConcurrency || 1;
-    const queuedOrFailed = jobs.filter(
-      (job) => job.status === "Queued" || job.status === "Failed"
-    );
-    let active = jobs.filter(
+    const active = jobs.filter(
       (job) =>
         job.status === "Downloading" || job.status === "Post-processing"
     ).length;
+    const availableSlots = Math.max(0, max - active);
+    if (availableSlots === 0) return;
 
-    for (const job of queuedOrFailed) {
-      if (active >= max) break;
-      startDownload(job.id);
-      active += 1;
-    }
+    const queued = jobs
+      .filter((job) => job.status === "Queued")
+      .sort((a, b) => {
+        const ao = typeof a.queueOrder === "number" ? a.queueOrder : a.createdAt;
+        const bo = typeof b.queueOrder === "number" ? b.queueOrder : b.createdAt;
+        return bo - ao;
+      });
+    const failed = jobs
+      .filter((job) => job.status === "Failed")
+      .sort((a, b) => getJobTs(b) - getJobTs(a));
+
+    const toStart = [...queued, ...failed].slice(0, availableSlots);
+    toStart.forEach((job) => {
+      updateJob(job.id, {
+        status: "Downloading",
+        phase: "Resolving formats",
+        statusDetail: "Preparing download",
+        progress: 0,
+      });
+      void startDownload(job.id);
+    });
   };
 
   const handleRetryFailed = () => {
     const max = settings.maxConcurrency || 1;
-    const failedJobs = jobs.filter((job) => job.status === "Failed");
-    let active = jobs.filter(
+    const active = jobs.filter(
       (job) => job.status === "Downloading" || job.status === "Post-processing"
     ).length;
+    const availableSlots = Math.max(0, max - active);
+    if (availableSlots === 0) return;
 
-    for (const job of failedJobs) {
-      if (active >= max) break;
-      startDownload(job.id);
-      active += 1;
-    }
+    const failedJobs = jobs
+      .filter((job) => job.status === "Failed")
+      .sort((a, b) => getJobTs(b) - getJobTs(a))
+      .slice(0, availableSlots);
+
+    failedJobs.forEach((job) => {
+      updateJob(job.id, {
+        status: "Downloading",
+        phase: "Resolving formats",
+        statusDetail: "Preparing download",
+        progress: 0,
+      });
+      void startDownload(job.id);
+    });
   };
 
   const handleToggleSelection = (id: string) => {
@@ -284,13 +312,58 @@ export function DownloadsScreen() {
 
   const handleStartSelected = () => {
     if (!selectedIds.length) return;
-    selectedIds.forEach((id) => {
-      const job = jobs.find((j) => j.id === id);
-      if (!job) return;
-      if (job.status === "Queued" || job.status === "Failed") {
-        startDownload(id);
-      }
+    const max = settings.maxConcurrency || 1;
+    const active = jobs.filter(
+      (job) => job.status === "Downloading" || job.status === "Post-processing"
+    ).length;
+    const availableSlots = Math.max(0, max - active);
+    if (availableSlots === 0) return;
+
+    const selectedSet = new Set(selectedIds);
+    const queued = jobs
+      .filter((job) => selectedSet.has(job.id) && job.status === "Queued")
+      .sort((a, b) => {
+        const ao = typeof a.queueOrder === "number" ? a.queueOrder : a.createdAt;
+        const bo = typeof b.queueOrder === "number" ? b.queueOrder : b.createdAt;
+        return bo - ao;
+      });
+    const failed = jobs
+      .filter((job) => selectedSet.has(job.id) && job.status === "Failed")
+      .sort((a, b) => getJobTs(b) - getJobTs(a));
+
+    [...queued, ...failed].slice(0, availableSlots).forEach((job) => {
+      updateJob(job.id, {
+        status: "Downloading",
+        phase: "Resolving formats",
+        statusDetail: "Preparing download",
+        progress: 0,
+      });
+      void startDownload(job.id);
     });
+  };
+
+  const handleCopySelected = async () => {
+    const copyablePaths = jobs
+      .filter(
+        (job) =>
+          selectedIds.includes(job.id) &&
+          job.status === "Done" &&
+          Boolean(job.outputPath)
+      )
+      .map((job) => job.outputPath!)
+      .filter(Boolean);
+
+    if (copyablePaths.length === 0) return;
+
+    try {
+      await copyFilesToClipboard(copyablePaths);
+      toast.success(
+        `${copyablePaths.length} file${copyablePaths.length === 1 ? "" : "s"} copied to clipboard`
+      );
+    } catch (e) {
+      const message = e instanceof Error ? e.message : String(e);
+      toast.error(`Failed to copy files: ${message}`);
+    }
   };
 
   const handleRemoveSelected = () => {
@@ -322,7 +395,13 @@ export function DownloadsScreen() {
   const handleRemoveJob = (jobId: string) => {
     void cleanupThumbnailByJobId(jobId);
     removeJob(jobId);
+    setSelectedIds((prev) => prev.filter((id) => id !== jobId));
   };
+
+  const canStartMore = activeCount < (settings.maxConcurrency || 1);
+  const canCopySelected = jobs.some(
+    (job) => selectedIds.includes(job.id) && job.status === "Done" && Boolean(job.outputPath)
+  );
 
   return (
     <div className="flex flex-col h-full bg-background max-w-6xl mx-auto w-full" role="main">
@@ -366,9 +445,9 @@ export function DownloadsScreen() {
               failedCount={failedCount}
               doneCount={doneCount}
               onStartAll={handleStartAll}
-              canStartAll={jobs.some((job) => job.status === "Queued" || job.status === "Failed")}
+              canStartAll={canStartMore && jobs.some((job) => job.status === "Queued" || job.status === "Failed")}
               onRetryFailed={handleRetryFailed}
-              canRetryFailed={jobs.some((job) => job.status === "Failed")}
+              canRetryFailed={canStartMore && jobs.some((job) => job.status === "Failed")}
               sortMode={sortMode}
               onSortModeChange={setSortMode}
             />
@@ -383,6 +462,8 @@ export function DownloadsScreen() {
           selectedIds={selectedIds}
           onToggleSelection={handleToggleSelection}
           onStartSelected={handleStartSelected}
+          onCopySelected={handleCopySelected}
+          canCopySelected={canCopySelected}
           onRemoveSelected={handleRemoveSelected}
           onClearCompleted={handleClearCompleted}
           onRemoveJob={handleRemoveJob}
