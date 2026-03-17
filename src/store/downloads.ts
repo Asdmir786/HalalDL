@@ -35,6 +35,7 @@ export interface DownloadJob {
   thumbnailError?: string;
   fallbackUsed?: boolean;
   fallbackFormat?: string;
+  ffmpegProgressKnown?: boolean;
 }
 
 interface DownloadsState {
@@ -63,7 +64,7 @@ export const useDownloadsStore = create<DownloadsState>((set) => ({
           status: "Queued",
           progress: 0,
           phase: "Resolving formats",
-          statusDetail: "Waiting to start",
+          statusDetail: "Start queue to begin",
           thumbnailStatus: "pending",
           fallbackUsed: false,
           fallbackFormat: undefined,

@@ -132,7 +132,7 @@ export function AboutSection() {
     } catch {
       setUpdateStatus("error");
     }
-  }, [version, storeUpdate]);
+  }, [version]);
 
   const handleDownloadUpdate = useCallback(async () => {
     if (!downloadUrl || !assetName || !checksumUrl) {

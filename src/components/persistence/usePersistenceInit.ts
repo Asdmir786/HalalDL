@@ -32,6 +32,7 @@ import {
 import { toast } from "sonner";
 import { getAppMode } from "@/lib/tools/app-mode";
 import { checkAndStoreAppUpdate, logAvailableAppUpdate } from "@/lib/app-updates/service";
+import { startQueuedJobs } from "@/lib/downloader";
 
 export function usePersistenceInit(): MutableRefObject<boolean> {
   const { setSettings } = useSettingsStore();
@@ -201,19 +202,42 @@ export function usePersistenceInit(): MutableRefObject<boolean> {
 
         const savedDownloads = await storage.getDownloads<DownloadJob[]>();
         if (savedDownloads && Array.isArray(savedDownloads)) {
+          const normalizedDownloads = savedDownloads.map((job) => {
+            if (
+              job.status === "Downloading" ||
+              job.status === "Post-processing"
+            ) {
+              return {
+                ...job,
+                status: "Queued" as const,
+                phase: "Resolving formats" as const,
+                statusDetail: "Recovered after restart",
+                progress: 0,
+                speed: undefined,
+                eta: undefined,
+                statusChangedAt: Date.now(),
+              };
+            }
+            return job;
+          });
           const uuidRe =
             /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
-          const needsMigration = savedDownloads.some((j) => !uuidRe.test(j.id));
+          const needsMigration = normalizedDownloads.some((j) => !uuidRe.test(j.id));
 
           if (!needsMigration) {
-            useDownloadsStore.setState({ jobs: savedDownloads });
+            useDownloadsStore.setState({ jobs: normalizedDownloads });
             addLog({
               level: "info",
-              message: `Downloads loaded (${savedDownloads.length})`,
+              message: `Downloads loaded (${normalizedDownloads.length})`,
             });
+            if (normalizedDownloads.some((job) => job.status === "Queued")) {
+              window.setTimeout(() => {
+                startQueuedJobs();
+              }, 0);
+            }
           } else {
             const idMap = new Map<string, string>();
-            const migratedDownloads: DownloadJob[] = savedDownloads.map(
+            const migratedDownloads: DownloadJob[] = normalizedDownloads.map(
               (job) => {
                 const nextId = createId();
                 idMap.set(job.id, nextId);
@@ -232,6 +256,11 @@ export function usePersistenceInit(): MutableRefObject<boolean> {
               level: "info",
               message: `Downloads loaded (${migratedDownloads.length})`,
             });
+            if (migratedDownloads.some((job) => job.status === "Queued")) {
+              window.setTimeout(() => {
+                startQueuedJobs();
+              }, 0);
+            }
 
             const logsState = useLogsStore.getState();
             const migratedLogs = logsState.logs.map((l) => {

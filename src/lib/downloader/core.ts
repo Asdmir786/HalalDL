@@ -12,6 +12,161 @@ import { fetchMetadata } from "./metadata";
 import { useHistoryStore, extractDomain, type HistoryEntry } from "@/store/history";
 import { stat } from "@tauri-apps/plugin-fs";
 import { createId } from "@/lib/id";
+import type { DownloadJob } from "@/store/downloads";
+
+const ACTIVE_JOB_STATUSES = new Set<DownloadJob["status"]>([
+  "Downloading",
+  "Post-processing",
+]);
+
+const startingJobs = new Set<string>();
+
+function getQueueOrder(job: DownloadJob) {
+  return typeof job.queueOrder === "number" ? job.queueOrder : job.createdAt;
+}
+
+function getReservedJobIds(jobs: DownloadJob[]) {
+  const reserved = new Set(startingJobs);
+  jobs.forEach((job) => {
+    if (ACTIVE_JOB_STATUSES.has(job.status)) {
+      reserved.add(job.id);
+    }
+  });
+  return reserved;
+}
+
+function launchJob(jobId: string) {
+  const { jobs, updateJob } = useDownloadsStore.getState();
+  const job = jobs.find((candidate) => candidate.id === jobId);
+  if (!job) return false;
+  if (startingJobs.has(jobId)) return false;
+  if (ACTIVE_JOB_STATUSES.has(job.status) || job.status === "Done") return false;
+
+  startingJobs.add(jobId);
+  updateJob(jobId, {
+    status: "Downloading",
+    phase: "Resolving formats",
+    statusDetail: "Preparing download",
+    progress: 0,
+    speed: undefined,
+    eta: undefined,
+  });
+
+  void startDownload(jobId).finally(() => {
+    startingJobs.delete(jobId);
+    void startQueuedJobs();
+  });
+
+  return true;
+}
+
+export function startQueuedJobs(jobIds?: string[]) {
+  const { jobs } = useDownloadsStore.getState();
+  const { settings } = useSettingsStore.getState();
+  const allowedIds = jobIds ? new Set(jobIds) : undefined;
+  const reservedIds = getReservedJobIds(jobs);
+  const maxConcurrency = settings.maxConcurrency || 1;
+  const availableSlots = Math.max(0, maxConcurrency - reservedIds.size);
+
+  if (availableSlots === 0) return 0;
+
+  const queued = jobs
+    .filter(
+      (job) =>
+        job.status === "Queued" &&
+        !reservedIds.has(job.id) &&
+        (!allowedIds || allowedIds.has(job.id))
+    )
+    .sort((a, b) => getQueueOrder(b) - getQueueOrder(a))
+    .slice(0, availableSlots);
+
+  let started = 0;
+  queued.forEach((job) => {
+    if (launchJob(job.id)) started += 1;
+  });
+
+  return started;
+}
+
+export function retryFailedJobs(jobIds?: string[]) {
+  const { jobs } = useDownloadsStore.getState();
+  const { settings } = useSettingsStore.getState();
+  const allowedIds = jobIds ? new Set(jobIds) : undefined;
+  const reservedIds = getReservedJobIds(jobs);
+  const maxConcurrency = settings.maxConcurrency || 1;
+  const availableSlots = Math.max(0, maxConcurrency - reservedIds.size);
+
+  if (availableSlots === 0) return 0;
+
+  const failed = jobs
+    .filter(
+      (job) =>
+        job.status === "Failed" &&
+        !reservedIds.has(job.id) &&
+        (!allowedIds || allowedIds.has(job.id))
+    )
+    .sort((a, b) => {
+      const at = typeof a.statusChangedAt === "number" ? a.statusChangedAt : a.createdAt;
+      const bt = typeof b.statusChangedAt === "number" ? b.statusChangedAt : b.createdAt;
+      return bt - at;
+    })
+    .slice(0, availableSlots);
+
+  let started = 0;
+  failed.forEach((job) => {
+    if (launchJob(job.id)) started += 1;
+  });
+
+  return started;
+}
+
+async function probeMediaDurationSeconds(
+  inputPath: string,
+  jobId: string,
+  addLog: (entry: { level: "info" | "warn" | "error" | "debug"; message: string; jobId?: string }) => void
+) {
+  try {
+    const ffprobe = await resolveTool("ffprobe");
+    const probeCmd = Command.create(ffprobe.command, [
+      "-v",
+      "error",
+      "-show_entries",
+      "format=duration",
+      "-of",
+      "default=nw=1:nk=1",
+      inputPath,
+    ]);
+    const result = await probeCmd.execute();
+    if (result.code !== 0) {
+      addLog({
+        level: "warn",
+        message: `ffprobe duration probe failed (code ${result.code})`,
+        jobId,
+      });
+      return null;
+    }
+
+    const raw = result.stdout.trim();
+    const duration = Number.parseFloat(raw);
+    if (!Number.isFinite(duration) || duration <= 0) {
+      addLog({
+        level: "warn",
+        message: `ffprobe returned invalid duration: ${raw || "<empty>"}`,
+        jobId,
+      });
+      return null;
+    }
+
+    return duration;
+  } catch (error) {
+    addLog({
+      level: "warn",
+      message: `Could not probe media duration for FFmpeg progress: ${String(error)}`,
+      jobId,
+    });
+    return null;
+  }
+}
 
 export async function startDownload(jobId: string) {
   const { jobs, updateJob, removeJob } = useDownloadsStore.getState();
@@ -22,6 +177,13 @@ export async function startDownload(jobId: string) {
 
   const job = jobs.find((j) => j.id === jobId);
   if (!job) return;
+  if (
+    job.status !== "Queued" &&
+    job.status !== "Failed" &&
+    !ACTIVE_JOB_STATUSES.has(job.status)
+  ) {
+    return;
+  }
 
   const preset = presets.find((p) => p.id === job.presetId) || presets[0];
   const ytDlp = await resolveTool("yt-dlp");
@@ -168,6 +330,7 @@ export async function startDownload(jobId: string) {
     thumbnailError: undefined,
     fallbackUsed: false,
     fallbackFormat: undefined,
+    ffmpegProgressKnown: undefined,
   });
 
   const buildArgsWithFormat = (sourceArgs: string[], format: string) => {
@@ -419,9 +582,10 @@ export async function startDownload(jobId: string) {
   };
 
   let activeArgs = [...args];
-  let { effectiveArgs: resolvedInitialArgs, attemptResult: result } =
+  const { effectiveArgs: resolvedInitialArgs, attemptResult: initialResult } =
     await runAttemptWithDownloaderFallback(activeArgs);
   activeArgs = resolvedInitialArgs;
+  let result = initialResult;
 
   let didFallback = false;
 
@@ -471,20 +635,135 @@ export async function startDownload(jobId: string) {
       const baseName = inputPath.replace(/\.[^.]+$/, "");
       const tmpPath = `${baseName}.converting.${targetExt}`;
       const finalPath = `${baseName}.${targetExt}`;
+      const inputDurationSeconds = await probeMediaDurationSeconds(inputPath, jobId, addLog);
 
       updateJob(jobId, {
         status: "Post-processing",
         phase: "Converting with FFmpeg",
-        statusDetail: "Converting to target format",
-        progress: 99,
+        statusDetail: inputDurationSeconds
+          ? "Converting to target format with FFmpeg"
+          : "Converting to target format",
+        progress: 0,
+        speed: undefined,
+        eta: undefined,
+        ffmpegProgressKnown: Boolean(inputDurationSeconds),
       });
 
-      const ffmpegArgs = ["-i", inputPath, ...conversionArgs, "-y", tmpPath];
+      const ffmpegArgs = [
+        "-progress",
+        "pipe:1",
+        "-nostats",
+        ...(inputDurationSeconds ? ["-stats_period", "0.5"] : []),
+        "-i",
+        inputPath,
+        ...conversionArgs,
+        "-y",
+        tmpPath,
+      ];
       const ffmpegQuoted = ffmpegArgs.map(a => a.includes(" ") ? `"${a}"` : a).join(" ");
       addLog({ level: "info", message: `Running separate FFmpeg conversion:\n${ffmpeg.path} ${ffmpegQuoted}`, jobId });
 
       const ffmpegCmd = Command.create(ffmpeg.command, ffmpegArgs);
-      const ffmpegResult = await ffmpegCmd.execute();
+      const ffmpegResult = await new Promise<{ code: number; stderr: string }>((resolve) => {
+        let stdoutBuffer = "";
+        let stderrBuffer = "";
+        const progressState: {
+          outTimeUs?: number;
+          speed?: string;
+        } = {};
+        let lastProgressUpdate = 0;
+
+        const flushProgressLine = (line: string) => {
+          const trimmed = line.replace(/\r/g, "").trim();
+          if (!trimmed) return;
+
+          const eqIndex = trimmed.indexOf("=");
+          if (eqIndex === -1) {
+            addLog({ level: "info", message: `[ffmpeg] ${trimmed}`, jobId });
+            return;
+          }
+
+          const key = trimmed.slice(0, eqIndex);
+          const value = trimmed.slice(eqIndex + 1);
+
+          if (key === "out_time_us" || key === "out_time_ms") {
+            const parsed = Number.parseInt(value, 10);
+            if (Number.isFinite(parsed)) {
+              progressState.outTimeUs = parsed;
+            }
+          }
+
+          if (key === "speed") {
+            progressState.speed = value.trim();
+          }
+
+          if (key === "progress") {
+            if (value === "continue" || value === "end") {
+              const now = Date.now();
+              const shouldUpdate = value === "end" || now - lastProgressUpdate >= 250;
+
+              if (inputDurationSeconds && shouldUpdate) {
+                const outTimeUs = progressState.outTimeUs ?? 0;
+                const percent = Math.max(
+                  0,
+                  Math.min(100, (outTimeUs / (inputDurationSeconds * 1_000_000)) * 100)
+                );
+                updateJob(jobId, {
+                  progress: percent,
+                  speed: progressState.speed,
+                  statusDetail:
+                    value === "end"
+                      ? "Wrapping up FFmpeg conversion"
+                      : `Converting to target format (${Math.round(percent)}%)`,
+                });
+                lastProgressUpdate = now;
+              }
+            }
+            return;
+          }
+        };
+
+        const flushStderrLine = (line: string) => {
+          const trimmed = line.replace(/\r/g, "");
+          if (!trimmed) return;
+          addLog({ level: "info", message: `[ffmpeg] ${trimmed}`, jobId });
+        };
+
+        ffmpegCmd.stdout.on("data", (chunk) => {
+          stdoutBuffer += chunk;
+          const parts = stdoutBuffer.split(/\n/);
+          stdoutBuffer = parts.pop() ?? "";
+          for (const part of parts) flushProgressLine(part);
+        });
+
+        ffmpegCmd.stderr.on("data", (chunk) => {
+          stderrBuffer += chunk;
+          const parts = stderrBuffer.split(/\n/);
+          stderrBuffer = parts.pop() ?? "";
+          for (const part of parts) flushStderrLine(part);
+        });
+
+        ffmpegCmd.on("close", (data) => {
+          flushProgressLine(stdoutBuffer);
+          flushStderrLine(stderrBuffer);
+          resolve({
+            code: typeof data.code === "number" ? data.code : 1,
+            stderr: stderrBuffer,
+          });
+        });
+
+        ffmpegCmd.on("error", (error) => {
+          const message = String(error);
+          addLog({ level: "error", message: `FFmpeg process error: ${message}`, jobId });
+          resolve({ code: 1, stderr: message });
+        });
+
+        ffmpegCmd.spawn().catch((error) => {
+          const message = String(error);
+          addLog({ level: "error", message: `Failed to spawn FFmpeg: ${message}`, jobId });
+          resolve({ code: 1, stderr: message });
+        });
+      });
 
       if (ffmpegResult.code === 0) {
         addLog({ level: "info", message: "FFmpeg conversion succeeded, replacing original file", jobId });
@@ -511,6 +790,7 @@ export async function startDownload(jobId: string) {
       phase: "Generating thumbnail",
       statusDetail: "Finalizing download",
       progress: 100,
+      ffmpegProgressKnown: undefined,
     });
     fetchMetadata(jobId);
 
@@ -585,6 +865,7 @@ export async function startDownload(jobId: string) {
       status: "Failed",
       phase: "Resolving formats",
       statusDetail: failDetail,
+      ffmpegProgressKnown: undefined,
     });
 
     // Record failed download to history

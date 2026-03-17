@@ -12,7 +12,6 @@ import { useLogsStore } from "@/store/logs";
 import { useDownloadsStore } from "@/store/downloads";
 import { MotionButton } from "@/components/motion/MotionButton";
 import { revealInExplorer, deleteFile, openFile, copyFilesToClipboard } from "@/lib/commands";
-import { startDownload } from "@/lib/downloader";
 import { Checkbox } from "@/components/ui/checkbox";
 import { ContextMenu, ContextMenuContent, ContextMenuItem, ContextMenuTrigger, ContextMenuSeparator } from "@/components/ui/context-menu";
 import { toast } from "sonner";
@@ -25,6 +24,12 @@ interface DownloadItemProps {
   onToggleSelection: (id: string) => void;
   onRemove: (id: string) => void;
   onViewLogs: (id: string) => void;
+  onRetry: (id: string) => void;
+  queueMeta?: {
+    position: number;
+    statusLabel: string;
+    detail: string;
+  };
   itemVariants: Variants;
   formatRelativeTime: (ts: number) => string;
 }
@@ -35,6 +40,8 @@ export function DownloadItem({
   onToggleSelection,
   onRemove,
   onViewLogs,
+  onRetry,
+  queueMeta,
   itemVariants,
   formatRelativeTime
 }: DownloadItemProps) {
@@ -51,6 +58,9 @@ export function DownloadItem({
   const statusMeta = getStatusMeta(job.status);
   const StatusIcon = statusMeta.Icon;
   const phaseIndex = job.phase ? PHASE_ORDER.indexOf(job.phase as Phase) : -1;
+  const statusLabel = job.status === "Queued" ? queueMeta?.statusLabel || "Queued" : job.status;
+  const footerDetail = job.status === "Queued" ? queueMeta?.detail || job.statusDetail || "" : job.statusDetail || "";
+  const hasFfmpegProgress = job.phase === "Converting with FFmpeg" && job.ffmpegProgressKnown;
 
   const handleCopyLink = (url: string) => {
     navigator.clipboard.writeText(url);
@@ -162,12 +172,23 @@ export function DownloadItem({
                                 {job.outputPath.split(/[/\\]/).pop()}
                             </span>
                         )}
+                        {job.status === "Queued" && queueMeta && (
+                            <>
+                              <span className="w-0.5 h-0.5 rounded-full bg-muted-foreground/50" />
+                              <span
+                                className="whitespace-nowrap shrink-0 rounded-full border border-yellow-500/25 bg-yellow-500/10 px-1.5 py-0.5 text-[9px] font-semibold text-yellow-300"
+                                title={`Queue position ${queueMeta.position}`}
+                              >
+                                #{queueMeta.position} in queue
+                              </span>
+                            </>
+                        )}
                     </div>
                 </div>
 
                 <div className={cn("flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[10px] font-semibold border shadow-sm backdrop-blur-sm transition-colors", statusMeta.badgeClassName)}>
                     <StatusIcon className="w-3 h-3" />
-                    <span>{job.status}</span>
+                    <span>{statusLabel}</span>
                 </div>
               </div>
 
@@ -190,7 +211,34 @@ export function DownloadItem({
                         />
                       ))}
                     </div>
-                    {job.phase === "Converting with FFmpeg" || job.phase === "Merging streams" ? (
+                    {hasFfmpegProgress ? (
+                      <>
+                        <div className="flex items-center justify-between w-full text-[10px] font-mono font-medium">
+                          <span className="flex items-center gap-1.5 text-foreground">
+                            <span className="inline-block w-1.5 h-1.5 rounded-full bg-amber-400" />
+                            FFmpeg
+                          </span>
+                          <span className="text-muted-foreground">
+                            {Math.round(job.progress)}%
+                          </span>
+                        </div>
+                        <div className="flex items-center justify-between w-full text-[10px] font-mono font-medium text-muted-foreground">
+                          <span>{job.speed || "FFmpeg"}</span>
+                          <span className="opacity-70">{job.statusDetail || "Converting..."}</span>
+                        </div>
+                        <div className="w-full h-1.5 bg-muted/30 rounded-full overflow-hidden">
+                          <motion.div
+                            className="h-full rounded-full"
+                            style={{
+                              background: "linear-gradient(90deg, rgba(251,191,36,0.65), rgba(251,191,36,0.95))",
+                            }}
+                            initial={{ width: 0 }}
+                            animate={{ width: `${job.progress}%` }}
+                            transition={{ duration: 0.35, ease: "easeOut" }}
+                          />
+                        </div>
+                      </>
+                    ) : job.phase === "Converting with FFmpeg" ? (
                       <>
                         <div className="flex items-center justify-between w-full text-[10px] font-mono font-medium">
                           <span className="flex items-center gap-1.5 text-foreground">
@@ -206,7 +254,59 @@ export function DownloadItem({
                             animate={{ opacity: [0.5, 1, 0.5] }}
                             transition={{ duration: 2, repeat: Infinity, ease: "easeInOut" }}
                           >
-                            {job.phase === "Merging streams" ? "Merging..." : "Converting..."}
+                            Converting...
+                          </motion.span>
+                        </div>
+                        <div className="flex items-center justify-between w-full text-[10px] font-mono font-medium text-muted-foreground">
+                          <span>{job.speed || "FFmpeg"}</span>
+                          <span className="opacity-70">{job.statusDetail || "Converting..."}</span>
+                        </div>
+                        <div className="relative w-full h-1.5 bg-muted/30 rounded-full overflow-hidden">
+                          <motion.div
+                            className="absolute inset-0 rounded-full"
+                            style={{
+                              background: "linear-gradient(90deg, transparent, rgba(251,191,36,0.15), transparent)",
+                            }}
+                            animate={{ x: ["-100%", "100%"] }}
+                            transition={{ duration: 2, repeat: Infinity, ease: "linear" }}
+                          />
+                          <motion.div
+                            className="absolute h-full rounded-full"
+                            style={{
+                              background: "linear-gradient(90deg, rgba(251,191,36,0.6), rgba(251,191,36,0.9), rgba(251,191,36,0.6))",
+                              width: "40%",
+                            }}
+                            animate={{ left: ["-40%", "100%"] }}
+                            transition={{ duration: 1.8, repeat: Infinity, ease: [0.4, 0, 0.2, 1] }}
+                          />
+                          <motion.div
+                            className="absolute h-full rounded-full"
+                            style={{
+                              background: "linear-gradient(90deg, transparent, rgba(251,191,36,0.4), transparent)",
+                              width: "25%",
+                            }}
+                            animate={{ left: ["-25%", "100%"] }}
+                            transition={{ duration: 1.8, repeat: Infinity, ease: [0.4, 0, 0.2, 1], delay: 0.6 }}
+                          />
+                        </div>
+                      </>
+                    ) : job.phase === "Merging streams" ? (
+                      <>
+                        <div className="flex items-center justify-between w-full text-[10px] font-mono font-medium">
+                          <span className="flex items-center gap-1.5 text-foreground">
+                            <motion.span
+                              className="inline-block w-1.5 h-1.5 rounded-full bg-amber-400"
+                              animate={{ opacity: [1, 0.3, 1], scale: [1, 0.8, 1] }}
+                              transition={{ duration: 1.2, repeat: Infinity, ease: "easeInOut" }}
+                            />
+                            FFmpeg
+                          </span>
+                          <motion.span
+                            className="text-muted-foreground"
+                            animate={{ opacity: [0.5, 1, 0.5] }}
+                            transition={{ duration: 2, repeat: Infinity, ease: "easeInOut" }}
+                          >
+                            Merging...
                           </motion.span>
                         </div>
                         <div className="relative w-full h-1.5 bg-muted/30 rounded-full overflow-hidden">
@@ -258,7 +358,7 @@ export function DownloadItem({
                 ) : (
                   <div className="flex items-center justify-between gap-2">
                     <div className="text-[10px] text-muted-foreground truncate">
-                      {job.statusDetail || ""}
+                      {footerDetail}
                     </div>
                     <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-all duration-300 transform translate-x-4 group-hover:translate-x-0">
                       {job.status === "Queued" && (
@@ -316,18 +416,18 @@ export function DownloadItem({
                         </MotionButton>
                       )}
 
-                      {(job.status === "Queued" || job.status === "Failed") && (
+                      {job.status === "Failed" && (
                         <MotionButton
                           variant="ghost"
                           size="icon"
                           className="w-8 h-8 rounded-full border border-primary/20 bg-primary/5 hover:bg-primary/15 hover:text-primary transition-colors"
                           onClick={(e) => {
                             e.stopPropagation();
-                            startDownload(job.id);
+                            onRetry(job.id);
                           }}
-                          title="Start Download"
+                          title="Retry Download"
                         >
-                          <Play className="w-4 h-4 fill-current" />
+                          <RotateCcw className="w-4 h-4" />
                         </MotionButton>
                       )}
 
@@ -335,14 +435,14 @@ export function DownloadItem({
                         variant="ghost"
                         size="icon"
                         className="w-8 h-8 rounded-full border border-destructive/20 bg-destructive/5 hover:bg-destructive/15 hover:text-destructive transition-colors"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          onRemove(job.id);
-                        }}
-                        title="Remove"
-                      >
-                        <X className="w-4 h-4" />
-                      </MotionButton>
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            onRemove(job.id);
+                          }}
+                          title={job.status === "Queued" ? "Remove from queue" : "Remove"}
+                        >
+                          <X className="w-4 h-4" />
+                        </MotionButton>
                     </div>
                   </div>
                 )}
@@ -387,7 +487,7 @@ export function DownloadItem({
             Copy Link
           </ContextMenuItem>
           {job.status === "Failed" && (
-            <ContextMenuItem onClick={() => startDownload(job.id)}>
+            <ContextMenuItem onClick={() => onRetry(job.id)}>
               <RotateCcw className="mr-2 h-3.5 w-3.5" />
               Retry
             </ContextMenuItem>
@@ -418,7 +518,7 @@ export function DownloadItem({
           )}
           <ContextMenuItem onClick={() => onRemove(job.id)}>
             <X className="mr-2 h-3.5 w-3.5" />
-            Remove from List
+            {job.status === "Queued" ? "Remove from Queue" : "Remove from List"}
           </ContextMenuItem>
         </ContextMenuContent>
       </ContextMenu>

@@ -6,8 +6,8 @@ interface DownloadStatsBarProps {
   activeCount: number;
   failedCount: number;
   doneCount: number;
-  onStartAll: () => void;
-  canStartAll: boolean;
+  onStartQueue: () => void;
+  showStartQueue: boolean;
   onRetryFailed: () => void;
   canRetryFailed: boolean;
   sortMode: "newest" | "status";
@@ -19,8 +19,8 @@ export function DownloadStatsBar({
   activeCount,
   failedCount,
   doneCount,
-  onStartAll,
-  canStartAll,
+  onStartQueue,
+  showStartQueue,
   onRetryFailed,
   canRetryFailed,
   sortMode,
@@ -29,7 +29,7 @@ export function DownloadStatsBar({
   const stats = [
     {
       id: "queued",
-      label: `${queuedCount} queued`,
+      label: `${queuedCount} ${activeCount > 0 ? "waiting" : "queued"}`,
       Icon: Clock3,
       className:
         "border-yellow-500/20 bg-yellow-500/10 text-yellow-300",
@@ -109,17 +109,18 @@ export function DownloadStatsBar({
           <RotateCcw className="w-3.5 h-3.5" />
           Retry Failed
         </MotionButton>
-        <MotionButton
-          type="button"
-          variant="default"
-          size="sm"
-          onClick={onStartAll}
-          disabled={!canStartAll}
-          className="h-8 px-4 text-xs font-semibold gap-1.5 rounded-full bg-linear-to-r from-primary/95 via-primary to-primary/85 hover:from-primary hover:to-primary shadow-md shadow-primary/20 disabled:opacity-40 transition-all"
-        >
-          <Play className="w-3.5 h-3.5" />
-          Start All
-        </MotionButton>
+        {showStartQueue && (
+          <MotionButton
+            type="button"
+            variant="default"
+            size="sm"
+            onClick={onStartQueue}
+            className="h-8 px-4 text-xs font-semibold gap-1.5 rounded-full bg-linear-to-r from-primary/95 via-primary to-primary/85 hover:from-primary hover:to-primary shadow-md shadow-primary/20 transition-all"
+          >
+            <Play className="w-3.5 h-3.5" />
+            Start Queue
+          </MotionButton>
+        )}
       </div>
     </div>
   );

@@ -18,6 +18,11 @@
           "args": true
         },
         {
+          "name": "ffprobe",
+          "cmd": "ffprobe",
+          "args": true
+        },
+        {
           "name": "aria2c",
           "cmd": "aria2c",
           "args": true
@@ -35,6 +40,11 @@
         {
           "name": "local-ffmpeg",
           "cmd": "$APPDATA/bin/ffmpeg.exe",
+          "args": true
+        },
+        {
+          "name": "local-ffprobe",
+          "cmd": "$APPDATA/bin/ffprobe.exe",
           "args": true
         },
         {
@@ -73,6 +83,11 @@
           "args": true
         },
         {
+          "name": "ffprobe",
+          "cmd": "ffprobe",
+          "args": true
+        },
+        {
           "name": "aria2c",
           "cmd": "aria2c",
           "args": true
@@ -90,6 +105,11 @@
         {
           "name": "local-ffmpeg",
           "cmd": "$APPDATA/bin/ffmpeg.exe",
+          "args": true
+        },
+        {
+          "name": "local-ffprobe",
+          "cmd": "$APPDATA/bin/ffprobe.exe",
           "args": true
         },
         {

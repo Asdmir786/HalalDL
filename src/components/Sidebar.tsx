@@ -77,15 +77,17 @@ export function Sidebar() {
   }, [jobs]);
 
   const queueStatus = useMemo(() => {
-    const total = activeCount + queuedCount;
-    return `${String(activeCount).padStart(2, "0")}/${String(total).padStart(2, "0")}`;
+    if (queuedCount > 0) {
+      return `${activeCount} active • ${queuedCount} waiting`;
+    }
+    return `${activeCount} active`;
   }, [activeCount, queuedCount]);
 
   const downloadNavMeta = useMemo(() => {
     if (activeCount > 0) {
       return {
         Icon: ArrowDownToLine,
-        count: activeCount,
+        count: activeCount + queuedCount,
         badgeClassName: "border border-white/20 bg-white/10 text-foreground/90 backdrop-blur-xl shadow-sm",
         iconClassName: "text-foreground/95",
       };

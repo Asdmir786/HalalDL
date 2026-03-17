@@ -145,15 +145,32 @@ export function DownloadInputSection({
 
   useEffect(() => {
     const trimmed = url.trim();
+    let immediateTimer: number | undefined;
+    const queueProbeState = (next: {
+      url: string;
+      result: UrlProbeResult | null;
+      pending: boolean;
+      verified: boolean;
+      host: string | null;
+    }) => {
+      immediateTimer = window.setTimeout(() => {
+        setProbeState(next);
+      }, 0);
+    };
+
     if (!trimmed) {
-      setProbeState({
+      queueProbeState({
         url: "",
         result: null,
         pending: false,
         verified: false,
         host: null,
       });
-      return;
+      return () => {
+        if (typeof immediateTimer === "number") {
+          window.clearTimeout(immediateTimer);
+        }
+      };
     }
 
     const host = getProbeHostLabel(trimmed);
@@ -161,31 +178,39 @@ export function DownloadInputSection({
     const cachedResult = probeCacheRef.current.get(trimmed);
 
     if (cachedResult) {
-      setProbeState({
+      queueProbeState({
         url: trimmed,
         result: cachedResult,
         pending: false,
         verified: true,
         host,
       });
-      return;
+      return () => {
+        if (typeof immediateTimer === "number") {
+          window.clearTimeout(immediateTimer);
+        }
+      };
     }
 
     if (quickResult === "unsupported") {
-      setProbeState({
+      queueProbeState({
         url: trimmed,
         result: "unsupported",
         pending: false,
         verified: false,
         host,
       });
-      return;
+      return () => {
+        if (typeof immediateTimer === "number") {
+          window.clearTimeout(immediateTimer);
+        }
+      };
     }
 
     const requestId = probeRequestRef.current + 1;
     probeRequestRef.current = requestId;
 
-    setProbeState({
+    queueProbeState({
       url: trimmed,
       result: quickResult,
       pending: true,
@@ -219,6 +244,9 @@ export function DownloadInputSection({
     }, quickResult === "supported" ? 120 : 180);
 
     return () => {
+      if (typeof immediateTimer === "number") {
+        window.clearTimeout(immediateTimer);
+      }
       window.clearTimeout(timer);
     };
   }, [url]);

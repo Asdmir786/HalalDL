@@ -1,4 +1,4 @@
-export { startDownload } from "./core";
+export { retryFailedJobs, startDownload, startQueuedJobs } from "./core";
 export { fetchMetadata } from "./metadata";
 export { cleanupThumbnailByJobId } from "./thumbnails";
 export {

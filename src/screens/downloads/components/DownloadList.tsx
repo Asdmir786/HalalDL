@@ -3,7 +3,7 @@ import { useLayoutEffect, useRef, type UIEvent } from "react";
 import { DownloadItem } from "./DownloadItem";
 import { DownloadJob } from "@/store/downloads";
 import { MotionButton } from "@/components/motion/MotionButton";
-import { CheckCircle2, Copy, Download, Layers, Play, Plus, Settings, Sparkles, X, Upload } from "lucide-react";
+import { CheckCircle2, Copy, Download, Layers, Plus, RotateCcw, Settings, Sparkles, X, Upload } from "lucide-react";
 import { FadeInItem } from "@/components/motion/StaggerContainer";
 import { useNavigationStore } from "@/store/navigation";
 import { exportJobTemplate, importJobTemplate } from "@/lib/job-templates";
@@ -15,13 +15,17 @@ interface DownloadListProps {
   hasCompletedJobs: boolean;
   selectedIds: string[];
   onToggleSelection: (id: string) => void;
-  onStartSelected: () => void;
+  onRetrySelected: () => void;
+  canRetrySelected: boolean;
+  selectedFailedCount: number;
   onCopySelected: () => void;
   canCopySelected: boolean;
   onRemoveSelected: () => void;
   onClearCompleted: () => void;
   onRemoveJob: (id: string) => void;
   onViewLogs: (id: string) => void;
+  onRetryJob: (id: string) => void;
+  queueMetaById: Map<string, { position: number; statusLabel: string; detail: string }>;
   itemVariants: Variants;
   formatRelativeTime: (ts: number) => string;
 }
@@ -33,13 +37,17 @@ export function DownloadList({
   hasCompletedJobs,
   selectedIds,
   onToggleSelection,
-  onStartSelected,
+  onRetrySelected,
+  canRetrySelected,
+  selectedFailedCount,
   onCopySelected,
   canCopySelected,
   onRemoveSelected,
   onClearCompleted,
   onRemoveJob,
   onViewLogs,
+  onRetryJob,
+  queueMetaById,
   itemVariants,
   formatRelativeTime
 }: DownloadListProps) {
@@ -148,16 +156,19 @@ export function DownloadList({
                           exit={{ opacity: 0, x: 20 }}
                           className="flex gap-2"
                       >
-                          <MotionButton
-                              type="button"
-                              variant="secondary"
-                              size="sm"
-                              className="h-8 px-3.5 text-xs rounded-full shadow-sm border border-primary/20 bg-primary/10 text-primary hover:bg-primary/20 gap-1.5"
-                              onClick={onStartSelected}
-                          >
-                              <Play className="w-3.5 h-3.5" />
-                              Start Selected
-                          </MotionButton>
+                          {selectedFailedCount > 0 && (
+                            <MotionButton
+                                type="button"
+                                variant="secondary"
+                                size="sm"
+                                className="h-8 px-3.5 text-xs rounded-full shadow-sm border border-destructive/20 bg-destructive/10 text-destructive hover:bg-destructive/20 gap-1.5"
+                                onClick={onRetrySelected}
+                                disabled={!canRetrySelected}
+                            >
+                                <RotateCcw className="w-3.5 h-3.5" />
+                                Retry Failed ({selectedFailedCount})
+                            </MotionButton>
+                          )}
                           <MotionButton
                               type="button"
                               variant="secondary"
@@ -245,6 +256,8 @@ export function DownloadList({
                       onToggleSelection={onToggleSelection}
                       onRemove={onRemoveJob}
                       onViewLogs={onViewLogs}
+                      onRetry={onRetryJob}
+                      queueMeta={queueMetaById.get(job.id)}
                       itemVariants={itemVariants}
                       formatRelativeTime={formatRelativeTime}
                     />
