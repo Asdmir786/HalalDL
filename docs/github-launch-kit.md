@@ -4,7 +4,7 @@ This file captures the repo settings and launch copy that cannot be stored direc
 
 ## Repo Metadata
 
-- **Homepage:** `https://github.com/Asdmir786/HalalDL/releases/latest`
+- **Homepage:** `https://halaldl.vercel.app`
 - **Description:** `Windows-first, local-first desktop GUI for yt-dlp with presets, raw logs, and optional bundled tools.`
 - **Topics to keep:** `desktop-app`, `ffmpeg`, `open-source`, `react`, `rust`, `tauri`, `video-downloader`, `windows`, `yt-dlp`, `yt-dlp-gui`
 - **Topics to consider adding:** `media-downloader`, `download-manager`, `privacy-focused`, `windows-app`

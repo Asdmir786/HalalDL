@@ -1,5 +1,8 @@
 blank_issues_enabled: false
 contact_links:
+  - name: Official website
+    url: https://halaldl.vercel.app
+    about: Project homepage, install guidance, and public release links.
   - name: Security report
     url: https://github.com/Asdmir786/HalalDL/security
     about: Use GitHub private vulnerability reporting instead of opening a public issue.

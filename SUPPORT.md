@@ -2,6 +2,7 @@
 
 ## Where To Ask For Help
 
+- **Official website:** [halaldl.vercel.app](https://halaldl.vercel.app)
 - **Bug reports:** use [GitHub Issues](https://github.com/Asdmir786/HalalDL/issues/new/choose)
 - **Feature ideas:** use [GitHub Issues](https://github.com/Asdmir786/HalalDL/issues/new/choose) or Discussions if enabled
 - **Security concerns:** follow [SECURITY.md](./SECURITY.md)

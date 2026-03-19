@@ -2,7 +2,7 @@
 
 Windows-first, local-first desktop downloads for people who want a clean GUI on top of `yt-dlp`.
 
-[Download the latest release](https://github.com/Asdmir786/HalalDL/releases/latest) • [Report a bug](https://github.com/Asdmir786/HalalDL/issues/new/choose) • [Get support](./SUPPORT.md) • [Read the docs](./docs)
+[Official website](https://halaldl.vercel.app) • [Download the latest release](https://github.com/Asdmir786/HalalDL/releases/latest) • [Report a bug](https://github.com/Asdmir786/HalalDL/issues/new/choose) • [Get support](./SUPPORT.md) • [Read the docs](./docs)
 
 ## Start Here
 
