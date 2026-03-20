@@ -7,6 +7,8 @@ use crate::fs_utils::{temp_path_for, safe_replace_with_backup};
 use crate::download::{download_to_temp, emit_progress, resolve_latest_aria2_zip_url};
 use crate::extract::{extract_from_zip, extract_from_7z};
 
+const MAX_ARCHIVE_INSTALL_RETRIES: u8 = 3;
+
 /// Resolve the full system path of a tool using `where` (Windows).
 #[tauri::command]
 pub fn resolve_system_tool_path(tool: String) -> Result<Option<String>, String> {
@@ -93,14 +95,40 @@ async fn download_ffmpeg(app_handle: &tauri::AppHandle, dest: &PathBuf, variant:
         "https://www.gyan.dev/ffmpeg/builds/ffmpeg-release-full.7z"
     };
     let archive_path = dest.join("ffmpeg-update.7z");
-    download_tool_payload(app_handle, "ffmpeg", url, &archive_path).await?;
-    emit_progress(app_handle, "ffmpeg", 99.0, "Extracting ffmpeg.exe, ffprobe.exe from 7z...");
-    let extracted = extract_from_7z(app_handle, "ffmpeg", &archive_path, dest, vec!["ffmpeg.exe", "ffprobe.exe"])?;
-    emit_progress(app_handle, "ffmpeg", 100.0, &format!("Extracted: {}", extracted.join(", ")));
-    if let Err(e) = fs::remove_file(&archive_path) {
-        eprintln!("[tools] Warning: failed to clean up {:?}: {}", archive_path, e);
+
+    let mut last_error: Option<String> = None;
+    for attempt in 1..=MAX_ARCHIVE_INSTALL_RETRIES {
+        download_tool_payload(app_handle, "ffmpeg", url, &archive_path).await?;
+        emit_progress(app_handle, "ffmpeg", 99.0, "Extracting ffmpeg.exe, ffprobe.exe from 7z...");
+
+        match extract_from_7z(app_handle, "ffmpeg", &archive_path, dest, vec!["ffmpeg.exe", "ffprobe.exe"]) {
+            Ok(extracted) => {
+                emit_progress(app_handle, "ffmpeg", 100.0, &format!("Extracted: {}", extracted.join(", ")));
+                if let Err(e) = fs::remove_file(&archive_path) {
+                    eprintln!("[tools] Warning: failed to clean up {:?}: {}", archive_path, e);
+                }
+                return Ok(());
+            }
+            Err(e) => {
+                last_error = Some(e.clone());
+                let _ = fs::remove_file(&archive_path);
+                if attempt < MAX_ARCHIVE_INSTALL_RETRIES {
+                    emit_progress(
+                        app_handle,
+                        "ffmpeg",
+                        0.0,
+                        &format!(
+                            "FFmpeg archive extract failed, retrying install (attempt {}/{})...",
+                            attempt + 1,
+                            MAX_ARCHIVE_INSTALL_RETRIES
+                        ),
+                    );
+                }
+            }
+        }
     }
-    Ok(())
+
+    Err(last_error.unwrap_or_else(|| "FFmpeg install failed after archive retries".to_string()))
 }
 
 async fn download_aria2(app_handle: &tauri::AppHandle, dest: &PathBuf) -> Result<(), String> {
