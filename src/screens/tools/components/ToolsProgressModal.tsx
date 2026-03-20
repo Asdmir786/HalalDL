@@ -63,103 +63,104 @@ export function ToolsProgressModal({
         }
         onOpenChange(true);
       }}
-    >
-      <DialogContent
-        className="sm:max-w-[440px] border-none bg-transparent shadow-2xl p-0 overflow-hidden"
-        onInteractOutside={() => {
-          void 0;
-        }}
-        onEscapeKeyDown={() => {
-          void 0;
-        }}
       >
-        <div className="relative bg-background/90 backdrop-blur-2xl border border-white/10 rounded-xl overflow-hidden">
-          <div className="absolute top-0 left-0 right-0 h-1 bg-linear-to-r from-primary via-purple-500 to-primary animate-gradient-x" />
+        <DialogContent
+          className="w-[calc(100%-1rem)] max-w-[560px] border-none bg-transparent p-0 shadow-2xl overflow-hidden"
+          onInteractOutside={() => {
+            void 0;
+          }}
+          onEscapeKeyDown={() => {
+            void 0;
+          }}
+        >
+          <div className="relative flex max-h-[min(720px,calc(100vh-1rem))] min-h-0 flex-col overflow-hidden rounded-xl border border-white/10 bg-background/90 backdrop-blur-2xl">
+            <div className="absolute top-0 left-0 right-0 h-1 bg-linear-to-r from-primary via-purple-500 to-primary animate-gradient-x" />
 
-          <div className="p-6 pb-3">
-            <DialogHeader className="mb-4">
-              <div className="flex items-center gap-3">
-                <div className="relative">
-                  <div className="absolute inset-0 bg-primary/20 blur-lg rounded-full animate-pulse" />
-                  <div className="relative p-2.5 bg-primary/10 rounded-xl border border-primary/20">
-                    <Sparkles className="w-5 h-5 text-primary" />
+            <div className="min-h-0 flex-1 overflow-y-auto p-4 pb-3 sm:p-6">
+              <DialogHeader className="mb-4">
+                <div className="flex items-start gap-3">
+                  <div className="relative shrink-0">
+                    <div className="absolute inset-0 bg-primary/20 blur-lg rounded-full animate-pulse" />
+                    <div className="relative p-2.5 bg-primary/10 rounded-xl border border-primary/20">
+                      <Sparkles className="w-5 h-5 text-primary" />
+                    </div>
+                  </div>
+                  <div className="min-w-0">
+                    <DialogTitle className="text-lg font-bold tracking-tight">
+                      {modalTitle}
+                    </DialogTitle>
+                    <p className="mt-0.5 text-xs font-medium text-muted-foreground">
+                      {modalDone
+                        ? "Download complete — restart to apply"
+                        : modalError
+                          ? "Something went wrong"
+                          : modalCurrentToolName
+                            ? `${modalCurrentToolName}: ${modalCurrentStatus}`
+                            : "Preparing transfer..."}
+                    </p>
                   </div>
                 </div>
-                <div>
-                  <DialogTitle className="text-lg font-bold tracking-tight">
-                    {modalTitle}
-                  </DialogTitle>
-                  <p className="text-xs text-muted-foreground font-medium mt-0.5">
-                    {modalDone
-                      ? "Download complete — restart to apply"
-                      : modalError
-                        ? "Something went wrong"
-                        : modalCurrentToolName
-                          ? `${modalCurrentToolName}: ${modalCurrentStatus}`
-                          : "Preparing transfer..."}
-                  </p>
-                </div>
-              </div>
-            </DialogHeader>
+              </DialogHeader>
 
-            <AnimatePresence mode="wait">
-              {modalError ? (
-                <motion.div
-                  key="error"
-                  initial={{ opacity: 0 }}
-                  animate={{ opacity: 1 }}
-                  className="space-y-4"
-                >
-                  <div className="flex items-start gap-3 rounded-xl border border-destructive/20 bg-destructive/5 p-4 text-sm text-destructive">
-                    <AlertCircle className="mt-0.5 h-5 w-5 shrink-0" />
-                    <p>{modalError}</p>
-                  </div>
-                  {modalBatchResult && (
-                    <ToolBatchSummary result={modalBatchResult} toolNameById={toolNameById} />
-                  )}
-                </motion.div>
-              ) : (
-                <motion.div
-                  key="progress"
-                  initial={{ opacity: 0, y: 10 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  exit={{ opacity: 0, y: -10 }}
-                >
-                  <ToolTransferStatus
-                    progress={modalProgress}
-                    currentToolName={modalCurrentToolName}
-                    currentStatus={modalCurrentStatus}
-                    orderedToolIds={orderedModalToolIds}
-                    toolProgress={modalToolProgress}
-                    toolNameById={toolNameById}
-                    logs={modalLogs}
-                    emptyLabel="Initializing transfer..."
-                  />
-                </motion.div>
+              <AnimatePresence mode="wait">
+                {modalError ? (
+                  <motion.div
+                    key="error"
+                    initial={{ opacity: 0 }}
+                    animate={{ opacity: 1 }}
+                    className="space-y-4"
+                  >
+                    <div className="flex items-start gap-3 rounded-xl border border-destructive/20 bg-destructive/5 p-4 text-sm text-destructive">
+                      <AlertCircle className="mt-0.5 h-5 w-5 shrink-0" />
+                      <p>{modalError}</p>
+                    </div>
+                    {modalBatchResult && (
+                      <ToolBatchSummary result={modalBatchResult} toolNameById={toolNameById} />
+                    )}
+                  </motion.div>
+                ) : (
+                  <motion.div
+                    key="progress"
+                    initial={{ opacity: 0, y: 10 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    exit={{ opacity: 0, y: -10 }}
+                    className="min-h-0"
+                  >
+                    <ToolTransferStatus
+                      progress={modalProgress}
+                      currentToolName={modalCurrentToolName}
+                      currentStatus={modalCurrentStatus}
+                      orderedToolIds={orderedModalToolIds}
+                      toolProgress={modalToolProgress}
+                      toolNameById={toolNameById}
+                      logs={modalLogs}
+                      emptyLabel="Initializing transfer..."
+                    />
+                  </motion.div>
+                )}
+              </AnimatePresence>
+            </div>
+
+            <DialogFooter className="gap-2 bg-muted/5 p-4 pt-2 sm:flex-row sm:p-6 sm:pt-2">
+              {modalDone && (
+                <div className="flex h-12 w-full items-center justify-center gap-2 rounded-xl border border-green-500/20 bg-green-600/10 text-sm font-medium text-green-400">
+                  <Loader2 className="w-4 h-4 animate-spin" />
+                  Restarting...
+                </div>
               )}
-            </AnimatePresence>
+              {modalError && (
+                <MotionButton
+                  type="button"
+                  variant="outline"
+                  onClick={onDismiss}
+                  className="h-11 w-full rounded-xl"
+                >
+                  Dismiss
+                </MotionButton>
+              )}
+            </DialogFooter>
           </div>
-
-          <DialogFooter className="p-6 pt-2 flex-col sm:flex-row gap-2 bg-muted/5">
-            {modalDone && (
-              <div className="w-full flex items-center justify-center gap-2 h-12 rounded-xl bg-green-600/10 border border-green-500/20 text-green-400 text-sm font-medium">
-                <Loader2 className="w-4 h-4 animate-spin" />
-                Restarting...
-              </div>
-            )}
-            {modalError && (
-              <MotionButton
-                type="button"
-                variant="outline"
-                onClick={onDismiss}
-                className="w-full h-11 rounded-xl"
-              >
-                Dismiss
-              </MotionButton>
-            )}
-          </DialogFooter>
-        </div>
-      </DialogContent>
+        </DialogContent>
     </Dialog>
   );
 }

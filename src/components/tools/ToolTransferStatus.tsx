@@ -23,7 +23,7 @@ export function ToolTransferStatus({
   emptyLabel = "Preparing transfer...",
 }: ToolTransferStatusProps) {
   return (
-    <div className="space-y-5 py-1">
+    <div className="flex min-h-0 flex-col gap-5 py-1">
       <div className="rounded-2xl border border-white/10 bg-white/5 p-4">
         <div className="mb-3 flex items-end justify-between gap-3">
           <div>
@@ -41,7 +41,7 @@ export function ToolTransferStatus({
         <Progress value={progress} className="h-2 bg-muted/50" />
       </div>
 
-      <div className="grid grid-cols-2 gap-2 text-[11px]">
+      <div className="grid grid-cols-1 gap-2 text-[11px] sm:grid-cols-2">
         <div className="rounded-xl border border-white/10 bg-muted/20 px-3 py-2.5">
           <div className="text-[10px] uppercase tracking-[0.18em] text-muted-foreground">
             Active Tool
@@ -82,11 +82,11 @@ export function ToolTransferStatus({
         </div>
       )}
 
-      <div className="relative h-[144px] overflow-hidden rounded-2xl border border-white/8 bg-black/40 p-4 font-mono text-[10px]">
-        <div className="absolute right-3 top-3 opacity-45">
+      <div className="relative min-h-0 flex-1 rounded-2xl border border-white/8 bg-black/40 p-4 font-mono text-[10px]">
+        <div className="absolute right-3 top-3 opacity-45 pointer-events-none">
           <Terminal className="h-3.5 w-3.5" />
         </div>
-        <div className="space-y-1.5 pr-4 opacity-85">
+        <div className="max-h-44 space-y-1.5 overflow-y-auto pr-4 opacity-85 sm:max-h-56">
           {logs.slice(-6).map((log, index) => (
             <div key={`${log}-${index}`} className="flex items-center gap-2">
               <ChevronRight className="h-2.5 w-2.5 shrink-0 text-primary" />
@@ -95,7 +95,7 @@ export function ToolTransferStatus({
           ))}
           {logs.length === 0 && <span className="italic text-muted-foreground">{emptyLabel}</span>}
         </div>
-        <div className="absolute bottom-0 left-0 right-0 h-10 bg-linear-to-t from-black/40 to-transparent" />
+        <div className="pointer-events-none absolute bottom-0 left-0 right-0 h-10 bg-linear-to-t from-black/40 to-transparent" />
       </div>
     </div>
   );

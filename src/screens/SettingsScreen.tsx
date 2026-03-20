@@ -237,9 +237,9 @@ export function SettingsScreen() {
   };
 
   return (
-    <div className="relative flex flex-col h-full bg-background max-w-6xl mx-auto w-full" role="main">
+    <div className="relative flex h-full w-full max-w-6xl flex-col bg-background mx-auto" role="main">
       {/* Header */}
-      <div className="p-8 pb-4">
+      <div className="px-4 pt-4 pb-3 sm:px-6 sm:pt-6 md:px-8 md:pb-4">
         <SettingsHeader
           isGlobalDirty={isGlobalDirty}
           isResetting={isResetting}
@@ -248,12 +248,12 @@ export function SettingsScreen() {
       </div>
 
       {/* Mobile nav pills */}
-      <div className="px-8 md:hidden">
+      <div className="px-4 md:hidden sm:px-6">
         <SettingsNav scrollContainerRef={scrollRef} />
       </div>
 
       {/* Two-column layout */}
-      <div className="flex-1 flex overflow-hidden px-8 pb-8 gap-6">
+      <div className="flex flex-1 overflow-hidden gap-4 px-4 pb-6 sm:px-6 md:gap-6 md:px-8 md:pb-8">
         {/* Left: sticky nav (desktop only) */}
         <div className="hidden md:block w-44 shrink-0 pt-2">
           <SettingsNav scrollContainerRef={scrollRef} />
@@ -263,9 +263,9 @@ export function SettingsScreen() {
         <div
           ref={scrollRef}
           onScroll={handleScroll}
-          className="flex-1 overflow-auto pr-1"
+          className="min-h-0 flex-1 overflow-auto pr-0 md:pr-1"
         >
-          <div className="flex flex-col gap-8 pb-20">
+          <div className="flex flex-col gap-6 pb-24 md:gap-8">
             <AppearanceSection
               theme={draftSettings.theme}
               onThemeChange={(v) => setDraftValue("theme", v)}

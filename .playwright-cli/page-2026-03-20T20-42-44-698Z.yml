@@ -1,0 +1,45 @@
+- generic [ref=e3]:
+  - complementary [ref=e4]:
+    - heading "HalalDL" [level=1] [ref=e6]
+    - navigation [ref=e7]:
+      - button "Downloads" [ref=e8] [cursor=pointer]:
+        - generic [ref=e10]:
+          - img
+        - generic [ref=e12]: Downloads
+      - button "Presets" [ref=e13] [cursor=pointer]:
+        - generic [ref=e14]:
+          - img
+        - generic [ref=e16]: Presets
+      - button "Tools" [ref=e17] [cursor=pointer]:
+        - generic [ref=e18]:
+          - img
+        - generic [ref=e20]: Tools
+      - button "Logs" [ref=e21] [cursor=pointer]:
+        - generic [ref=e22]:
+          - img
+        - generic [ref=e24]: Logs
+      - button "History" [ref=e25] [cursor=pointer]:
+        - generic [ref=e26]:
+          - img
+        - generic [ref=e28]: History
+      - button "Settings" [ref=e29] [cursor=pointer]:
+        - generic [ref=e30]:
+          - img
+        - generic [ref=e32]: Settings
+    - button "Collapse Sidebar" [ref=e34] [cursor=pointer]:
+      - generic [ref=e35]:
+        - img
+        - generic [ref=e36]: Collapse Sidebar
+    - generic [ref=e37]: vunknown Lite
+  - main [ref=e38]:
+    - generic [ref=e41]:
+      - generic [ref=e50]:
+        - img [ref=e52]
+        - img [ref=e56]
+        - img [ref=e59]
+      - img [ref=e65]
+  - region "Notifications alt+T":
+    - list:
+      - listitem [ref=e69]:
+        - img [ref=e71]
+        - generic [ref=e76]: Failed to load settings

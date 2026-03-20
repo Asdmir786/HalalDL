@@ -532,28 +532,34 @@ export async function startDownload(jobId: string) {
       formatUnavailable: boolean;
       aria2Error: boolean;
     }>((resolve) => {
+      let settled = false;
+      const finish = (code: number) => {
+        if (settled) return;
+        settled = true;
+        resolve({ code, lastKnownOutputPath, formatUnavailable, aria2Error });
+      };
+
       cmd.on("close", (data) => {
         flushStdoutLine(stdoutBuffer);
         flushStderrLine(stderrBuffer);
         const code = typeof data.code === "number" ? data.code : 1;
         addLog({ level: "info", message: `Process finished with code ${code}`, jobId });
-        resolve({ code, lastKnownOutputPath, formatUnavailable, aria2Error });
+        finish(code);
       });
 
       cmd.on("error", (error) => {
         const message = String(error);
         if (message.toLowerCase().includes("invalid utf-8 sequence")) {
           addLog({ level: "warn", message: `Process output decode warning: ${message}`, jobId });
-          resolve({ code: 1, lastKnownOutputPath, formatUnavailable, aria2Error });
           return;
         }
         addLog({ level: "error", message: `Process error: ${message}`, jobId });
-        resolve({ code: 1, lastKnownOutputPath, formatUnavailable, aria2Error });
+        finish(1);
       });
 
       cmd.spawn().catch((e) => {
         addLog({ level: "error", message: `Failed to spawn process: ${e}`, jobId });
-        resolve({ code: 1, lastKnownOutputPath, formatUnavailable, aria2Error });
+        finish(1);
       });
     });
   };

@@ -186,10 +186,10 @@ export function AboutSection() {
       description="App info, updates, and links."
     >
       {/* Version + Update check */}
-      <div className="rounded-xl border border-border/30 bg-muted/15 p-4 space-y-4">
-        <div className="flex items-center justify-between gap-4">
-          <div className="space-y-1">
-            <div className="flex items-center gap-2.5">
+      <div className="space-y-4 rounded-xl border border-border/30 bg-muted/15 p-4 sm:p-5">
+        <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+          <div className="min-w-0 space-y-2">
+            <div className="flex flex-wrap items-center gap-2">
               <span className="text-2xl font-bold tracking-tight">HalalDL</span>
               <Badge variant="secondary" className="font-mono text-xs">
                 v{version}
@@ -207,14 +207,14 @@ export function AboutSection() {
               </Badge>
               <Badge
                 variant="outline"
-                className="text-[10px] h-5 px-2 font-semibold tracking-wide border-white/10"
+                className="h-5 max-w-full px-2 text-[10px] font-semibold tracking-wide border-white/10"
               >
                 {formatInstallerLabel(
                   storeUpdate.installContext?.installerType ?? "unknown"
                 )}
               </Badge>
             </div>
-            <p className="text-xs text-muted-foreground">
+            <p className="max-w-2xl text-xs text-muted-foreground">
               A modern, privacy-focused video downloader.
             </p>
           </div>
@@ -226,7 +226,7 @@ export function AboutSection() {
             onClick={checkForUpdates}
             whileHover={{ scale: 1.05 }}
             whileTap={{ scale: 0.95 }}
-            className="shrink-0"
+            className="w-full sm:w-auto sm:shrink-0"
           >
             {updateStatus === "checking" ? (
               <Loader2 className="w-4 h-4 mr-2 animate-spin" />
@@ -239,9 +239,9 @@ export function AboutSection() {
 
         {/* Update status feedback */}
         {updateStatus === "up-to-date" && (
-          <div className="flex items-center gap-2.5 rounded-lg border border-green-500/20 bg-green-500/5 px-4 py-3">
+          <div className="flex items-start gap-2.5 rounded-lg border border-green-500/20 bg-green-500/5 px-4 py-3">
             <CheckCircle2 className="w-5 h-5 text-green-500 shrink-0" />
-            <div>
+            <div className="min-w-0">
               <p className="text-sm font-medium text-green-400">
                 You're up to date!
               </p>
@@ -253,19 +253,25 @@ export function AboutSection() {
         )}
 
         {updateStatus === "update-available" && latestVersion && (
-          <div className="flex items-center justify-between gap-3 rounded-lg border border-blue-500/20 bg-blue-500/5 px-4 py-3">
-            <div className="flex items-center gap-2.5">
+          <div className="rounded-lg border border-blue-500/20 bg-blue-500/5 px-4 py-4">
+            <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
+              <div className="flex min-w-0 items-start gap-2.5">
               <ArrowUpCircle className="w-5 h-5 text-blue-400 shrink-0" />
-              <div>
+                <div className="min-w-0 space-y-1">
                 <p className="text-sm font-medium text-blue-400">
                   Update available — v{latestVersion}
                 </p>
-                <p className="text-xs text-muted-foreground">
+                  <p className="text-xs text-muted-foreground">
                   You're on v{version}.{" "}
                   {assetName
                     ? `Preferred package: ${assetName}`
                     : "A newer version is ready."}
                 </p>
+                  {assetName && (
+                    <div className="overflow-x-auto rounded-md border border-blue-500/15 bg-background/40 px-2.5 py-2 text-[11px] font-mono text-muted-foreground">
+                      {assetName}
+                    </div>
+                  )}
                 {verifiedInstallerPath && (
                   <p className="text-xs text-green-400">
                     Update ready. SHA-256 checksum verified.
@@ -277,63 +283,64 @@ export function AboutSection() {
                   </p>
                 )}
               </div>
-            </div>
-            <div className="flex shrink-0 flex-col items-end gap-2">
-              {verifiedInstallerPath ? (
-                <>
+              </div>
+              <div className="grid shrink-0 grid-cols-1 gap-2 sm:grid-cols-2 lg:w-[230px] lg:grid-cols-1">
+                {verifiedInstallerPath ? (
+                  <>
+                    <MotionButton
+                      size="sm"
+                      onClick={() => setInstallDialogOpen(true)}
+                      disabled={!canInstallUpdate || isLaunchingInstaller}
+                      whileHover={{ scale: 1.05 }}
+                      whileTap={{ scale: 0.95 }}
+                      className="w-full"
+                    >
+                      {isLaunchingInstaller ? (
+                        <Loader2 className="w-3.5 h-3.5 mr-1.5 animate-spin" />
+                      ) : (
+                        <ExternalLink className="w-3.5 h-3.5 mr-1.5" />
+                      )}
+                      Install Update
+                    </MotionButton>
+                    <MotionButton
+                      variant="outline"
+                      size="sm"
+                      onClick={() => void revealInExplorer(verifiedInstallerPath)}
+                      whileHover={{ scale: 1.03 }}
+                      whileTap={{ scale: 0.97 }}
+                      className="w-full"
+                    >
+                      Open Folder
+                    </MotionButton>
+                  </>
+                ) : (
                   <MotionButton
                     size="sm"
-                    onClick={() => setInstallDialogOpen(true)}
-                    disabled={!canInstallUpdate || isLaunchingInstaller}
+                    onClick={() => void handleDownloadUpdate()}
+                    disabled={isDownloadingUpdate}
                     whileHover={{ scale: 1.05 }}
                     whileTap={{ scale: 0.95 }}
-                    className="shrink-0"
+                    className="w-full sm:col-span-2 lg:col-span-1"
                   >
-                    {isLaunchingInstaller ? (
+                    {isDownloadingUpdate ? (
                       <Loader2 className="w-3.5 h-3.5 mr-1.5 animate-spin" />
                     ) : (
                       <ExternalLink className="w-3.5 h-3.5 mr-1.5" />
                     )}
-                    Install Update
+                    {downloadUrl && checksumUrl
+                      ? "Download Update"
+                      : "View Release"}
                   </MotionButton>
-                  <MotionButton
-                    variant="outline"
-                    size="sm"
-                    onClick={() => void revealInExplorer(verifiedInstallerPath)}
-                    whileHover={{ scale: 1.03 }}
-                    whileTap={{ scale: 0.97 }}
-                    className="shrink-0"
-                  >
-                    Open Folder
-                  </MotionButton>
-                </>
-              ) : (
-                <MotionButton
-                  size="sm"
-                  onClick={() => void handleDownloadUpdate()}
-                  disabled={isDownloadingUpdate}
-                  whileHover={{ scale: 1.05 }}
-                  whileTap={{ scale: 0.95 }}
-                  className="shrink-0"
-                >
-                  {isDownloadingUpdate ? (
-                    <Loader2 className="w-3.5 h-3.5 mr-1.5 animate-spin" />
-                  ) : (
-                    <ExternalLink className="w-3.5 h-3.5 mr-1.5" />
-                  )}
-                  {downloadUrl && checksumUrl
-                    ? "Download Update"
-                    : "View Release"}
-                </MotionButton>
-              )}
+                )}
+              </div>
             </div>
           </div>
         )}
 
         {verifiedInstallerPath && activeJobCount === 0 && (
-          <div className="flex items-center gap-2.5 rounded-lg border border-green-500/20 bg-green-500/5 px-4 py-3">
+          <div className="flex items-start gap-2.5 rounded-lg border border-green-500/20 bg-green-500/5 px-4 py-3">
             <CheckCircle2 className="w-5 h-5 text-green-500 shrink-0" />
-            <div>
+            <div className="min-w-0">
               <p className="text-sm font-medium text-green-400">
                 Update ready to install
               </p>
@@ -346,9 +353,9 @@ export function AboutSection() {
         )}
 
         {verifiedInstallerPath && activeJobCount > 0 && (
-          <div className="flex items-center gap-2.5 rounded-lg border border-amber-500/20 bg-amber-500/5 px-4 py-3">
+          <div className="flex items-start gap-2.5 rounded-lg border border-amber-500/20 bg-amber-500/5 px-4 py-3">
             <Info className="w-5 h-5 text-amber-400 shrink-0" />
-            <div>
+            <div className="min-w-0">
               <p className="text-sm font-medium text-amber-300">
                 Finish active downloads before installing
               </p>
@@ -361,9 +368,9 @@ export function AboutSection() {
         )}
 
         {updateStatus === "error" && (
-          <div className="flex items-center gap-2.5 rounded-lg border border-destructive/20 bg-destructive/5 px-4 py-3">
+          <div className="flex items-start gap-2.5 rounded-lg border border-destructive/20 bg-destructive/5 px-4 py-3">
             <Info className="w-5 h-5 text-destructive shrink-0" />
-            <div>
+            <div className="min-w-0">
               <p className="text-sm font-medium text-destructive">
                 Couldn't check for updates
               </p>
@@ -376,7 +383,7 @@ export function AboutSection() {
       </div>
 
       {/* Links */}
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5">
+      <div className="grid grid-cols-1 gap-2.5 sm:grid-cols-2 xl:grid-cols-3">
         <LinkCard
           icon={Github}
           title="Source Code"
@@ -398,7 +405,7 @@ export function AboutSection() {
       </div>
 
       <Dialog open={installDialogOpen} onOpenChange={setInstallDialogOpen}>
-        <DialogContent>
+        <DialogContent className="sm:max-w-xl">
           <DialogHeader>
             <DialogTitle>Install update now?</DialogTitle>
             <DialogDescription>
@@ -411,10 +418,18 @@ export function AboutSection() {
               package.
             </DialogDescription>
           </DialogHeader>
-          <div className="space-y-2 text-sm text-muted-foreground">
-            <p>Version: v{latestVersion ?? "unknown"}</p>
-            <p>Package: {assetName ?? "Unknown package"}</p>
-            <p>Checksum: SHA-256 verified</p>
+          <div className="space-y-3 text-sm text-muted-foreground">
+            <div className="grid gap-2 rounded-lg border border-border/40 bg-muted/20 p-3 sm:grid-cols-3">
+              <p>Version: v{latestVersion ?? "unknown"}</p>
+              <p>Checksum: SHA-256 verified</p>
+              <p>Jobs active: {activeJobCount}</p>
+            </div>
+            <div className="space-y-1">
+              <p className="text-foreground/90">Package</p>
+              <div className="max-h-24 overflow-auto rounded-lg border border-border/40 bg-muted/20 px-3 py-2 font-mono text-xs">
+                {assetName ?? "Unknown package"}
+              </div>
+            </div>
             {activeJobCount > 0 && (
               <p className="text-amber-400">
                 Active downloads are still running. Finish them before
