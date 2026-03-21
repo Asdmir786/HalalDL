@@ -46,3 +46,16 @@ export {
   deleteFile,
   renameFile,
 } from "./file-commands";
+export {
+  syncRuntimeSettings,
+  updateTrayState,
+  restoreMainWindow,
+  showQuickDownloadWindow,
+  hideMainWindowToTray,
+  isAutostartEnabled,
+  wasLaunchedFromAutostart,
+  setAutostartEnabled,
+  takePendingLaunchUrls,
+  type RuntimeSettingsSyncPayload,
+  type TrayStatePayload,
+} from "./runtime-commands";

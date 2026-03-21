@@ -10,7 +10,16 @@ import {
 import { MotionButton } from "@/components/motion/MotionButton";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Switch } from "@/components/ui/switch";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { type Preset } from "@/store/presets";
+import { splitSubtitleLanguages, subtitleLanguagesToString } from "@/lib/subtitles";
 
 interface PresetEditorProps {
   preset: Preset | null;
@@ -23,12 +32,35 @@ export function PresetEditor({ preset, isOpen, onClose, onSave }: PresetEditorPr
   const [name, setName] = useState(preset?.name ?? "");
   const [description, setDescription] = useState(preset?.description ?? "");
   const [args, setArgs] = useState(preset ? preset.args.join(" ") : "");
+  const [quickEligible, setQuickEligible] = useState(preset?.quickEligible ?? true);
+  const [subtitleMode, setSubtitleMode] = useState<"off" | "on" | "only">(
+    preset?.subtitleOnly ? "only" : preset?.subtitleMode ?? "off"
+  );
+  const [subtitleSourcePolicy, setSubtitleSourcePolicy] = useState<
+    "manual" | "auto" | "manual-then-auto"
+  >(preset?.subtitleSourcePolicy ?? "manual-then-auto");
+  const [subtitleLanguageMode, setSubtitleLanguageMode] = useState<
+    "all" | "preferred" | "custom"
+  >(preset?.subtitleLanguageMode ?? "preferred");
+  const [subtitleLanguagesText, setSubtitleLanguagesText] = useState(
+    subtitleLanguagesToString(preset?.subtitleLanguages ?? ["en.*", "en"])
+  );
+  const [subtitleFormat, setSubtitleFormat] = useState<"original" | "srt" | "vtt">(
+    preset?.subtitleFormat ?? "srt"
+  );
 
   const handleSave = () => {
     onSave({
       name,
       description,
       args: args.split(" ").filter(a => a.trim() !== ""),
+      quickEligible,
+      subtitleMode,
+      subtitleSourcePolicy,
+      subtitleLanguageMode,
+      subtitleLanguages: splitSubtitleLanguages(subtitleLanguagesText),
+      subtitleFormat,
+      subtitleOnly: subtitleMode === "only",
     });
     onClose();
   };
@@ -70,6 +102,90 @@ export function PresetEditor({ preset, isOpen, onClose, onSave }: PresetEditorPr
               placeholder="-f bestvideo+bestaudio --merge-output-format mp4"
               className="font-mono text-xs"
             />
+          </div>
+          <div className="flex items-center justify-between rounded-lg border border-border/40 bg-muted/20 px-3 py-2.5">
+            <div className="space-y-0.5">
+              <div className="text-sm font-medium">Show in quick download</div>
+              <div className="text-xs text-muted-foreground">
+                Makes this preset available in tray and quick-download flows.
+              </div>
+            </div>
+            <Switch checked={quickEligible} onCheckedChange={setQuickEligible} />
+          </div>
+          <div className="grid gap-4 rounded-lg border border-border/40 bg-muted/20 p-3">
+            <div className="text-sm font-medium">Subtitle defaults</div>
+            <div className="grid gap-4 sm:grid-cols-2">
+              <div className="grid gap-2">
+                <Label>Mode</Label>
+                <Select value={subtitleMode} onValueChange={(val) => setSubtitleMode(val as typeof subtitleMode)}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Subtitle mode" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="off">Off</SelectItem>
+                    <SelectItem value="on">Video + sidecar subtitles</SelectItem>
+                    <SelectItem value="only">Subtitles only</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="grid gap-2">
+                <Label>Source</Label>
+                <Select
+                  value={subtitleSourcePolicy}
+                  onValueChange={(val) => setSubtitleSourcePolicy(val as typeof subtitleSourcePolicy)}
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="Subtitle source" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="manual-then-auto">Manual, then auto</SelectItem>
+                    <SelectItem value="manual">Manual only</SelectItem>
+                    <SelectItem value="auto">Auto only</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="grid gap-2">
+                <Label>Language Mode</Label>
+                <Select
+                  value={subtitleLanguageMode}
+                  onValueChange={(val) => setSubtitleLanguageMode(val as typeof subtitleLanguageMode)}
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="Language mode" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="preferred">Preferred languages</SelectItem>
+                    <SelectItem value="all">All available</SelectItem>
+                    <SelectItem value="custom">Custom</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="grid gap-2">
+                <Label>Format</Label>
+                <Select value={subtitleFormat} onValueChange={(val) => setSubtitleFormat(val as typeof subtitleFormat)}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Subtitle format" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="original">Original</SelectItem>
+                    <SelectItem value="srt">SRT</SelectItem>
+                    <SelectItem value="vtt">VTT</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+            {subtitleLanguageMode === "custom" && (
+              <div className="grid gap-2">
+                <Label htmlFor="subtitle-languages">Custom Languages</Label>
+                <Input
+                  id="subtitle-languages"
+                  value={subtitleLanguagesText}
+                  onChange={(e) => setSubtitleLanguagesText(e.target.value)}
+                  placeholder="en.*, en, ur, ar"
+                  className="font-mono text-xs"
+                />
+              </div>
+            )}
           </div>
         </div>
         <DialogFooter>

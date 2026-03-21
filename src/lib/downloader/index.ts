@@ -1,9 +1,10 @@
 export { retryFailedJobs, startDownload, startQueuedJobs } from "./core";
-export { fetchMetadata } from "./metadata";
+export { fetchMetadata, fetchMediaInfo, type MediaMetadataProbe } from "./metadata";
 export { cleanupThumbnailByJobId } from "./thumbnails";
 export {
   probeMediaUrl,
   quickProbeMediaUrl,
   getProbeHostLabel,
+  pickSupportedUrlFromText,
   type UrlProbeResult,
 } from "./validation";

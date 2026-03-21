@@ -7,6 +7,20 @@ export const BUILT_IN_PRESETS: Preset[] = [
     description: "Best video + audio from the source (no size limits)",
     isBuiltIn: true,
     args: ["-f", "bestvideo+bestaudio/best"],
+    quickEligible: true,
+  },
+  {
+    id: "default-subs",
+    name: "Recommended — Best Available + Subtitles",
+    description: "Best video + audio, plus subtitles when available",
+    isBuiltIn: true,
+    args: ["-f", "bestvideo+bestaudio/best"],
+    quickEligible: true,
+    subtitleMode: "on",
+    subtitleSourcePolicy: "manual-then-auto",
+    subtitleLanguageMode: "preferred",
+    subtitleLanguages: ["en.*", "en"],
+    subtitleFormat: "srt",
   },
   {
     id: "recommended-1080p",
@@ -14,6 +28,7 @@ export const BUILT_IN_PRESETS: Preset[] = [
     description: "Best video up to 1080p + best audio",
     isBuiltIn: true,
     args: ["-f", "bestvideo[height<=1080]+bestaudio/best"],
+    quickEligible: true,
   },
   {
     id: "high-quality",
@@ -21,6 +36,7 @@ export const BUILT_IN_PRESETS: Preset[] = [
     description: "Best video up to 2160p + best audio",
     isBuiltIn: true,
     args: ["-f", "bestvideo[height<=2160]+bestaudio/best"],
+    quickEligible: true,
   },
   {
     id: "whatsapp-optimized",
@@ -35,6 +51,27 @@ export const BUILT_IN_PRESETS: Preset[] = [
       "--postprocessor-args",
       "VideoConvertor:-c:v libx264 -pix_fmt yuv420p -c:a aac -b:a 128k -crf 23 -preset slow -movflags +faststart"
     ],
+    quickEligible: true,
+  },
+  {
+    id: "whatsapp-optimized-subs",
+    name: "Compatibility — WhatsApp Optimized + Subtitles",
+    description: "WhatsApp optimized video with sidecar subtitles when available",
+    isBuiltIn: true,
+    args: [
+      "-f",
+      "bv[height<=1080][ext=mp4][vcodec^=avc1]+ba[ext=m4a]/bv[height<=1080][vcodec^=avc1]+ba/b[height<=1080][ext=mp4][vcodec^=avc1]/b[height<=1080]",
+      "--merge-output-format",
+      "mp4",
+      "--postprocessor-args",
+      "VideoConvertor:-c:v libx264 -pix_fmt yuv420p -c:a aac -b:a 128k -crf 23 -preset slow -movflags +faststart"
+    ],
+    quickEligible: true,
+    subtitleMode: "on",
+    subtitleSourcePolicy: "manual-then-auto",
+    subtitleLanguageMode: "preferred",
+    subtitleLanguages: ["en.*", "en"],
+    subtitleFormat: "srt",
   },
   {
     id: "whatsapp",
@@ -47,6 +84,7 @@ export const BUILT_IN_PRESETS: Preset[] = [
       "--merge-output-format",
       "mp4"
     ],
+    quickEligible: true,
   },
   {
     id: "mp4-best",
@@ -54,6 +92,7 @@ export const BUILT_IN_PRESETS: Preset[] = [
     description: "Highest quality MP4; codec may vary by source",
     isBuiltIn: true,
     args: ["-f", "bestvideo[ext=mp4]+bestaudio[ext=m4a]/best[ext=mp4]", "--merge-output-format", "mp4"],
+    quickEligible: true,
   },
   {
     id: "webm-best",
@@ -61,6 +100,7 @@ export const BUILT_IN_PRESETS: Preset[] = [
     description: "Best WebM quality; not ideal for most editors",
     isBuiltIn: true,
     args: ["-f", "bestvideo[ext=webm]+bestaudio[ext=webm]/best[ext=webm]"],
+    quickEligible: true,
   },
   {
     id: "editors-capcut-1080p-mp4",
@@ -73,6 +113,7 @@ export const BUILT_IN_PRESETS: Preset[] = [
       "--merge-output-format",
       "mp4",
     ],
+    quickEligible: false,
   },
   {
     id: "editors-capcut-4k-mp4",
@@ -85,6 +126,7 @@ export const BUILT_IN_PRESETS: Preset[] = [
       "--merge-output-format",
       "mp4",
     ],
+    quickEligible: false,
   },
   {
     id: "editors-premiere-ae-1080p-mp4",
@@ -97,6 +139,7 @@ export const BUILT_IN_PRESETS: Preset[] = [
       "--merge-output-format",
       "mp4",
     ],
+    quickEligible: false,
   },
   {
     id: "editors-premiere-ae-4k-mp4",
@@ -109,6 +152,7 @@ export const BUILT_IN_PRESETS: Preset[] = [
       "--merge-output-format",
       "mp4",
     ],
+    quickEligible: false,
   },
   {
     id: "editors-prores-1080p-mov",
@@ -123,6 +167,7 @@ export const BUILT_IN_PRESETS: Preset[] = [
       "--postprocessor-args",
       "VideoConvertor:-c:v prores_ks -profile:v 3 -pix_fmt yuv422p10le -c:a pcm_s16le",
     ],
+    quickEligible: false,
   },
   {
     id: "editors-prores-4k-mov",
@@ -137,6 +182,7 @@ export const BUILT_IN_PRESETS: Preset[] = [
       "--postprocessor-args",
       "VideoConvertor:-c:v prores_ks -profile:v 3 -pix_fmt yuv422p10le -c:a pcm_s16le",
     ],
+    quickEligible: false,
   },
   {
     id: "video-only",
@@ -144,6 +190,7 @@ export const BUILT_IN_PRESETS: Preset[] = [
     description: "Highest quality video stream without audio",
     isBuiltIn: true,
     args: ["-f", "bestvideo"],
+    quickEligible: true,
   },
   {
     id: "audio-only",
@@ -151,6 +198,21 @@ export const BUILT_IN_PRESETS: Preset[] = [
     description: "Highest bitrate audio stream; format may be Opus/WebM depending on source",
     isBuiltIn: true,
     args: ["-f", "bestaudio"],
+    quickEligible: true,
+  },
+  {
+    id: "subtitles-only",
+    name: "Subtitles — Sidecar Only",
+    description: "Downloads subtitles only, preferring manual and falling back to auto-generated captions",
+    isBuiltIn: true,
+    args: [],
+    quickEligible: true,
+    subtitleMode: "only",
+    subtitleOnly: true,
+    subtitleSourcePolicy: "manual-then-auto",
+    subtitleLanguageMode: "preferred",
+    subtitleLanguages: ["en.*", "en"],
+    subtitleFormat: "srt",
   },
   {
     id: "flac",
@@ -158,6 +220,7 @@ export const BUILT_IN_PRESETS: Preset[] = [
     description: "Converts best source audio to FLAC (no added loss; source may be lossy)",
     isBuiltIn: true,
     args: ["-f", "bestaudio", "-x", "--audio-format", "flac"],
+    quickEligible: false,
   },
   {
     id: "wav",
@@ -165,6 +228,7 @@ export const BUILT_IN_PRESETS: Preset[] = [
     description: "Converts best source audio to WAV (no added loss; huge files; source may be lossy)",
     isBuiltIn: true,
     args: ["-f", "bestaudio", "-x", "--audio-format", "wav"],
+    quickEligible: false,
   },
   {
     id: "alac",
@@ -172,6 +236,7 @@ export const BUILT_IN_PRESETS: Preset[] = [
     description: "Converts best source audio to ALAC (no added loss; source may be lossy)",
     isBuiltIn: true,
     args: ["-f", "bestaudio", "-x", "--audio-format", "alac"],
+    quickEligible: false,
   },
   {
     id: "mp3",
@@ -179,5 +244,6 @@ export const BUILT_IN_PRESETS: Preset[] = [
     description: "Converts best source audio to MP3 (lossy; requires FFmpeg)",
     isBuiltIn: true,
     args: ["-f", "bestaudio", "-x", "--audio-format", "mp3", "--audio-quality", "0"],
+    quickEligible: true,
   },
 ];

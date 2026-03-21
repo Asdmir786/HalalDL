@@ -17,6 +17,23 @@ const FAST_SUPPORTED_HOSTS = [
   "soundcloud.com",
 ];
 
+export function pickSupportedUrlFromText(raw: string): string | null {
+  const trimmed = raw.trim();
+  if (!trimmed) return null;
+
+  const match = trimmed.match(/https?:\/\/\S+/i);
+  const candidate = (match ? match[0] : trimmed).replace(/[)\].,;]+$/, "");
+  const parsed = parseProbeUrl(candidate);
+  if (!parsed) return null;
+
+  const host = parsed.hostname.toLowerCase();
+  const supported = FAST_SUPPORTED_HOSTS.some(
+    (candidateHost) => host === candidateHost || host.endsWith(`.${candidateHost}`)
+  );
+
+  return supported ? parsed.toString() : null;
+}
+
 function parseProbeUrl(url: string): URL | null {
   try {
     const parsed = new URL(url);

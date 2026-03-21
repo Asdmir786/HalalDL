@@ -244,6 +244,14 @@ export function PresetsScreen() {
                   description: data.description || "",
                   args: data.args || [],
                   isBuiltIn: false,
+                  quickEligible: data.quickEligible ?? true,
+                  subtitleMode: data.subtitleMode,
+                  subtitleSourcePolicy: data.subtitleSourcePolicy,
+                  subtitleLanguageMode: data.subtitleLanguageMode,
+                  subtitleLanguages: data.subtitleLanguages,
+                  subtitleFormat: data.subtitleFormat,
+                  subtitleOnly: data.subtitleOnly,
+                  askFolderBehavior: data.askFolderBehavior,
                 });
                 toast.success("Preset created");
               }

@@ -18,8 +18,15 @@ import { DownloadOutputOptions } from "./DownloadOutputOptions";
 import { DuplicateWarning } from "./DuplicateWarning";
 import { Preset } from "@/store/presets";
 import { readTextFromClipboard } from "@/lib/commands";
+import type {
+  SubtitleFormat,
+  SubtitleLanguageMode,
+  SubtitleMode,
+  SubtitleSourcePolicy,
+} from "@/lib/subtitles";
 import {
   getProbeHostLabel,
+  pickSupportedUrlFromText,
   probeMediaUrl,
   quickProbeMediaUrl,
   type UrlProbeResult,
@@ -47,46 +54,20 @@ interface DownloadInputSectionProps {
   onBrowseDir: () => void;
   isCustomPreset: boolean;
   defaultDownloadDir: string;
+  subtitleMode: SubtitleMode;
+  onSubtitleModeChange: (val: SubtitleMode) => void;
+  subtitleSourcePolicy: SubtitleSourcePolicy;
+  onSubtitleSourcePolicyChange: (val: SubtitleSourcePolicy) => void;
+  subtitleLanguageMode: SubtitleLanguageMode;
+  onSubtitleLanguageModeChange: (val: SubtitleLanguageMode) => void;
+  subtitleLanguagesText: string;
+  onSubtitleLanguagesTextChange: (val: string) => void;
+  subtitleFormat: SubtitleFormat;
+  onSubtitleFormatChange: (val: SubtitleFormat) => void;
+  subtitleHint: string;
 }
 
 const GROUP_ORDER = ["Recommended", "Compatibility", "Editors", "Editors Pro", "Web", "Video", "Audio", "Other", "Custom"] as const;
-
-const SUPPORTED_AUTO_PASTE_HOSTS = [
-  "youtube.com",
-  "youtu.be",
-  "tiktok.com",
-  "instagram.com",
-  "facebook.com",
-  "fb.watch",
-  "x.com",
-  "twitter.com",
-  "twitch.tv",
-  "vimeo.com",
-  "soundcloud.com",
-];
-
-function pickSupportedUrlFromText(raw: string): string | null {
-  const trimmed = raw.trim();
-  if (!trimmed) return null;
-
-  const match = trimmed.match(/https?:\/\/\S+/i);
-  const candidate = (match ? match[0] : trimmed).replace(/[)\].,;]+$/, "");
-
-  let url: URL;
-  try {
-    url = new URL(candidate);
-  } catch {
-    return null;
-  }
-
-  if (url.protocol !== "http:" && url.protocol !== "https:") return null;
-
-  const host = url.hostname.toLowerCase();
-  const supported = SUPPORTED_AUTO_PASTE_HOSTS.some((h) => host === h || host.endsWith(`.${h}`));
-  if (!supported) return null;
-
-  return url.toString();
-}
 
 export function DownloadInputSection({
   url, setUrl, autoPasteLinks, onAdd,
@@ -97,7 +78,18 @@ export function DownloadInputSection({
   outputFormat, onFormatChange,
   customDownloadDir, onBrowseDir,
   isCustomPreset,
-  defaultDownloadDir
+  defaultDownloadDir,
+  subtitleMode,
+  onSubtitleModeChange,
+  subtitleSourcePolicy,
+  onSubtitleSourcePolicyChange,
+  subtitleLanguageMode,
+  onSubtitleLanguageModeChange,
+  subtitleLanguagesText,
+  onSubtitleLanguagesTextChange,
+  subtitleFormat,
+  onSubtitleFormatChange,
+  subtitleHint,
 }: DownloadInputSectionProps) {
   const [probeState, setProbeState] = useState<{
     url: string;
@@ -481,6 +473,17 @@ export function DownloadInputSection({
           onBrowseDir={onBrowseDir}
           isCustomPreset={isCustomPreset}
           defaultDownloadDir={defaultDownloadDir}
+          subtitleMode={subtitleMode}
+          onSubtitleModeChange={onSubtitleModeChange}
+          subtitleSourcePolicy={subtitleSourcePolicy}
+          onSubtitleSourcePolicyChange={onSubtitleSourcePolicyChange}
+          subtitleLanguageMode={subtitleLanguageMode}
+          onSubtitleLanguageModeChange={onSubtitleLanguageModeChange}
+          subtitleLanguagesText={subtitleLanguagesText}
+          onSubtitleLanguagesTextChange={onSubtitleLanguagesTextChange}
+          subtitleFormat={subtitleFormat}
+          onSubtitleFormatChange={onSubtitleFormatChange}
+          subtitleHint={subtitleHint}
         />
       )}
     </div>

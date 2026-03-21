@@ -3,16 +3,23 @@ import { useDownloadsStore } from "@/store/downloads";
 import { useLogsStore } from "@/store/logs";
 import { usePresetsStore } from "@/store/presets";
 import { useSettingsStore } from "@/store/settings";
+import { useRuntimeStore } from "@/store/runtime";
 import { join } from "@tauri-apps/api/path";
 import { OutputParser } from "@/lib/output-parser";
 import { copyFilesToClipboard, deleteFile, renameFile } from "@/lib/commands";
 import { resolveTool, ytDlpEnv, sendDownloadCompleteNotification } from "./tool-env";
 import { cleanupThumbnailByJobId } from "./thumbnails";
-import { fetchMetadata } from "./metadata";
+import { fetchMediaInfo, fetchMetadata } from "./metadata";
 import { useHistoryStore, extractDomain, type HistoryEntry } from "@/store/history";
 import { stat } from "@tauri-apps/plugin-fs";
 import { createId } from "@/lib/id";
 import type { DownloadJob } from "@/store/downloads";
+import {
+  normalizeSubtitlePreferences,
+  resolveSubtitleLanguages,
+  resolveSubtitlePlan,
+  type SubtitleAvailability,
+} from "@/lib/subtitles";
 
 const ACTIVE_JOB_STATUSES = new Set<DownloadJob["status"]>([
   "Downloading",
@@ -63,6 +70,8 @@ function launchJob(jobId: string) {
 export function startQueuedJobs(jobIds?: string[]) {
   const { jobs } = useDownloadsStore.getState();
   const { settings } = useSettingsStore.getState();
+  const { queuePaused } = useRuntimeStore.getState();
+  if (queuePaused) return 0;
   const allowedIds = jobIds ? new Set(jobIds) : undefined;
   const reservedIds = getReservedJobIds(jobs);
   const maxConcurrency = settings.maxConcurrency || 1;
@@ -91,6 +100,8 @@ export function startQueuedJobs(jobIds?: string[]) {
 export function retryFailedJobs(jobIds?: string[]) {
   const { jobs } = useDownloadsStore.getState();
   const { settings } = useSettingsStore.getState();
+  const { queuePaused } = useRuntimeStore.getState();
+  if (queuePaused) return 0;
   const allowedIds = jobIds ? new Set(jobIds) : undefined;
   const reservedIds = getReservedJobIds(jobs);
   const maxConcurrency = settings.maxConcurrency || 1;
@@ -168,6 +179,32 @@ async function probeMediaDurationSeconds(
   }
 }
 
+function getSubtitlePreferences(job: DownloadJob) {
+  const { presets } = usePresetsStore.getState();
+  const preset = presets.find((candidate) => candidate.id === job.presetId) || presets[0];
+  const base = normalizeSubtitlePreferences({
+    mode: preset?.subtitleOnly ? "only" : preset?.subtitleMode,
+    sourcePolicy: preset?.subtitleSourcePolicy,
+    languageMode: preset?.subtitleLanguageMode,
+    languages: preset?.subtitleLanguages,
+    format: preset?.subtitleFormat,
+  });
+
+  return normalizeSubtitlePreferences({
+    ...base,
+    mode: job.overrides?.subtitleOnly
+      ? "only"
+      : (job.overrides?.subtitleMode ?? base.mode),
+    sourcePolicy: job.overrides?.subtitleSourcePolicy ?? base.sourcePolicy,
+    languageMode: job.overrides?.subtitleLanguageMode ?? base.languageMode,
+    languages:
+      job.overrides?.subtitleLanguages && job.overrides.subtitleLanguages.length > 0
+        ? job.overrides.subtitleLanguages
+        : base.languages,
+    format: job.overrides?.subtitleFormat ?? base.format,
+  });
+}
+
 export async function startDownload(jobId: string) {
   const { jobs, updateJob, removeJob } = useDownloadsStore.getState();
 
@@ -191,6 +228,7 @@ export async function startDownload(jobId: string) {
   const aria2 = await resolveTool("aria2c");
 
   const args = [...preset.args];
+  const subtitlePreferences = getSubtitlePreferences(job);
 
   if (job.overrides?.format) {
     const removeFlagWithValue = (flag: string) => {
@@ -276,6 +314,87 @@ export async function startDownload(jobId: string) {
     args.push("--external-downloader-args", "aria2c:-x 16 -s 16 -k 1M --summary-interval=0");
   } else {
     addLog({ level: "info", message: "Aria2c not found in local bin, checking system PATH...", jobId });
+  }
+
+  if (subtitlePreferences.mode !== "off") {
+    let availability: SubtitleAvailability = {
+      hasManualSubtitles: Boolean(job.hasManualSubtitles),
+      hasAutoSubtitles: Boolean(job.hasAutoSubtitles),
+      availableSubtitleLanguages: job.availableSubtitleLanguages ?? [],
+    };
+
+    if (
+      job.subtitleStatus !== "available" &&
+      job.subtitleStatus !== "unavailable"
+    ) {
+      try {
+        updateJob(jobId, { subtitleStatus: "checking" });
+        const info = await fetchMediaInfo(job.url);
+        availability = {
+          hasManualSubtitles: info.hasManualSubtitles,
+          hasAutoSubtitles: info.hasAutoSubtitles,
+          availableSubtitleLanguages: info.availableSubtitleLanguages,
+        };
+        updateJob(jobId, {
+          subtitleStatus:
+            info.hasManualSubtitles || info.hasAutoSubtitles ? "available" : "unavailable",
+          hasManualSubtitles: info.hasManualSubtitles,
+          hasAutoSubtitles: info.hasAutoSubtitles,
+          availableSubtitleLanguages: info.availableSubtitleLanguages,
+        });
+      } catch (error) {
+        addLog({
+          level: "warn",
+          message: `Subtitle availability probe failed: ${String(error)}`,
+          jobId,
+        });
+        updateJob(jobId, { subtitleStatus: "error" });
+      }
+    }
+
+    const subtitlePlan = resolveSubtitlePlan(subtitlePreferences, availability);
+    updateJob(jobId, { resolvedSubtitleSource: subtitlePlan.resolvedSource });
+
+    if (subtitlePlan.resolvedSource === "none") {
+      addLog({ level: "warn", message: "No subtitles available for this media", jobId });
+      if (subtitlePlan.subtitleOnly) {
+        updateJob(jobId, {
+          status: "Failed",
+          phase: "Resolving formats",
+          statusDetail: "No subtitles available",
+          resolvedSubtitleSource: "none",
+        });
+        return;
+      }
+    } else {
+      if (subtitlePlan.resolvedSource === "manual") {
+        args.push("--write-subs");
+      } else {
+        args.push("--write-auto-subs");
+      }
+
+      args.push(
+        "--sub-langs",
+        resolveSubtitleLanguages(
+          subtitlePreferences,
+          settings.preferredSubtitleLanguages
+        ).join(",")
+      );
+
+      if (subtitlePreferences.format !== "original") {
+        args.push("--convert-subs", subtitlePreferences.format);
+      }
+
+      if (subtitlePlan.subtitleOnly) {
+        args.push("--skip-download");
+      }
+
+      addLog({
+        level: "info",
+        message: `Subtitle plan: ${subtitlePlan.resolvedSource} (${subtitlePreferences.format})`,
+        jobId,
+      });
+    }
   }
 
   const downloadDir = job.overrides?.downloadDir || settings.defaultDownloadDir;

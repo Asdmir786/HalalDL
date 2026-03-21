@@ -6,6 +6,7 @@ import { useLogsStore } from "@/store/logs";
 import { useDownloadsStore } from "@/store/downloads";
 import { useHistoryStore } from "@/store/history";
 import { storage } from "@/lib/storage";
+import { setAutostartEnabled } from "@/lib/commands";
 
 export function useAutoSave(initialized: MutableRefObject<boolean>) {
   const settings = useSettingsStore((s) => s.settings);
@@ -24,6 +25,16 @@ export function useAutoSave(initialized: MutableRefObject<boolean>) {
     }, 500);
     return () => clearTimeout(timer);
   }, [settings, initialized]);
+
+  useEffect(() => {
+    if (!initialized.current) return;
+    const timer = setTimeout(() => {
+      setAutostartEnabled(settings.launchAtLogin).catch((e) => {
+        useLogsStore.getState().addLog({ level: "error", message: `Failed to sync autostart: ${String(e)}` });
+      });
+    }, 200);
+    return () => clearTimeout(timer);
+  }, [initialized, settings.launchAtLogin]);
 
   useEffect(() => {
     if (!initialized.current) return;

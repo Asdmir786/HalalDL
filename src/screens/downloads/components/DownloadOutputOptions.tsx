@@ -1,8 +1,14 @@
-import { Settings2, FolderOpen } from "lucide-react";
+import { Settings2, FolderOpen, Languages } from "lucide-react";
 import { MotionButton } from "@/components/motion/MotionButton";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { cn } from "@/lib/utils";
+import type {
+  SubtitleFormat,
+  SubtitleLanguageMode,
+  SubtitleMode,
+  SubtitleSourcePolicy,
+} from "@/lib/subtitles";
 
 interface DownloadOutputOptionsProps {
   filenameBase: string;
@@ -13,6 +19,17 @@ interface DownloadOutputOptionsProps {
   onBrowseDir: () => void;
   isCustomPreset: boolean;
   defaultDownloadDir: string;
+  subtitleMode: SubtitleMode;
+  onSubtitleModeChange: (val: SubtitleMode) => void;
+  subtitleSourcePolicy: SubtitleSourcePolicy;
+  onSubtitleSourcePolicyChange: (val: SubtitleSourcePolicy) => void;
+  subtitleLanguageMode: SubtitleLanguageMode;
+  onSubtitleLanguageModeChange: (val: SubtitleLanguageMode) => void;
+  subtitleLanguagesText: string;
+  onSubtitleLanguagesTextChange: (val: string) => void;
+  subtitleFormat: SubtitleFormat;
+  onSubtitleFormatChange: (val: SubtitleFormat) => void;
+  subtitleHint: string;
 }
 
 export function DownloadOutputOptions({
@@ -23,7 +40,18 @@ export function DownloadOutputOptions({
   customDownloadDir,
   onBrowseDir,
   isCustomPreset,
-  defaultDownloadDir
+  defaultDownloadDir,
+  subtitleMode,
+  onSubtitleModeChange,
+  subtitleSourcePolicy,
+  onSubtitleSourcePolicyChange,
+  subtitleLanguageMode,
+  onSubtitleLanguageModeChange,
+  subtitleLanguagesText,
+  onSubtitleLanguagesTextChange,
+  subtitleFormat,
+  onSubtitleFormatChange,
+  subtitleHint,
 }: DownloadOutputOptionsProps) {
   
   const insertPlaceholder = (placeholder: string) => {
@@ -132,6 +160,98 @@ export function DownloadOutputOptions({
               </MotionButton>
             </div>
           </div>
+       </div>
+
+       <div className="grid gap-3 rounded-xl border border-muted/40 bg-muted/15 p-3">
+         <div className="flex items-center justify-between gap-3">
+           <div className="flex items-center gap-2">
+             <Languages className="h-4 w-4 text-primary/80" />
+             <label className="text-xs font-medium text-muted-foreground">Subtitles</label>
+           </div>
+           <span className="text-[10px] text-muted-foreground">{subtitleHint}</span>
+         </div>
+
+         <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+           <div className="grid gap-2">
+             <label className="text-xs font-medium text-muted-foreground">Subtitle Mode</label>
+             <Select value={subtitleMode} onValueChange={(val) => onSubtitleModeChange(val as SubtitleMode)}>
+               <SelectTrigger className="h-9 bg-background/50 text-xs">
+                 <SelectValue placeholder="Subtitle mode" />
+               </SelectTrigger>
+               <SelectContent>
+                 <SelectItem value="off">Off</SelectItem>
+                 <SelectItem value="on">Video + sidecar subtitles</SelectItem>
+                 <SelectItem value="only">Subtitles only</SelectItem>
+               </SelectContent>
+             </Select>
+           </div>
+
+           <div className="grid gap-2">
+             <label className="text-xs font-medium text-muted-foreground">Source Preference</label>
+             <Select
+               value={subtitleSourcePolicy}
+               onValueChange={(val) =>
+                 onSubtitleSourcePolicyChange(val as SubtitleSourcePolicy)
+               }
+             >
+               <SelectTrigger className="h-9 bg-background/50 text-xs">
+                 <SelectValue placeholder="Subtitle source" />
+               </SelectTrigger>
+               <SelectContent>
+                 <SelectItem value="manual-then-auto">Manual, then auto fallback</SelectItem>
+                 <SelectItem value="manual">Manual only</SelectItem>
+                 <SelectItem value="auto">Auto only</SelectItem>
+               </SelectContent>
+             </Select>
+           </div>
+
+           <div className="grid gap-2">
+             <label className="text-xs font-medium text-muted-foreground">Language Mode</label>
+             <Select
+               value={subtitleLanguageMode}
+               onValueChange={(val) =>
+                 onSubtitleLanguageModeChange(val as SubtitleLanguageMode)
+               }
+             >
+               <SelectTrigger className="h-9 bg-background/50 text-xs">
+                 <SelectValue placeholder="Subtitle language mode" />
+               </SelectTrigger>
+               <SelectContent>
+                 <SelectItem value="preferred">Preferred languages</SelectItem>
+                 <SelectItem value="all">All available languages</SelectItem>
+                 <SelectItem value="custom">Custom languages</SelectItem>
+               </SelectContent>
+             </Select>
+           </div>
+
+           <div className="grid gap-2">
+             <label className="text-xs font-medium text-muted-foreground">Subtitle Format</label>
+             <Select value={subtitleFormat} onValueChange={(val) => onSubtitleFormatChange(val as SubtitleFormat)}>
+               <SelectTrigger className="h-9 bg-background/50 text-xs">
+                 <SelectValue placeholder="Subtitle format" />
+               </SelectTrigger>
+               <SelectContent>
+                 <SelectItem value="original">Keep original format</SelectItem>
+                 <SelectItem value="srt">Convert to SRT</SelectItem>
+                 <SelectItem value="vtt">Convert to VTT</SelectItem>
+               </SelectContent>
+             </Select>
+           </div>
+         </div>
+
+         {subtitleLanguageMode === "custom" && (
+           <div className="grid gap-2">
+             <label className="text-xs font-medium text-muted-foreground">
+               Custom Subtitle Languages
+             </label>
+             <Input
+               value={subtitleLanguagesText}
+               onChange={(e) => onSubtitleLanguagesTextChange(e.target.value)}
+               placeholder="en.*, en, ur, ar"
+               className="h-9 bg-background/50 font-mono text-xs"
+             />
+           </div>
+         )}
        </div>
     </div>
   );

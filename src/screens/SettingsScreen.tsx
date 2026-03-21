@@ -19,6 +19,7 @@ import { StorageSection } from "./settings/components/StorageSection";
 import { BehaviorSection } from "./settings/components/BehaviorSection";
 import { EngineSection } from "./settings/components/EngineSection";
 import { AboutSection } from "./settings/components/AboutSection";
+import { usePresetsStore } from "@/store/presets";
 
 const SETTINGS_KEY_SET = new Set(SETTINGS_KEYS as unknown as string[]);
 const ACCENT_CLASSES = ACCENT_COLORS.map((c) => `accent-${c.id}`).filter((c) => c !== "accent-default");
@@ -45,6 +46,7 @@ const resolveDefaultSettings = async (): Promise<Settings> => {
 
 export function SettingsScreen() {
   const { settings, setSettings } = useSettingsStore();
+  const presets = usePresetsStore((state) => state.presets);
   const scrollRef = useRef<HTMLDivElement>(null);
   const scrollTopRef = useRef(0);
 
@@ -211,6 +213,17 @@ export function SettingsScreen() {
               autoClearFinished: defaults.autoClearFinished,
               autoCopyFile: defaults.autoCopyFile,
               autoPasteLinks: defaults.autoPasteLinks,
+              preferredSubtitleLanguages: defaults.preferredSubtitleLanguages,
+              closeToTray: defaults.closeToTray,
+              launchAtLogin: defaults.launchAtLogin,
+              startMinimizedToTray: defaults.startMinimizedToTray,
+              enableBackgroundUpdateChecks: defaults.enableBackgroundUpdateChecks,
+              checkToolUpdatesInBackground: defaults.checkToolUpdatesInBackground,
+              checkAppUpdatesInBackground: defaults.checkAppUpdatesInBackground,
+              quickDefaultPreset: defaults.quickDefaultPreset,
+              quickActionBehavior: defaults.quickActionBehavior,
+              quickDownloadStartMode: defaults.quickDownloadStartMode,
+              quickDownloadDestinationMode: defaults.quickDownloadDestinationMode,
               fileCollision: defaults.fileCollision,
               historyRetention: defaults.historyRetention,
             }
@@ -293,6 +306,31 @@ export function SettingsScreen() {
               onFileCollisionChange={(v) => setDraftValue("fileCollision", v)}
               historyRetention={draftSettings.historyRetention}
               onHistoryRetentionChange={(v) => setDraftValue("historyRetention", v)}
+              preferredSubtitleLanguages={draftSettings.preferredSubtitleLanguages}
+              onPreferredSubtitleLanguagesChange={(v) => setDraftValue("preferredSubtitleLanguages", v)}
+              closeToTray={draftSettings.closeToTray}
+              onCloseToTrayChange={(v) => setDraftValue("closeToTray", v)}
+              launchAtLogin={draftSettings.launchAtLogin}
+              onLaunchAtLoginChange={(v) => setDraftValue("launchAtLogin", v)}
+              startMinimizedToTray={draftSettings.startMinimizedToTray}
+              onStartMinimizedToTrayChange={(v) => setDraftValue("startMinimizedToTray", v)}
+              enableBackgroundUpdateChecks={draftSettings.enableBackgroundUpdateChecks}
+              onEnableBackgroundUpdateChecksChange={(v) => setDraftValue("enableBackgroundUpdateChecks", v)}
+              checkToolUpdatesInBackground={draftSettings.checkToolUpdatesInBackground}
+              onCheckToolUpdatesInBackgroundChange={(v) => setDraftValue("checkToolUpdatesInBackground", v)}
+              checkAppUpdatesInBackground={draftSettings.checkAppUpdatesInBackground}
+              onCheckAppUpdatesInBackgroundChange={(v) => setDraftValue("checkAppUpdatesInBackground", v)}
+              quickDefaultPreset={draftSettings.quickDefaultPreset}
+              onQuickDefaultPresetChange={(v) => setDraftValue("quickDefaultPreset", v)}
+              quickActionBehavior={draftSettings.quickActionBehavior}
+              onQuickActionBehaviorChange={(v) => setDraftValue("quickActionBehavior", v)}
+              quickDownloadStartMode={draftSettings.quickDownloadStartMode}
+              onQuickDownloadStartModeChange={(v) => setDraftValue("quickDownloadStartMode", v)}
+              quickDownloadDestinationMode={draftSettings.quickDownloadDestinationMode}
+              onQuickDownloadDestinationModeChange={(v) => setDraftValue("quickDownloadDestinationMode", v)}
+              quickPresetOptions={presets
+                .filter((preset) => preset.quickEligible !== false)
+                .map((preset) => ({ id: preset.id, name: preset.name }))}
             />
 
             <EngineSection

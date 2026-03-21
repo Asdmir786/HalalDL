@@ -1,5 +1,14 @@
 import { create } from "zustand";
 import { createId } from "@/lib/id";
+import { useRuntimeStore } from "./runtime";
+import type {
+  SubtitleFormat,
+  SubtitleLanguageMode,
+  SubtitleMode,
+  SubtitleResolvedSource,
+  SubtitleSourcePolicy,
+  SubtitleStatus,
+} from "@/lib/subtitles";
 
 export type JobStatus = "Queued" | "Downloading" | "Post-processing" | "Done" | "Failed";
 export type DownloadPhase =
@@ -9,6 +18,13 @@ export type DownloadPhase =
   | "Converting with FFmpeg"
   | "Generating thumbnail";
 export type ThumbnailStatus = "pending" | "generating" | "ready" | "failed";
+export type DownloadOrigin = "app" | "tray" | "deeplink";
+
+export interface ComposeDraft {
+  url: string;
+  presetId: string;
+  overrides?: DownloadJob["overrides"];
+}
 
 export interface DownloadJob {
   id: string;
@@ -30,18 +46,32 @@ export interface DownloadJob {
     filenameTemplate?: string;
     format?: string;
     downloadDir?: string;
+    subtitleMode?: SubtitleMode;
+    subtitleSourcePolicy?: SubtitleSourcePolicy;
+    subtitleLanguageMode?: SubtitleLanguageMode;
+    subtitleLanguages?: string[];
+    subtitleFormat?: SubtitleFormat;
+    subtitleOnly?: boolean;
+    origin?: DownloadOrigin;
   };
   thumbnailStatus?: ThumbnailStatus;
   thumbnailError?: string;
   fallbackUsed?: boolean;
   fallbackFormat?: string;
   ffmpegProgressKnown?: boolean;
+  subtitleStatus?: SubtitleStatus;
+  hasManualSubtitles?: boolean;
+  hasAutoSubtitles?: boolean;
+  availableSubtitleLanguages?: string[];
+  resolvedSubtitleSource?: SubtitleResolvedSource;
 }
 
 interface DownloadsState {
   jobs: DownloadJob[];
   pendingUrl?: string;
+  composeDraft?: ComposeDraft;
   setPendingUrl: (url: string | undefined) => void;
+  setComposeDraft: (draft: ComposeDraft | undefined) => void;
   addJob: (url: string, presetId: string, overrides?: DownloadJob["overrides"]) => string;
   moveJob: (id: string, direction: "up" | "down") => void;
   reorderQueued: (orderedIds: string[]) => void;
@@ -52,10 +82,13 @@ interface DownloadsState {
 export const useDownloadsStore = create<DownloadsState>((set) => ({
   jobs: [], // Start empty for skeleton review
   pendingUrl: undefined,
+  composeDraft: undefined,
   setPendingUrl: (url) => set({ pendingUrl: url }),
+  setComposeDraft: (draft) => set({ composeDraft: draft }),
   addJob: (url, presetId, overrides) => {
     const id = createId();
     const now = Date.now();
+    const queuePaused = useRuntimeStore.getState().queuePaused;
     set((state) => ({
       jobs: [
         {
@@ -64,8 +97,9 @@ export const useDownloadsStore = create<DownloadsState>((set) => ({
           status: "Queued",
           progress: 0,
           phase: "Resolving formats",
-          statusDetail: "Start queue to begin",
+          statusDetail: queuePaused ? "Queue paused" : "Start queue to begin",
           thumbnailStatus: "pending",
+          subtitleStatus: "idle",
           fallbackUsed: false,
           fallbackFormat: undefined,
           presetId,

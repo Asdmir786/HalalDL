@@ -1,6 +1,14 @@
 import { create } from "zustand";
 export { BUILT_IN_PRESETS } from "./built-in-presets";
 import { BUILT_IN_PRESETS } from "./built-in-presets";
+import type {
+  SubtitleFormat,
+  SubtitleLanguageMode,
+  SubtitleMode,
+  SubtitleSourcePolicy,
+} from "@/lib/subtitles";
+
+export type PresetFolderBehavior = "default" | "ask";
 
 export interface Preset {
   id: string;
@@ -8,6 +16,14 @@ export interface Preset {
   description: string;
   isBuiltIn: boolean;
   args: string[];
+  quickEligible?: boolean;
+  subtitleMode?: SubtitleMode;
+  subtitleSourcePolicy?: SubtitleSourcePolicy;
+  subtitleLanguageMode?: SubtitleLanguageMode;
+  subtitleLanguages?: string[];
+  subtitleFormat?: SubtitleFormat;
+  subtitleOnly?: boolean;
+  askFolderBehavior?: PresetFolderBehavior;
 }
 
 interface PresetsState {

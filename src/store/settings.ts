@@ -4,6 +4,8 @@ export type Theme = "system" | "light" | "dark";
 export type AccentColor = "default" | "blue" | "green" | "purple" | "rose" | "orange" | "teal";
 export type FileCollisionAction = "overwrite" | "rename" | "skip";
 export type DownloadsAddMode = "queue" | "start";
+export type QuickActionBehavior = "ask" | "instant";
+export type QuickDestinationMode = "default" | "ask";
 
 export const ACCENT_COLORS: { id: AccentColor; label: string; swatch: string }[] = [
   { id: "default", label: "Default", swatch: "oklch(0.55 0.01 250)" },
@@ -37,6 +39,17 @@ export interface Settings {
   autoPasteLinks: boolean;
   downloadsAddMode: DownloadsAddMode;
   downloadsSelectedPreset: string;
+  preferredSubtitleLanguages: string;
+  closeToTray: boolean;
+  launchAtLogin: boolean;
+  startMinimizedToTray: boolean;
+  enableBackgroundUpdateChecks: boolean;
+  checkToolUpdatesInBackground: boolean;
+  checkAppUpdatesInBackground: boolean;
+  quickDefaultPreset: string;
+  quickActionBehavior: QuickActionBehavior;
+  quickDownloadStartMode: DownloadsAddMode;
+  quickDownloadDestinationMode: QuickDestinationMode;
 
   // History
   historyRetention: number; // max entries to keep, 0 = unlimited
@@ -64,6 +77,17 @@ export const DEFAULT_SETTINGS: Settings = {
   autoPasteLinks: true,
   downloadsAddMode: "start",
   downloadsSelectedPreset: "default",
+  preferredSubtitleLanguages: "en.*, en",
+  closeToTray: true,
+  launchAtLogin: false,
+  startMinimizedToTray: true,
+  enableBackgroundUpdateChecks: true,
+  checkToolUpdatesInBackground: true,
+  checkAppUpdatesInBackground: true,
+  quickDefaultPreset: "default",
+  quickActionBehavior: "ask",
+  quickDownloadStartMode: "start",
+  quickDownloadDestinationMode: "default",
   historyRetention: 0,
 };
 

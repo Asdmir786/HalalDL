@@ -28,6 +28,7 @@ import {
   fetchLatestDenoVersion,
   isUpdateAvailable,
   listToolBackups,
+  isAutostartEnabled,
 } from "@/lib/commands";
 import { toast } from "sonner";
 import { getAppMode } from "@/lib/tools/app-mode";
@@ -174,6 +175,11 @@ export function usePersistenceInit(): MutableRefObject<boolean> {
               });
             }
           }
+          try {
+            mergedSettings.launchAtLogin = await isAutostartEnabled();
+          } catch {
+            void 0;
+          }
           setSettings(mergedSettings);
           addLog({ level: "info", message: "Settings loaded" });
         } else {
@@ -186,6 +192,13 @@ export function usePersistenceInit(): MutableRefObject<boolean> {
               level: "warn",
               message: `Could not resolve download dir: ${String(e)}`,
             });
+          }
+          try {
+            const launchAtLogin = await isAutostartEnabled();
+            const currentSettings = useSettingsStore.getState().settings;
+            setSettings({ ...currentSettings, launchAtLogin });
+          } catch {
+            void 0;
           }
         }
 

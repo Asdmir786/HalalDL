@@ -46,6 +46,22 @@ export function PresetCard({ preset, onDuplicate, onEdit, onDelete }: PresetCard
         </div>
       </CardHeader>
       <CardContent className="flex-1 space-y-3">
+        <div className="flex flex-wrap gap-1.5">
+          {preset.quickEligible !== false && (
+            <Badge variant="outline" className="text-[10px]">
+              Quick Download
+            </Badge>
+          )}
+          {preset.subtitleOnly || preset.subtitleMode === "only" ? (
+            <Badge variant="outline" className="text-[10px]">
+              Subtitles Only
+            </Badge>
+          ) : preset.subtitleMode === "on" ? (
+            <Badge variant="outline" className="text-[10px]">
+              Subtitles
+            </Badge>
+          ) : null}
+        </div>
         <div className="bg-muted/30 p-3 rounded-lg border border-muted/50 font-mono text-[10px] text-muted-foreground break-words relative group max-h-24 overflow-y-auto">
            <div className="line-clamp-4">
               yt-dlp {preset.args.join(" ")}
