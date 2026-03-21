@@ -97,6 +97,16 @@ pub fn run() {
                 runtime::attach_main_window_close_handler(&win, &app.handle());
                 if launched_from_autostart {
                     let _ = win.hide();
+                    let _ = runtime::update_tray_state(
+                        app.handle().clone(),
+                        app
+                            .handle()
+                            .state::<runtime::RuntimeState>()
+                            .tray_state
+                            .lock()
+                            .map(|state| state.clone())
+                            .unwrap_or_default(),
+                    );
                 } else {
                     let _ = win.set_focus();
                 }

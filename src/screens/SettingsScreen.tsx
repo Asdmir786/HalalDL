@@ -217,6 +217,9 @@ export function SettingsScreen() {
               closeToTray: defaults.closeToTray,
               launchAtLogin: defaults.launchAtLogin,
               startMinimizedToTray: defaults.startMinimizedToTray,
+              trayLeftClickAction: defaults.trayLeftClickAction,
+              trayDoubleClickAction: defaults.trayDoubleClickAction,
+              trayMenuShowHideItem: defaults.trayMenuShowHideItem,
               enableBackgroundUpdateChecks: defaults.enableBackgroundUpdateChecks,
               checkToolUpdatesInBackground: defaults.checkToolUpdatesInBackground,
               checkAppUpdatesInBackground: defaults.checkAppUpdatesInBackground,
@@ -314,6 +317,12 @@ export function SettingsScreen() {
               onLaunchAtLoginChange={(v) => setDraftValue("launchAtLogin", v)}
               startMinimizedToTray={draftSettings.startMinimizedToTray}
               onStartMinimizedToTrayChange={(v) => setDraftValue("startMinimizedToTray", v)}
+              trayLeftClickAction={draftSettings.trayLeftClickAction}
+              onTrayLeftClickActionChange={(v) => setDraftValue("trayLeftClickAction", v)}
+              trayDoubleClickAction={draftSettings.trayDoubleClickAction}
+              onTrayDoubleClickActionChange={(v) => setDraftValue("trayDoubleClickAction", v)}
+              trayMenuShowHideItem={draftSettings.trayMenuShowHideItem}
+              onTrayMenuShowHideItemChange={(v) => setDraftValue("trayMenuShowHideItem", v)}
               enableBackgroundUpdateChecks={draftSettings.enableBackgroundUpdateChecks}
               onEnableBackgroundUpdateChecksChange={(v) => setDraftValue("enableBackgroundUpdateChecks", v)}
               checkToolUpdatesInBackground={draftSettings.checkToolUpdatesInBackground}

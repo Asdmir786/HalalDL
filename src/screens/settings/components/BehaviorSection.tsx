@@ -1,4 +1,4 @@
-import { Bell, Clipboard, Trash2, FileWarning, History, Link2, AppWindow, Download, RefreshCw, Languages } from "lucide-react";
+import { Bell, Clipboard, Trash2, FileWarning, History, Link2, AppWindow, Download, RefreshCw, Languages, MousePointerClick, MousePointer2 } from "lucide-react";
 import { Switch } from "@/components/ui/switch";
 import {
   Select,
@@ -7,7 +7,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { FileCollisionAction, QuickActionBehavior, QuickDestinationMode, DownloadsAddMode } from "@/store/settings";
+import { FileCollisionAction, QuickActionBehavior, QuickDestinationMode, DownloadsAddMode, TrayDoubleClickAction, TrayLeftClickAction } from "@/store/settings";
 import { SettingsSection } from "./SettingsSection";
 import { SettingRow } from "./SettingRow";
 import { Input } from "@/components/ui/input";
@@ -33,6 +33,12 @@ interface BehaviorSectionProps {
   onLaunchAtLoginChange: (val: boolean) => void;
   startMinimizedToTray: boolean;
   onStartMinimizedToTrayChange: (val: boolean) => void;
+  trayLeftClickAction: TrayLeftClickAction;
+  onTrayLeftClickActionChange: (val: TrayLeftClickAction) => void;
+  trayDoubleClickAction: TrayDoubleClickAction;
+  onTrayDoubleClickActionChange: (val: TrayDoubleClickAction) => void;
+  trayMenuShowHideItem: boolean;
+  onTrayMenuShowHideItemChange: (val: boolean) => void;
   enableBackgroundUpdateChecks: boolean;
   onEnableBackgroundUpdateChecksChange: (val: boolean) => void;
   checkToolUpdatesInBackground: boolean;
@@ -61,6 +67,9 @@ export function BehaviorSection({
   closeToTray, onCloseToTrayChange,
   launchAtLogin, onLaunchAtLoginChange,
   startMinimizedToTray, onStartMinimizedToTrayChange,
+  trayLeftClickAction, onTrayLeftClickActionChange,
+  trayDoubleClickAction, onTrayDoubleClickActionChange,
+  trayMenuShowHideItem, onTrayMenuShowHideItemChange,
   enableBackgroundUpdateChecks, onEnableBackgroundUpdateChecksChange,
   checkToolUpdatesInBackground, onCheckToolUpdatesInBackgroundChange,
   checkAppUpdatesInBackground, onCheckAppUpdatesInBackgroundChange,
@@ -135,6 +144,35 @@ export function BehaviorSection({
 
       <SettingRow icon={AppWindow} label="Start Minimized To Tray" description="When launched automatically, start hidden and ready in the tray.">
         <Switch checked={startMinimizedToTray} onCheckedChange={onStartMinimizedToTrayChange} />
+      </SettingRow>
+
+      <SettingRow icon={MousePointerClick} label="Tray Left Click" description="Choose what happens when you left click the tray icon. Right click always opens the tray menu.">
+        <Select value={trayLeftClickAction} onValueChange={(v) => onTrayLeftClickActionChange(v as TrayLeftClickAction)}>
+          <SelectTrigger className="w-[220px]">
+            <SelectValue placeholder="Select action" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="quick-panel">Open quick panel</SelectItem>
+            <SelectItem value="open-app">Open main app</SelectItem>
+            <SelectItem value="none">Do nothing</SelectItem>
+          </SelectContent>
+        </Select>
+      </SettingRow>
+
+      <SettingRow icon={MousePointer2} label="Tray Double Click" description="Optional secondary action for double clicking the tray icon. Keeping this off avoids accidental app opens.">
+        <Select value={trayDoubleClickAction} onValueChange={(v) => onTrayDoubleClickActionChange(v as TrayDoubleClickAction)}>
+          <SelectTrigger className="w-[220px]">
+            <SelectValue placeholder="Select action" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="none">Do nothing</SelectItem>
+            <SelectItem value="open-app">Open main app</SelectItem>
+          </SelectContent>
+        </Select>
+      </SettingRow>
+
+      <SettingRow icon={AppWindow} label="Tray Show/Hide Item" description="Show a dynamic Show HalalDL or Hide HalalDL item in the tray menu.">
+        <Switch checked={trayMenuShowHideItem} onCheckedChange={onTrayMenuShowHideItemChange} />
       </SettingRow>
 
       <SettingRow icon={Download} label="Quick Default Preset" description="Preset used by tray quick download and instant clipboard actions.">

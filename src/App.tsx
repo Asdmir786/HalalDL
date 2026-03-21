@@ -23,6 +23,7 @@ import {
   fetchLatestDenoVersion,
   fetchLatestFfmpegVersion,
   fetchLatestYtDlpVersion,
+  hideMainWindowToTray,
   isUpdateAvailable,
   readTextFromClipboard,
   restoreMainWindow,
@@ -42,7 +43,7 @@ const SettingsScreen = lazy(() => import("@/screens/SettingsScreen").then(module
 const HistoryScreen = lazy(() => import("@/screens/HistoryScreen").then(module => ({ default: module.HistoryScreen })));
 
 interface TrayActionPayload {
-  action: "open-app" | "quick-download" | "download-clipboard" | "pause-queue" | "resume-queue" | "check-updates";
+  action: "open-app" | "hide-window" | "quick-download" | "download-clipboard" | "pause-queue" | "resume-queue" | "check-updates";
 }
 
 const LoadingFallback = () => (
@@ -126,21 +127,15 @@ const LoadingFallback = () => (
 export default function App() {
   useTaskbarProgress();
   const currentScreen = useNavigationStore((state) => state.currentScreen);
-  const setScreen = useNavigationStore((state) => state.setScreen);
   const settings = useSettingsStore((state) => state.settings);
   const jobs = useDownloadsStore((state) => state.jobs);
-  const addJob = useDownloadsStore((state) => state.addJob);
-  const setComposeDraft = useDownloadsStore((state) => state.setComposeDraft);
   const updateTool = useToolsStore((state) => state.updateTool);
   const tools = useToolsStore((state) => state.tools);
   const appUpdateAvailable = useAppUpdateStore((state) => state.updateAvailable);
   const {
     windowMode,
     queuePaused,
-    setQueuePaused,
     setTrayStatus,
-    openQuickMode,
-    restoreFullMode,
   } = useRuntimeStore();
   const [isBooting, setIsBooting] = useState(true);
   const [launchedFromAutostart, setLaunchedFromAutostart] = useState(false);
@@ -159,18 +154,8 @@ export default function App() {
     () => tools.filter((tool) => tool.updateAvailable).length,
     [tools]
   );
-  const toolChannels = useMemo(
-    () =>
-      Object.fromEntries(
-        tools.map((tool) => [tool.id, tool.channel])
-      ) as Record<string, "stable" | "nightly">,
-    [tools]
-  );
-  const toolVersions = useMemo(
-    () =>
-      Object.fromEntries(
-        tools.map((tool) => [tool.id, tool.version ?? ""])
-      ) as Record<string, string>,
+  const toolsReady = useMemo(
+    () => tools.every((tool) => tool.status !== "Checking"),
     [tools]
   );
 
@@ -191,10 +176,20 @@ export default function App() {
   }, []);
 
   useEffect(() => {
-    void syncRuntimeSettings({ closeToTray: settings.closeToTray }).catch(() => {
+    void syncRuntimeSettings({
+      closeToTray: settings.closeToTray,
+      trayLeftClickAction: settings.trayLeftClickAction,
+      trayDoubleClickAction: settings.trayDoubleClickAction,
+      trayMenuShowHideItem: settings.trayMenuShowHideItem,
+    }).catch(() => {
       void 0;
     });
-  }, [settings.closeToTray]);
+  }, [
+    settings.closeToTray,
+    settings.trayDoubleClickAction,
+    settings.trayLeftClickAction,
+    settings.trayMenuShowHideItem,
+  ]);
 
   useEffect(() => {
     if (!launchedFromAutostart) return;
@@ -232,7 +227,11 @@ export default function App() {
         throw new Error("Clipboard does not contain a supported media URL.");
       }
 
-      const presetId = settings.quickDefaultPreset || "default";
+      const latestSettings = useSettingsStore.getState().settings;
+      const { addJob, setComposeDraft } = useDownloadsStore.getState();
+      const { setScreen } = useNavigationStore.getState();
+      const runtime = useRuntimeStore.getState();
+      const presetId = latestSettings.quickDefaultPreset || "default";
 
       if (openAdvanced) {
         setComposeDraft({
@@ -243,7 +242,7 @@ export default function App() {
           },
         });
         setScreen("downloads");
-        restoreFullMode("downloads");
+        runtime.restoreFullMode("downloads");
         await restoreMainWindow().catch(() => {
           void 0;
         });
@@ -254,11 +253,11 @@ export default function App() {
         origin: "tray",
       });
       await fetchMetadata(id);
-      if (settings.quickDownloadStartMode === "start") {
+      if (latestSettings.quickDownloadStartMode === "start") {
         startQueuedJobs([id]);
       }
     },
-    [addJob, restoreFullMode, setComposeDraft, setScreen, settings.quickDefaultPreset, settings.quickDownloadStartMode]
+    []
   );
 
   const processLaunchUrls = useCallback(
@@ -272,6 +271,10 @@ export default function App() {
         }
 
         const action = parsed.hostname || parsed.pathname.replace(/^\/+/, "");
+        const { setScreen } = useNavigationStore.getState();
+        const { addJob, setComposeDraft } = useDownloadsStore.getState();
+        const runtime = useRuntimeStore.getState();
+        const latestSettings = useSettingsStore.getState().settings;
         if (action === "open") {
           const screen = parsed.searchParams.get("screen");
           if (
@@ -284,7 +287,7 @@ export default function App() {
           ) {
             setScreen(screen);
           }
-          restoreFullMode();
+          runtime.restoreFullMode();
           await restoreMainWindow().catch(() => {
             void 0;
           });
@@ -295,7 +298,7 @@ export default function App() {
 
         const targetUrl = parsed.searchParams.get("url");
         if (!targetUrl) continue;
-        const presetId = parsed.searchParams.get("preset") || settings.quickDefaultPreset || "default";
+        const presetId = parsed.searchParams.get("preset") || latestSettings.quickDefaultPreset || "default";
         const advanced = parsed.searchParams.get("advanced") === "1";
         const startImmediately = parsed.searchParams.get("start") !== "queue";
 
@@ -308,7 +311,7 @@ export default function App() {
             },
           });
           setScreen("downloads");
-          restoreFullMode("downloads");
+          runtime.restoreFullMode("downloads");
           await restoreMainWindow().catch(() => {
             void 0;
           });
@@ -322,10 +325,86 @@ export default function App() {
         }
       }
     },
-    [addJob, restoreFullMode, setComposeDraft, setScreen, settings.quickDefaultPreset]
+    []
   );
 
   useEffect(() => {
+    let disposeTray: (() => void) | undefined;
+    let disposeDeepLinks: (() => void) | undefined;
+    const handleAction = async (action: TrayActionPayload["action"]) => {
+      const latestSettings = useSettingsStore.getState().settings;
+      const runtime = useRuntimeStore.getState();
+
+      switch (action) {
+        case "open-app":
+          runtime.restoreFullMode();
+          await restoreMainWindow().catch(() => {
+            void 0;
+          });
+          break;
+        case "hide-window":
+          runtime.restoreFullMode();
+          await hideMainWindowToTray().catch(() => {
+            void 0;
+          });
+          break;
+        case "quick-download":
+          await showQuickDownloadWindow().catch(() => {
+            void 0;
+          });
+          runtime.openQuickMode({
+            url: "",
+            presetId: latestSettings.quickDefaultPreset || "default",
+            startMode: latestSettings.quickDownloadStartMode,
+            destinationMode: latestSettings.quickDownloadDestinationMode,
+          });
+          break;
+        case "download-clipboard":
+          if (latestSettings.quickActionBehavior === "instant") {
+            await addClipboardDownload(false);
+          } else {
+            await showQuickDownloadWindow().catch(() => {
+              void 0;
+            });
+            runtime.openQuickMode({
+              url: "",
+              presetId: latestSettings.quickDefaultPreset || "default",
+              startMode: latestSettings.quickDownloadStartMode,
+              destinationMode: latestSettings.quickDownloadDestinationMode,
+            });
+          }
+          break;
+        case "pause-queue":
+          runtime.setQueuePaused(true);
+          useDownloadsStore.setState((state) => ({
+            jobs: state.jobs.map((job) =>
+              job.status === "Queued"
+                ? { ...job, statusDetail: "Queue paused" }
+                : job
+            ),
+          }));
+          break;
+        case "resume-queue":
+          runtime.setQueuePaused(false);
+          useDownloadsStore.setState((state) => ({
+            jobs: state.jobs.map((job) =>
+              job.status === "Queued" && job.statusDetail === "Queue paused"
+                ? { ...job, statusDetail: "Start queue to begin" }
+                : job
+            ),
+          }));
+          startQueuedJobs();
+          break;
+        case "check-updates":
+          useNavigationStore.getState().setScreen("settings");
+          runtime.restoreFullMode("settings");
+          await restoreMainWindow().catch(() => {
+            void 0;
+          });
+          break;
+      }
+    };
+
     void takePendingLaunchUrls()
       .then((urls) => {
         if (urls.length > 0) {
@@ -336,76 +415,8 @@ export default function App() {
         void 0;
       });
 
-    let disposeTray: (() => void) | undefined;
-    let disposeDeepLinks: (() => void) | undefined;
-
     void listen<TrayActionPayload>("tray-action", (event) => {
-      const handleAction = async () => {
-        switch (event.payload.action) {
-          case "open-app":
-            restoreFullMode();
-            await restoreMainWindow().catch(() => {
-              void 0;
-            });
-            break;
-          case "quick-download":
-            await showQuickDownloadWindow().catch(() => {
-              void 0;
-            });
-            openQuickMode({
-              url: "",
-              presetId: settings.quickDefaultPreset || "default",
-              startMode: settings.quickDownloadStartMode,
-              destinationMode: settings.quickDownloadDestinationMode,
-            });
-            break;
-          case "download-clipboard":
-            if (settings.quickActionBehavior === "instant") {
-              await addClipboardDownload(false);
-            } else {
-              await showQuickDownloadWindow().catch(() => {
-                void 0;
-              });
-              openQuickMode({
-                url: "",
-                presetId: settings.quickDefaultPreset || "default",
-                startMode: settings.quickDownloadStartMode,
-                destinationMode: settings.quickDownloadDestinationMode,
-              });
-            }
-            break;
-          case "pause-queue":
-            setQueuePaused(true);
-            useDownloadsStore.setState((state) => ({
-              jobs: state.jobs.map((job) =>
-                job.status === "Queued"
-                  ? { ...job, statusDetail: "Queue paused" }
-                  : job
-              ),
-            }));
-            break;
-          case "resume-queue":
-            setQueuePaused(false);
-            useDownloadsStore.setState((state) => ({
-              jobs: state.jobs.map((job) =>
-                job.status === "Queued" && job.statusDetail === "Queue paused"
-                  ? { ...job, statusDetail: "Start queue to begin" }
-                  : job
-              ),
-            }));
-            startQueuedJobs();
-            break;
-          case "check-updates":
-            setScreen("settings");
-            restoreFullMode("settings");
-            await restoreMainWindow().catch(() => {
-              void 0;
-            });
-            break;
-        }
-      };
-
-      void handleAction().catch((error) => {
+      void handleAction(event.payload.action).catch((error) => {
         console.error(error);
       });
     }).then((unlisten) => {
@@ -424,38 +435,32 @@ export default function App() {
       if (disposeTray) disposeTray();
       if (disposeDeepLinks) disposeDeepLinks();
     };
-  }, [
-    addClipboardDownload,
-    openQuickMode,
-    processLaunchUrls,
-    restoreFullMode,
-    setQueuePaused,
-    setScreen,
-    settings.quickActionBehavior,
-    settings.quickDefaultPreset,
-    settings.quickDownloadDestinationMode,
-    settings.quickDownloadStartMode,
-  ]);
+  }, [addClipboardDownload, processLaunchUrls]);
 
   useEffect(() => {
     if (!settings.enableBackgroundUpdateChecks) return;
+    if (!toolsReady) return;
 
     const runChecks = async () => {
-      if (settings.checkAppUpdatesInBackground) {
+      const latestSettings = useSettingsStore.getState().settings;
+      const latestTools = useToolsStore.getState().tools;
+      const getTool = (id: string) => latestTools.find((tool) => tool.id === id);
+
+      if (latestSettings.checkAppUpdatesInBackground) {
         await checkAndStoreAppUpdate().catch(() => {
           void 0;
         });
       }
 
-      if (settings.checkToolUpdatesInBackground) {
+      if (latestSettings.checkToolUpdatesInBackground) {
         const checks: Array<{ id: string; fetchLatest: () => Promise<string | null> }> = [
           {
             id: "yt-dlp",
-            fetchLatest: () => fetchLatestYtDlpVersion(toolChannels["yt-dlp"] ?? "stable"),
+            fetchLatest: () => fetchLatestYtDlpVersion(getTool("yt-dlp")?.channel ?? "stable"),
           },
           {
             id: "ffmpeg",
-            fetchLatest: () => fetchLatestFfmpegVersion(toolChannels["ffmpeg"] ?? "stable"),
+            fetchLatest: () => fetchLatestFfmpegVersion(getTool("ffmpeg")?.channel ?? "stable"),
           },
           {
             id: "aria2",
@@ -471,9 +476,10 @@ export default function App() {
           checks.map(async ({ id, fetchLatest }) => {
             try {
               const latestVersion = await fetchLatest();
+              const currentTool = getTool(id);
               updateTool(id, {
                 latestVersion: latestVersion ?? undefined,
-                updateAvailable: isUpdateAvailable(toolVersions[id], latestVersion ?? undefined),
+                updateAvailable: isUpdateAvailable(currentTool?.version, latestVersion ?? undefined),
                 latestCheckedAt: Date.now(),
               });
             } catch {
@@ -484,15 +490,19 @@ export default function App() {
       }
     };
 
-    void runChecks();
+    const startupTimer = window.setTimeout(() => {
+      void runChecks();
+    }, 15000);
     const interval = window.setInterval(runChecks, 1000 * 60 * 60 * 6);
-    return () => window.clearInterval(interval);
+    return () => {
+      window.clearTimeout(startupTimer);
+      window.clearInterval(interval);
+    };
   }, [
     settings.checkAppUpdatesInBackground,
     settings.checkToolUpdatesInBackground,
     settings.enableBackgroundUpdateChecks,
-    toolChannels,
-    toolVersions,
+    toolsReady,
     updateTool,
   ]);
 

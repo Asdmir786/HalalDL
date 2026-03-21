@@ -1,4 +1,4 @@
-use std::sync::Mutex;
+use std::{sync::Mutex, thread, time::Duration};
 
 use serde::{Deserialize, Serialize};
 use tauri::menu::{MenuBuilder, MenuItemBuilder};
@@ -9,10 +9,30 @@ use tauri_plugin_positioner::{Position as WindowPosition, WindowExt};
 
 const TRAY_ID: &str = "main-tray";
 
+#[derive(Default, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "kebab-case")]
+pub enum TrayLeftClickAction {
+    #[default]
+    QuickPanel,
+    OpenApp,
+    None,
+}
+
+#[derive(Default, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "kebab-case")]
+pub enum TrayDoubleClickAction {
+    #[default]
+    None,
+    OpenApp,
+}
+
 #[derive(Default, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct RuntimeSettingsPayload {
     pub close_to_tray: bool,
+    pub tray_left_click_action: TrayLeftClickAction,
+    pub tray_double_click_action: TrayDoubleClickAction,
+    pub tray_menu_show_hide_item: bool,
 }
 
 #[derive(Default, Clone, Serialize, Deserialize)]
@@ -37,6 +57,7 @@ pub struct RuntimeState {
     pub tray_state: Mutex<TrayStatePayload>,
     pub pending_launch_urls: Mutex<Vec<String>>,
     pub saved_main_bounds: Mutex<Option<WindowBounds>>,
+    pub tray_click_nonce: Mutex<u64>,
     pub allow_exit: Mutex<bool>,
     pub launched_from_autostart: Mutex<bool>,
 }
@@ -47,7 +68,7 @@ pub struct TrayActionPayload {
     pub action: String,
 }
 
-fn emit_tray_action(app: &AppHandle, action: &str) {
+fn emit_tray_action<R: tauri::Runtime>(app: &AppHandle<R>, action: &str) {
     let _ = app.emit(
         "tray-action",
         TrayActionPayload {
@@ -56,12 +77,74 @@ fn emit_tray_action(app: &AppHandle, action: &str) {
     );
 }
 
-fn main_window(app: &AppHandle) -> Result<WebviewWindow, String> {
+fn main_window<R: tauri::Runtime>(app: &AppHandle<R>) -> Result<WebviewWindow<R>, String> {
     app.get_webview_window("main")
         .ok_or_else(|| "Main window is unavailable".to_string())
 }
 
-fn remember_main_bounds(window: &WebviewWindow, app: &AppHandle) -> Result<(), String> {
+fn is_main_window_visible<R: tauri::Runtime>(app: &AppHandle<R>) -> bool {
+    main_window(app)
+        .and_then(|window| window.is_visible().map_err(|e| e.to_string()))
+        .unwrap_or(true)
+}
+
+fn configured_left_click_action<R: tauri::Runtime>(app: &AppHandle<R>) -> TrayLeftClickAction {
+    app.state::<RuntimeState>()
+        .settings
+        .lock()
+        .map(|settings| settings.tray_left_click_action.clone())
+        .unwrap_or_default()
+}
+
+fn configured_double_click_action<R: tauri::Runtime>(app: &AppHandle<R>) -> TrayDoubleClickAction {
+    app.state::<RuntimeState>()
+        .settings
+        .lock()
+        .map(|settings| settings.tray_double_click_action.clone())
+        .unwrap_or_default()
+}
+
+fn bump_tray_click_nonce<R: tauri::Runtime>(app: &AppHandle<R>) -> u64 {
+    let state = app.state::<RuntimeState>();
+    let next = if let Ok(mut nonce) = state.tray_click_nonce.lock() {
+        *nonce += 1;
+        *nonce
+    } else {
+        0
+    };
+    next
+}
+
+fn nonce_matches<R: tauri::Runtime>(app: &AppHandle<R>, expected: u64) -> bool {
+    app.state::<RuntimeState>()
+        .tray_click_nonce
+        .lock()
+        .map(|nonce| *nonce == expected)
+        .unwrap_or(false)
+}
+
+fn schedule_left_click_action<R: tauri::Runtime>(app: &AppHandle<R>, action: TrayLeftClickAction) {
+    if action == TrayLeftClickAction::None {
+        return;
+    }
+
+    let app_handle = app.clone();
+    let nonce = bump_tray_click_nonce(app);
+    thread::spawn(move || {
+        thread::sleep(Duration::from_millis(225));
+        if !nonce_matches(&app_handle, nonce) {
+            return;
+        }
+
+        match action {
+            TrayLeftClickAction::QuickPanel => emit_tray_action(&app_handle, "quick-download"),
+            TrayLeftClickAction::OpenApp => emit_tray_action(&app_handle, "open-app"),
+            TrayLeftClickAction::None => {}
+        }
+    });
+}
+
+fn remember_main_bounds<R: tauri::Runtime>(window: &WebviewWindow<R>, app: &AppHandle<R>) -> Result<(), String> {
     let size = window.outer_size().map_err(|e| e.to_string())?;
     if size.width <= 460 && size.height <= 580 {
         return Ok(());
@@ -73,7 +156,7 @@ fn remember_main_bounds(window: &WebviewWindow, app: &AppHandle) -> Result<(), S
     Ok(())
 }
 
-fn apply_saved_bounds(window: &WebviewWindow, app: &AppHandle) -> Result<(), String> {
+fn apply_saved_bounds<R: tauri::Runtime>(window: &WebviewWindow<R>, app: &AppHandle<R>) -> Result<(), String> {
     let state = app.state::<RuntimeState>();
     let saved = state.saved_main_bounds.lock().map_err(|_| "Runtime state lock poisoned".to_string())?;
     if let Some(bounds) = saved.as_ref() {
@@ -92,12 +175,19 @@ fn apply_saved_bounds(window: &WebviewWindow, app: &AppHandle) -> Result<(), Str
 }
 
 fn build_tray_menu<R: tauri::Runtime>(app: &AppHandle<R>) -> Result<tauri::menu::Menu<R>, String> {
+    let settings = app
+        .state::<RuntimeState>()
+        .settings
+        .lock()
+        .map_err(|_| "Runtime settings lock poisoned".to_string())?
+        .clone();
     let tray_state = app
         .state::<RuntimeState>()
         .tray_state
         .lock()
         .map_err(|_| "Tray state lock poisoned".to_string())?
         .clone();
+    let window_visible = is_main_window_visible(app);
 
     let queue_label = if tray_state.active_downloads > 0 {
         format!("Downloads Active: {}", tray_state.active_downloads)
@@ -137,9 +227,16 @@ fn build_tray_menu<R: tauri::Runtime>(app: &AppHandle<R>) -> Result<tauri::menu:
     let quick_download = MenuItemBuilder::with_id("quick-download", "Quick Download")
         .build(app)
         .map_err(|e| e.to_string())?;
-    let open_app = MenuItemBuilder::with_id("open-app", "Open HalalDL")
-        .build(app)
-        .map_err(|e| e.to_string())?;
+    let toggle_window = MenuItemBuilder::with_id(
+        "toggle-main-window",
+        if window_visible {
+            "Hide HalalDL"
+        } else {
+            "Show HalalDL"
+        },
+    )
+    .build(app)
+    .map_err(|e| e.to_string())?;
     let pause_queue = MenuItemBuilder::with_id("pause-queue", pause_label)
         .build(app)
         .map_err(|e| e.to_string())?;
@@ -150,13 +247,18 @@ fn build_tray_menu<R: tauri::Runtime>(app: &AppHandle<R>) -> Result<tauri::menu:
         .build(app)
         .map_err(|e| e.to_string())?;
 
-    MenuBuilder::new(app)
+    let mut builder = MenuBuilder::new(app)
         .item(&status_queue)
         .item(&status_updates)
         .separator()
         .item(&download_clipboard)
-        .item(&quick_download)
-        .item(&open_app)
+        .item(&quick_download);
+
+    if settings.tray_menu_show_hide_item {
+        builder = builder.item(&toggle_window);
+    }
+
+    builder
         .item(&pause_queue)
         .item(&check_updates)
         .separator()
@@ -165,7 +267,7 @@ fn build_tray_menu<R: tauri::Runtime>(app: &AppHandle<R>) -> Result<tauri::menu:
         .map_err(|e| e.to_string())
 }
 
-fn refresh_tray(app: &AppHandle) -> Result<(), String> {
+fn refresh_tray<R: tauri::Runtime>(app: &AppHandle<R>) -> Result<(), String> {
     let menu = build_tray_menu(app)?;
     if let Some(tray) = app.tray_by_id(TRAY_ID) {
         tray.set_menu(Some(menu)).map_err(|e| e.to_string())?;
@@ -173,7 +275,7 @@ fn refresh_tray(app: &AppHandle) -> Result<(), String> {
     Ok(())
 }
 
-pub fn append_launch_urls(app: &AppHandle, urls: Vec<String>) {
+pub fn append_launch_urls<R: tauri::Runtime>(app: &AppHandle<R>, urls: Vec<String>) {
     if urls.is_empty() {
         return;
     }
@@ -191,7 +293,7 @@ pub fn capture_launch_urls(args: &[String]) -> Vec<String> {
         .collect()
 }
 
-pub fn attach_main_window_close_handler(window: &WebviewWindow, app: &AppHandle) {
+pub fn attach_main_window_close_handler<R: tauri::Runtime>(window: &WebviewWindow<R>, app: &AppHandle<R>) {
     let app_handle = app.clone();
     let window_handle = window.clone();
     window.on_window_event(move |event| {
@@ -211,6 +313,7 @@ pub fn attach_main_window_close_handler(window: &WebviewWindow, app: &AppHandle)
             if !allow_exit && close_to_tray {
                 api.prevent_close();
                 let _ = window_handle.hide();
+                let _ = refresh_tray(&app_handle);
             }
         }
     });
@@ -233,9 +336,15 @@ pub fn init_tray(app: &AppHandle) -> Result<(), String> {
             "quick-download" => {
                 emit_tray_action(app, "quick-download");
             }
-            "open-app" => {
-                let _ = restore_main_window(app.clone());
-                emit_tray_action(app, "open-app");
+            "toggle-main-window" => {
+                emit_tray_action(
+                    app,
+                    if is_main_window_visible(app) {
+                        "hide-window"
+                    } else {
+                        "open-app"
+                    },
+                );
             }
             "pause-queue" => {
                 let queue_paused = app
@@ -247,7 +356,6 @@ pub fn init_tray(app: &AppHandle) -> Result<(), String> {
                 emit_tray_action(app, if queue_paused { "resume-queue" } else { "pause-queue" });
             }
             "check-updates" => {
-                let _ = restore_main_window(app.clone());
                 emit_tray_action(app, "check-updates");
             }
             "quit" => {
@@ -256,15 +364,25 @@ pub fn init_tray(app: &AppHandle) -> Result<(), String> {
             _ => {}
         })
         .on_tray_icon_event(|tray, event| {
-            if let TrayIconEvent::Click {
-                button: MouseButton::Left,
-                button_state: MouseButtonState::Up,
-                ..
-            } = event
-            {
-                let app = tray.app_handle();
-                let _ = restore_main_window(app.clone());
-                emit_tray_action(app, "open-app");
+            let app = tray.app_handle();
+            match event {
+                TrayIconEvent::Click {
+                    button: MouseButton::Left,
+                    button_state: MouseButtonState::Up,
+                    ..
+                } => {
+                    schedule_left_click_action(app, configured_left_click_action(app));
+                }
+                TrayIconEvent::DoubleClick {
+                    button: MouseButton::Left,
+                    ..
+                } => {
+                    bump_tray_click_nonce(app);
+                    if configured_double_click_action(app) == TrayDoubleClickAction::OpenApp {
+                        emit_tray_action(app, "open-app");
+                    }
+                }
+                _ => {}
             }
         })
         .build(app)
@@ -284,6 +402,8 @@ pub fn sync_runtime_settings(
         .lock()
         .map_err(|_| "Runtime settings lock poisoned".to_string())?;
     *settings = payload;
+    drop(settings);
+    refresh_tray(&app)?;
     Ok(())
 }
 
@@ -310,6 +430,7 @@ pub fn restore_main_window(app: AppHandle) -> Result<(), String> {
     window.unminimize().map_err(|e| e.to_string())?;
     window.show().map_err(|e| e.to_string())?;
     window.set_focus().map_err(|e| e.to_string())?;
+    refresh_tray(&app)?;
     Ok(())
 }
 
@@ -326,6 +447,7 @@ pub fn show_quick_download_window(app: AppHandle) -> Result<(), String> {
     window.show().map_err(|e| e.to_string())?;
     window.move_window(WindowPosition::BottomRight).map_err(|e| e.to_string())?;
     window.set_focus().map_err(|e| e.to_string())?;
+    refresh_tray(&app)?;
     Ok(())
 }
 
@@ -333,6 +455,7 @@ pub fn show_quick_download_window(app: AppHandle) -> Result<(), String> {
 pub fn hide_main_window_to_tray(app: AppHandle) -> Result<(), String> {
     let window = main_window(&app)?;
     window.hide().map_err(|e| e.to_string())?;
+    refresh_tray(&app)?;
     Ok(())
 }
 

@@ -2,6 +2,9 @@ import { invoke } from "@tauri-apps/api/core";
 
 export interface RuntimeSettingsSyncPayload {
   closeToTray: boolean;
+  trayLeftClickAction: "quick-panel" | "open-app" | "none";
+  trayDoubleClickAction: "none" | "open-app";
+  trayMenuShowHideItem: boolean;
 }
 
 export interface TrayStatePayload {

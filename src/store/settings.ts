@@ -6,6 +6,8 @@ export type FileCollisionAction = "overwrite" | "rename" | "skip";
 export type DownloadsAddMode = "queue" | "start";
 export type QuickActionBehavior = "ask" | "instant";
 export type QuickDestinationMode = "default" | "ask";
+export type TrayLeftClickAction = "quick-panel" | "open-app" | "none";
+export type TrayDoubleClickAction = "none" | "open-app";
 
 export const ACCENT_COLORS: { id: AccentColor; label: string; swatch: string }[] = [
   { id: "default", label: "Default", swatch: "oklch(0.55 0.01 250)" },
@@ -43,6 +45,9 @@ export interface Settings {
   closeToTray: boolean;
   launchAtLogin: boolean;
   startMinimizedToTray: boolean;
+  trayLeftClickAction: TrayLeftClickAction;
+  trayDoubleClickAction: TrayDoubleClickAction;
+  trayMenuShowHideItem: boolean;
   enableBackgroundUpdateChecks: boolean;
   checkToolUpdatesInBackground: boolean;
   checkAppUpdatesInBackground: boolean;
@@ -81,6 +86,9 @@ export const DEFAULT_SETTINGS: Settings = {
   closeToTray: true,
   launchAtLogin: false,
   startMinimizedToTray: true,
+  trayLeftClickAction: "quick-panel",
+  trayDoubleClickAction: "none",
+  trayMenuShowHideItem: true,
   enableBackgroundUpdateChecks: true,
   checkToolUpdatesInBackground: true,
   checkAppUpdatesInBackground: true,

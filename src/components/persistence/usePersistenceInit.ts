@@ -22,17 +22,11 @@ import {
   checkFfmpegVersion,
   checkAria2Version,
   checkDenoVersion,
-  fetchLatestYtDlpVersion,
-  fetchLatestFfmpegVersion,
-  fetchLatestAria2Version,
-  fetchLatestDenoVersion,
-  isUpdateAvailable,
   listToolBackups,
   isAutostartEnabled,
 } from "@/lib/commands";
 import { toast } from "sonner";
 import { getAppMode } from "@/lib/tools/app-mode";
-import { checkAndStoreAppUpdate, logAvailableAppUpdate } from "@/lib/app-updates/service";
 import { startQueuedJobs } from "@/lib/downloader";
 
 export function usePersistenceInit(): MutableRefObject<boolean> {
@@ -73,54 +67,6 @@ export function usePersistenceInit(): MutableRefObject<boolean> {
         checkAndNotify("aria2", checkAria2Version),
         checkAndNotify("deno", checkDenoVersion),
       ]);
-    };
-
-    const checkLatestVersions = async () => {
-      addLog({ level: "debug", message: "Checking latest tool versions..." });
-
-      const toolsSnapshot = useToolsStore.getState().tools;
-      const getChannel = (id: string) =>
-        toolsSnapshot.find((t) => t.id === id)?.channel ?? "stable";
-
-      const checks: Array<{
-        id: string;
-        fetchFn: () => Promise<string | null>;
-      }> = [
-        {
-          id: "yt-dlp",
-          fetchFn: () => fetchLatestYtDlpVersion(getChannel("yt-dlp")),
-        },
-        {
-          id: "ffmpeg",
-          fetchFn: () => fetchLatestFfmpegVersion(getChannel("ffmpeg")),
-        },
-        { id: "aria2", fetchFn: fetchLatestAria2Version },
-        { id: "deno", fetchFn: fetchLatestDenoVersion },
-      ];
-
-      await Promise.all(
-        checks.map(async ({ id, fetchFn }) => {
-          try {
-            const latest = await fetchFn();
-            const tool = useToolsStore
-              .getState()
-              .tools.find((t) => t.id === id);
-            updateTool(id, {
-              latestVersion: latest || undefined,
-              updateAvailable: isUpdateAvailable(
-                tool?.version,
-                latest || undefined
-              ),
-              latestCheckedAt: Date.now(),
-            });
-          } catch (e) {
-            addLog({
-              level: "warn",
-              message: `Latest version check failed (${id}): ${String(e)}`,
-            });
-          }
-        })
-      );
     };
 
     const init = async () => {
@@ -350,9 +296,6 @@ export function usePersistenceInit(): MutableRefObject<boolean> {
         }
 
         initialized.current = true;
-
-        void checkLatestVersions();
-        void checkAppUpdate();
       } catch (e) {
         addLog({
           level: "error",
@@ -361,16 +304,6 @@ export function usePersistenceInit(): MutableRefObject<boolean> {
         toast.error("Failed to load settings");
       }
     };
-
-    async function checkAppUpdate() {
-      try {
-        const appUpdate = await checkAndStoreAppUpdate();
-        logAvailableAppUpdate(appUpdate);
-      } catch {
-        // silently ignore update check failures
-      }
-    }
-
     init();
   }, [setSettings, setPresets, setTools, updateTool, addLog]);
 
