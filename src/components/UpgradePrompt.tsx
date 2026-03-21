@@ -132,6 +132,7 @@ export function UpgradePrompt() {
     (startupReady && promptToolIds.length > 0 && dismissedMissingKey !== missingKey);
   const modalCurrentToolName = currentToolId ? toolNameById[currentToolId] ?? currentToolId : null;
   const totalSize = modalToolIds.reduce((acc, toolId) => acc + (TOOL_SIZES[toolId] || 0), 0);
+  const showFooterActions = !isDownloading;
 
   const resetProgressState = useCallback(() => {
     setProgress(0);
@@ -332,7 +333,8 @@ export function UpgradePrompt() {
   return (
     <Dialog open={modalOpen} onOpenChange={handleClose}>
       <DialogContent
-        className="sm:max-w-[480px] border-none bg-transparent p-0 shadow-2xl overflow-hidden"
+        showCloseButton={!isDownloading}
+        className="w-[calc(100%-1rem)] max-w-[560px] border-none bg-transparent p-0 shadow-2xl overflow-hidden"
         onInteractOutside={(event) => {
           if (isDownloading) event.preventDefault();
         }}
@@ -340,19 +342,19 @@ export function UpgradePrompt() {
           if (isDownloading) event.preventDefault();
         }}
       >
-        <div className="relative overflow-hidden rounded-xl border border-white/10 bg-background/90 backdrop-blur-2xl">
+        <div className="relative flex max-h-[min(760px,calc(100vh-1rem))] min-h-0 flex-col overflow-hidden rounded-xl border border-white/10 bg-background/90 backdrop-blur-2xl">
           <div className="absolute left-0 right-0 top-0 h-1 bg-linear-to-r from-primary via-purple-500 to-primary animate-gradient-x" />
 
-          <div className="p-6 pb-3">
+          <div className="min-h-0 flex-1 overflow-y-auto p-4 pb-3 sm:p-6">
             <DialogHeader className="mb-4">
-              <div className="flex items-center gap-3">
-                <div className="relative">
+              <div className="flex items-start gap-3">
+                <div className="relative shrink-0">
                   <div className="absolute inset-0 rounded-full bg-primary/20 blur-lg animate-pulse" />
                   <div className="relative rounded-xl border border-primary/20 bg-primary/10 p-2.5">
                     <Sparkles className="h-5 w-5 text-primary" />
                   </div>
                 </div>
-                <div>
+                <div className="min-w-0">
                   <DialogTitle className="text-lg font-bold tracking-tight">
                     {isDownloading ? "Setting Up Tools" : isFullMode ? "Full Mode Setup" : "Setup Required"}
                   </DialogTitle>
@@ -410,8 +412,8 @@ export function UpgradePrompt() {
                   className="space-y-4"
                 >
                   <div className="rounded-2xl border border-white/10 bg-white/5 p-4">
-                    <div className="flex items-center justify-between gap-3">
-                      <div>
+                    <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                      <div className="min-w-0">
                         <div className="text-[10px] uppercase tracking-[0.18em] text-muted-foreground">
                           Pending Tools
                         </div>
@@ -419,7 +421,7 @@ export function UpgradePrompt() {
                           {promptToolIds.length} tool{promptToolIds.length === 1 ? "" : "s"} need local setup
                         </div>
                       </div>
-                      <div className="text-right">
+                      <div className="text-left sm:text-right">
                         <div className="text-[10px] uppercase tracking-[0.18em] text-muted-foreground">
                           Download Size
                         </div>
@@ -428,7 +430,7 @@ export function UpgradePrompt() {
                     </div>
                   </div>
 
-                  <div className="grid grid-cols-1 gap-2">
+                  <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
                     {tools.map((tool) => {
                       const isSelected = promptToolIds.includes(tool.id);
                       return (
@@ -467,29 +469,27 @@ export function UpgradePrompt() {
             </AnimatePresence>
           </div>
 
-          <DialogFooter className="gap-2 bg-muted/5 p-6 pt-2">
-            {!isDownloading && (
-              <>
-                <MotionButton
-                  type="button"
-                  variant="ghost"
-                  onClick={() => handleClose(false)}
-                  className="h-11 flex-1 rounded-xl text-muted-foreground hover:text-foreground"
-                >
-                  Close
-                </MotionButton>
-                <MotionButton
-                  type="button"
-                  onClick={() => void handleUpgrade()}
-                  disabled={actionToolIds.length === 0 || !startupReady}
-                  className="h-11 flex-1 gap-2 rounded-xl bg-primary text-primary-foreground shadow-lg shadow-primary/20 hover:bg-primary/90"
-                >
-                  <Download className="h-4 w-4" />
-                  {error ? "Retry Install" : `Install (${totalSize}MB)`}
-                </MotionButton>
-              </>
-            )}
-          </DialogFooter>
+          {showFooterActions && (
+            <DialogFooter className="gap-2 bg-muted/5 p-4 pt-2 sm:flex-row sm:p-6 sm:pt-2">
+              <MotionButton
+                type="button"
+                variant="ghost"
+                onClick={() => handleClose(false)}
+                className="h-11 w-full flex-1 rounded-xl text-muted-foreground hover:text-foreground"
+              >
+                Close
+              </MotionButton>
+              <MotionButton
+                type="button"
+                onClick={() => void handleUpgrade()}
+                disabled={actionToolIds.length === 0 || !startupReady}
+                className="h-11 w-full flex-1 gap-2 rounded-xl bg-primary text-primary-foreground shadow-lg shadow-primary/20 hover:bg-primary/90"
+              >
+                <Download className="h-4 w-4" />
+                {error ? "Retry Install" : `Install (${totalSize}MB)`}
+              </MotionButton>
+            </DialogFooter>
+          )}
         </div>
       </DialogContent>
     </Dialog>

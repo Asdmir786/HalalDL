@@ -48,6 +48,8 @@ export function ToolsProgressModal({
   modalLogs,
   onDismiss,
 }: ToolsProgressModalProps) {
+  const showFooter = modalDone || Boolean(modalError);
+
   return (
     <Dialog
       open={open}
@@ -141,24 +143,26 @@ export function ToolsProgressModal({
               </AnimatePresence>
             </div>
 
-            <DialogFooter className="gap-2 bg-muted/5 p-4 pt-2 sm:flex-row sm:p-6 sm:pt-2">
-              {modalDone && (
-                <div className="flex h-12 w-full items-center justify-center gap-2 rounded-xl border border-green-500/20 bg-green-600/10 text-sm font-medium text-green-400">
-                  <Loader2 className="w-4 h-4 animate-spin" />
-                  Restarting...
-                </div>
-              )}
-              {modalError && (
-                <MotionButton
-                  type="button"
-                  variant="outline"
-                  onClick={onDismiss}
-                  className="h-11 w-full rounded-xl"
-                >
-                  Dismiss
-                </MotionButton>
-              )}
-            </DialogFooter>
+            {showFooter && (
+              <DialogFooter className="gap-2 bg-muted/5 p-4 pt-2 sm:flex-row sm:p-6 sm:pt-2">
+                {modalDone && (
+                  <div className="flex h-12 w-full items-center justify-center gap-2 rounded-xl border border-green-500/20 bg-green-600/10 text-sm font-medium text-green-400">
+                    <Loader2 className="w-4 h-4 animate-spin" />
+                    Restarting...
+                  </div>
+                )}
+                {modalError && (
+                  <MotionButton
+                    type="button"
+                    variant="outline"
+                    onClick={onDismiss}
+                    className="h-11 w-full rounded-xl"
+                  >
+                    Dismiss
+                  </MotionButton>
+                )}
+              </DialogFooter>
+            )}
           </div>
         </DialogContent>
     </Dialog>
