@@ -5,9 +5,7 @@ use tauri::Manager;
 
 use crate::fs_utils::{temp_path_for, safe_replace_with_backup};
 use crate::download::{download_to_temp, emit_progress, resolve_latest_aria2_zip_url};
-use crate::extract::{extract_from_zip, extract_from_7z};
-
-const MAX_ARCHIVE_INSTALL_RETRIES: u8 = 3;
+use crate::extract::extract_from_zip;
 
 /// Resolve the full system path of a tool using `where` (Windows).
 #[tauri::command]
@@ -80,55 +78,21 @@ async fn download_ytdlp(app_handle: &tauri::AppHandle, dest: &PathBuf, is_nightl
 }
 
 async fn download_ffmpeg(app_handle: &tauri::AppHandle, dest: &PathBuf, variant: Option<String>, is_nightly: bool) -> Result<(), String> {
-    let variant_lower = variant.as_deref().unwrap_or("").to_lowercase();
-    let url = if is_nightly {
-        if variant_lower.contains("essentials") {
-            "https://www.gyan.dev/ffmpeg/builds/ffmpeg-git-essentials.7z"
-        } else {
-            "https://www.gyan.dev/ffmpeg/builds/ffmpeg-git-full.7z"
-        }
-    } else if variant_lower.contains("shared") {
-        "https://www.gyan.dev/ffmpeg/builds/ffmpeg-release-full-shared.7z"
-    } else if variant_lower.contains("essentials") {
-        "https://www.gyan.dev/ffmpeg/builds/ffmpeg-release-essentials.7z"
-    } else {
-        "https://www.gyan.dev/ffmpeg/builds/ffmpeg-release-full.7z"
-    };
-    let archive_path = dest.join("ffmpeg-update.7z");
+    let _ = variant;
+    let _ = is_nightly;
 
-    let mut last_error: Option<String> = None;
-    for attempt in 1..=MAX_ARCHIVE_INSTALL_RETRIES {
-        download_tool_payload(app_handle, "ffmpeg", url, &archive_path).await?;
-        emit_progress(app_handle, "ffmpeg", 99.0, "Extracting ffmpeg.exe, ffprobe.exe from 7z...");
-
-        match extract_from_7z(app_handle, "ffmpeg", &archive_path, dest, vec!["ffmpeg.exe", "ffprobe.exe"]) {
-            Ok(extracted) => {
-                emit_progress(app_handle, "ffmpeg", 100.0, &format!("Extracted: {}", extracted.join(", ")));
-                if let Err(e) = fs::remove_file(&archive_path) {
-                    eprintln!("[tools] Warning: failed to clean up {:?}: {}", archive_path, e);
-                }
-                return Ok(());
-            }
-            Err(e) => {
-                last_error = Some(e.clone());
-                let _ = fs::remove_file(&archive_path);
-                if attempt < MAX_ARCHIVE_INSTALL_RETRIES {
-                    emit_progress(
-                        app_handle,
-                        "ffmpeg",
-                        0.0,
-                        &format!(
-                            "FFmpeg archive extract failed, retrying install (attempt {}/{})...",
-                            attempt + 1,
-                            MAX_ARCHIVE_INSTALL_RETRIES
-                        ),
-                    );
-                }
-            }
-        }
+    // Gyan only publishes an official ZIP for the stable Essentials build.
+    // Use that package for app-managed installs so FFmpeg no longer depends on 7z extraction.
+    let url = "https://www.gyan.dev/ffmpeg/builds/ffmpeg-release-essentials.zip";
+    let zip_path = dest.join("ffmpeg-update.zip");
+    download_tool_payload(app_handle, "ffmpeg", url, &zip_path).await?;
+    emit_progress(app_handle, "ffmpeg", 99.0, "Extracting ffmpeg.exe, ffprobe.exe from zip...");
+    let extracted = extract_from_zip(app_handle, "ffmpeg", &zip_path, dest, vec!["ffmpeg.exe", "ffprobe.exe"])?;
+    emit_progress(app_handle, "ffmpeg", 100.0, &format!("Extracted: {}", extracted.join(", ")));
+    if let Err(e) = fs::remove_file(&zip_path) {
+        eprintln!("[tools] Warning: failed to clean up {:?}: {}", zip_path, e);
     }
-
-    Err(last_error.unwrap_or_else(|| "FFmpeg install failed after archive retries".to_string()))
+    Ok(())
 }
 
 async fn download_aria2(app_handle: &tauri::AppHandle, dest: &PathBuf) -> Result<(), String> {
@@ -582,7 +546,7 @@ pub fn cleanup_bin_tools(app_handle: tauri::AppHandle, tools: Vec<String>) -> Re
         }
     }
 
-    for extra in ["aria2.zip", "aria2-update.zip", "deno.zip", "deno-update.zip"] {
+    for extra in ["aria2.zip", "aria2-update.zip", "deno.zip", "deno-update.zip", "ffmpeg-update.zip", "ffmpeg-update.7z"] {
         let p = bin_dir.join(extra);
         if p.exists() {
             let _ = fs::remove_file(&p);

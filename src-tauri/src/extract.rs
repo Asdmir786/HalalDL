@@ -1,7 +1,7 @@
 use std::collections::HashMap;
 use std::fs;
 use std::io::Write;
-use std::path::{Path, PathBuf};
+use std::path::PathBuf;
 
 use crate::fs_utils::{temp_path_for, safe_replace_with_backup};
 use crate::download::emit_progress;
@@ -93,81 +93,3 @@ pub fn extract_from_zip_with_hashes(
     Ok(found_targets)
 }
 
-pub fn extract_from_7z(app_handle: &tauri::AppHandle, tool_name: &str, archive_path: &PathBuf, dest_dir: &PathBuf, targets: Vec<&str>) -> Result<Vec<String>, String> {
-    emit_progress(app_handle, tool_name, 99.0, "Opening 7z archive...");
-    let mut staged_targets: HashMap<String, (String, PathBuf)> = HashMap::new();
-
-    let file = fs::File::open(archive_path).map_err(|e| format!("Failed to open 7z archive: {}", e))?;
-
-    fn to_7z_err(msg: String) -> sevenz_rust::Error {
-        sevenz_rust::Error::Other(std::borrow::Cow::Owned(msg))
-    }
-
-    let extract_result = sevenz_rust::decompress_with_extract_fn(file, dest_dir, |entry, reader, _dest| {
-        let entry_name = entry.name().to_string();
-        let file_name = Path::new(&entry_name)
-            .file_name()
-            .unwrap_or_default()
-            .to_string_lossy()
-            .to_string();
-
-        if !targets.iter().any(|&t| file_name.eq_ignore_ascii_case(t)) {
-            return Ok(true);
-        }
-
-        let target_name = file_name.clone();
-        let dest_file = dest_dir.join(&target_name);
-        let temp_dest = temp_path_for(&dest_file).map_err(to_7z_err)?;
-
-        if temp_dest.exists() {
-            let _ = fs::remove_file(&temp_dest);
-        }
-
-        let mut outfile = fs::File::create(&temp_dest)
-            .map_err(|e| to_7z_err(format!("Failed to create {}: {}", target_name, e)))?;
-        std::io::copy(reader, &mut outfile)
-            .map_err(|e| to_7z_err(format!("Failed to extract {}: {}", target_name, e)))?;
-        outfile.flush()
-            .map_err(|e| to_7z_err(format!("Failed to flush {}: {}", target_name, e)))?;
-
-        let metadata = fs::metadata(&temp_dest)
-            .map_err(|e| to_7z_err(format!("Metadata read failed: {}", e)))?;
-        if metadata.len() == 0 {
-            return Err(to_7z_err(format!("Extracted file {} is empty", target_name)));
-        }
-
-        staged_targets.insert(target_name.to_lowercase(), (target_name, temp_dest));
-        Ok(true)
-    });
-
-    if let Err(e) = extract_result {
-        for (_, temp_dest) in staged_targets.values() {
-            let _ = fs::remove_file(temp_dest);
-        }
-        return Err(format!("7z extraction failed: {}", e));
-    }
-
-    if staged_targets.len() != targets.len() {
-        let found_targets = staged_targets
-            .values()
-            .map(|(target_name, _)| target_name.clone())
-            .collect::<Vec<_>>();
-        for (_, temp_dest) in staged_targets.into_values() {
-            let _ = fs::remove_file(temp_dest);
-        }
-        return Err(format!("Missing files from 7z. Found {:?}, expected {:?}", found_targets, targets));
-    }
-
-    let mut found_targets: Vec<String> = Vec::new();
-    for target in &targets {
-        let key = target.to_lowercase();
-        let Some((target_name, temp_dest)) = staged_targets.remove(&key) else {
-            return Err(format!("Missing staged file for {}", target));
-        };
-        let dest_file = dest_dir.join(&target_name);
-        safe_replace_with_backup(&dest_file, &temp_dest)?;
-        found_targets.push(target_name);
-    }
-
-    Ok(found_targets)
-}
