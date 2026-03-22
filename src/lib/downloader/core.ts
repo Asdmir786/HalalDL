@@ -11,6 +11,8 @@ import { copyFilesToClipboard, deleteFile, renameFile } from "@/lib/commands";
 import { resolveTool, ytDlpEnv, sendDownloadCompleteNotification } from "./tool-env";
 import { cleanupThumbnailByJobId } from "./thumbnails";
 import { fetchMediaInfo, fetchMetadata } from "./metadata";
+import { downloadInstagramJob } from "./instagram";
+import { isInstagramUrl } from "@/lib/media-engine";
 import { useHistoryStore, extractDomain, type HistoryEntry } from "@/store/history";
 import { stat } from "@tauri-apps/plugin-fs";
 import { createId } from "@/lib/id";
@@ -224,12 +226,134 @@ export async function startDownload(jobId: string) {
   }
 
   const preset = resolvePresetById(presets, job.presetId) ?? presets[0];
+  const subtitlePreferences = getSubtitlePreferences(job);
+
+  const finalizeSuccessfulDownload = async (lastKnownOutputPath?: string) => {
+    updateJob(jobId, {
+      status: "Post-processing",
+      phase: "Generating thumbnail",
+      statusDetail: "Finalizing download",
+      progress: 100,
+      ffmpegProgressKnown: undefined,
+    });
+    fetchMetadata(jobId);
+
+    setTimeout(() => {
+      const { settings } = useSettingsStore.getState();
+      const finalJob = useDownloadsStore.getState().jobs.find((j) => j.id === jobId);
+      const outputPathToUse = lastKnownOutputPath || finalJob?.outputPath;
+
+      if (lastKnownOutputPath && finalJob?.outputPath !== lastKnownOutputPath) {
+        updateJob(jobId, { outputPath: lastKnownOutputPath });
+      }
+
+      if (settings.notifications && finalJob) {
+        const title = finalJob.title || "Download Complete";
+        sendDownloadCompleteNotification("Download Finished", `${title} has been downloaded successfully.`);
+      }
+
+      if (settings.autoCopyFile && outputPathToUse) {
+        copyFilesToClipboard([outputPathToUse]).catch((e) => {
+          addLog({ level: "error", message: `Auto-copy failed: ${e}`, jobId });
+        });
+      }
+    }, 50);
+
+    if (settings.autoClearFinished) {
+      setTimeout(() => {
+        cleanupThumbnailByJobId(jobId).finally(() => {
+          removeJob(jobId);
+        });
+      }, 2000);
+    }
+
+    updateJob(jobId, { status: "Done", statusDetail: "Completed" });
+
+    const doneJob = useDownloadsStore.getState().jobs.find((j) => j.id === jobId);
+    if (doneJob) {
+      const finalPath = lastKnownOutputPath || doneJob.outputPath;
+      let fileSize: number | undefined;
+      if (finalPath) {
+        try {
+          const info = await stat(finalPath);
+          fileSize = info.size;
+        } catch {
+          void 0;
+        }
+      }
+      const entry: HistoryEntry = {
+        id: createId(),
+        url: doneJob.url,
+        title: doneJob.title || doneJob.url,
+        thumbnail: doneJob.thumbnail,
+        format: doneJob.overrides?.format || doneJob.fallbackFormat,
+        fileSize,
+        outputPath: finalPath,
+        presetId: doneJob.presetId,
+        presetName: preset?.name,
+        downloadedAt: Date.now(),
+        duration: doneJob.createdAt ? Date.now() - doneJob.createdAt : undefined,
+        domain: extractDomain(doneJob.url),
+        status: "completed",
+        overrides: doneJob.overrides,
+      };
+      useHistoryStore.getState().addEntry(entry);
+    }
+  };
+
+  const finalizeFailedDownload = async (failDetail: string) => {
+    updateJob(jobId, {
+      status: "Failed",
+      phase: "Resolving formats",
+      statusDetail: failDetail,
+      ffmpegProgressKnown: undefined,
+    });
+
+    const failedJob = useDownloadsStore.getState().jobs.find((j) => j.id === jobId);
+    if (failedJob) {
+      const entry: HistoryEntry = {
+        id: createId(),
+        url: failedJob.url,
+        title: failedJob.title || failedJob.url,
+        thumbnail: failedJob.thumbnail,
+        format: failedJob.overrides?.format,
+        outputPath: failedJob.outputPath,
+        presetId: failedJob.presetId,
+        presetName: preset?.name,
+        downloadedAt: Date.now(),
+        duration: failedJob.createdAt ? Date.now() - failedJob.createdAt : undefined,
+        domain: extractDomain(failedJob.url),
+        status: "failed",
+        failReason: failDetail,
+        overrides: failedJob.overrides,
+      };
+      useHistoryStore.getState().addEntry(entry);
+    }
+  };
+
+  if (isInstagramUrl(job.url)) {
+    const instagramResult = await downloadInstagramJob({
+      job,
+      preset,
+      settings,
+      subtitlePreferences,
+      updateJob,
+      addLog,
+    });
+
+    if (instagramResult.code === 0) {
+      await finalizeSuccessfulDownload(instagramResult.lastKnownOutputPath);
+    } else {
+      await finalizeFailedDownload(instagramResult.failDetail);
+    }
+    return;
+  }
+
   const ytDlp = await resolveTool("yt-dlp");
   const ffmpeg = await resolveTool("ffmpeg");
   const aria2 = await resolveTool("aria2c");
 
   const args = [...preset.args];
-  const subtitlePreferences = getSubtitlePreferences(job);
 
   if (job.overrides?.format) {
     const removeFlagWithValue = (flag: string) => {
@@ -911,75 +1035,7 @@ export async function startDownload(jobId: string) {
   }
 
   if (result.code === 0) {
-    updateJob(jobId, {
-      status: "Post-processing",
-      phase: "Generating thumbnail",
-      statusDetail: "Finalizing download",
-      progress: 100,
-      ffmpegProgressKnown: undefined,
-    });
-    fetchMetadata(jobId);
-
-    setTimeout(() => {
-      const { settings } = useSettingsStore.getState();
-      const finalJob = useDownloadsStore.getState().jobs.find((j) => j.id === jobId);
-      const outputPathToUse = result.lastKnownOutputPath || finalJob?.outputPath;
-
-      if (result.lastKnownOutputPath && finalJob?.outputPath !== result.lastKnownOutputPath) {
-        updateJob(jobId, { outputPath: result.lastKnownOutputPath });
-      }
-
-      if (settings.notifications && finalJob) {
-        const title = finalJob.title || "Download Complete";
-        sendDownloadCompleteNotification("Download Finished", `${title} has been downloaded successfully.`);
-      }
-
-      if (settings.autoCopyFile && outputPathToUse) {
-        copyFilesToClipboard([outputPathToUse]).catch((e) => {
-          addLog({ level: "error", message: `Auto-copy failed: ${e}`, jobId });
-        });
-      }
-    }, 50);
-
-    if (settings.autoClearFinished) {
-      setTimeout(() => {
-        cleanupThumbnailByJobId(jobId).finally(() => {
-          removeJob(jobId);
-        });
-      }, 2000);
-    }
-
-    updateJob(jobId, { status: "Done", statusDetail: "Completed" });
-
-    // Record to history
-    const doneJob = useDownloadsStore.getState().jobs.find((j) => j.id === jobId);
-    if (doneJob) {
-      const finalPath = result.lastKnownOutputPath || doneJob.outputPath;
-      let fileSize: number | undefined;
-      if (finalPath) {
-        try {
-          const info = await stat(finalPath);
-          fileSize = info.size;
-        } catch { /* file may not exist yet */ }
-      }
-      const entry: HistoryEntry = {
-        id: createId(),
-        url: doneJob.url,
-        title: doneJob.title || doneJob.url,
-        thumbnail: doneJob.thumbnail,
-        format: doneJob.overrides?.format || doneJob.fallbackFormat,
-        fileSize,
-        outputPath: finalPath,
-        presetId: doneJob.presetId,
-        presetName: preset?.name,
-        downloadedAt: Date.now(),
-        duration: doneJob.createdAt ? Date.now() - doneJob.createdAt : undefined,
-        domain: extractDomain(doneJob.url),
-        status: "completed",
-        overrides: doneJob.overrides,
-      };
-      useHistoryStore.getState().addEntry(entry);
-    }
+    await finalizeSuccessfulDownload(result.lastKnownOutputPath);
   } else {
     if (result.formatUnavailable) {
       addLog({ level: "error", message: "Fallback failed: format unavailable after retry", jobId });
@@ -987,33 +1043,6 @@ export async function startDownload(jobId: string) {
     const failDetail = result.formatUnavailable
       ? "Failed to resolve a compatible format"
       : "Download failed (see logs)";
-    updateJob(jobId, {
-      status: "Failed",
-      phase: "Resolving formats",
-      statusDetail: failDetail,
-      ffmpegProgressKnown: undefined,
-    });
-
-    // Record failed download to history
-    const failedJob = useDownloadsStore.getState().jobs.find((j) => j.id === jobId);
-    if (failedJob) {
-      const entry: HistoryEntry = {
-        id: createId(),
-        url: failedJob.url,
-        title: failedJob.title || failedJob.url,
-        thumbnail: failedJob.thumbnail,
-        format: failedJob.overrides?.format,
-        outputPath: failedJob.outputPath,
-        presetId: failedJob.presetId,
-        presetName: preset?.name,
-        downloadedAt: Date.now(),
-        duration: failedJob.createdAt ? Date.now() - failedJob.createdAt : undefined,
-        domain: extractDomain(failedJob.url),
-        status: "failed",
-        failReason: failDetail,
-        overrides: failedJob.overrides,
-      };
-      useHistoryStore.getState().addEntry(entry);
-    }
+    await finalizeFailedDownload(failDetail);
   }
 }

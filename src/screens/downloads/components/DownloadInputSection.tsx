@@ -12,7 +12,6 @@ import {
 } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { MotionButton } from "@/components/motion/MotionButton";
-import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectGroup, SelectItem, SelectLabel, SelectSeparator, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { DownloadOutputOptions } from "./DownloadOutputOptions";
@@ -417,128 +416,79 @@ export function DownloadInputSection({
         </div>
       )}
 
-      <div className="rounded-2xl border border-muted/60 bg-background/80 p-3.5 shadow-sm">
-        <div className="flex flex-col gap-3">
-          <div className="flex flex-col gap-1">
-            <div className="text-sm font-semibold tracking-tight">Preset</div>
-            <div className="text-xs text-muted-foreground">
-              Pick the result you want. The dropdown is grouped by outcome so the common choices are easier to find.
-            </div>
-          </div>
-
-          <div className="grid gap-2 lg:grid-cols-[minmax(0,1fr)_auto] lg:items-end">
-            <div className="grid gap-2">
+      <div className="rounded-2xl border border-muted/60 bg-background/80 p-3 shadow-sm">
+        <div className="grid gap-2 lg:grid-cols-[minmax(0,1fr)_auto] lg:items-center">
+          <div className="grid gap-1.5">
+            <div className="flex items-center justify-between gap-3">
               <label className="text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">
-                Download preset
+                Preset
               </label>
-              <Select value={selectedPreset} onValueChange={onPresetChange}>
-                <SelectTrigger className="h-auto min-h-12 bg-background border-muted px-3 py-2 shadow-sm focus:ring-1">
-                  {isCustomPreset ? (
-                    <div className="min-w-0 text-left">
-                      <div className="truncate text-sm font-semibold">Custom configuration</div>
-                      <div className="truncate text-[11px] text-muted-foreground">
-                        Manual control over format, subtitles, folder, and filename rules
-                      </div>
-                    </div>
-                  ) : selectedPresetConfig ? (
-                    <div className="min-w-0 text-left">
-                      <div className="truncate text-sm font-semibold">{selectedPresetConfig.name}</div>
-                      <div className="truncate text-[11px] text-muted-foreground">
-                        {selectedPresetConfig.description}
-                      </div>
-                    </div>
-                  ) : (
-                    <SelectValue placeholder="Choose preset" />
-                  )}
-                </SelectTrigger>
-                <SelectContent className="max-h-[360px] overflow-y-auto rounded-2xl border-border/70 bg-popover/98 p-1.5 shadow-2xl" position="popper" sideOffset={6} align="start">
-                  <SelectItem value="custom" className="rounded-xl py-2.5 font-semibold text-primary">
-                    <div className="flex min-w-0 flex-col">
-                      <span className="text-sm">Custom configuration</span>
-                      <span className="text-[11px] font-normal text-muted-foreground">
-                        Manual control over format, subtitles, folder, and filename rules
-                      </span>
-                    </div>
-                  </SelectItem>
-                  <SelectSeparator />
-                  {presetGroups.map((entry, index) => (
-                    <div key={entry.group}>
-                      <SelectGroup>
-                        <SelectLabel className="py-1.5 text-[10px] uppercase tracking-wider text-muted-foreground/80">
-                          {entry.label}
-                        </SelectLabel>
-                        {entry.presets.map((preset) => (
-                          <SelectItem key={preset.id} value={preset.id} title={preset.description} className="rounded-xl py-2.5">
-                            <div className="flex min-w-0 flex-col">
-                              <span className="truncate text-sm font-medium">{preset.name}</span>
-                              <span className="truncate text-[11px] font-normal text-muted-foreground">
-                                {preset.description}
-                              </span>
-                            </div>
-                          </SelectItem>
-                        ))}
-                      </SelectGroup>
-                      {index < presetGroups.length - 1 && <SelectSeparator />}
-                    </div>
-                  ))}
-                </SelectContent>
-              </Select>
+              {!isCustomPreset && selectedPresetConfig && (
+                <div className="flex items-center gap-2 text-[10px] text-muted-foreground">
+                  <span className="truncate">{selectedPresetGroupLabel}</span>
+                  <span className="h-1 w-1 rounded-full bg-muted-foreground/40" />
+                  <span className="truncate">{selectedPresetSubtitleDetail}</span>
+                </div>
+              )}
             </div>
-
-            <MotionButton
-              type="button"
-              variant={isCustomPreset ? "secondary" : "outline"}
-              className="h-12 rounded-xl px-4"
-              onClick={() => onPresetChange("custom")}
-            >
-              <Settings2 className="mr-2 h-4 w-4" />
-              {isCustomPreset ? "Custom Active" : "Use Custom"}
-            </MotionButton>
-          </div>
-
-          <div
-            className={`rounded-2xl border px-3 py-3 shadow-sm transition-colors ${
-              isCustomPreset
-                ? "border-primary/30 bg-primary/8"
-                : "border-border/60 bg-muted/20"
-            }`}
-          >
-            {isCustomPreset ? (
-              <div className="space-y-1.5">
-                <div className="text-sm font-semibold">Custom configuration</div>
-                <p className="text-xs leading-5 text-muted-foreground">
-                  Output format, naming, subtitles, and folder choices are all controlled by the advanced options below.
-                </p>
-              </div>
-            ) : selectedPresetConfig ? (
-              <div className="space-y-2">
-                <div className="flex flex-wrap items-center gap-2">
-                  <div className="text-sm font-semibold">{selectedPresetConfig.name}</div>
-                  <Badge variant="secondary" className="rounded-full text-[10px]">
-                    {selectedPresetGroupLabel}
-                  </Badge>
-                  {selectedPresetConfig.quickEligible !== false && (
-                    <Badge variant="outline" className="rounded-full text-[10px]">
-                      Quick Download
-                    </Badge>
-                  )}
-                </div>
-                <p className="text-xs leading-5 text-muted-foreground">
-                  {selectedPresetConfig.description}
-                </p>
-                <div className="flex flex-wrap gap-2 text-[11px] text-muted-foreground">
-                  <span className="rounded-full border border-border/60 bg-background/80 px-2.5 py-1">
-                    {selectedPresetSubtitleDetail}
-                  </span>
-                  {selectedPresetConfig.askFolderBehavior === "ask" && (
-                    <span className="rounded-full border border-border/60 bg-background/80 px-2.5 py-1">
-                      Asks for a save folder
+            <Select value={selectedPreset} onValueChange={onPresetChange}>
+              <SelectTrigger className="h-11 bg-background border-muted px-3 shadow-sm focus:ring-1">
+                {isCustomPreset ? (
+                  <div className="min-w-0 text-left">
+                    <div className="truncate text-sm font-semibold">Custom configuration</div>
+                  </div>
+                ) : selectedPresetConfig ? (
+                  <div className="min-w-0 text-left">
+                    <div className="truncate text-sm font-semibold">{selectedPresetConfig.name}</div>
+                  </div>
+                ) : (
+                  <SelectValue placeholder="Choose preset" />
+                )}
+              </SelectTrigger>
+              <SelectContent className="max-h-[360px] overflow-y-auto rounded-2xl border-border/70 bg-popover/98 p-1.5 shadow-2xl" position="popper" sideOffset={6} align="start">
+                <SelectItem value="custom" className="rounded-xl py-2.5 font-semibold text-primary">
+                  <div className="flex min-w-0 flex-col">
+                    <span className="text-sm">Custom configuration</span>
+                    <span className="text-[11px] font-normal text-muted-foreground">
+                      Manual control over format, subtitles, folder, and filename rules
                     </span>
-                  )}
-                </div>
-              </div>
-            ) : null}
+                  </div>
+                </SelectItem>
+                <SelectSeparator />
+                {presetGroups.map((entry, index) => (
+                  <div key={entry.group}>
+                    <SelectGroup>
+                      <SelectLabel className="py-1.5 text-[10px] uppercase tracking-wider text-muted-foreground/80">
+                        {entry.label}
+                      </SelectLabel>
+                      {entry.presets.map((preset) => (
+                        <SelectItem key={preset.id} value={preset.id} title={preset.description} className="rounded-xl py-2.5">
+                          <div className="flex min-w-0 flex-col">
+                            <span className="truncate text-sm font-medium">{preset.name}</span>
+                            <span className="truncate text-[11px] font-normal text-muted-foreground">
+                              {preset.description}
+                            </span>
+                          </div>
+                        </SelectItem>
+                      ))}
+                    </SelectGroup>
+                    {index < presetGroups.length - 1 && <SelectSeparator />}
+                  </div>
+                ))}
+              </SelectContent>
+            </Select>
           </div>
+
+          <MotionButton
+            type="button"
+            variant="ghost"
+            size="sm"
+            className="h-9 rounded-xl px-3 text-xs"
+            onClick={() => onPresetChange("custom")}
+          >
+            <Settings2 className="mr-1.5 h-3.5 w-3.5" />
+            {isCustomPreset ? "Custom On" : "Custom"}
+          </MotionButton>
         </div>
       </div>
 

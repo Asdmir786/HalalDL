@@ -68,6 +68,53 @@ pub async fn download_url_to_file(url: String, dest: String, referer: Option<Str
     Ok(dest)
 }
 
+/// Post an x-www-form-urlencoded body and return the response text.
+#[tauri::command]
+pub async fn post_form_for_text(
+    url: String,
+    body: String,
+    referer: Option<String>,
+    origin: Option<String>,
+) -> Result<String, String> {
+    let client = reqwest::Client::builder()
+        .danger_accept_invalid_certs(true)
+        .build()
+        .map_err(|e| format!("HTTP client error: {}", e))?;
+
+    let mut req = client
+        .post(&url)
+        .header(
+            reqwest::header::CONTENT_TYPE,
+            "application/x-www-form-urlencoded; charset=UTF-8",
+        )
+        .header(
+            reqwest::header::ACCEPT,
+            "text/html, text/plain, */*",
+        )
+        .header(
+            reqwest::header::USER_AGENT,
+            "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/136.0.0.0 Safari/537.36 HalalDL/1.0",
+        )
+        .body(body);
+
+    if let Some(ref r) = referer {
+        req = req.header(reqwest::header::REFERER, r);
+    }
+
+    if let Some(ref o) = origin {
+        req = req.header(reqwest::header::ORIGIN, o);
+    }
+
+    let resp = req.send().await.map_err(|e| format!("Request failed: {}", e))?;
+    if !resp.status().is_success() {
+        return Err(format!("HTTP {}: {}", resp.status(), url));
+    }
+
+    resp.text()
+        .await
+        .map_err(|e| format!("Read body failed: {}", e))
+}
+
 pub fn sha256_of_path(path: &Path) -> Result<String, String> {
     let mut file = fs::File::open(path).map_err(|e| e.to_string())?;
     let mut hasher = Sha256::new();

@@ -36,6 +36,7 @@ export {
   cleanupToolBackup,
   cleanupAllBackups,
   downloadUrlToFile,
+  postFormForText,
 } from "./tool-commands";
 export {
   revealInExplorer,

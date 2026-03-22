@@ -4,7 +4,9 @@ import { useLogsStore } from "@/store/logs";
 import { join } from "@tauri-apps/api/path";
 import { BaseDirectory, exists } from "@tauri-apps/plugin-fs";
 import { downloadUrlToFile } from "@/lib/commands";
+import { isInstagramUrl } from "@/lib/media-engine";
 import { resolveTool, ytDlpEnv, isYouTubeUrl } from "./tool-env";
+import { fetchInstagramMediaInfo } from "./instagram";
 import {
   ensureThumbnailDir,
   thumbnailAssetUrl,
@@ -28,6 +30,10 @@ function extractLanguageKeys(value: unknown): string[] {
 }
 
 export async function fetchMediaInfo(url: string): Promise<MediaMetadataProbe> {
+  if (isInstagramUrl(url)) {
+    return fetchInstagramMediaInfo(url);
+  }
+
   const ytDlp = await resolveTool("yt-dlp");
   const command = Command.create(
     ytDlp.command,

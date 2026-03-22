@@ -1,4 +1,5 @@
 import { Command } from "@tauri-apps/plugin-shell";
+import { isInstagramUrl, resolveInstagramWithDownloadgram } from "@/lib/media-engine";
 import { resolveTool, ytDlpEnv } from "./tool-env";
 
 export type UrlProbeResult = "supported" | "unsupported" | "unknown";
@@ -70,6 +71,15 @@ export async function probeMediaUrl(url: string): Promise<UrlProbeResult> {
   const quickResult = quickProbeMediaUrl(url);
   if (quickResult === "unsupported") {
     return "unsupported";
+  }
+
+  if (isInstagramUrl(url)) {
+    try {
+      const resolved = await resolveInstagramWithDownloadgram(url);
+      return resolved.items.length > 0 ? "supported" : "unknown";
+    } catch {
+      return "unknown";
+    }
   }
 
   try {

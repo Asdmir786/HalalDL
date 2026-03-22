@@ -62,6 +62,7 @@ pub fn run() {
             clipboard::copy_files_to_clipboard,
             clipboard::read_text_from_clipboard,
             download::download_url_to_file,
+            download::post_form_for_text,
             runtime::sync_runtime_settings,
             runtime::update_tray_state,
             runtime::restore_main_window,

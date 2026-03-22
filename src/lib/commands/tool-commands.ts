@@ -92,3 +92,17 @@ export async function cleanupAllBackups(): Promise<string> {
 export async function downloadUrlToFile(url: string, dest: string, referer?: string): Promise<string> {
   return invoke<string>("download_url_to_file", { url, dest, referer: referer ?? null });
 }
+
+export async function postFormForText(
+  url: string,
+  body: string,
+  referer?: string,
+  origin?: string
+): Promise<string> {
+  return invoke<string>("post_form_for_text", {
+    url,
+    body,
+    referer: referer ?? null,
+    origin: origin ?? null,
+  });
+}
