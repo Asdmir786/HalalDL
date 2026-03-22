@@ -26,7 +26,6 @@ import type {
 } from "@/lib/subtitles";
 import {
   getPresetGroup,
-  getPresetSubtitleDetail,
   groupPresetsForSelect,
   PRESET_GROUP_LABELS,
   resolvePresetById,
@@ -120,10 +119,6 @@ export function DownloadInputSection({
   const selectedPresetGroupLabel = selectedPresetConfig
     ? PRESET_GROUP_LABELS[getPresetGroup(selectedPresetConfig)]
     : "Custom";
-  const selectedPresetSubtitleDetail = selectedPresetConfig
-    ? getPresetSubtitleDetail(selectedPresetConfig)
-    : subtitleHint;
-
   const [dupDismissed, setDupDismissed] = useState(false);
   const handleUrlChange = useCallback((val: string) => {
     setUrl(val);
@@ -338,8 +333,8 @@ export function DownloadInputSection({
   }, [autoPasteLinks, handleUrlChange, url]);
 
   return (
-    <div className="flex flex-col gap-3 bg-muted/30 p-3 rounded-xl border border-muted/50 shadow-sm glass-card">
-      <div className="flex flex-col lg:flex-row gap-3">
+    <div className="flex flex-col gap-2.5 rounded-xl border border-muted/45 bg-muted/20 p-2.5 shadow-sm glass-card">
+      <div className="flex flex-col gap-2.5 lg:flex-row">
         <div className="flex-1 relative">
           <Input
             placeholder="Paste video or playlist URL here..."
@@ -347,12 +342,12 @@ export function DownloadInputSection({
             onChange={(e) => handleUrlChange(e.target.value)}
             onFocus={(e) => handleUrlFocus(e.currentTarget)}
             onKeyDown={(e) => e.key === "Enter" && !isAdding && onAdd()}
-            className="bg-background border-muted shadow-sm focus-visible:ring-1 h-10"
+            className="h-10 border-muted bg-background shadow-sm focus-visible:ring-1"
           />
         </div>
         
-        <div className="flex flex-wrap gap-2 items-center justify-end">
-          <div className="flex rounded-xl border border-muted bg-background/80 p-0.5 gap-0.5 h-10 items-center shadow-sm">
+        <div className="flex flex-wrap items-center justify-end gap-2">
+          <div className="flex h-10 items-center gap-0.5 rounded-xl border border-muted bg-background/80 p-0.5 shadow-sm">
             <MotionButton
               type="button"
               variant={addMode === "queue" ? "secondary" : "ghost"}
@@ -395,7 +390,7 @@ export function DownloadInputSection({
       {probeMessage && (
         <div
           aria-live="polite"
-          className={`rounded-xl border px-3 py-2.5 shadow-sm transition-colors ${probeMessage.tone}`}
+          className={`rounded-lg border px-3 py-2 shadow-sm transition-colors ${probeMessage.tone}`}
         >
           <div className="flex items-start gap-2.5">
             <div className={`mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-full ${probeMessage.iconTone}`}>
@@ -408,7 +403,7 @@ export function DownloadInputSection({
                   {probeMessage.badge}
                 </span>
               </div>
-              <p className="mt-1 text-[11px] leading-5 opacity-90">
+              <p className="mt-1 text-[11px] leading-4 opacity-90">
                 {probeMessage.description}
               </p>
             </div>
@@ -416,83 +411,68 @@ export function DownloadInputSection({
         </div>
       )}
 
-      <div className="rounded-2xl border border-muted/60 bg-background/80 p-3 shadow-sm">
-        <div className="grid gap-2 lg:grid-cols-[minmax(0,1fr)_auto] lg:items-center">
-          <div className="grid gap-1.5">
-            <div className="flex items-center justify-between gap-3">
-              <label className="text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">
-                Preset
-              </label>
-              {!isCustomPreset && selectedPresetConfig && (
-                <div className="flex items-center gap-2 text-[10px] text-muted-foreground">
-                  <span className="truncate">{selectedPresetGroupLabel}</span>
-                  <span className="h-1 w-1 rounded-full bg-muted-foreground/40" />
-                  <span className="truncate">{selectedPresetSubtitleDetail}</span>
-                </div>
-              )}
-            </div>
-            <Select value={selectedPreset} onValueChange={onPresetChange}>
-              <SelectTrigger className="h-11 bg-background border-muted px-3 shadow-sm focus:ring-1">
-                {isCustomPreset ? (
-                  <div className="min-w-0 text-left">
-                    <div className="truncate text-sm font-semibold">Custom configuration</div>
-                  </div>
-                ) : selectedPresetConfig ? (
-                  <div className="min-w-0 text-left">
-                    <div className="truncate text-sm font-semibold">{selectedPresetConfig.name}</div>
-                  </div>
-                ) : (
-                  <SelectValue placeholder="Choose preset" />
-                )}
-              </SelectTrigger>
-              <SelectContent className="max-h-[360px] overflow-y-auto rounded-2xl border-border/70 bg-popover/98 p-1.5 shadow-2xl" position="popper" sideOffset={6} align="start">
-                <SelectItem value="custom" className="rounded-xl py-2.5 font-semibold text-primary">
-                  <div className="flex min-w-0 flex-col">
-                    <span className="text-sm">Custom configuration</span>
-                    <span className="text-[11px] font-normal text-muted-foreground">
-                      Manual control over format, subtitles, folder, and filename rules
-                    </span>
-                  </div>
-                </SelectItem>
-                <SelectSeparator />
-                {presetGroups.map((entry, index) => (
-                  <div key={entry.group}>
-                    <SelectGroup>
-                      <SelectLabel className="py-1.5 text-[10px] uppercase tracking-wider text-muted-foreground/80">
-                        {entry.label}
-                      </SelectLabel>
-                      {entry.presets.map((preset) => (
-                        <SelectItem key={preset.id} value={preset.id} title={preset.description} className="rounded-xl py-2.5">
-                          <div className="flex min-w-0 flex-col">
-                            <span className="truncate text-sm font-medium">{preset.name}</span>
-                            <span className="truncate text-[11px] font-normal text-muted-foreground">
-                              {preset.description}
-                            </span>
-                          </div>
-                        </SelectItem>
-                      ))}
-                    </SelectGroup>
-                    {index < presetGroups.length - 1 && <SelectSeparator />}
-                  </div>
-                ))}
-              </SelectContent>
-            </Select>
+      <div className="rounded-xl border border-muted/60 bg-background/80 p-2.5 shadow-sm">
+        <div className="grid gap-1.5">
+          <div className="flex items-center justify-between gap-2">
+            <label className="text-[10px] font-semibold uppercase tracking-[0.16em] text-muted-foreground">
+              Preset
+            </label>
+            {!isCustomPreset && selectedPresetConfig && (
+              <div className="truncate text-[10px] text-muted-foreground">
+                {selectedPresetGroupLabel}
+              </div>
+            )}
           </div>
-
-          <MotionButton
-            type="button"
-            variant="ghost"
-            size="sm"
-            className="h-9 rounded-xl px-3 text-xs"
-            onClick={() => onPresetChange("custom")}
-          >
-            <Settings2 className="mr-1.5 h-3.5 w-3.5" />
-            {isCustomPreset ? "Custom On" : "Custom"}
-          </MotionButton>
+          <Select value={selectedPreset} onValueChange={onPresetChange}>
+            <SelectTrigger className="h-9 rounded-lg border-muted bg-background px-3 shadow-sm focus:ring-1">
+              {isCustomPreset ? (
+                <div className="min-w-0 text-left">
+                  <div className="truncate text-sm font-semibold">Custom configuration</div>
+                </div>
+              ) : selectedPresetConfig ? (
+                <div className="min-w-0 text-left">
+                  <div className="truncate text-sm font-semibold">{selectedPresetConfig.name}</div>
+                </div>
+              ) : (
+                <SelectValue placeholder="Choose preset" />
+              )}
+            </SelectTrigger>
+            <SelectContent className="max-h-[360px] overflow-y-auto rounded-2xl border-border/70 bg-popover/98 p-1.5 shadow-2xl" position="popper" sideOffset={6} align="start">
+              <SelectItem value="custom" className="rounded-xl py-2.5 font-semibold text-primary">
+                <div className="flex min-w-0 flex-col">
+                  <span className="text-sm">Custom configuration</span>
+                  <span className="text-[11px] font-normal text-muted-foreground">
+                    Manual control over format, subtitles, folder, and filename rules
+                  </span>
+                </div>
+              </SelectItem>
+              <SelectSeparator />
+              {presetGroups.map((entry, index) => (
+                <div key={entry.group}>
+                  <SelectGroup>
+                    <SelectLabel className="py-1.5 text-[10px] uppercase tracking-wider text-muted-foreground/80">
+                      {entry.label}
+                    </SelectLabel>
+                    {entry.presets.map((preset) => (
+                      <SelectItem key={preset.id} value={preset.id} title={preset.description} className="rounded-xl py-2.5">
+                        <div className="flex min-w-0 flex-col">
+                          <span className="truncate text-sm font-medium">{preset.name}</span>
+                          <span className="truncate text-[11px] font-normal text-muted-foreground">
+                            {preset.description}
+                          </span>
+                        </div>
+                      </SelectItem>
+                    ))}
+                  </SelectGroup>
+                  {index < presetGroups.length - 1 && <SelectSeparator />}
+                </div>
+              ))}
+            </SelectContent>
+          </Select>
         </div>
       </div>
 
-      <div className="flex justify-center -mt-1">
+      <div className="flex justify-center">
         <MotionButton
           variant="ghost"
           size="sm"

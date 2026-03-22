@@ -124,6 +124,7 @@ export function DownloadsScreen() {
   const handlePresetChange = (val: string) => {
     updateSettings({ downloadsSelectedPreset: val });
     const isCustom = val === "custom";
+    setShowOutputConfig(isCustom);
     if (!isCustom) {
       setOutputFormat(inferOutputFormat(val));
       applyPresetSubtitleDefaults(val, settings.preferredSubtitleLanguages);
@@ -262,20 +263,26 @@ export function DownloadsScreen() {
     });
   }, [jobs, sortMode]);
 
-  const MAX_VISIBLE = 5;
+  const MAX_RECENT_TERMINAL_JOBS = 5;
   const visibleJobs = useMemo(() => {
-    const priority = sortedJobs.filter(
+    const liveJobs = sortedJobs.filter(
       (job) =>
         job.status === "Downloading" ||
         job.status === "Post-processing" ||
         job.status === "Queued"
     );
-    const priorityIds = new Set(priority.map((job) => job.id));
-    const rest = sortedJobs.filter((job) => !priorityIds.has(job.id));
-    return [...priority, ...rest].slice(0, MAX_VISIBLE);
+    const recentTerminalJobs = sortedJobs
+      .filter((job) => job.status === "Done" || job.status === "Failed")
+      .slice(0, MAX_RECENT_TERMINAL_JOBS);
+
+    return [...liveJobs, ...recentTerminalJobs];
   }, [sortedJobs]);
 
-  const overflowCount = Math.max(0, jobs.length - visibleJobs.length);
+  const overflowCount = Math.max(
+    0,
+    sortedJobs.filter((job) => job.status === "Done" || job.status === "Failed").length -
+      visibleJobs.filter((job) => job.status === "Done" || job.status === "Failed").length
+  );
   const hasCompletedJobs = jobs.some(
     (job) => job.status === "Done" || job.status === "Failed"
   );
@@ -504,16 +511,16 @@ export function DownloadsScreen() {
   const showStartQueue = queuedCount > 0 && activeCount === 0;
 
   return (
-    <div className="flex flex-col h-full bg-background max-w-6xl mx-auto w-full" role="main">
-      <FadeInStagger className="flex flex-col h-full">
-        <FadeInItem>
-          <header className="p-6 pb-4 space-y-4">
+    <div className="flex h-full min-h-0 w-full max-w-6xl mx-auto flex-col bg-background" role="main">
+      <FadeInStagger className="flex h-full min-h-0 flex-col">
+        <FadeInItem className="shrink-0">
+          <header className="space-y-3 px-5 pb-3 pt-5">
             <div className="flex flex-col gap-1">
               <div className="flex items-center gap-2">
-                <h2 className="text-2xl font-bold tracking-tight">Downloads</h2>
+                <h2 className="text-[1.7rem] font-bold tracking-tight">Downloads</h2>
               </div>
               <p className="text-muted-foreground text-sm">
-                Live queue for active and pending downloads.
+                Live queue for active and pending downloads, plus a few recent results.
               </p>
             </div>
             

@@ -53,6 +53,7 @@ export function resolvePresetById(presets: Preset[], presetId?: string | null): 
 }
 
 export function resolveExistingPresetId(presets: Preset[], presetId?: string | null, fallback = "default"): string {
+  if (presetId === "custom") return "custom";
   return resolvePresetById(presets, presetId)?.id ?? fallback;
 }
 

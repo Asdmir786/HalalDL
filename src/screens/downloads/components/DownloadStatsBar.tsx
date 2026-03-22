@@ -58,12 +58,12 @@ export function DownloadStatsBar({
   ];
 
   return (
-    <div className="flex items-center justify-between pt-2 border-t border-muted/50 gap-3 flex-wrap">
-      <div className="flex items-center gap-2 text-[11px] font-semibold tabular-nums flex-wrap">
+    <div className="flex flex-wrap items-center justify-between gap-2 border-t border-muted/50 pt-2">
+      <div className="flex flex-wrap items-center gap-1.5 text-[11px] font-semibold tabular-nums">
         {stats.map(({ id, label, Icon, className }) => (
           <div
             key={id}
-            className={`inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 backdrop-blur-sm transition-colors ${className}`}
+            className={`inline-flex items-center gap-1.5 rounded-full border px-2 py-1 backdrop-blur-sm transition-colors ${className}`}
           >
             <Icon className="w-3 h-3" />
             <span>{label}</span>
@@ -71,13 +71,13 @@ export function DownloadStatsBar({
         ))}
       </div>
 
-      <div className="flex items-center gap-2 flex-wrap justify-end">
-        <div className="flex items-center gap-1.5 rounded-full border border-border/50 bg-muted/20 px-2 py-1">
+      <div className="flex flex-wrap items-center justify-end gap-2">
+        <div className="flex items-center gap-1 rounded-full border border-border/50 bg-muted/20 px-1.5 py-1">
           <ArrowUpDown className="w-3 h-3 text-muted-foreground" />
           <button
             type="button"
             onClick={() => onSortModeChange("newest")}
-            className={`px-2 py-0.5 rounded-full text-[11px] font-medium transition-colors ${
+            className={`rounded-full px-2 py-0.5 text-[11px] font-medium transition-colors ${
               sortMode === "newest"
                 ? "bg-primary text-primary-foreground shadow-sm"
                 : "text-muted-foreground hover:text-foreground"
@@ -99,15 +99,15 @@ export function DownloadStatsBar({
         </div>
 
         <MotionButton
-          type="button"
-          variant="outline"
-          size="sm"
-          onClick={onRetryFailed}
-          disabled={!canRetryFailed}
-          className="h-8 px-3 text-xs font-semibold gap-1.5 rounded-full border-destructive/30 text-destructive hover:bg-destructive/10 disabled:opacity-40 transition-all"
-        >
-          <RotateCcw className="w-3.5 h-3.5" />
-          Retry Failed
+            type="button"
+            variant="outline"
+            size="sm"
+            onClick={onRetryFailed}
+            disabled={!canRetryFailed}
+            className="h-8 rounded-full border-destructive/30 px-3 text-xs font-semibold text-destructive gap-1.5 transition-all hover:bg-destructive/10 disabled:opacity-40"
+          >
+            <RotateCcw className="w-3.5 h-3.5" />
+            Retry Failed
         </MotionButton>
         {showStartQueue && (
           <MotionButton
@@ -115,7 +115,7 @@ export function DownloadStatsBar({
             variant="default"
             size="sm"
             onClick={onStartQueue}
-            className="h-8 px-4 text-xs font-semibold gap-1.5 rounded-full bg-linear-to-r from-primary/95 via-primary to-primary/85 hover:from-primary hover:to-primary shadow-md shadow-primary/20 transition-all"
+            className="h-8 rounded-full bg-linear-to-r from-primary/95 via-primary to-primary/85 px-4 text-xs font-semibold gap-1.5 shadow-md shadow-primary/20 transition-all hover:from-primary hover:to-primary"
           >
             <Play className="w-3.5 h-3.5" />
             Start Queue
