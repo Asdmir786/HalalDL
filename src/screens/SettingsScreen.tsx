@@ -20,6 +20,7 @@ import { BehaviorSection } from "./settings/components/BehaviorSection";
 import { EngineSection } from "./settings/components/EngineSection";
 import { AboutSection } from "./settings/components/AboutSection";
 import { usePresetsStore } from "@/store/presets";
+import { getQuickEligiblePresets } from "@/lib/preset-display";
 
 const SETTINGS_KEY_SET = new Set(SETTINGS_KEYS as unknown as string[]);
 const ACCENT_CLASSES = ACCENT_COLORS.map((c) => `accent-${c.id}`).filter((c) => c !== "accent-default");
@@ -47,6 +48,10 @@ const resolveDefaultSettings = async (): Promise<Settings> => {
 export function SettingsScreen() {
   const { settings, setSettings } = useSettingsStore();
   const presets = usePresetsStore((state) => state.presets);
+  const quickPresetOptions = useMemo(
+    () => getQuickEligiblePresets(presets).map((preset) => ({ id: preset.id, name: preset.name })),
+    [presets]
+  );
   const scrollRef = useRef<HTMLDivElement>(null);
   const scrollTopRef = useRef(0);
 
@@ -337,9 +342,7 @@ export function SettingsScreen() {
               onQuickDownloadStartModeChange={(v) => setDraftValue("quickDownloadStartMode", v)}
               quickDownloadDestinationMode={draftSettings.quickDownloadDestinationMode}
               onQuickDownloadDestinationModeChange={(v) => setDraftValue("quickDownloadDestinationMode", v)}
-              quickPresetOptions={presets
-                .filter((preset) => preset.quickEligible !== false)
-                .map((preset) => ({ id: preset.id, name: preset.name }))}
+              quickPresetOptions={quickPresetOptions}
             />
 
             <EngineSection

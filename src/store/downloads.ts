@@ -1,5 +1,6 @@
 import { create } from "zustand";
 import { createId } from "@/lib/id";
+import { canonicalizePresetId } from "@/lib/preset-display";
 import { useRuntimeStore } from "./runtime";
 import type {
   SubtitleFormat,
@@ -84,11 +85,16 @@ export const useDownloadsStore = create<DownloadsState>((set) => ({
   pendingUrl: undefined,
   composeDraft: undefined,
   setPendingUrl: (url) => set({ pendingUrl: url }),
-  setComposeDraft: (draft) => set({ composeDraft: draft }),
+  setComposeDraft: (draft) => set({
+    composeDraft: draft
+      ? { ...draft, presetId: canonicalizePresetId(draft.presetId) }
+      : undefined,
+  }),
   addJob: (url, presetId, overrides) => {
     const id = createId();
     const now = Date.now();
     const queuePaused = useRuntimeStore.getState().queuePaused;
+    const canonicalPresetId = canonicalizePresetId(presetId);
     set((state) => ({
       jobs: [
         {
@@ -102,7 +108,7 @@ export const useDownloadsStore = create<DownloadsState>((set) => ({
           subtitleStatus: "idle",
           fallbackUsed: false,
           fallbackFormat: undefined,
-          presetId,
+          presetId: canonicalPresetId,
           overrides,
           createdAt: now,
           statusChangedAt: now,

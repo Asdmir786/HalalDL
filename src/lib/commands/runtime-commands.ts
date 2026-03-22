@@ -35,6 +35,10 @@ export async function hideMainWindowToTray() {
   return invoke("hide_main_window_to_tray");
 }
 
+export async function isMainWindowVisible(): Promise<boolean> {
+  return invoke<boolean>("is_main_window_visible");
+}
+
 export async function isAutostartEnabled(): Promise<boolean> {
   return invoke<boolean>("is_autostart_enabled");
 }

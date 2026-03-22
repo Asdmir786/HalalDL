@@ -15,6 +15,7 @@ import { useLogsStore } from "@/store/logs";
 import { useDownloadsStore, type DownloadJob } from "@/store/downloads";
 import { useHistoryStore, type HistoryEntry } from "@/store/history";
 import { storage } from "@/lib/storage";
+import { canonicalizePresetId } from "@/lib/preset-display";
 import { invoke } from "@tauri-apps/api/core";
 import { createId } from "@/lib/id";
 import {
@@ -99,6 +100,8 @@ export function usePersistenceInit(): MutableRefObject<boolean> {
         const savedSettings = await storage.getSettings<Settings>();
         if (savedSettings) {
           const mergedSettings = { ...DEFAULT_SETTINGS, ...savedSettings };
+          mergedSettings.downloadsSelectedPreset = canonicalizePresetId(mergedSettings.downloadsSelectedPreset);
+          mergedSettings.quickDefaultPreset = canonicalizePresetId(mergedSettings.quickDefaultPreset);
           try {
             const addModeMigrationKey = "halaldl:addModeDefaultMigrated";
             if (
@@ -150,7 +153,12 @@ export function usePersistenceInit(): MutableRefObject<boolean> {
 
         const savedUserPresets = await storage.getPresets<Preset[]>();
         if (savedUserPresets && Array.isArray(savedUserPresets)) {
-          const userOnly = savedUserPresets.filter((p) => !p.isBuiltIn);
+          const userOnly = savedUserPresets
+            .filter((p) => !p.isBuiltIn)
+            .map((preset) => ({
+              ...preset,
+              group: preset.group ?? "custom",
+            }));
           const merged = [...BUILT_IN_PRESETS, ...userOnly];
           setPresets(merged);
           addLog({
@@ -162,12 +170,14 @@ export function usePersistenceInit(): MutableRefObject<boolean> {
         const savedDownloads = await storage.getDownloads<DownloadJob[]>();
         if (savedDownloads && Array.isArray(savedDownloads)) {
           const normalizedDownloads = savedDownloads.map((job) => {
+            const canonicalPresetId = canonicalizePresetId(job.presetId);
             if (
               job.status === "Downloading" ||
               job.status === "Post-processing"
             ) {
               return {
                 ...job,
+                presetId: canonicalPresetId,
                 status: "Queued" as const,
                 phase: "Resolving formats" as const,
                 statusDetail: "Recovered after restart",
@@ -177,7 +187,10 @@ export function usePersistenceInit(): MutableRefObject<boolean> {
                 statusChangedAt: Date.now(),
               };
             }
-            return job;
+            return {
+              ...job,
+              presetId: canonicalPresetId,
+            };
           });
           const uuidRe =
             /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;

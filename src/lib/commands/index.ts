@@ -52,6 +52,7 @@ export {
   restoreMainWindow,
   showQuickDownloadWindow,
   hideMainWindowToTray,
+  isMainWindowVisible,
   isAutostartEnabled,
   wasLaunchedFromAutostart,
   setAutostartEnabled,

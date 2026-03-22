@@ -2,6 +2,7 @@ import { Command } from "@tauri-apps/plugin-shell";
 import { useDownloadsStore } from "@/store/downloads";
 import { useLogsStore } from "@/store/logs";
 import { usePresetsStore } from "@/store/presets";
+import { resolvePresetById } from "@/lib/preset-display";
 import { useSettingsStore } from "@/store/settings";
 import { useRuntimeStore } from "@/store/runtime";
 import { join } from "@tauri-apps/api/path";
@@ -181,7 +182,7 @@ async function probeMediaDurationSeconds(
 
 function getSubtitlePreferences(job: DownloadJob) {
   const { presets } = usePresetsStore.getState();
-  const preset = presets.find((candidate) => candidate.id === job.presetId) || presets[0];
+  const preset = resolvePresetById(presets, job.presetId) ?? presets[0];
   const base = normalizeSubtitlePreferences({
     mode: preset?.subtitleOnly ? "only" : preset?.subtitleMode,
     sourcePolicy: preset?.subtitleSourcePolicy,
@@ -222,7 +223,7 @@ export async function startDownload(jobId: string) {
     return;
   }
 
-  const preset = presets.find((p) => p.id === job.presetId) || presets[0];
+  const preset = resolvePresetById(presets, job.presetId) ?? presets[0];
   const ytDlp = await resolveTool("yt-dlp");
   const ffmpeg = await resolveTool("ffmpeg");
   const aria2 = await resolveTool("aria2c");

@@ -31,6 +31,7 @@ import {
   getFailedToolResults,
   getSuccessfulToolResults,
 } from "@/lib/tools/tool-batch";
+import { notifyUser } from "@/lib/notifications";
 
 export function useToolActions(modalApi: ModalApi) {
   const { tools, updateTool } = useToolsStore();
@@ -165,10 +166,11 @@ export function useToolActions(modalApi: ModalApi) {
   };
 
   /* ── Auto-restart after successful update ── */
-  const autoRestartAfterUpdate = async () => {
+  const autoRestartAfterUpdate = async (summary: string) => {
     setModalDone(true);
     setModalCurrentStatus("Restarting...");
     pushModalLog("Restarting app to apply changes...");
+    await notifyUser("Tool update finished", summary, "success");
 
     try {
       await relaunch();
@@ -215,7 +217,7 @@ export function useToolActions(modalApi: ModalApi) {
         pushModalLog(`[${tool.name}] Completed successfully`);
         addLog({ level: "info", message: `${tool.id} installed/updated (${tool.channel})` });
         await refreshToolIds([tool.id]);
-        await autoRestartAfterUpdate();
+        await autoRestartAfterUpdate(`${tool.name} was updated successfully. HalalDL will restart now.`);
       } else {
         const message = buildToolBatchErrorMessage(result, { [tool.id]: tool.name });
         setModalError(message);
@@ -265,7 +267,7 @@ export function useToolActions(modalApi: ModalApi) {
         setModalProgress(100);
         setModalToolProgress({ [tool.id]: 100 });
         pushModalLog("[yt-dlp] pip upgrade completed");
-        await autoRestartAfterUpdate();
+        await autoRestartAfterUpdate("yt-dlp was updated successfully. HalalDL will restart now.");
       } else {
         setModalError("pip upgrade failed — check logs for details");
         pushModalLog("[yt-dlp] pip upgrade failed");
@@ -307,7 +309,7 @@ export function useToolActions(modalApi: ModalApi) {
       pushModalLog(`[${tool.name}] In-place update completed`);
       addLog({ level: "info", message: `${tool.id} updated at ${destDir}` });
       await refreshToolIds([tool.id]);
-      await autoRestartAfterUpdate();
+      await autoRestartAfterUpdate(`${tool.name} was updated successfully. HalalDL will restart now.`);
     } catch (e) {
       const message = e instanceof Error ? e.message : String(e);
       setModalError(message);
@@ -386,7 +388,7 @@ export function useToolActions(modalApi: ModalApi) {
         setModalProgress(100);
         pushModalLog("All selected tool updates completed.");
         await refreshToolIds(ids);
-        await autoRestartAfterUpdate();
+        await autoRestartAfterUpdate(`${toUpdate.length} tool updates completed. HalalDL will restart now.`);
       } else {
         const toolNameById = Object.fromEntries(tools.map((tool) => [tool.id, tool.name])) as Record<string, string>;
         setModalError(buildToolBatchErrorMessage(result, toolNameById));

@@ -18,7 +18,8 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { type Preset } from "@/store/presets";
+import { PRESET_GROUP_LABELS } from "@/lib/preset-display";
+import { type Preset, type PresetGroup } from "@/store/presets";
 import { splitSubtitleLanguages, subtitleLanguagesToString } from "@/lib/subtitles";
 
 interface PresetEditorProps {
@@ -32,6 +33,7 @@ export function PresetEditor({ preset, isOpen, onClose, onSave }: PresetEditorPr
   const [name, setName] = useState(preset?.name ?? "");
   const [description, setDescription] = useState(preset?.description ?? "");
   const [args, setArgs] = useState(preset ? preset.args.join(" ") : "");
+  const [group, setGroup] = useState<PresetGroup>(preset?.group ?? "custom");
   const [quickEligible, setQuickEligible] = useState(preset?.quickEligible ?? true);
   const [subtitleMode, setSubtitleMode] = useState<"off" | "on" | "only">(
     preset?.subtitleOnly ? "only" : preset?.subtitleMode ?? "off"
@@ -54,6 +56,7 @@ export function PresetEditor({ preset, isOpen, onClose, onSave }: PresetEditorPr
       name,
       description,
       args: args.split(" ").filter(a => a.trim() !== ""),
+      group,
       quickEligible,
       subtitleMode,
       subtitleSourcePolicy,
@@ -92,6 +95,21 @@ export function PresetEditor({ preset, isOpen, onClose, onSave }: PresetEditorPr
               onChange={(e) => setDescription(e.target.value)} 
               placeholder="Extract audio as FLAC..."
             />
+          </div>
+          <div className="grid gap-2">
+            <Label>Group</Label>
+            <Select value={group} onValueChange={(val) => setGroup(val as PresetGroup)}>
+              <SelectTrigger>
+                <SelectValue placeholder="Preset group" />
+              </SelectTrigger>
+              <SelectContent>
+                {Object.entries(PRESET_GROUP_LABELS).map(([value, label]) => (
+                  <SelectItem key={value} value={value}>
+                    {label}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
           </div>
           <div className="grid gap-2">
             <Label htmlFor="args">Arguments (yt-dlp flags)</Label>

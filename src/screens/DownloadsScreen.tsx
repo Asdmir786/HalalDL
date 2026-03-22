@@ -7,11 +7,13 @@ import { usePresetsStore } from "@/store/presets";
 import { useSettingsStore } from "@/store/settings";
 import { useLogsStore } from "@/store/logs";
 import { useNavigationStore } from "@/store/navigation";
+import { useRuntimeStore } from "@/store/runtime";
 import {
   normalizeSubtitlePreferences,
   splitSubtitleLanguages,
   subtitleLanguagesToString,
 } from "@/lib/subtitles";
+import { resolveExistingPresetId } from "@/lib/preset-display";
 
 import { FadeInStagger, FadeInItem } from "@/components/motion/StaggerContainer";
 import { fetchMetadata, cleanupThumbnailByJobId, retryFailedJobs, startQueuedJobs } from "@/lib/downloader";
@@ -26,7 +28,6 @@ import { getJobTs } from "./downloads/utils";
 export function DownloadsScreen() {
   const { settings, updateSettings } = useSettingsStore();
   const [url, setUrl] = useState("");
-  const selectedPreset = settings.downloadsSelectedPreset || "default";
   
   // Derived state for addMode from settings
   const addMode = settings.downloadsAddMode;
@@ -46,10 +47,12 @@ export function DownloadsScreen() {
   const [subtitleFormat, setSubtitleFormat] = useState<"original" | "srt" | "vtt">("srt");
 
   const { presets } = usePresetsStore();
+  const selectedPreset = resolveExistingPresetId(presets, settings.downloadsSelectedPreset || "default");
   const {
     jobs,
     addJob,
     removeJob,
+    updateJob,
     pendingUrl,
     setPendingUrl,
     composeDraft,
@@ -59,6 +62,12 @@ export function DownloadsScreen() {
   const { setScreen } = useNavigationStore();
 
   const isCustomPreset = selectedPreset === "custom";
+
+  useEffect(() => {
+    if (selectedPreset !== "custom" && settings.downloadsSelectedPreset !== selectedPreset) {
+      updateSettings({ downloadsSelectedPreset: selectedPreset });
+    }
+  }, [selectedPreset, settings.downloadsSelectedPreset, updateSettings]);
 
   const inferOutputFormat = useCallback((presetId: string): string => {
     const preset = presets.find((p) => p.id === presetId);
@@ -122,6 +131,7 @@ export function DownloadsScreen() {
   };
 
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
+  const [isAdding, setIsAdding] = useState(false);
 
   // Handle Drag & Drop Pending URL
   useEffect(() => {
@@ -319,66 +329,79 @@ export function DownloadsScreen() {
   }, [jobs, activeCount]);
 
   const handleAdd = async () => {
-    if (!url.trim()) return;
-    
-    // Construct final template: NamePart + .%(ext)s
-    const finalTemplate = `${filenameBase.trim() || "%(title)s"}.%(ext)s`;
+    const trimmedUrl = url.trim();
+    if (!trimmedUrl || isAdding) return;
 
-    const customDirTrimmed = customDownloadDir.trim();
-    const selectedPresetConfig = presets.find((preset) => preset.id === selectedPreset);
-    const presetSubtitleDefaults = normalizeSubtitlePreferences({
-      mode: selectedPresetConfig?.subtitleOnly ? "only" : selectedPresetConfig?.subtitleMode,
-      sourcePolicy: selectedPresetConfig?.subtitleSourcePolicy,
-      languageMode: selectedPresetConfig?.subtitleLanguageMode,
-      languages: selectedPresetConfig?.subtitleLanguages,
-      format: selectedPresetConfig?.subtitleFormat,
-    });
-    const resolvedSubtitleLanguages = splitSubtitleLanguages(subtitleLanguagesText);
-    const subtitleOverridesNeeded =
-      subtitleMode !== presetSubtitleDefaults.mode ||
-      subtitleSourcePolicy !== presetSubtitleDefaults.sourcePolicy ||
-      subtitleLanguageMode !== presetSubtitleDefaults.languageMode ||
-      subtitleFormat !== presetSubtitleDefaults.format ||
-      (subtitleLanguageMode === "custom" &&
-        subtitleLanguagesToString(resolvedSubtitleLanguages) !==
-          subtitleLanguagesToString(presetSubtitleDefaults.languages));
+    setIsAdding(true);
+    try {
+      const finalTemplate = `${filenameBase.trim() || "%(title)s"}.%(ext)s`;
 
-    const overrides =
-      showOutputConfig ||
-      isCustomPreset ||
-      Boolean(customDirTrimmed) ||
-      subtitleOverridesNeeded
-        ? {
-            ...(showOutputConfig || isCustomPreset ? { filenameTemplate: finalTemplate } : {}),
-            ...(isCustomPreset ? { format: outputFormat } : {}),
-            ...(customDirTrimmed ? { downloadDir: customDirTrimmed } : {}),
-            ...(subtitleOverridesNeeded
-              ? {
-                  subtitleMode,
-                  subtitleSourcePolicy,
-                  subtitleLanguageMode,
-                  subtitleLanguages:
-                    subtitleLanguageMode === "custom"
-                      ? resolvedSubtitleLanguages
-                      : undefined,
-                  subtitleFormat,
-                  subtitleOnly: subtitleMode === "only",
-                  origin: "app" as const,
-                }
-              : {}),
-          }
-        : undefined;
+      const customDirTrimmed = customDownloadDir.trim();
+      const selectedPresetConfig = presets.find((preset) => preset.id === selectedPreset);
+      const presetSubtitleDefaults = normalizeSubtitlePreferences({
+        mode: selectedPresetConfig?.subtitleOnly ? "only" : selectedPresetConfig?.subtitleMode,
+        sourcePolicy: selectedPresetConfig?.subtitleSourcePolicy,
+        languageMode: selectedPresetConfig?.subtitleLanguageMode,
+        languages: selectedPresetConfig?.subtitleLanguages,
+        format: selectedPresetConfig?.subtitleFormat,
+      });
+      const resolvedSubtitleLanguages = splitSubtitleLanguages(subtitleLanguagesText);
+      const subtitleOverridesNeeded =
+        subtitleMode !== presetSubtitleDefaults.mode ||
+        subtitleSourcePolicy !== presetSubtitleDefaults.sourcePolicy ||
+        subtitleLanguageMode !== presetSubtitleDefaults.languageMode ||
+        subtitleFormat !== presetSubtitleDefaults.format ||
+        (subtitleLanguageMode === "custom" &&
+          subtitleLanguagesToString(resolvedSubtitleLanguages) !==
+            subtitleLanguagesToString(presetSubtitleDefaults.languages));
 
-    const presetIdToUse = isCustomPreset ? "default" : selectedPreset;
+      const overrides =
+        showOutputConfig ||
+        isCustomPreset ||
+        Boolean(customDirTrimmed) ||
+        subtitleOverridesNeeded
+          ? {
+              ...(showOutputConfig || isCustomPreset ? { filenameTemplate: finalTemplate } : {}),
+              ...(isCustomPreset ? { format: outputFormat } : {}),
+              ...(customDirTrimmed ? { downloadDir: customDirTrimmed } : {}),
+              ...(subtitleOverridesNeeded
+                ? {
+                    subtitleMode,
+                    subtitleSourcePolicy,
+                    subtitleLanguageMode,
+                    subtitleLanguages:
+                      subtitleLanguageMode === "custom"
+                        ? resolvedSubtitleLanguages
+                        : undefined,
+                    subtitleFormat,
+                    subtitleOnly: subtitleMode === "only",
+                    origin: "app" as const,
+                  }
+                : {}),
+            }
+          : undefined;
 
-    const id = addJob(url, presetIdToUse, overrides);
-    
-    await fetchMetadata(id);
+      const presetIdToUse = isCustomPreset ? "default" : selectedPreset;
+      const id = addJob(trimmedUrl, presetIdToUse, overrides);
 
-    if (addMode === "start") {
-      startQueuedJobs([id]);
+      setUrl("");
+
+      if (addMode === "start") {
+        const started = startQueuedJobs([id]);
+        if (started === 0) {
+          const queuePaused = useRuntimeStore.getState().queuePaused;
+          updateJob(id, {
+            statusDetail: queuePaused ? "Queue paused" : "Waiting for an open slot",
+          });
+        }
+      } else {
+        updateJob(id, { statusDetail: "Queued" });
+      }
+
+      void fetchMetadata(id);
+    } finally {
+      setIsAdding(false);
     }
-    setUrl("");
   };
 
   const handleBrowseDir = async () => {
@@ -497,6 +520,7 @@ export function DownloadsScreen() {
         <DownloadInputSection
               url={url}
               setUrl={setUrl}
+              isAdding={isAdding}
               autoPasteLinks={settings.autoPasteLinks}
               onAdd={handleAdd}
               selectedPreset={selectedPreset}

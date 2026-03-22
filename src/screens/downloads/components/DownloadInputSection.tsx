@@ -12,6 +12,7 @@ import {
 } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { MotionButton } from "@/components/motion/MotionButton";
+import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectGroup, SelectItem, SelectLabel, SelectSeparator, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { DownloadOutputOptions } from "./DownloadOutputOptions";
@@ -25,6 +26,13 @@ import type {
   SubtitleSourcePolicy,
 } from "@/lib/subtitles";
 import {
+  getPresetGroup,
+  getPresetSubtitleDetail,
+  groupPresetsForSelect,
+  PRESET_GROUP_LABELS,
+  resolvePresetById,
+} from "@/lib/preset-display";
+import {
   getProbeHostLabel,
   pickSupportedUrlFromText,
   probeMediaUrl,
@@ -35,6 +43,7 @@ import {
 interface DownloadInputSectionProps {
   url: string;
   setUrl: (val: string) => void;
+  isAdding: boolean;
   autoPasteLinks: boolean;
   onAdd: () => void;
   selectedPreset: string;
@@ -67,10 +76,8 @@ interface DownloadInputSectionProps {
   subtitleHint: string;
 }
 
-const GROUP_ORDER = ["Recommended", "Compatibility", "Editors", "Editors Pro", "Web", "Video", "Audio", "Other", "Custom"] as const;
-
 export function DownloadInputSection({
-  url, setUrl, autoPasteLinks, onAdd,
+  url, setUrl, isAdding, autoPasteLinks, onAdd,
   selectedPreset, onPresetChange, presets,
   addMode, setAddMode,
   showOutputConfig, onToggleOutputConfig,
@@ -106,28 +113,17 @@ export function DownloadInputSection({
   });
   const probeCacheRef = useRef(new Map<string, UrlProbeResult>());
   const probeRequestRef = useRef(0);
-
-  const getGroupAndLabel = (preset: Preset): { group: string; label: string } => {
-    const parts = preset.name.split(" — ");
-    if (parts.length >= 2) return { group: parts[0], label: parts.slice(1).join(" — ") };
-    return { group: preset.isBuiltIn ? "Other" : "Custom", label: preset.name };
-  };
-
-  const { grouped, orderedGroups } = useMemo(() => {
-    const groupedMap = presets.reduce<Record<string, Array<{ preset: Preset; label: string }>>>((acc, preset) => {
-      const { group, label } = getGroupAndLabel(preset);
-      acc[group] = acc[group] ?? [];
-      acc[group].push({ preset, label });
-      return acc;
-    }, {});
-
-    const ordered = [
-      ...GROUP_ORDER.filter((g) => (groupedMap[g]?.length ?? 0) > 0),
-      ...Object.keys(groupedMap).filter((g) => !GROUP_ORDER.includes(g as (typeof GROUP_ORDER)[number])).sort(),
-    ];
-
-    return { grouped: groupedMap, orderedGroups: ordered };
-  }, [presets]);
+  const presetGroups = useMemo(() => groupPresetsForSelect(presets), [presets]);
+  const selectedPresetConfig = useMemo(
+    () => (selectedPreset === "custom" ? null : resolvePresetById(presets, selectedPreset) ?? null),
+    [presets, selectedPreset]
+  );
+  const selectedPresetGroupLabel = selectedPresetConfig
+    ? PRESET_GROUP_LABELS[getPresetGroup(selectedPresetConfig)]
+    : "Custom";
+  const selectedPresetSubtitleDetail = selectedPresetConfig
+    ? getPresetSubtitleDetail(selectedPresetConfig)
+    : subtitleHint;
 
   const [dupDismissed, setDupDismissed] = useState(false);
   const handleUrlChange = useCallback((val: string) => {
@@ -351,37 +347,12 @@ export function DownloadInputSection({
             value={url}
             onChange={(e) => handleUrlChange(e.target.value)}
             onFocus={(e) => handleUrlFocus(e.currentTarget)}
-            onKeyDown={(e) => e.key === "Enter" && onAdd()}
+            onKeyDown={(e) => e.key === "Enter" && !isAdding && onAdd()}
             className="bg-background border-muted shadow-sm focus-visible:ring-1 h-10"
           />
         </div>
         
         <div className="flex flex-wrap gap-2 items-center justify-end">
-          <Select value={selectedPreset} onValueChange={onPresetChange}>
-            <SelectTrigger className="w-[140px] bg-background border-muted shadow-sm focus:ring-1 h-10">
-              <SelectValue placeholder="Preset" />
-            </SelectTrigger>
-            <SelectContent className="max-h-[300px] overflow-y-auto" position="popper" sideOffset={6} align="start">
-              <SelectItem value="custom" className="font-semibold text-primary">
-                ✨ Custom Configuration
-              </SelectItem>
-              <SelectSeparator />
-              {orderedGroups.map((group) => (
-                <SelectGroup key={group}>
-                  <SelectLabel className="text-[10px] uppercase tracking-wider text-muted-foreground/80 py-1.5">
-                    {group}
-                  </SelectLabel>
-                  {(grouped[group] ?? []).map(({ preset, label }) => (
-                    <SelectItem key={preset.id} value={preset.id} title={preset.description}>
-                      {label}
-                    </SelectItem>
-                  ))}
-                  <SelectSeparator />
-                </SelectGroup>
-              ))}
-            </SelectContent>
-          </Select>
-
           <div className="flex rounded-xl border border-muted bg-background/80 p-0.5 gap-0.5 h-10 items-center shadow-sm">
             <MotionButton
               type="button"
@@ -409,11 +380,11 @@ export function DownloadInputSection({
 
           <MotionButton
             onClick={onAdd}
-            disabled={!url.trim()}
+            disabled={!url.trim() || isAdding}
             className="h-10 px-4 rounded-xl bg-linear-to-r from-primary/95 via-primary to-primary/85 hover:from-primary hover:to-primary shadow-md shadow-primary/20"
           >
             <Plus className="w-4 h-4 mr-2" />
-            Add
+            {isAdding ? "Adding..." : addMode === "start" ? "Start" : "Queue"}
           </MotionButton>
         </div>
       </div>
@@ -445,6 +416,131 @@ export function DownloadInputSection({
           </div>
         </div>
       )}
+
+      <div className="rounded-2xl border border-muted/60 bg-background/80 p-3.5 shadow-sm">
+        <div className="flex flex-col gap-3">
+          <div className="flex flex-col gap-1">
+            <div className="text-sm font-semibold tracking-tight">Preset</div>
+            <div className="text-xs text-muted-foreground">
+              Pick the result you want. The dropdown is grouped by outcome so the common choices are easier to find.
+            </div>
+          </div>
+
+          <div className="grid gap-2 lg:grid-cols-[minmax(0,1fr)_auto] lg:items-end">
+            <div className="grid gap-2">
+              <label className="text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">
+                Download preset
+              </label>
+              <Select value={selectedPreset} onValueChange={onPresetChange}>
+                <SelectTrigger className="h-auto min-h-12 bg-background border-muted px-3 py-2 shadow-sm focus:ring-1">
+                  {isCustomPreset ? (
+                    <div className="min-w-0 text-left">
+                      <div className="truncate text-sm font-semibold">Custom configuration</div>
+                      <div className="truncate text-[11px] text-muted-foreground">
+                        Manual control over format, subtitles, folder, and filename rules
+                      </div>
+                    </div>
+                  ) : selectedPresetConfig ? (
+                    <div className="min-w-0 text-left">
+                      <div className="truncate text-sm font-semibold">{selectedPresetConfig.name}</div>
+                      <div className="truncate text-[11px] text-muted-foreground">
+                        {selectedPresetConfig.description}
+                      </div>
+                    </div>
+                  ) : (
+                    <SelectValue placeholder="Choose preset" />
+                  )}
+                </SelectTrigger>
+                <SelectContent className="max-h-[360px] overflow-y-auto rounded-2xl border-border/70 bg-popover/98 p-1.5 shadow-2xl" position="popper" sideOffset={6} align="start">
+                  <SelectItem value="custom" className="rounded-xl py-2.5 font-semibold text-primary">
+                    <div className="flex min-w-0 flex-col">
+                      <span className="text-sm">Custom configuration</span>
+                      <span className="text-[11px] font-normal text-muted-foreground">
+                        Manual control over format, subtitles, folder, and filename rules
+                      </span>
+                    </div>
+                  </SelectItem>
+                  <SelectSeparator />
+                  {presetGroups.map((entry, index) => (
+                    <div key={entry.group}>
+                      <SelectGroup>
+                        <SelectLabel className="py-1.5 text-[10px] uppercase tracking-wider text-muted-foreground/80">
+                          {entry.label}
+                        </SelectLabel>
+                        {entry.presets.map((preset) => (
+                          <SelectItem key={preset.id} value={preset.id} title={preset.description} className="rounded-xl py-2.5">
+                            <div className="flex min-w-0 flex-col">
+                              <span className="truncate text-sm font-medium">{preset.name}</span>
+                              <span className="truncate text-[11px] font-normal text-muted-foreground">
+                                {preset.description}
+                              </span>
+                            </div>
+                          </SelectItem>
+                        ))}
+                      </SelectGroup>
+                      {index < presetGroups.length - 1 && <SelectSeparator />}
+                    </div>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+
+            <MotionButton
+              type="button"
+              variant={isCustomPreset ? "secondary" : "outline"}
+              className="h-12 rounded-xl px-4"
+              onClick={() => onPresetChange("custom")}
+            >
+              <Settings2 className="mr-2 h-4 w-4" />
+              {isCustomPreset ? "Custom Active" : "Use Custom"}
+            </MotionButton>
+          </div>
+
+          <div
+            className={`rounded-2xl border px-3 py-3 shadow-sm transition-colors ${
+              isCustomPreset
+                ? "border-primary/30 bg-primary/8"
+                : "border-border/60 bg-muted/20"
+            }`}
+          >
+            {isCustomPreset ? (
+              <div className="space-y-1.5">
+                <div className="text-sm font-semibold">Custom configuration</div>
+                <p className="text-xs leading-5 text-muted-foreground">
+                  Output format, naming, subtitles, and folder choices are all controlled by the advanced options below.
+                </p>
+              </div>
+            ) : selectedPresetConfig ? (
+              <div className="space-y-2">
+                <div className="flex flex-wrap items-center gap-2">
+                  <div className="text-sm font-semibold">{selectedPresetConfig.name}</div>
+                  <Badge variant="secondary" className="rounded-full text-[10px]">
+                    {selectedPresetGroupLabel}
+                  </Badge>
+                  {selectedPresetConfig.quickEligible !== false && (
+                    <Badge variant="outline" className="rounded-full text-[10px]">
+                      Quick Download
+                    </Badge>
+                  )}
+                </div>
+                <p className="text-xs leading-5 text-muted-foreground">
+                  {selectedPresetConfig.description}
+                </p>
+                <div className="flex flex-wrap gap-2 text-[11px] text-muted-foreground">
+                  <span className="rounded-full border border-border/60 bg-background/80 px-2.5 py-1">
+                    {selectedPresetSubtitleDetail}
+                  </span>
+                  {selectedPresetConfig.askFolderBehavior === "ask" && (
+                    <span className="rounded-full border border-border/60 bg-background/80 px-2.5 py-1">
+                      Asks for a save folder
+                    </span>
+                  )}
+                </div>
+              </div>
+            ) : null}
+          </div>
+        </div>
+      </div>
 
       <div className="flex justify-center -mt-1">
         <MotionButton

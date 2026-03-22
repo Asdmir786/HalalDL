@@ -82,7 +82,7 @@ fn main_window<R: tauri::Runtime>(app: &AppHandle<R>) -> Result<WebviewWindow<R>
         .ok_or_else(|| "Main window is unavailable".to_string())
 }
 
-fn is_main_window_visible<R: tauri::Runtime>(app: &AppHandle<R>) -> bool {
+fn main_window_is_visible<R: tauri::Runtime>(app: &AppHandle<R>) -> bool {
     main_window(app)
         .and_then(|window| window.is_visible().map_err(|e| e.to_string()))
         .unwrap_or(true)
@@ -170,6 +170,7 @@ fn apply_saved_bounds<R: tauri::Runtime>(window: &WebviewWindow<R>, app: &AppHan
         window
             .set_size(Size::Physical(PhysicalSize::new(1000, 600)))
             .map_err(|e| e.to_string())?;
+        window.center().map_err(|e| e.to_string())?;
     }
     Ok(())
 }
@@ -187,24 +188,21 @@ fn build_tray_menu<R: tauri::Runtime>(app: &AppHandle<R>) -> Result<tauri::menu:
         .lock()
         .map_err(|_| "Tray state lock poisoned".to_string())?
         .clone();
-    let window_visible = is_main_window_visible(app);
+    let window_visible = main_window_is_visible(app);
 
     let queue_label = if tray_state.active_downloads > 0 {
-        format!("Downloads Active: {}", tray_state.active_downloads)
+        format!("{} active", tray_state.active_downloads)
     } else if tray_state.failed_jobs > 0 {
-        format!("Failed Jobs: {}", tray_state.failed_jobs)
+        format!("{} failed", tray_state.failed_jobs)
     } else {
-        "Downloads Idle".to_string()
+        "Idle".to_string()
     };
 
-    let updates_label = if tray_state.app_update_available || tray_state.tool_update_count > 0 {
-        format!(
-            "Updates Available: app={} tools={}",
-            if tray_state.app_update_available { "yes" } else { "no" },
-            tray_state.tool_update_count
-        )
+    let updates_total = tray_state.tool_update_count + usize::from(tray_state.app_update_available);
+    let updates_label = if updates_total > 0 {
+        format!("{} updates", updates_total)
     } else {
-        "Updates: none".to_string()
+        "No updates".to_string()
     };
 
     let pause_label = if tray_state.queue_paused {
@@ -213,18 +211,17 @@ fn build_tray_menu<R: tauri::Runtime>(app: &AppHandle<R>) -> Result<tauri::menu:
         "Pause New Jobs"
     };
 
-    let status_queue = MenuItemBuilder::with_id("status-queue", queue_label)
+    let status_summary = MenuItemBuilder::with_id(
+        "status-summary",
+        format!("{} • {}", queue_label, updates_label),
+    )
         .enabled(false)
         .build(app)
         .map_err(|e| e.to_string())?;
-    let status_updates = MenuItemBuilder::with_id("status-updates", updates_label)
-        .enabled(false)
+    let download_clipboard = MenuItemBuilder::with_id("download-clipboard", "Download Copied URL")
         .build(app)
         .map_err(|e| e.to_string())?;
-    let download_clipboard = MenuItemBuilder::with_id("download-clipboard", "Download Clipboard")
-        .build(app)
-        .map_err(|e| e.to_string())?;
-    let quick_download = MenuItemBuilder::with_id("quick-download", "Quick Download")
+    let quick_download = MenuItemBuilder::with_id("quick-download", "Open Quick Panel")
         .build(app)
         .map_err(|e| e.to_string())?;
     let toggle_window = MenuItemBuilder::with_id(
@@ -248,14 +245,18 @@ fn build_tray_menu<R: tauri::Runtime>(app: &AppHandle<R>) -> Result<tauri::menu:
         .map_err(|e| e.to_string())?;
 
     let mut builder = MenuBuilder::new(app)
-        .item(&status_queue)
-        .item(&status_updates)
+        .item(&status_summary)
         .separator()
-        .item(&download_clipboard)
-        .item(&quick_download);
+        .item(&toggle_window)
+        .item(&quick_download)
+        .item(&download_clipboard);
 
-    if settings.tray_menu_show_hide_item {
-        builder = builder.item(&toggle_window);
+    if !settings.tray_menu_show_hide_item {
+        builder = MenuBuilder::new(app)
+            .item(&status_summary)
+            .separator()
+            .item(&quick_download)
+            .item(&download_clipboard);
     }
 
     builder
@@ -339,7 +340,7 @@ pub fn init_tray(app: &AppHandle) -> Result<(), String> {
             "toggle-main-window" => {
                 emit_tray_action(
                     app,
-                    if is_main_window_visible(app) {
+                    if main_window_is_visible(app) {
                         "hide-window"
                     } else {
                         "open-app"
@@ -457,6 +458,12 @@ pub fn hide_main_window_to_tray(app: AppHandle) -> Result<(), String> {
     window.hide().map_err(|e| e.to_string())?;
     refresh_tray(&app)?;
     Ok(())
+}
+
+#[tauri::command]
+pub fn is_main_window_visible(app: AppHandle) -> Result<bool, String> {
+    let window = main_window(&app)?;
+    window.is_visible().map_err(|e| e.to_string())
 }
 
 pub fn quit_application(app: AppHandle) -> Result<(), String> {

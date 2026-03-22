@@ -16,6 +16,7 @@ import {
 } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { type Preset } from "@/store/presets";
+import { getPresetGroup, getPresetSubtitleDetail, PRESET_GROUP_LABELS } from "@/lib/preset-display";
 
 interface PresetCardProps {
   preset: Preset;
@@ -25,6 +26,9 @@ interface PresetCardProps {
 }
 
 export function PresetCard({ preset, onDuplicate, onEdit, onDelete }: PresetCardProps) {
+  const presetGroupLabel = PRESET_GROUP_LABELS[getPresetGroup(preset)];
+  const subtitleDetail = getPresetSubtitleDetail(preset);
+
   return (
     <Card className="flex flex-col h-full hover:shadow-md transition-shadow duration-200 border-muted/60 overflow-hidden glass-card">
       <CardHeader className="pb-3">
@@ -47,6 +51,9 @@ export function PresetCard({ preset, onDuplicate, onEdit, onDelete }: PresetCard
       </CardHeader>
       <CardContent className="flex-1 space-y-3">
         <div className="flex flex-wrap gap-1.5">
+          <Badge variant="outline" className="text-[10px]">
+            {presetGroupLabel}
+          </Badge>
           {preset.quickEligible !== false && (
             <Badge variant="outline" className="text-[10px]">
               Quick Download
@@ -61,6 +68,11 @@ export function PresetCard({ preset, onDuplicate, onEdit, onDelete }: PresetCard
               Subtitles
             </Badge>
           ) : null}
+          {subtitleDetail !== "No subtitles" && (
+            <Badge variant="outline" className="text-[10px]">
+              {subtitleDetail}
+            </Badge>
+          )}
         </div>
         <div className="bg-muted/30 p-3 rounded-lg border border-muted/50 font-mono text-[10px] text-muted-foreground break-words relative group max-h-24 overflow-y-auto">
            <div className="line-clamp-4">

@@ -25,6 +25,7 @@ import { SettingsSection } from "./SettingsSection";
 import { toast } from "sonner";
 import { useDownloadsStore } from "@/store/downloads";
 import { checkAndStoreAppUpdate } from "@/lib/app-updates/service";
+import { notifyUser } from "@/lib/notifications";
 import {
   Dialog,
   DialogContent,
@@ -147,7 +148,11 @@ export function AboutSection() {
         assetName,
         checksumUrl,
       });
-      toast.success("Update downloaded and checksum verified");
+      await notifyUser(
+        "HalalDL update ready",
+        "The verified installer has been downloaded and is ready to run.",
+        "success"
+      );
       setVerifiedInstallerPath(verifiedPath);
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);

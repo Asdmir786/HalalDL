@@ -79,9 +79,12 @@ export function BehaviorSection({
   quickDownloadDestinationMode, onQuickDownloadDestinationModeChange,
   quickPresetOptions,
 }: BehaviorSectionProps) {
+  const startupOptionsEnabled = launchAtLogin;
+  const backgroundChecksEnabled = enableBackgroundUpdateChecks;
+
   return (
     <SettingsSection id="behavior" icon={Bell} title="Behavior" description="Notifications, clipboard, and file handling preferences.">
-      <SettingRow icon={Bell} label="Desktop Notifications" description="Show alerts when downloads complete or fail.">
+      <SettingRow icon={Bell} label="Desktop Notifications" description="Allow HalalDL to show download, app update, and tool update alerts.">
         <Switch checked={notifications} onCheckedChange={onNotificationsChange} />
       </SettingRow>
 
@@ -134,16 +137,30 @@ export function BehaviorSection({
         </Select>
       </SettingRow>
 
-      <SettingRow icon={AppWindow} label="Close To Tray" description="Hide HalalDL to the system tray instead of quitting when the window is closed.">
+      <SettingRow icon={AppWindow} label="Close To Tray" description="Clicking the window close button keeps HalalDL running in the tray instead of fully quitting.">
         <Switch checked={closeToTray} onCheckedChange={onCloseToTrayChange} />
       </SettingRow>
 
-      <SettingRow icon={AppWindow} label="Launch At Login" description="Start HalalDL automatically when you sign in to Windows.">
+      <SettingRow icon={AppWindow} label="Launch At Login" description="Start HalalDL automatically when you sign in to Windows. Enable this if you want tray-first startup.">
         <Switch checked={launchAtLogin} onCheckedChange={onLaunchAtLoginChange} />
       </SettingRow>
 
-      <SettingRow icon={AppWindow} label="Start Minimized To Tray" description="When launched automatically, start hidden and ready in the tray.">
-        <Switch checked={startMinimizedToTray} onCheckedChange={onStartMinimizedToTrayChange} />
+      <SettingRow
+        icon={AppWindow}
+        label="Start Minimized To Tray"
+        description={
+          startupOptionsEnabled
+            ? "When HalalDL launches at sign-in, open it hidden in the tray instead of showing the main window."
+            : "Requires Launch At Login. Turn that on first if you want HalalDL to start directly in the tray."
+        }
+        disabled={!startupOptionsEnabled}
+        inset
+      >
+        <Switch
+          checked={startMinimizedToTray}
+          onCheckedChange={onStartMinimizedToTrayChange}
+          disabled={!startupOptionsEnabled}
+        />
       </SettingRow>
 
       <SettingRow icon={MousePointerClick} label="Tray Left Click" description="Choose what happens when you left click the tray icon. Right click always opens the tray menu.">
@@ -175,7 +192,7 @@ export function BehaviorSection({
         <Switch checked={trayMenuShowHideItem} onCheckedChange={onTrayMenuShowHideItemChange} />
       </SettingRow>
 
-      <SettingRow icon={Download} label="Quick Default Preset" description="Preset used by tray quick download and instant clipboard actions.">
+      <SettingRow icon={Download} label="Quick Default Preset" description="Preset used by the quick panel and the Download Copied URL tray action.">
         <Select value={quickDefaultPreset} onValueChange={onQuickDefaultPresetChange}>
           <SelectTrigger className="w-[220px]">
             <SelectValue placeholder="Choose preset" />
@@ -190,7 +207,7 @@ export function BehaviorSection({
         </Select>
       </SettingRow>
 
-      <SettingRow icon={Download} label="Quick Action Behavior" description="Either ask for confirmation each time or instantly download from the clipboard using the default preset.">
+      <SettingRow icon={Download} label="Copied URL Action" description="Choose whether the tray action opens the quick panel first or immediately downloads the copied URL with the default preset.">
         <Select value={quickActionBehavior} onValueChange={(v) => onQuickActionBehaviorChange(v as QuickActionBehavior)}>
           <SelectTrigger className="w-[220px]">
             <SelectValue placeholder="Select behavior" />
@@ -202,7 +219,7 @@ export function BehaviorSection({
         </Select>
       </SettingRow>
 
-      <SettingRow icon={Download} label="Quick Download Start Mode" description="Whether quick downloads start immediately or join the queue first.">
+      <SettingRow icon={Download} label="Quick Download Start Mode" description="Controls whether quick panel downloads begin right away or sit in the queue waiting for you to start them.">
         <Select value={quickDownloadStartMode} onValueChange={(v) => onQuickDownloadStartModeChange(v as DownloadsAddMode)}>
           <SelectTrigger className="w-[220px]">
             <SelectValue placeholder="Select start mode" />
@@ -214,7 +231,7 @@ export function BehaviorSection({
         </Select>
       </SettingRow>
 
-      <SettingRow icon={Download} label="Quick Destination Mode" description="Choose whether quick downloads use the default folder or ask you to pick one.">
+      <SettingRow icon={Download} label="Quick Destination Mode" description="Choose whether quick downloads save to the default folder or ask you to choose a folder every time.">
         <Select value={quickDownloadDestinationMode} onValueChange={(v) => onQuickDownloadDestinationModeChange(v as QuickDestinationMode)}>
           <SelectTrigger className="w-[220px]">
             <SelectValue placeholder="Select destination mode" />
@@ -226,16 +243,44 @@ export function BehaviorSection({
         </Select>
       </SettingRow>
 
-      <SettingRow icon={RefreshCw} label="Background Update Checks" description="Allow HalalDL to look for app and tool updates while the app is idle in the background.">
+      <SettingRow icon={RefreshCw} label="Background Update Checks" description="Let HalalDL quietly check for app and tool updates while it is open or sitting in the tray.">
         <Switch checked={enableBackgroundUpdateChecks} onCheckedChange={onEnableBackgroundUpdateChecksChange} />
       </SettingRow>
 
-      <SettingRow icon={RefreshCw} label="Check Tool Updates In Background" description="Periodically check yt-dlp, FFmpeg, aria2, and Deno for new versions.">
-        <Switch checked={checkToolUpdatesInBackground} onCheckedChange={onCheckToolUpdatesInBackgroundChange} />
+      <SettingRow
+        icon={RefreshCw}
+        label="Tool Update Checks"
+        description={
+          backgroundChecksEnabled
+            ? "Look for newer yt-dlp, FFmpeg, aria2, and Deno versions in the background."
+            : "Requires Background Update Checks. Turn that on first to let HalalDL look for tool updates."
+        }
+        disabled={!backgroundChecksEnabled}
+        inset
+      >
+        <Switch
+          checked={checkToolUpdatesInBackground}
+          onCheckedChange={onCheckToolUpdatesInBackgroundChange}
+          disabled={!backgroundChecksEnabled}
+        />
       </SettingRow>
 
-      <SettingRow icon={RefreshCw} label="Check App Updates In Background" description="Periodically check for a new HalalDL release while the app stays in the tray.">
-        <Switch checked={checkAppUpdatesInBackground} onCheckedChange={onCheckAppUpdatesInBackgroundChange} />
+      <SettingRow
+        icon={RefreshCw}
+        label="App Update Checks"
+        description={
+          backgroundChecksEnabled
+            ? "Look for new HalalDL releases in the background and notify you when one is available."
+            : "Requires Background Update Checks. Turn that on first to let HalalDL look for app updates."
+        }
+        disabled={!backgroundChecksEnabled}
+        inset
+      >
+        <Switch
+          checked={checkAppUpdatesInBackground}
+          onCheckedChange={onCheckAppUpdatesInBackgroundChange}
+          disabled={!backgroundChecksEnabled}
+        />
       </SettingRow>
     </SettingsSection>
   );

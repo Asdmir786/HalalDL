@@ -8,12 +8,13 @@ import { PageTransition } from "@/components/motion/PageTransition";
 import { DownloadsScreen } from "@/screens/DownloadsScreen"; // Keep critical path eager
 import { useTaskbarProgress } from "@/hooks/useTaskbarProgress";
 import { GlobalDragDrop } from "@/components/GlobalDragDrop";
-import { lazy, Suspense, useCallback, useEffect, useMemo, useState } from "react";
+import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Cpu, Sparkles, Zap } from "lucide-react";
 import { listen } from "@tauri-apps/api/event";
 import { QuickDownloadPanel } from "@/components/QuickDownloadPanel";
 import { useRuntimeStore } from "@/store/runtime";
 import { useDownloadsStore } from "@/store/downloads";
+import { usePresetsStore } from "@/store/presets";
 import { useSettingsStore } from "@/store/settings";
 import { useAppUpdateStore } from "@/store/app-update";
 import { useToolsStore } from "@/store/tools";
@@ -34,6 +35,14 @@ import {
   wasLaunchedFromAutostart,
 } from "@/lib/commands";
 import { checkAndStoreAppUpdate } from "@/lib/app-updates/service";
+import {
+  notifyUser,
+  readLastNotifiedAppUpdateVersion,
+  readLastNotifiedToolUpdateVersions,
+  writeLastNotifiedAppUpdateVersion,
+  writeLastNotifiedToolUpdateVersions,
+} from "@/lib/notifications";
+import { resolveExistingPresetId } from "@/lib/preset-display";
 
 // Lazy load non-critical screens
 const PresetsScreen = lazy(() => import("@/screens/PresetsScreen").then(module => ({ default: module.PresetsScreen })));
@@ -129,8 +138,7 @@ export default function App() {
   const currentScreen = useNavigationStore((state) => state.currentScreen);
   const settings = useSettingsStore((state) => state.settings);
   const jobs = useDownloadsStore((state) => state.jobs);
-  const updateTool = useToolsStore((state) => state.updateTool);
-  const tools = useToolsStore((state) => state.tools);
+  const setTools = useToolsStore((state) => state.setTools);
   const appUpdateAvailable = useAppUpdateStore((state) => state.updateAvailable);
   const {
     windowMode,
@@ -139,6 +147,8 @@ export default function App() {
   } = useRuntimeStore();
   const [isBooting, setIsBooting] = useState(true);
   const [launchedFromAutostart, setLaunchedFromAutostart] = useState(false);
+  const lastNotifiedAppVersionRef = useRef<string | null>(readLastNotifiedAppUpdateVersion());
+  const lastNotifiedToolVersionsRef = useRef<Record<string, string>>(readLastNotifiedToolUpdateVersions());
   const activeDownloads = useMemo(
     () =>
       jobs.filter(
@@ -150,13 +160,11 @@ export default function App() {
     () => jobs.filter((job) => job.status === "Failed").length,
     [jobs]
   );
-  const toolUpdateCount = useMemo(
-    () => tools.filter((tool) => tool.updateAvailable).length,
-    [tools]
+  const toolUpdateCount = useToolsStore(
+    (state) => state.tools.reduce((count, tool) => count + (tool.updateAvailable ? 1 : 0), 0)
   );
-  const toolsReady = useMemo(
-    () => tools.every((tool) => tool.status !== "Checking"),
-    [tools]
+  const toolsReady = useToolsStore(
+    (state) => state.tools.every((tool) => tool.status !== "Checking")
   );
 
   // Initial boot sequence to show off the loader
@@ -231,7 +239,10 @@ export default function App() {
       const { addJob, setComposeDraft } = useDownloadsStore.getState();
       const { setScreen } = useNavigationStore.getState();
       const runtime = useRuntimeStore.getState();
-      const presetId = latestSettings.quickDefaultPreset || "default";
+      const presetId = resolveExistingPresetId(
+        usePresetsStore.getState().presets,
+        latestSettings.quickDefaultPreset || "default"
+      );
 
       if (openAdvanced) {
         setComposeDraft({
@@ -298,7 +309,10 @@ export default function App() {
 
         const targetUrl = parsed.searchParams.get("url");
         if (!targetUrl) continue;
-        const presetId = parsed.searchParams.get("preset") || latestSettings.quickDefaultPreset || "default";
+        const presetId = resolveExistingPresetId(
+          usePresetsStore.getState().presets,
+          parsed.searchParams.get("preset") || latestSettings.quickDefaultPreset || "default"
+        );
         const advanced = parsed.searchParams.get("advanced") === "1";
         const startImmediately = parsed.searchParams.get("start") !== "queue";
 
@@ -334,6 +348,10 @@ export default function App() {
     const handleAction = async (action: TrayActionPayload["action"]) => {
       const latestSettings = useSettingsStore.getState().settings;
       const runtime = useRuntimeStore.getState();
+      const quickPresetId = resolveExistingPresetId(
+        usePresetsStore.getState().presets,
+        latestSettings.quickDefaultPreset || "default"
+      );
 
       switch (action) {
         case "open-app":
@@ -354,7 +372,7 @@ export default function App() {
           });
           runtime.openQuickMode({
             url: "",
-            presetId: latestSettings.quickDefaultPreset || "default",
+            presetId: quickPresetId,
             startMode: latestSettings.quickDownloadStartMode,
             destinationMode: latestSettings.quickDownloadDestinationMode,
           });
@@ -368,7 +386,7 @@ export default function App() {
             });
             runtime.openQuickMode({
               url: "",
-              presetId: latestSettings.quickDefaultPreset || "default",
+              presetId: quickPresetId,
               startMode: latestSettings.quickDownloadStartMode,
               destinationMode: latestSettings.quickDownloadDestinationMode,
             });
@@ -445,11 +463,24 @@ export default function App() {
       const latestSettings = useSettingsStore.getState().settings;
       const latestTools = useToolsStore.getState().tools;
       const getTool = (id: string) => latestTools.find((tool) => tool.id === id);
+      const newlyAvailableTools: Array<{ id: string; name: string; latestVersion: string }> = [];
 
       if (latestSettings.checkAppUpdatesInBackground) {
-        await checkAndStoreAppUpdate().catch(() => {
-          void 0;
+        const appUpdate = await checkAndStoreAppUpdate().catch(() => {
+          return null;
         });
+        if (
+          appUpdate?.resolved.updateAvailable &&
+          appUpdate.resolved.latestVersion &&
+          lastNotifiedAppVersionRef.current !== appUpdate.resolved.latestVersion
+        ) {
+          await notifyUser(
+            "HalalDL update available",
+            `Version ${appUpdate.resolved.latestVersion} is ready to install from Settings.`
+          );
+          lastNotifiedAppVersionRef.current = appUpdate.resolved.latestVersion;
+          writeLastNotifiedAppUpdateVersion(appUpdate.resolved.latestVersion);
+        }
       }
 
       if (latestSettings.checkToolUpdatesInBackground) {
@@ -472,21 +503,80 @@ export default function App() {
           },
         ];
 
-        await Promise.all(
+        const latestResults = await Promise.all(
           checks.map(async ({ id, fetchLatest }) => {
             try {
               const latestVersion = await fetchLatest();
               const currentTool = getTool(id);
-              updateTool(id, {
+              const updateAvailable = isUpdateAvailable(currentTool?.version, latestVersion ?? undefined);
+
+              if (
+                updateAvailable &&
+                latestVersion &&
+                lastNotifiedToolVersionsRef.current[id] !== latestVersion
+              ) {
+                newlyAvailableTools.push({
+                  id,
+                  name: currentTool?.name ?? id,
+                  latestVersion,
+                });
+              }
+
+              return {
+                id,
                 latestVersion: latestVersion ?? undefined,
-                updateAvailable: isUpdateAvailable(currentTool?.version, latestVersion ?? undefined),
+                updateAvailable,
                 latestCheckedAt: Date.now(),
-              });
+              };
             } catch {
-              void 0;
+              return null;
             }
           })
         );
+
+        const updatesById = new Map(
+          latestResults
+            .filter((item): item is NonNullable<typeof item> => item !== null)
+            .map((item) => [item.id, item])
+        );
+        if (updatesById.size > 0) {
+          const nextTools = latestTools.map((tool) => {
+            const next = updatesById.get(tool.id);
+            return next
+              ? {
+                  ...tool,
+                  latestVersion: next.latestVersion,
+                  updateAvailable: next.updateAvailable,
+                  latestCheckedAt: next.latestCheckedAt,
+                }
+              : tool;
+          });
+          setTools(nextTools);
+        }
+
+        if (newlyAvailableTools.length === 1) {
+          const tool = newlyAvailableTools[0];
+          await notifyUser(
+            `${tool.name} update available`,
+            `${tool.latestVersion} is ready to install from the Tools screen.`
+          );
+        } else if (newlyAvailableTools.length > 1) {
+          await notifyUser(
+            `${newlyAvailableTools.length} tool updates available`,
+            newlyAvailableTools.map((tool) => tool.name).join(", ")
+          );
+        }
+
+        if (newlyAvailableTools.length > 0) {
+          const nextNotified = {
+            ...lastNotifiedToolVersionsRef.current,
+            ...Object.fromEntries(
+              newlyAvailableTools.map((tool) => [tool.id, tool.latestVersion])
+            ),
+          };
+          lastNotifiedToolVersionsRef.current = nextNotified;
+          writeLastNotifiedToolUpdateVersions(nextNotified);
+        }
       }
     };
 
@@ -502,8 +592,8 @@ export default function App() {
     settings.checkAppUpdatesInBackground,
     settings.checkToolUpdatesInBackground,
     settings.enableBackgroundUpdateChecks,
+    setTools,
     toolsReady,
-    updateTool,
   ]);
 
   const renderScreen = () => {

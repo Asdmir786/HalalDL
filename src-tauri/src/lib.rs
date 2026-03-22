@@ -67,6 +67,7 @@ pub fn run() {
             runtime::restore_main_window,
             runtime::show_quick_download_window,
             runtime::hide_main_window_to_tray,
+            runtime::is_main_window_visible,
             runtime::is_autostart_enabled,
             runtime::was_launched_from_autostart,
             runtime::set_autostart_enabled,

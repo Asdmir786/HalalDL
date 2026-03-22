@@ -28,12 +28,12 @@ class StorageManager {
 
     this.initPromise = (async () => {
       try {
-        this.settingsStore = await load("settings.json", { autoSave: true, defaults: {} });
-        this.presetsStore = await load("presets.json", { autoSave: true, defaults: {} });
-        this.logsStore = await load("logs.json", { autoSave: true, defaults: {} });
-        this.downloadsStore = await load("downloads.json", { autoSave: true, defaults: {} });
-        this.toolsStore = await load("tools.json", { autoSave: true, defaults: {} });
-        this.historyStore = await load("history.json", { autoSave: true, defaults: {} });
+        this.settingsStore = await load("settings.json", { autoSave: false, defaults: {} });
+        this.presetsStore = await load("presets.json", { autoSave: false, defaults: {} });
+        this.logsStore = await load("logs.json", { autoSave: false, defaults: {} });
+        this.downloadsStore = await load("downloads.json", { autoSave: false, defaults: {} });
+        this.toolsStore = await load("tools.json", { autoSave: false, defaults: {} });
+        this.historyStore = await load("history.json", { autoSave: false, defaults: {} });
         this.initError = null;
         console.log("Storage initialized successfully");
       } catch (error) {

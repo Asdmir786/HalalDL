@@ -15,6 +15,7 @@ import { save, open } from "@tauri-apps/plugin-dialog";
 import { invoke } from "@tauri-apps/api/core";
 import { PresetCard } from "./presets/components/PresetCard";
 import { useLogsStore } from "@/store/logs";
+import { sortPresetsForDisplay } from "@/lib/preset-display";
 
 export function PresetsScreen() {
   const { presets, duplicatePreset, deletePreset, updatePreset, addPreset } = usePresetsStore();
@@ -36,8 +37,9 @@ export function PresetsScreen() {
     scrollTopRef.current = event.currentTarget.scrollTop;
   };
 
-  const builtInPresets = presets.filter((p) => p.isBuiltIn);
-  const userPresets = presets.filter((p) => !p.isBuiltIn);
+  const orderedPresets = sortPresetsForDisplay(presets);
+  const builtInPresets = orderedPresets.filter((p) => p.isBuiltIn);
+  const userPresets = orderedPresets.filter((p) => !p.isBuiltIn);
 
   const handleExport = async () => {
     setIsExporting(true);
@@ -164,7 +166,7 @@ export function PresetsScreen() {
 
             <TabsContent value="all" className="mt-0">
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-2 xl:grid-cols-3 gap-6">
-                {presets.map((p) => (
+                {orderedPresets.map((p) => (
                   <PresetCard 
                       key={p.id} 
                       preset={p} 
@@ -244,6 +246,7 @@ export function PresetsScreen() {
                   description: data.description || "",
                   args: data.args || [],
                   isBuiltIn: false,
+                  group: data.group ?? "custom",
                   quickEligible: data.quickEligible ?? true,
                   subtitleMode: data.subtitleMode,
                   subtitleSourcePolicy: data.subtitleSourcePolicy,

@@ -1,16 +1,23 @@
-import { useEffect, useMemo, useState } from "react";
-import { Download, ExternalLink, FolderOpen, X } from "lucide-react";
+import { useCallback, useEffect, useMemo, useState } from "react";
+import { CheckCircle2, ClipboardPaste, Download, ExternalLink, FolderOpen, Link2, X } from "lucide-react";
 import { open as openDialog } from "@tauri-apps/plugin-dialog";
 import { toast } from "sonner";
 import { MotionButton } from "@/components/motion/MotionButton";
 import { Input } from "@/components/ui/input";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Select, SelectContent, SelectGroup, SelectItem, SelectLabel, SelectSeparator, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useDownloadsStore } from "@/store/downloads";
 import { usePresetsStore } from "@/store/presets";
 import { useSettingsStore } from "@/store/settings";
 import { useNavigationStore } from "@/store/navigation";
 import { useRuntimeStore } from "@/store/runtime";
 import { buildSubtitleSummary } from "@/lib/subtitles";
+import {
+  getPresetSubtitleDetail,
+  getQuickEligiblePresets,
+  groupPresetsForSelect,
+  resolveExistingPresetId,
+  resolvePresetById,
+} from "@/lib/preset-display";
 import { fetchMetadata, pickSupportedUrlFromText, startQueuedJobs } from "@/lib/downloader";
 import { hideMainWindowToTray, readTextFromClipboard, restoreMainWindow } from "@/lib/commands";
 
@@ -23,33 +30,46 @@ export function QuickDownloadPanel() {
   const { quickDraft, closeQuickMode, restoreFullMode } = useRuntimeStore();
 
   const quickPresets = useMemo(
-    () => presets.filter((preset) => preset.quickEligible !== false),
+    () => getQuickEligiblePresets(presets),
     [presets]
+  );
+  const quickPresetGroups = useMemo(
+    () => groupPresetsForSelect(quickPresets),
+    [quickPresets]
   );
 
   const [url, setUrl] = useState("");
-  const [presetId, setPresetId] = useState(settings.quickDefaultPreset || "default");
+  const [presetId, setPresetId] = useState(resolveExistingPresetId(quickPresets, settings.quickDefaultPreset || "default"));
+  const [clipboardUrl, setClipboardUrl] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
+
+  const refreshClipboardUrl = useCallback(async () => {
+    try {
+      const text = await readTextFromClipboard();
+      const supported = pickSupportedUrlFromText(text);
+      setClipboardUrl(supported ?? null);
+      if (supported && (!quickDraft || !quickDraft.url)) {
+        setUrl(supported);
+      }
+    } catch {
+      setClipboardUrl(null);
+    }
+  }, [quickDraft]);
 
   useEffect(() => {
     if (quickDraft) {
       setUrl(quickDraft.url);
-      setPresetId(quickDraft.presetId || settings.quickDefaultPreset || "default");
+      setPresetId(resolveExistingPresetId(quickPresets, quickDraft.presetId || settings.quickDefaultPreset || "default"));
+      void refreshClipboardUrl();
       return;
     }
 
-    readTextFromClipboard()
-      .then((text) => {
-        const supported = pickSupportedUrlFromText(text);
-        if (supported) setUrl(supported);
-      })
-      .catch(() => {
-        void 0;
-      });
-  }, [quickDraft, settings.quickDefaultPreset]);
+    setPresetId((current) => resolveExistingPresetId(quickPresets, current || settings.quickDefaultPreset || "default"));
+    void refreshClipboardUrl();
+  }, [quickDraft, quickPresets, refreshClipboardUrl, settings.quickDefaultPreset]);
 
   const selectedPreset =
-    quickPresets.find((preset) => preset.id === presetId) ??
+    resolvePresetById(quickPresets, presetId) ??
     quickPresets[0] ??
     presets[0];
 
@@ -62,6 +82,7 @@ export function QuickDownloadPanel() {
         format: selectedPreset.subtitleFormat ?? "srt",
       })
     : "No subtitles";
+  const subtitleDetail = selectedPreset ? getPresetSubtitleDetail(selectedPreset) : "No subtitles";
 
   const handleCancel = async () => {
     closeQuickMode();
@@ -73,12 +94,12 @@ export function QuickDownloadPanel() {
   const handleAdvanced = async () => {
     if (!url.trim()) return;
 
-    setComposeDraft({
-      url: url.trim(),
-      presetId: presetId || settings.quickDefaultPreset || "default",
-      overrides: {
-        origin: "tray",
-      },
+      setComposeDraft({
+        url: url.trim(),
+        presetId: resolveExistingPresetId(quickPresets, presetId || settings.quickDefaultPreset || "default"),
+        overrides: {
+          origin: "tray",
+        },
     });
     setScreen("downloads");
     restoreFullMode("downloads");
@@ -112,7 +133,7 @@ export function QuickDownloadPanel() {
         }
       }
 
-      const id = addJob(supportedUrl, presetId, {
+      const id = addJob(supportedUrl, resolveExistingPresetId(quickPresets, presetId), {
         ...(downloadDir ? { downloadDir } : {}),
         origin: "tray",
       });
@@ -134,12 +155,12 @@ export function QuickDownloadPanel() {
   };
 
   return (
-    <div className="flex h-full flex-col bg-background p-4">
+    <div className="flex h-full flex-col bg-[radial-gradient(circle_at_top,_rgba(255,255,255,0.08),_transparent_50%),linear-gradient(180deg,rgba(255,255,255,0.02),transparent)] p-4">
       <div className="mb-4 flex items-start justify-between gap-3">
         <div>
           <div className="text-sm font-semibold tracking-tight">Quick Download</div>
           <div className="mt-1 text-xs text-muted-foreground">
-            Paste a link, pick a preset, and send it straight to the queue.
+            Drop in a copied video URL, choose a preset, and send it off without opening the full app.
           </div>
         </div>
         <MotionButton type="button" variant="ghost" size="icon" className="h-9 w-9" onClick={() => void handleCancel()}>
@@ -148,35 +169,91 @@ export function QuickDownloadPanel() {
       </div>
 
       <div className="space-y-3">
-        <div className="grid gap-2">
-          <label className="text-xs font-medium text-muted-foreground">URL</label>
-          <Input
-            value={url}
-            onChange={(event) => setUrl(event.target.value)}
-            placeholder="Paste a YouTube, TikTok, Instagram, or similar link"
-            className="h-10"
-          />
+        <div className="rounded-2xl border border-border/50 bg-card/80 p-3 shadow-sm">
+          <div className="flex items-start justify-between gap-3">
+            <div className="min-w-0">
+              <div className="flex items-center gap-2 text-sm font-medium text-foreground">
+                <Link2 className="h-4 w-4 text-primary" />
+                Copied URL
+              </div>
+              <div className="mt-1 text-xs text-muted-foreground">
+                {clipboardUrl
+                  ? "Detected a supported video link from your clipboard."
+                  : "No supported copied URL detected right now."}
+              </div>
+            </div>
+            <MotionButton
+              type="button"
+              variant="outline"
+              className="h-9 shrink-0 gap-2 rounded-xl px-3"
+              onClick={() => {
+                if (clipboardUrl) {
+                  setUrl(clipboardUrl);
+                } else {
+                  void refreshClipboardUrl();
+                }
+              }}
+            >
+              <ClipboardPaste className="h-4 w-4" />
+              {clipboardUrl ? "Use Copied URL" : "Check Clipboard"}
+            </MotionButton>
+          </div>
+          {clipboardUrl && (
+            <div className="mt-3 flex items-start gap-2 rounded-xl border border-emerald-500/20 bg-emerald-500/8 p-3 text-xs text-emerald-100/90">
+              <CheckCircle2 className="mt-0.5 h-4 w-4 shrink-0 text-emerald-400" />
+              <span className="line-clamp-2 break-all text-foreground/90">{clipboardUrl}</span>
+            </div>
+          )}
         </div>
 
-        <div className="grid gap-2">
-          <label className="text-xs font-medium text-muted-foreground">Preset</label>
-          <Select value={presetId} onValueChange={setPresetId}>
-            <SelectTrigger className="h-10">
-              <SelectValue placeholder="Choose preset" />
-            </SelectTrigger>
-            <SelectContent>
-              {quickPresets.map((preset) => (
-                <SelectItem key={preset.id} value={preset.id}>
-                  {preset.name}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
+        <div className="rounded-2xl border border-border/50 bg-card/80 p-3 shadow-sm">
+          <div className="grid gap-2">
+            <label className="text-xs font-medium text-muted-foreground">Video URL</label>
+            <Input
+              value={url}
+              onChange={(event) => setUrl(event.target.value)}
+              placeholder="Paste a YouTube, TikTok, Instagram, or similar link"
+              className="h-11 rounded-xl"
+            />
+          </div>
+
+          <div className="mt-3 grid gap-2">
+            <label className="text-xs font-medium text-muted-foreground">Preset</label>
+            <Select value={presetId} onValueChange={setPresetId}>
+              <SelectTrigger className="h-11 rounded-xl">
+                <SelectValue placeholder="Choose preset" />
+              </SelectTrigger>
+              <SelectContent>
+                {quickPresetGroups.map((entry, index) => (
+                  <div key={entry.group}>
+                    <SelectGroup>
+                      <SelectLabel className="py-1.5 text-[10px] uppercase tracking-wider text-muted-foreground/80">
+                        {entry.label}
+                      </SelectLabel>
+                      {entry.presets.map((preset) => (
+                        <SelectItem key={preset.id} value={preset.id}>
+                          {preset.name}
+                        </SelectItem>
+                      ))}
+                    </SelectGroup>
+                    {index < quickPresetGroups.length - 1 && <SelectSeparator />}
+                  </div>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+
+          {selectedPreset && (
+            <div className="mt-3 rounded-xl border border-border/50 bg-muted/20 p-3 text-xs">
+              <div className="font-medium text-foreground">{selectedPreset.name}</div>
+              <div className="mt-1 text-muted-foreground">{selectedPreset.description}</div>
+            </div>
+          )}
         </div>
 
-        <div className="rounded-xl border border-border/40 bg-muted/20 p-3 text-xs text-muted-foreground">
+        <div className="grid gap-2 rounded-2xl border border-border/50 bg-card/80 p-3 text-xs text-muted-foreground shadow-sm">
           <div className="flex items-center justify-between gap-3">
-            <span>Destination</span>
+            <span>Save location</span>
             <span className="font-medium text-foreground/90">
               {settings.quickDownloadDestinationMode === "ask"
                 ? "Ask every time"
@@ -193,6 +270,10 @@ export function QuickDownloadPanel() {
             <span>Subtitles</span>
             <span className="font-medium text-foreground/90">{subtitleSummary}</span>
           </div>
+          <div className="mt-2 flex items-center justify-between gap-3">
+            <span>Subtitle behavior</span>
+            <span className="font-medium text-right text-foreground/90">{subtitleDetail}</span>
+          </div>
         </div>
       </div>
 
@@ -204,16 +285,16 @@ export function QuickDownloadPanel() {
           className="h-11 gap-2 rounded-xl"
         >
           <Download className="h-4 w-4" />
-          {submitting ? "Adding..." : "Download"}
+          {submitting ? "Adding..." : "Download Now"}
         </MotionButton>
         <div className="grid grid-cols-2 gap-2">
           <MotionButton type="button" variant="outline" onClick={() => void handleAdvanced()} className="h-10 gap-2 rounded-xl">
             <ExternalLink className="h-4 w-4" />
-            Advanced
+            Open Advanced
           </MotionButton>
           <MotionButton type="button" variant="ghost" onClick={() => void handleCancel()} className="h-10 gap-2 rounded-xl">
             <FolderOpen className="h-4 w-4" />
-            Cancel
+            Hide
           </MotionButton>
         </div>
       </div>
