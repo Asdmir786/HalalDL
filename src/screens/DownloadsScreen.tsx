@@ -63,7 +63,6 @@ export function DownloadsScreen() {
   } = useDownloadsStore();
   const { setActiveJobId } = useLogsStore();
   const { setScreen } = useNavigationStore();
-
   const isCustomPreset = selectedPreset === "custom";
   const isDirectImageInput = isDirectImageUrl(url.trim());
 
@@ -542,15 +541,15 @@ export function DownloadsScreen() {
     );
   };
 
-  const handleViewLogs = (jobId: string) => {
-    setActiveJobId(jobId);
-    setScreen("logs");
-  };
-
   const handleRemoveJob = (jobId: string) => {
     void cleanupThumbnailByJobId(jobId);
     removeJob(jobId);
     setSelectedIds((prev) => prev.filter((id) => id !== jobId));
+  };
+
+  const handleViewLogs = (jobId: string) => {
+    setActiveJobId(jobId);
+    setScreen("logs");
   };
 
   const canFillMoreSlots = activeCount < (settings.maxConcurrency || 1);
@@ -578,12 +577,9 @@ export function DownloadsScreen() {
                       Launch Panel
                     </div>
                     <h2 className="text-[1.45rem] font-bold tracking-tight">Downloads</h2>
-                    <p className="max-w-2xl text-sm text-muted-foreground">
-                      Paste a link, pick a preset, and keep the queue moving.
-                    </p>
-                    <p className="text-xs text-muted-foreground">
-                      Default preset: {isCustomPreset ? "Custom configuration" : selectedPresetConfig?.name || "Default"} • Save to: {destinationLabel}
-                    </p>
+                    <div className="text-xs text-muted-foreground">
+                      {isCustomPreset ? "Custom configuration" : selectedPresetConfig?.name || "Default"} • {destinationLabel}
+                    </div>
                   </div>
 
                   <DownloadInputSection

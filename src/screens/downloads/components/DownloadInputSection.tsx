@@ -337,14 +337,6 @@ export function DownloadInputSection({
   return (
     <div className="relative flex flex-col gap-2 rounded-2xl border border-white/10 bg-[linear-gradient(180deg,rgba(255,255,255,0.04),rgba(255,255,255,0.015))] p-2.5 shadow-[0_14px_40px_rgba(0,0,0,0.18)] glass-card">
       <div className="pointer-events-none absolute inset-0 rounded-2xl bg-[radial-gradient(circle_at_top_left,rgba(56,189,248,0.08),transparent_42%)]" />
-      <div className="relative flex items-center justify-between gap-2">
-        <div className="text-[10px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">
-          Add Download
-        </div>
-        <div className="text-[11px] text-muted-foreground">
-          {addMode === "start" ? "Starts when a slot is free" : "Added to queue"}
-        </div>
-      </div>
       <div className="relative flex flex-col gap-2 md:flex-row">
         <div className="flex-1 relative">
           <Input

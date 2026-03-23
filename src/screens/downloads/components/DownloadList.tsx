@@ -72,7 +72,7 @@ function SectionHeader({
   action?: ReactNode;
 }) {
   return (
-    <div className="sticky top-0 z-10 flex h-full items-center justify-between gap-3 rounded-2xl border border-white/8 bg-background/88 px-4 py-3 backdrop-blur-xl">
+    <div className="sticky top-0 z-10 flex items-center justify-between gap-3 rounded-2xl border border-white/8 bg-background/88 px-4 py-3 backdrop-blur-xl">
       <div className="min-w-0 flex-1">
         <div className="flex items-center gap-2">
           <span className={`h-2 w-2 rounded-full ${accentClassName}`} />
@@ -315,7 +315,7 @@ export function DownloadList({
               </DropdownMenu>
             </div>
 
-              <div className="flex min-h-full flex-col gap-2.5 px-4 pb-12 pt-2">
+              <div className="flex flex-col gap-2.5 px-4 pb-12 pt-2">
                 {liveJobs.length > 0 && (
                   <section className="flex flex-col gap-1.5">
                     <SectionHeader
@@ -346,43 +346,48 @@ export function DownloadList({
                 )}
 
                 {recentJobs.length > 0 && (
-                  <section className="flex flex-col gap-1.5">
-                    <SectionHeader
-                      title="Recent Results"
-                      count={recentJobs.length}
-                      accentClassName="bg-emerald-400 shadow-[0_0_16px_rgba(52,211,153,0.55)]"
-                      action={
-                        overflowCount > 0 ? (
-                          <MotionButton
-                            type="button"
-                            variant="ghost"
-                            size="sm"
-                            className="h-9 shrink-0 rounded-full border border-muted/60 bg-background/65 px-3 text-[11px] text-muted-foreground gap-1.5 transition-colors hover:border-muted hover:text-foreground"
-                            onClick={() => setScreen("history")}
-                          >
-                            +{overflowCount} more in History
-                          </MotionButton>
-                        ) : undefined
-                      }
-                    />
-                    <div className="flex flex-col gap-1.5">
-                      <AnimatePresence mode="popLayout" initial={false}>
-                        {recentJobs.map((job) => (
-                          <DownloadItem
-                            key={job.id}
-                            job={job}
-                            section="recent"
-                            isSelected={selectedIds.includes(job.id)}
-                            onToggleSelection={onToggleSelection}
-                            onRemove={onRemoveJob}
-                            onViewLogs={onViewLogs}
-                            onRetry={onRetryJob}
-                            queueMeta={queueMetaById.get(job.id)}
-                            itemVariants={itemVariants}
-                            formatRelativeTime={formatRelativeTime}
-                          />
-                        ))}
-                      </AnimatePresence>
+                  <section className="relative overflow-hidden rounded-[30px] border border-white/8 bg-[linear-gradient(180deg,rgba(11,19,30,0.98),rgba(8,14,24,0.96))] shadow-[0_18px_60px_rgba(0,0,0,0.18)]">
+                    <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_top,rgba(16,185,129,0.08),transparent_38%)]" />
+                    <div className="relative flex flex-col gap-2 p-3">
+                      <SectionHeader
+                        title="Recent Results"
+                        count={recentJobs.length}
+                        accentClassName="bg-emerald-400 shadow-[0_0_16px_rgba(52,211,153,0.55)]"
+                        action={
+                          overflowCount > 0 ? (
+                            <MotionButton
+                              type="button"
+                              variant="ghost"
+                              size="sm"
+                              className="h-9 shrink-0 rounded-full border border-muted/60 bg-background/65 px-3 text-[11px] text-muted-foreground gap-1.5 transition-colors hover:border-muted hover:text-foreground"
+                              onClick={() => setScreen("history")}
+                            >
+                              +{overflowCount} more in History
+                            </MotionButton>
+                          ) : undefined
+                        }
+                      />
+                      <div className="rounded-[24px] border border-white/6 bg-black/10 p-1.5 shadow-[inset_0_1px_0_rgba(255,255,255,0.03)]">
+                        <div className="flex flex-col gap-1.5">
+                          <AnimatePresence mode="popLayout" initial={false}>
+                            {recentJobs.map((job) => (
+                              <DownloadItem
+                                key={job.id}
+                                job={job}
+                                section="recent"
+                                isSelected={selectedIds.includes(job.id)}
+                                onToggleSelection={onToggleSelection}
+                                onRemove={onRemoveJob}
+                                onViewLogs={onViewLogs}
+                                onRetry={onRetryJob}
+                                queueMeta={queueMetaById.get(job.id)}
+                                itemVariants={itemVariants}
+                                formatRelativeTime={formatRelativeTime}
+                              />
+                            ))}
+                          </AnimatePresence>
+                        </div>
+                      </div>
                     </div>
                   </section>
                 )}
