@@ -5,6 +5,7 @@ export {
   probeMediaUrl,
   quickProbeMediaUrl,
   getProbeHostLabel,
+  isDirectImageUrl,
   pickSupportedUrlFromText,
   type UrlProbeResult,
 } from "./validation";

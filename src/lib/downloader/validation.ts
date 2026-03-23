@@ -4,6 +4,8 @@ import { resolveTool, ytDlpEnv } from "./tool-env";
 
 export type UrlProbeResult = "supported" | "unsupported" | "unknown";
 
+const DIRECT_IMAGE_PATH_PATTERN = /\.(avif|bmp|gif|jpe?g|png|svg|webp)(?:$|[?#])/i;
+
 const FAST_SUPPORTED_HOSTS = [
   "youtube.com",
   "youtu.be",
@@ -51,6 +53,13 @@ export function getProbeHostLabel(url: string): string | null {
   const parsed = parseProbeUrl(url);
   if (!parsed) return null;
   return parsed.hostname.replace(/^www\./i, "").toLowerCase();
+}
+
+export function isDirectImageUrl(url: string): boolean {
+  const parsed = parseProbeUrl(url);
+  if (!parsed) return false;
+  const pathWithQuery = `${parsed.pathname}${parsed.search}${parsed.hash}`;
+  return DIRECT_IMAGE_PATH_PATTERN.test(pathWithQuery);
 }
 
 export function quickProbeMediaUrl(url: string): UrlProbeResult {

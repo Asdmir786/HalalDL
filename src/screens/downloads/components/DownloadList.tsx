@@ -1,18 +1,25 @@
+import type { ReactNode } from "react";
 import { AnimatePresence, motion, Variants } from "framer-motion";
-import { useLayoutEffect, useRef, type UIEvent } from "react";
+import { CheckCircle2, Copy, Download, Layers, MoreHorizontal, Plus, RotateCcw, Settings, Sparkles, Upload, X } from "lucide-react";
+
 import { DownloadItem } from "./DownloadItem";
-import { DownloadJob } from "@/store/downloads";
 import { MotionButton } from "@/components/motion/MotionButton";
-import { CheckCircle2, Copy, Download, Layers, Plus, RotateCcw, Settings, Sparkles, X, Upload } from "lucide-react";
 import { FadeInItem } from "@/components/motion/StaggerContainer";
 import { useNavigationStore } from "@/store/navigation";
+import { type DownloadJob } from "@/store/downloads";
 import { exportJobTemplate, importJobTemplate } from "@/lib/job-templates";
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
+import type { DownloadStatusFilter } from "./DownloadStatsBar";
 
 interface DownloadListProps {
-  jobs: DownloadJob[];
+  liveJobs: DownloadJob[];
+  recentJobs: DownloadJob[];
   totalJobs: number;
+  hasVisibleJobs: boolean;
   overflowCount: number;
   hasCompletedJobs: boolean;
+  statusFilter: DownloadStatusFilter;
+  onResetFilter: () => void;
   selectedIds: string[];
   onToggleSelection: (id: string) => void;
   onRetrySelected: () => void;
@@ -30,11 +37,69 @@ interface DownloadListProps {
   formatRelativeTime: (ts: number) => string;
 }
 
+const FILTER_EMPTY_COPY: Record<DownloadStatusFilter, { title: string; body: string }> = {
+  all: {
+    title: "Nothing to show yet",
+    body: "Add a URL above to start building your queue.",
+  },
+  active: {
+    title: "No active downloads",
+    body: "Queue something up or start waiting jobs to see live progress here.",
+  },
+  queued: {
+    title: "No queued jobs",
+    body: "Everything is either running already or has finished.",
+  },
+  failed: {
+    title: "No failed jobs in view",
+    body: "This queue is clean right now. Older failures still live in History.",
+  },
+  done: {
+    title: "No finished jobs in view",
+    body: "Completed results will appear here before they roll into History.",
+  },
+};
+
+function SectionHeader({
+  title,
+  count,
+  accentClassName,
+  action,
+}: {
+  title: string;
+  count: number;
+  accentClassName: string;
+  action?: ReactNode;
+}) {
+  return (
+    <div className="sticky top-0 z-10 flex h-full items-center justify-between gap-3 rounded-2xl border border-white/8 bg-background/88 px-4 py-3 backdrop-blur-xl">
+      <div className="min-w-0 flex-1">
+        <div className="flex items-center gap-2">
+          <span className={`h-2 w-2 rounded-full ${accentClassName}`} />
+          <h3 className="text-xs font-semibold uppercase tracking-[0.16em] text-foreground/90">
+            {title}
+          </h3>
+        </div>
+      </div>
+      <div className="flex items-center gap-2">
+        <div className="rounded-full border border-white/10 bg-white/5 px-2 py-1 text-[10px] font-semibold tabular-nums text-muted-foreground">
+          {count}
+        </div>
+        {action}
+      </div>
+    </div>
+  );
+}
+
 export function DownloadList({
-  jobs,
+  liveJobs,
+  recentJobs,
   totalJobs,
+  hasVisibleJobs,
   overflowCount,
   hasCompletedJobs,
+  statusFilter,
+  onResetFilter,
   selectedIds,
   onToggleSelection,
   onRetrySelected,
@@ -49,221 +114,278 @@ export function DownloadList({
   onRetryJob,
   queueMetaById,
   itemVariants,
-  formatRelativeTime
+  formatRelativeTime,
 }: DownloadListProps) {
   const { setScreen } = useNavigationStore();
-  const scrollRef = useRef<HTMLDivElement>(null);
-  const scrollTopRef = useRef(0);
-
-  useLayoutEffect(() => {
-    const el = scrollRef.current;
-    if (!el) return;
-    el.scrollTop = scrollTopRef.current;
-  });
-
-  const handleScroll = (event: UIEvent<HTMLDivElement>) => {
-    scrollTopRef.current = event.currentTarget.scrollTop;
-  };
+  const filterEmptyCopy = FILTER_EMPTY_COPY[statusFilter];
 
   return (
-    <FadeInItem className="flex min-h-0 flex-1 flex-col overflow-hidden px-5 pb-5">
-      <div className="relative flex min-h-0 flex-1 flex-col overflow-hidden rounded-2xl border border-white/5 bg-black/5 shadow-inner backdrop-blur-sm">
+    <FadeInItem className="flex min-h-0 flex-1 flex-col px-4 pb-6">
+      <div className="relative flex min-h-[320px] flex-col rounded-[24px] border border-white/8 bg-[linear-gradient(180deg,rgba(255,255,255,0.035),rgba(255,255,255,0.015))] shadow-[0_18px_60px_rgba(0,0,0,0.18)] backdrop-blur-xl">
         {totalJobs === 0 ? (
-          <div className="flex-1 flex flex-col items-center justify-center p-8 relative overflow-hidden min-h-[400px]">
-              {/* Background Effects */}
-              <div className="absolute inset-0 bg-linear-to-b from-transparent via-background/50 to-background z-10" />
-              <div className="absolute inset-0 bg-[radial-gradient(circle_at_center,var(--tw-gradient-stops))] from-primary/5 via-transparent to-transparent opacity-40 blur-3xl" />
-          
-              {/* Content */}
-              <motion.div 
-                  initial={{ opacity: 0, y: 20 }} 
-                  animate={{ opacity: 1, y: 0 }} 
-                  className="relative z-20 flex flex-col items-center text-center max-w-md"
-              >
-                  {/* Icon Cluster */}
-                  <div className="relative mb-8 group cursor-default">
-                      <div className="absolute -inset-4 bg-primary/20 rounded-full blur-xl opacity-0 group-hover:opacity-100 transition-opacity duration-700" />
-                      <div className="relative w-20 h-20 bg-background/50 backdrop-blur-xl border border-white/10 rounded-2xl flex items-center justify-center shadow-2xl transform group-hover:scale-105 transition-all duration-500">
-                          <Download className="w-8 h-8 text-primary/80" />
-                      </div>
-                      {/* Floating decorative icons */}
-                      <div className="absolute -top-2 -right-2 w-8 h-8 bg-background/50 backdrop-blur-md border border-white/10 rounded-lg flex items-center justify-center shadow-lg animate-bounce delay-75">
-                          <Sparkles className="w-4 h-4 text-yellow-500/80" />
-                      </div>
-                       <div className="absolute -bottom-2 -left-2 w-8 h-8 bg-background/50 backdrop-blur-md border border-white/10 rounded-lg flex items-center justify-center shadow-lg animate-bounce delay-150">
-                          <Layers className="w-4 h-4 text-blue-500/80" />
-                      </div>
-                  </div>
-          
-                  <h3 className="text-2xl font-bold tracking-tight mb-2 bg-clip-text text-transparent bg-linear-to-br from-foreground to-muted-foreground">
-                      Ready to Download
-                  </h3>
-                  <p className="text-muted-foreground text-sm mb-8 leading-relaxed">
-                      Your queue is currently empty. Add a URL above to start downloading instantly.
-                  </p>
-          
-                  {/* Quick Actions Grid */}
-                  <div className="grid grid-cols-2 gap-3 w-full">
-                       <div 
-                         className="col-span-2 p-3 rounded-xl border border-white/5 bg-white/5 hover:bg-white/10 transition-colors cursor-pointer flex items-center gap-3 group active:scale-[0.98]" 
-                         onClick={() => document.querySelector('input')?.focus()}
-                       >
-                          <div className="w-8 h-8 rounded-lg bg-primary/10 flex items-center justify-center group-hover:bg-primary/20 transition-colors">
-                              <Plus className="w-4 h-4 text-primary" />
-                          </div>
-                          <div className="text-left">
-                              <div className="text-xs font-semibold">New Download</div>
-                              <div className="text-[10px] text-muted-foreground">Paste a URL to begin</div>
-                          </div>
-                       </div>
-                       
-                       <div 
-                         className="p-3 rounded-xl border border-white/5 bg-white/5 hover:bg-white/10 transition-colors cursor-pointer flex items-center gap-3 group active:scale-[0.98]"
-                         onClick={() => setScreen("presets")}
-                       >
-                          <div className="w-8 h-8 rounded-lg bg-purple-500/10 flex items-center justify-center group-hover:bg-purple-500/20 transition-colors">
-                              <Layers className="w-4 h-4 text-purple-400" />
-                          </div>
-                          <div className="text-left">
-                              <div className="text-xs font-semibold">Presets</div>
-                              <div className="text-[10px] text-muted-foreground">Manage formats</div>
-                          </div>
-                       </div>
+          <div className="relative flex min-h-[560px] min-w-0 flex-col items-center justify-center overflow-hidden px-8 py-12">
+            <div className="absolute inset-0 bg-linear-to-b from-transparent via-background/45 to-background" />
+            <div className="absolute inset-0 bg-[radial-gradient(circle_at_center,var(--tw-gradient-stops))] from-primary/8 via-transparent to-transparent opacity-50 blur-3xl" />
 
-                       <div 
-                         className="p-3 rounded-xl border border-white/5 bg-white/5 hover:bg-white/10 transition-colors cursor-pointer flex items-center gap-3 group active:scale-[0.98]"
-                         onClick={() => setScreen("tools")}
-                       >
-                          <div className="w-8 h-8 rounded-lg bg-blue-500/10 flex items-center justify-center group-hover:bg-blue-500/20 transition-colors">
-                              <Settings className="w-4 h-4 text-blue-400" />
-                          </div>
-                          <div className="text-left">
-                              <div className="text-xs font-semibold">Tools</div>
-                              <div className="text-[10px] text-muted-foreground">Check status</div>
-                          </div>
-                       </div>
+            <motion.div
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              className="relative z-10 flex max-w-md flex-col items-center text-center"
+            >
+              <div className="group relative mb-8 cursor-default">
+                <div className="absolute -inset-4 rounded-full bg-primary/20 opacity-0 blur-xl transition-opacity duration-700 group-hover:opacity-100" />
+                <div className="relative flex h-20 w-20 items-center justify-center rounded-2xl border border-white/10 bg-background/50 shadow-2xl transition-all duration-500 group-hover:scale-105">
+                  <Download className="h-8 w-8 text-primary/80" />
+                </div>
+                <div className="absolute -right-2 -top-2 flex h-8 w-8 items-center justify-center rounded-lg border border-white/10 bg-background/50 shadow-lg">
+                  <Sparkles className="h-4 w-4 text-yellow-500/80" />
+                </div>
+                <div className="absolute -bottom-2 -left-2 flex h-8 w-8 items-center justify-center rounded-lg border border-white/10 bg-background/50 shadow-lg">
+                  <Layers className="h-4 w-4 text-blue-500/80" />
+                </div>
+              </div>
+
+              <h3 className="mb-2 bg-linear-to-br from-foreground to-muted-foreground bg-clip-text text-2xl font-bold tracking-tight text-transparent">
+                Queue is ready
+              </h3>
+              <p className="mb-8 text-sm leading-relaxed text-muted-foreground">
+                Paste a URL above and this page turns into your live download control room. Live jobs stay pinned up top, and recent results remain close by for quick cleanup.
+              </p>
+
+              <div className="mb-4 grid w-full gap-2 text-left text-[11px] text-muted-foreground sm:grid-cols-3">
+                <div className="rounded-xl border border-white/5 bg-white/5 p-3">
+                  <div className="font-semibold text-foreground/90">Paste link</div>
+                  <div className="mt-1 leading-5">Drop in a video, playlist, or supported direct media URL.</div>
+                </div>
+                <div className="rounded-xl border border-white/5 bg-white/5 p-3">
+                  <div className="font-semibold text-foreground/90">Choose output</div>
+                  <div className="mt-1 leading-5">Preset-first workflow with custom options when you need them.</div>
+                </div>
+                <div className="rounded-xl border border-white/5 bg-white/5 p-3">
+                  <div className="font-semibold text-foreground/90">Track progress</div>
+                  <div className="mt-1 leading-5">Running jobs, queue order, and recent results stay separated.</div>
+                </div>
+              </div>
+
+              <div className="grid w-full grid-cols-2 gap-3">
+                <button
+                  type="button"
+                  className="col-span-2 flex cursor-pointer items-center gap-3 rounded-xl border border-white/5 bg-white/5 p-3 text-left transition-colors hover:bg-white/10 active:scale-[0.98]"
+                  onClick={() => document.getElementById("download-url-input")?.focus()}
+                >
+                  <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-primary/10">
+                    <Plus className="h-4 w-4 text-primary" />
                   </div>
-              </motion.div>
+                  <div className="text-left">
+                    <div className="text-xs font-semibold">New Download</div>
+                    <div className="text-[10px] text-muted-foreground">Focus the link box and start building the queue</div>
+                  </div>
+                </button>
+
+                <button
+                  type="button"
+                  className="flex cursor-pointer items-center gap-3 rounded-xl border border-white/5 bg-white/5 p-3 text-left transition-colors hover:bg-white/10 active:scale-[0.98]"
+                  onClick={() => setScreen("presets")}
+                >
+                  <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-purple-500/10">
+                    <Layers className="h-4 w-4 text-purple-400" />
+                  </div>
+                  <div className="text-left">
+                    <div className="text-xs font-semibold">Presets</div>
+                    <div className="text-[10px] text-muted-foreground">Tune repeatable output profiles</div>
+                  </div>
+                </button>
+
+                <button
+                  type="button"
+                  className="flex cursor-pointer items-center gap-3 rounded-xl border border-white/5 bg-white/5 p-3 text-left transition-colors hover:bg-white/10 active:scale-[0.98]"
+                  onClick={() => setScreen("tools")}
+                >
+                  <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-blue-500/10">
+                    <Settings className="h-4 w-4 text-blue-400" />
+                  </div>
+                  <div className="text-left">
+                    <div className="text-xs font-semibold">Tools</div>
+                    <div className="text-[10px] text-muted-foreground">Check yt-dlp and FFmpeg setup</div>
+                  </div>
+                </button>
+              </div>
+            </motion.div>
+          </div>
+        ) : !hasVisibleJobs ? (
+          <div className="flex min-h-[420px] min-w-0 flex-col items-center justify-center gap-3 px-8 py-10 text-center">
+            <div className="rounded-full border border-white/10 bg-white/5 px-3 py-1 text-[10px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">
+              Filter Active
+            </div>
+            <h3 className="text-xl font-semibold tracking-tight">{filterEmptyCopy.title}</h3>
+            <p className="max-w-md text-sm text-muted-foreground">{filterEmptyCopy.body}</p>
+            <MotionButton
+              type="button"
+              variant="outline"
+              size="sm"
+              className="rounded-full"
+              onClick={onResetFilter}
+            >
+              Show all jobs
+            </MotionButton>
           </div>
         ) : (
           <>
-            <div className="flex shrink-0 flex-wrap items-center justify-end gap-2 px-4 pb-2 pt-4">
-                <AnimatePresence>
-                  {selectedIds.length > 0 && (
-                      <motion.div
-                          initial={{ opacity: 0, x: 20 }}
-                          animate={{ opacity: 1, x: 0 }}
-                          exit={{ opacity: 0, x: 20 }}
-                          className="flex gap-2"
+            <div className="sticky top-0 z-20 flex shrink-0 flex-wrap items-center justify-end gap-2 border-b border-white/6 bg-background/75 px-4 py-2 backdrop-blur-xl">
+              <AnimatePresence>
+                {selectedIds.length > 0 && (
+                  <motion.div
+                    initial={{ opacity: 0, x: 20 }}
+                    animate={{ opacity: 1, x: 0 }}
+                    exit={{ opacity: 0, x: 20 }}
+                    className="flex flex-wrap items-center gap-2"
+                  >
+                    <div className="rounded-full border border-white/10 bg-white/5 px-2.5 py-1 text-[11px] font-semibold text-foreground/85">
+                      {selectedIds.length} selected
+                    </div>
+                    {selectedFailedCount > 0 && (
+                      <MotionButton
+                        type="button"
+                        variant="secondary"
+                        size="sm"
+                      className="h-7 rounded-full border border-destructive/20 bg-destructive/10 px-3 text-[11px] text-destructive shadow-sm gap-1.5 hover:bg-destructive/20"
+                        onClick={onRetrySelected}
+                        disabled={!canRetrySelected}
                       >
-                          {selectedFailedCount > 0 && (
-                            <MotionButton
-                                type="button"
-                                variant="secondary"
-                                size="sm"
-                                className="h-8 px-3.5 text-xs rounded-full shadow-sm border border-destructive/20 bg-destructive/10 text-destructive hover:bg-destructive/20 gap-1.5"
-                                onClick={onRetrySelected}
-                                disabled={!canRetrySelected}
-                            >
-                                <RotateCcw className="w-3.5 h-3.5" />
-                                Retry Failed ({selectedFailedCount})
-                            </MotionButton>
-                          )}
-                          <MotionButton
-                              type="button"
-                              variant="secondary"
-                              size="sm"
-                              className="h-8 px-3.5 text-xs rounded-full shadow-sm border border-blue-500/20 bg-blue-500/10 text-blue-300 hover:bg-blue-500/20 gap-1.5"
-                              onClick={onCopySelected}
-                              disabled={!canCopySelected}
-                          >
-                              <Copy className="w-3.5 h-3.5" />
-                              Copy Files
-                          </MotionButton>
-                          <MotionButton
-                              type="button"
-                              variant="ghost"
-                              size="sm"
-                              className="h-8 px-3.5 text-xs rounded-full border border-destructive/20 bg-destructive/5 text-destructive/90 hover:bg-destructive/15 hover:text-destructive gap-1.5"
-                              onClick={onRemoveSelected}
-                          >
-                              <X className="w-3.5 h-3.5" />
-                              Remove
-                          </MotionButton>
-                      </motion.div>
-                  )}
-                </AnimatePresence>
-                
-                <div className="flex-1" />
+                        <RotateCcw className="h-3.5 w-3.5" />
+                        Retry Failed ({selectedFailedCount})
+                      </MotionButton>
+                    )}
+                    <MotionButton
+                      type="button"
+                      variant="secondary"
+                      size="sm"
+                      className="h-7 rounded-full border border-blue-500/20 bg-blue-500/10 px-3 text-[11px] text-blue-300 shadow-sm gap-1.5 hover:bg-blue-500/20"
+                      onClick={onCopySelected}
+                      disabled={!canCopySelected}
+                    >
+                      <Copy className="h-3.5 w-3.5" />
+                      Copy Files
+                    </MotionButton>
+                    <MotionButton
+                      type="button"
+                      variant="ghost"
+                      size="sm"
+                      className="h-7 rounded-full border border-destructive/20 bg-destructive/5 px-3 text-[11px] text-destructive/90 gap-1.5 hover:bg-destructive/15 hover:text-destructive"
+                      onClick={onRemoveSelected}
+                    >
+                      <X className="h-3.5 w-3.5" />
+                      Remove
+                    </MotionButton>
+                  </motion.div>
+                )}
+              </AnimatePresence>
 
-                <MotionButton
-                  type="button"
-                  variant="ghost"
-                  size="sm"
-                  className="h-8 px-3.5 text-xs rounded-full text-muted-foreground border border-muted/60 bg-background/50 hover:text-foreground hover:border-muted transition-colors gap-1.5"
-                  onClick={() => void importJobTemplate()}
-                >
-                  <Upload className="w-3.5 h-3.5" />
-                  Import
-                </MotionButton>
-                <MotionButton
-                  type="button"
-                  variant="ghost"
-                  size="sm"
-                  className="h-8 px-3.5 text-xs rounded-full text-muted-foreground border border-muted/60 bg-background/50 hover:text-foreground hover:border-muted transition-colors gap-1.5"
-                  onClick={() => void exportJobTemplate(selectedIds)}
-                >
-                  <Download className="w-3.5 h-3.5" />
-                  Export
-                </MotionButton>
+              <div className="flex-1" />
 
-                {overflowCount > 0 && (
+              <div className="text-[11px] text-muted-foreground">
+                {liveJobs.length > 0 ? `${liveJobs.length} live` : `${recentJobs.length} recent`}
+              </div>
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
                   <MotionButton
                     type="button"
                     variant="ghost"
                     size="sm"
-                    className="h-8 px-3.5 text-xs rounded-full text-muted-foreground border border-muted/60 bg-background/50 hover:text-foreground hover:border-muted transition-colors gap-1.5"
-                    onClick={() => setScreen("history")}
+                    className="h-8 rounded-full border border-muted/60 bg-background/50 px-3 text-[11px] text-muted-foreground gap-1.5 transition-colors hover:border-muted hover:text-foreground"
                   >
-                    +{overflowCount} more in History
+                    <MoreHorizontal className="h-3.5 w-3.5" />
+                    Actions
                   </MotionButton>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end" className="w-44">
+                  <DropdownMenuItem onClick={() => void importJobTemplate()}>
+                    <Upload className="mr-2 h-3.5 w-3.5" />
+                    Import
+                  </DropdownMenuItem>
+                  <DropdownMenuItem onClick={() => void exportJobTemplate(selectedIds)}>
+                    <Download className="mr-2 h-3.5 w-3.5" />
+                    Export
+                  </DropdownMenuItem>
+                  <DropdownMenuItem disabled={!hasCompletedJobs} onClick={onClearCompleted}>
+                    <CheckCircle2 className="mr-2 h-3.5 w-3.5" />
+                    Clear Completed
+                  </DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
+            </div>
+
+              <div className="flex min-h-full flex-col gap-2.5 px-4 pb-12 pt-2">
+                {liveJobs.length > 0 && (
+                  <section className="flex flex-col gap-1.5">
+                    <SectionHeader
+                      title="Live Queue"
+                      count={liveJobs.length}
+                      accentClassName="bg-sky-400 shadow-[0_0_16px_rgba(56,189,248,0.65)]"
+                    />
+                    <div className="flex flex-col gap-1.5">
+                      <AnimatePresence mode="popLayout" initial={false}>
+                        {liveJobs.map((job) => (
+                          <DownloadItem
+                            key={job.id}
+                            job={job}
+                            section="live"
+                            isSelected={selectedIds.includes(job.id)}
+                            onToggleSelection={onToggleSelection}
+                            onRemove={onRemoveJob}
+                            onViewLogs={onViewLogs}
+                            onRetry={onRetryJob}
+                            queueMeta={queueMetaById.get(job.id)}
+                            itemVariants={itemVariants}
+                            formatRelativeTime={formatRelativeTime}
+                          />
+                        ))}
+                      </AnimatePresence>
+                    </div>
+                  </section>
                 )}
 
-                <MotionButton
-                  type="button"
-                  variant="ghost"
-                  size="sm"
-                  className="h-8 px-3.5 text-xs rounded-full text-muted-foreground border border-muted/60 bg-background/50 hover:text-foreground hover:border-muted transition-colors gap-1.5"
-                  disabled={!hasCompletedJobs}
-                  onClick={onClearCompleted}
-                >
-                  <CheckCircle2 className="w-3.5 h-3.5" />
-                  Clear Completed
-                </MotionButton>
-            </div>
-            <div
-              ref={scrollRef}
-              onScroll={handleScroll}
-              className="min-h-0 flex-1 overflow-y-auto overflow-x-hidden p-4 pt-0"
-            >
-              <div className="relative flex min-h-full flex-col gap-2">
-                <AnimatePresence mode="popLayout" initial={false}>
-                  {jobs.map((job) => (
-                    <DownloadItem
-                      key={job.id}
-                      job={job}
-                      isSelected={selectedIds.includes(job.id)}
-                      onToggleSelection={onToggleSelection}
-                      onRemove={onRemoveJob}
-                      onViewLogs={onViewLogs}
-                      onRetry={onRetryJob}
-                      queueMeta={queueMetaById.get(job.id)}
-                      itemVariants={itemVariants}
-                      formatRelativeTime={formatRelativeTime}
+                {recentJobs.length > 0 && (
+                  <section className="flex flex-col gap-1.5">
+                    <SectionHeader
+                      title="Recent Results"
+                      count={recentJobs.length}
+                      accentClassName="bg-emerald-400 shadow-[0_0_16px_rgba(52,211,153,0.55)]"
+                      action={
+                        overflowCount > 0 ? (
+                          <MotionButton
+                            type="button"
+                            variant="ghost"
+                            size="sm"
+                            className="h-9 shrink-0 rounded-full border border-muted/60 bg-background/65 px-3 text-[11px] text-muted-foreground gap-1.5 transition-colors hover:border-muted hover:text-foreground"
+                            onClick={() => setScreen("history")}
+                          >
+                            +{overflowCount} more in History
+                          </MotionButton>
+                        ) : undefined
+                      }
                     />
-                  ))}
-                </AnimatePresence>
-            </div>
+                    <div className="flex flex-col gap-1.5">
+                      <AnimatePresence mode="popLayout" initial={false}>
+                        {recentJobs.map((job) => (
+                          <DownloadItem
+                            key={job.id}
+                            job={job}
+                            section="recent"
+                            isSelected={selectedIds.includes(job.id)}
+                            onToggleSelection={onToggleSelection}
+                            onRemove={onRemoveJob}
+                            onViewLogs={onViewLogs}
+                            onRetry={onRetryJob}
+                            queueMeta={queueMetaById.get(job.id)}
+                            itemVariants={itemVariants}
+                            formatRelativeTime={formatRelativeTime}
+                          />
+                        ))}
+                      </AnimatePresence>
+                    </div>
+                  </section>
+                )}
             </div>
           </>
         )}

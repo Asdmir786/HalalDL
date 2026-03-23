@@ -1,10 +1,10 @@
 import { useState } from "react";
 import { motion, Variants } from "framer-motion";
-import { 
-  X, FolderOpen, Terminal, 
+import {
+  X, FolderOpen, Terminal,
   Copy, RotateCcw, Play,
   Link, Clock,
-  ArrowUp, ArrowDown,
+  ArrowUp, ArrowDown, Check,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { DownloadJob } from "@/store/downloads";
@@ -12,7 +12,6 @@ import { useLogsStore } from "@/store/logs";
 import { useDownloadsStore } from "@/store/downloads";
 import { MotionButton } from "@/components/motion/MotionButton";
 import { revealInExplorer, deleteFile, openFile, copyFilesToClipboard } from "@/lib/commands";
-import { Checkbox } from "@/components/ui/checkbox";
 import { ContextMenu, ContextMenuContent, ContextMenuItem, ContextMenuTrigger, ContextMenuSeparator } from "@/components/ui/context-menu";
 import { toast } from "sonner";
 import { getJobTs } from "../utils";
@@ -20,6 +19,7 @@ import { getStatusMeta, PHASE_ORDER, type Phase } from "../constants";
 
 interface DownloadItemProps {
   job: DownloadJob;
+  section?: "live" | "recent";
   isSelected: boolean;
   onToggleSelection: (id: string) => void;
   onRemove: (id: string) => void;
@@ -36,6 +36,7 @@ interface DownloadItemProps {
 
 export function DownloadItem({
   job,
+  section = "live",
   isSelected,
   onToggleSelection,
   onRemove,
@@ -59,8 +60,19 @@ export function DownloadItem({
   const StatusIcon = statusMeta.Icon;
   const phaseIndex = job.phase ? PHASE_ORDER.indexOf(job.phase as Phase) : -1;
   const statusLabel = job.status === "Queued" ? queueMeta?.statusLabel || "Queued" : job.status;
-  const footerDetail = job.status === "Queued" ? queueMeta?.detail || job.statusDetail || "" : job.statusDetail || "";
+  const isActiveJob = job.status === "Downloading" || job.status === "Post-processing";
+  const isQueuedJob = job.status === "Queued";
+  const isRecentResult = section === "recent";
+  const footerDetail = job.status === "Queued"
+    ? queueMeta?.detail || job.statusDetail || ""
+    : isRecentResult
+      ? ""
+      : job.statusDetail || "";
   const hasFfmpegProgress = job.phase === "Converting with FFmpeg" && job.ffmpegProgressKnown;
+  const showFooterRow =
+    job.status === "Queued" ||
+    job.status === "Failed" ||
+    footerDetail.length > 0;
 
   const handleCopyLink = (url: string) => {
     navigator.clipboard.writeText(url);
@@ -111,19 +123,43 @@ export function DownloadItem({
                 openFile(job.outputPath);
               }
             }}
-            className="group relative flex gap-4 p-3 rounded-xl border border-white/5 bg-background/40 hover:bg-background/60 hover:border-white/10 backdrop-blur-md shadow-sm transition-all duration-300"
+            className={cn(
+              "group relative flex gap-3 overflow-hidden rounded-2xl border py-3 pl-14 pr-3 backdrop-blur-md shadow-sm transition-all duration-300",
+              isActiveJob &&
+                "border-sky-400/15 bg-[linear-gradient(135deg,rgba(56,189,248,0.08),rgba(15,23,42,0.86)_45%,rgba(15,23,42,0.96))] shadow-[0_14px_45px_rgba(14,165,233,0.12)] hover:border-sky-300/25",
+              isQueuedJob &&
+                "border-yellow-400/12 bg-[linear-gradient(135deg,rgba(250,204,21,0.06),rgba(15,23,42,0.82)_40%,rgba(15,23,42,0.94))] hover:border-yellow-300/20",
+              !isActiveJob &&
+                !isQueuedJob &&
+                !isRecentResult &&
+                "border-white/6 bg-background/45 hover:border-white/12 hover:bg-background/60",
+              isRecentResult &&
+                "border-white/5 bg-background/28 opacity-[0.96] hover:border-white/10 hover:bg-background/40"
+            )}
           >
-            {/* Selection & Thumbnail Column */}
-            <div className="flex items-start gap-3">
-              <div className="pt-1">
-                <Checkbox
-                  checked={isSelected}
-                  onCheckedChange={() => onToggleSelection(job.id)}
-                  className="border-white/20 data-[state=checked]:bg-primary data-[state=checked]:border-primary"
-                />
-              </div>
-
-              <div className="relative w-28 aspect-video rounded-lg overflow-hidden bg-black/20 ring-1 ring-white/10 shadow-inner group-hover:shadow-md transition-all">
+            {isActiveJob && (
+              <div className="pointer-events-none absolute inset-x-10 top-0 h-16 bg-sky-400/10 blur-3xl" />
+            )}
+            <button
+              type="button"
+              aria-label={isSelected ? "Deselect download" : "Select download"}
+              aria-pressed={isSelected}
+              onClick={(event) => {
+                event.stopPropagation();
+                onToggleSelection(job.id);
+              }}
+              className={cn(
+                "absolute left-4 top-1/2 z-20 flex h-7 w-7 -translate-y-1/2 items-center justify-center rounded-full border transition-all",
+                isSelected
+                  ? "border-primary/70 bg-primary text-primary-foreground"
+                  : "border-white/12 bg-black/10 text-transparent hover:border-white/25 hover:bg-white/10"
+              )}
+            >
+              <Check className="h-3.5 w-3.5" />
+            </button>
+            {/* Thumbnail Column */}
+            <div className="relative z-10 flex items-center gap-3">
+              <div className="relative aspect-video w-24 overflow-hidden rounded-lg bg-black/20 ring-1 ring-white/10 shadow-inner transition-all group-hover:shadow-md">
                 {job.thumbnail && !thumbError ? (
                   <img
                     src={job.thumbnail}
@@ -144,31 +180,28 @@ export function DownloadItem({
             </div>
 
             {/* Content Column */}
-            <div className="flex-1 min-w-0 flex flex-col justify-between py-0.5">
+            <div className="relative z-10 flex min-w-0 flex-1 flex-col justify-between py-0.5">
               {/* Header */}
-              <div className="flex items-start justify-between gap-4">
-                <div className="flex flex-col gap-0.5 min-w-0">
-                    <h4 className="font-semibold text-sm leading-tight text-foreground/90 truncate pr-2 group-hover:text-primary transition-colors">
+              <div className="flex items-start justify-between gap-3">
+                <div className="min-w-0 flex flex-col gap-1">
+                    <h4 className="truncate pr-2 text-[15px] font-semibold leading-tight text-foreground/90 transition-colors group-hover:text-primary">
                     {job.title || job.url}
                     </h4>
-                    <div className="flex items-center gap-2 text-[10px] text-muted-foreground font-medium">
+                    <div className="flex flex-wrap items-center gap-1.5 text-[10px] font-medium text-muted-foreground">
+                        {isActiveJob && (
+                            <>
+                              <span className="whitespace-nowrap shrink-0 rounded-full border border-sky-400/20 bg-sky-400/10 px-1.5 py-0.5 text-[9px] font-semibold text-sky-200">
+                                Live
+                              </span>
+                              <span className="w-0.5 h-0.5 rounded-full bg-muted-foreground/50" />
+                            </>
+                        )}
                         <span className="flex items-center gap-1 shrink-0 whitespace-nowrap" title={absolute}>
                             <Clock className="w-3 h-3 opacity-70" /> {relative}
                         </span>
-                        {job.fallbackUsed && (
-                            <>
-                              <span className="w-0.5 h-0.5 rounded-full bg-muted-foreground/50" />
-                              <span
-                                className="whitespace-nowrap shrink-0 rounded-full border border-blue-500/30 bg-blue-500/10 px-1.5 py-0.5 text-[9px] font-semibold text-blue-300"
-                                title={job.fallbackFormat ? `Fallback format: ${job.fallbackFormat}` : "Adaptive fallback used"}
-                              >
-                                Adaptive fallback
-                              </span>
-                            </>
-                        )}
                         {job.outputPath && <span className="w-0.5 h-0.5 rounded-full bg-muted-foreground/50" />}
                         {job.outputPath && (
-                            <span className="truncate max-w-[200px] opacity-70" title={job.outputPath}>
+                            <span className="truncate max-w-[220px] opacity-70" title={job.outputPath}>
                                 {job.outputPath.split(/[/\\]/).pop()}
                             </span>
                         )}
@@ -186,14 +219,14 @@ export function DownloadItem({
                     </div>
                 </div>
 
-                <div className={cn("flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[10px] font-semibold border shadow-sm backdrop-blur-sm transition-colors", statusMeta.badgeClassName)}>
+                <div className={cn("flex shrink-0 items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-semibold border transition-colors", statusMeta.badgeClassName)}>
                     <StatusIcon className="w-3 h-3" />
                     <span>{statusLabel}</span>
                 </div>
               </div>
 
               {/* Footer: Progress or Actions */}
-              <div className="mt-2">
+              <div className="mt-1">
                 {job.status === "Downloading" || job.status === "Post-processing" ? (
                   <div className="flex flex-col gap-1.5 w-full">
                     <div className="flex items-center justify-between w-full text-[10px] text-muted-foreground">
@@ -355,12 +388,12 @@ export function DownloadItem({
                       </>
                     )}
                   </div>
-                ) : (
+                ) : showFooterRow ? (
                   <div className="flex items-center justify-between gap-2">
-                    <div className="text-[10px] text-muted-foreground truncate">
+                    <div className="truncate text-[10px] text-muted-foreground">
                       {footerDetail}
                     </div>
-                    <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-all duration-300 transform translate-x-4 group-hover:translate-x-0">
+                    <div className="flex items-center gap-1 opacity-100 transition-all duration-300 md:translate-x-4 md:opacity-0 md:group-hover:translate-x-0 md:group-hover:opacity-100">
                       {job.status === "Queued" && (
                         <>
                           <MotionButton
@@ -445,7 +478,7 @@ export function DownloadItem({
                         </MotionButton>
                     </div>
                   </div>
-                )}
+                ) : null}
               </div>
             </div>
           </div>

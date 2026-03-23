@@ -1,7 +1,6 @@
 import { Variants } from "framer-motion";
 import { useCallback, useEffect, useMemo, useState, useRef } from "react";
 import { open as openDialog } from "@tauri-apps/plugin-dialog";
-
 import { useDownloadsStore } from "@/store/downloads";
 import { usePresetsStore } from "@/store/presets";
 import { useSettingsStore } from "@/store/settings";
@@ -16,12 +15,12 @@ import {
 import { resolveExistingPresetId } from "@/lib/preset-display";
 
 import { FadeInStagger, FadeInItem } from "@/components/motion/StaggerContainer";
-import { fetchMetadata, cleanupThumbnailByJobId, retryFailedJobs, startQueuedJobs } from "@/lib/downloader";
+import { fetchMetadata, cleanupThumbnailByJobId, retryFailedJobs, startQueuedJobs, isDirectImageUrl } from "@/lib/downloader";
 import { copyFilesToClipboard } from "@/lib/commands";
 import { toast } from "sonner";
 
 import { DownloadInputSection } from "./downloads/components/DownloadInputSection";
-import { DownloadStatsBar } from "./downloads/components/DownloadStatsBar";
+import { DownloadStatsBar, type DownloadStatusFilter } from "./downloads/components/DownloadStatsBar";
 import { DownloadList } from "./downloads/components/DownloadList";
 import { getJobTs } from "./downloads/utils";
 
@@ -48,6 +47,10 @@ export function DownloadsScreen() {
 
   const { presets } = usePresetsStore();
   const selectedPreset = resolveExistingPresetId(presets, settings.downloadsSelectedPreset || "default");
+  const selectedPresetConfig = useMemo(
+    () => presets.find((preset) => preset.id === selectedPreset) ?? null,
+    [presets, selectedPreset]
+  );
   const {
     jobs,
     addJob,
@@ -62,6 +65,7 @@ export function DownloadsScreen() {
   const { setScreen } = useNavigationStore();
 
   const isCustomPreset = selectedPreset === "custom";
+  const isDirectImageInput = isDirectImageUrl(url.trim());
 
   useEffect(() => {
     if (selectedPreset !== "custom" && settings.downloadsSelectedPreset !== selectedPreset) {
@@ -230,6 +234,7 @@ export function DownloadsScreen() {
   };
 
   const [sortMode, setSortMode] = useState<"newest" | "status">("newest");
+  const [statusFilter, setStatusFilter] = useState<DownloadStatusFilter>("all");
 
   const getStatusRank = (status: string) => {
     if (status === "Downloading" || status === "Post-processing") return 0;
@@ -263,29 +268,64 @@ export function DownloadsScreen() {
     });
   }, [jobs, sortMode]);
 
-  const MAX_RECENT_TERMINAL_JOBS = 5;
-  const visibleJobs = useMemo(() => {
-    const liveJobs = sortedJobs.filter(
-      (job) =>
-        job.status === "Downloading" ||
-        job.status === "Post-processing" ||
-        job.status === "Queued"
-    );
-    const recentTerminalJobs = sortedJobs
-      .filter((job) => job.status === "Done" || job.status === "Failed")
-      .slice(0, MAX_RECENT_TERMINAL_JOBS);
+  const matchesStatusFilter = useCallback(
+    (status: DownloadStatusFilter, jobStatus: typeof jobs[number]["status"]) => {
+      if (status === "all") return true;
+      if (status === "active") {
+        return jobStatus === "Downloading" || jobStatus === "Post-processing";
+      }
+      if (status === "queued") return jobStatus === "Queued";
+      if (status === "failed") return jobStatus === "Failed";
+      if (status === "done") return jobStatus === "Done";
+      return true;
+    },
+    []
+  );
 
-    return [...liveJobs, ...recentTerminalJobs];
-  }, [sortedJobs]);
+  const MAX_RECENT_TERMINAL_JOBS = 5;
+  const liveJobs = useMemo(
+    () =>
+      sortedJobs.filter(
+        (job) =>
+          job.status === "Downloading" ||
+          job.status === "Post-processing" ||
+          job.status === "Queued"
+      ),
+    [sortedJobs]
+  );
+  const recentTerminalJobs = useMemo(
+    () =>
+      sortedJobs
+        .filter((job) => job.status === "Done" || job.status === "Failed")
+        .slice(0, MAX_RECENT_TERMINAL_JOBS),
+    [sortedJobs]
+  );
+  const visibleLiveJobs = useMemo(
+    () => liveJobs.filter((job) => matchesStatusFilter(statusFilter, job.status)),
+    [liveJobs, matchesStatusFilter, statusFilter]
+  );
+  const visibleRecentJobs = useMemo(
+    () => recentTerminalJobs.filter((job) => matchesStatusFilter(statusFilter, job.status)),
+    [matchesStatusFilter, recentTerminalJobs, statusFilter]
+  );
+  const filteredTerminalCount = useMemo(
+    () =>
+      sortedJobs.filter(
+        (job) =>
+          (job.status === "Done" || job.status === "Failed") &&
+          matchesStatusFilter(statusFilter, job.status)
+      ).length,
+    [matchesStatusFilter, sortedJobs, statusFilter]
+  );
 
   const overflowCount = Math.max(
     0,
-    sortedJobs.filter((job) => job.status === "Done" || job.status === "Failed").length -
-      visibleJobs.filter((job) => job.status === "Done" || job.status === "Failed").length
+    filteredTerminalCount - visibleRecentJobs.length
   );
   const hasCompletedJobs = jobs.some(
     (job) => job.status === "Done" || job.status === "Failed"
   );
+  const hasVisibleJobs = visibleLiveJobs.length > 0 || visibleRecentJobs.length > 0;
 
   const queuedCount = useMemo(
     () => jobs.filter((job) => job.status === "Queued").length,
@@ -388,8 +428,17 @@ export function DownloadsScreen() {
             }
           : undefined;
 
-      const presetIdToUse = isCustomPreset ? "default" : selectedPreset;
-      const id = addJob(trimmedUrl, presetIdToUse, overrides);
+      const presetIdToUse = isDirectImageInput
+        ? "default"
+        : isCustomPreset
+          ? "default"
+          : selectedPreset;
+      const safeOverrides = isDirectImageInput
+        ? customDirTrimmed
+          ? { downloadDir: customDirTrimmed }
+          : undefined
+        : overrides;
+      const id = addJob(trimmedUrl, presetIdToUse, safeOverrides);
 
       setUrl("");
 
@@ -509,75 +558,98 @@ export function DownloadsScreen() {
     (job) => selectedIds.includes(job.id) && job.status === "Done" && Boolean(job.outputPath)
   );
   const showStartQueue = queuedCount > 0 && activeCount === 0;
+  const destinationLabel = customDownloadDir.trim() || settings.defaultDownloadDir || "Default folder";
 
   return (
-    <div className="flex h-full min-h-0 w-full max-w-6xl mx-auto flex-col bg-background" role="main">
-      <FadeInStagger className="flex h-full min-h-0 flex-col">
+    <div className="relative mx-auto flex h-full min-h-0 w-full max-w-6xl flex-col overflow-y-auto overflow-x-hidden bg-background" role="main">
+      <div className="pointer-events-none absolute inset-0 overflow-hidden">
+        <div className="absolute left-10 top-0 h-56 w-56 rounded-full bg-sky-500/10 blur-3xl" />
+        <div className="absolute right-[-4rem] top-10 h-72 w-72 rounded-full bg-emerald-500/8 blur-3xl" />
+        <div className="absolute inset-x-0 top-0 h-64 bg-[linear-gradient(180deg,rgba(255,255,255,0.035),transparent)]" />
+      </div>
+      <FadeInStagger className="relative flex min-h-full flex-col pb-10">
         <FadeInItem className="shrink-0">
-          <header className="space-y-3 px-5 pb-3 pt-5">
-            <div className="flex flex-col gap-1">
-              <div className="flex items-center gap-2">
-                <h2 className="text-[1.7rem] font-bold tracking-tight">Downloads</h2>
-              </div>
-              <p className="text-muted-foreground text-sm">
-                Live queue for active and pending downloads, plus a few recent results.
-              </p>
-            </div>
-            
-        <DownloadInputSection
-              url={url}
-              setUrl={setUrl}
-              isAdding={isAdding}
-              autoPasteLinks={settings.autoPasteLinks}
-              onAdd={handleAdd}
-              selectedPreset={selectedPreset}
-              onPresetChange={handlePresetChange}
-              presets={presets}
-              addMode={addMode}
-              setAddMode={setAddMode}
-              showOutputConfig={showOutputConfig}
-              onToggleOutputConfig={() => setShowOutputConfig(!showOutputConfig)}
-              filenameBase={filenameBase}
-              onFilenameChange={setFilenameBase}
-          outputFormat={outputFormat}
-          onFormatChange={setOutputFormat}
-          customDownloadDir={customDownloadDir}
-          onBrowseDir={handleBrowseDir}
-          isCustomPreset={isCustomPreset}
-          defaultDownloadDir={settings.defaultDownloadDir || ""}
-          subtitleMode={subtitleMode}
-          onSubtitleModeChange={setSubtitleMode}
-          subtitleSourcePolicy={subtitleSourcePolicy}
-          onSubtitleSourcePolicyChange={setSubtitleSourcePolicy}
-          subtitleLanguageMode={subtitleLanguageMode}
-          onSubtitleLanguageModeChange={setSubtitleLanguageMode}
-          subtitleLanguagesText={subtitleLanguagesText}
-          onSubtitleLanguagesTextChange={setSubtitleLanguagesText}
-          subtitleFormat={subtitleFormat}
-          onSubtitleFormatChange={setSubtitleFormat}
-          subtitleHint={subtitleHint}
-        />
+          <header className="px-4 pb-2 pt-3">
+            <div className="rounded-[24px] border border-white/10 bg-[linear-gradient(180deg,rgba(255,255,255,0.05),rgba(255,255,255,0.02))] shadow-[0_20px_80px_rgba(0,0,0,0.22)] backdrop-blur-xl">
+              <div className="px-3 py-3">
+                <div className="space-y-2">
+                  <div className="flex flex-col gap-1.5">
+                    <div className="inline-flex w-fit items-center gap-2 rounded-full border border-sky-400/20 bg-sky-400/10 px-2.5 py-1 text-[10px] font-semibold uppercase tracking-[0.18em] text-sky-200">
+                      Launch Panel
+                    </div>
+                    <h2 className="text-[1.45rem] font-bold tracking-tight">Downloads</h2>
+                    <p className="max-w-2xl text-sm text-muted-foreground">
+                      Paste a link, pick a preset, and keep the queue moving.
+                    </p>
+                    <p className="text-xs text-muted-foreground">
+                      Default preset: {isCustomPreset ? "Custom configuration" : selectedPresetConfig?.name || "Default"} • Save to: {destinationLabel}
+                    </p>
+                  </div>
 
-            <DownloadStatsBar 
-              queuedCount={queuedCount}
-              activeCount={activeCount}
-              failedCount={failedCount}
-              doneCount={doneCount}
-              onStartQueue={handleStartQueue}
-              showStartQueue={showStartQueue}
-              onRetryFailed={handleRetryFailed}
-              canRetryFailed={canFillMoreSlots && jobs.some((job) => job.status === "Failed")}
-              sortMode={sortMode}
-              onSortModeChange={setSortMode}
-            />
+                  <DownloadInputSection
+                    url={url}
+                    setUrl={setUrl}
+                    isAdding={isAdding}
+                    autoPasteLinks={settings.autoPasteLinks}
+                    onAdd={handleAdd}
+                    selectedPreset={selectedPreset}
+                    onPresetChange={handlePresetChange}
+                    presets={presets}
+                    isDirectImageUrl={isDirectImageInput}
+                    addMode={addMode}
+                    setAddMode={setAddMode}
+                    showOutputConfig={showOutputConfig}
+                    onToggleOutputConfig={() => setShowOutputConfig(!showOutputConfig)}
+                    filenameBase={filenameBase}
+                    onFilenameChange={setFilenameBase}
+                    outputFormat={outputFormat}
+                    onFormatChange={setOutputFormat}
+                    customDownloadDir={customDownloadDir}
+                    onBrowseDir={handleBrowseDir}
+                    isCustomPreset={isCustomPreset}
+                    defaultDownloadDir={settings.defaultDownloadDir || ""}
+                    subtitleMode={subtitleMode}
+                    onSubtitleModeChange={setSubtitleMode}
+                    subtitleSourcePolicy={subtitleSourcePolicy}
+                    onSubtitleSourcePolicyChange={setSubtitleSourcePolicy}
+                    subtitleLanguageMode={subtitleLanguageMode}
+                    onSubtitleLanguageModeChange={setSubtitleLanguageMode}
+                    subtitleLanguagesText={subtitleLanguagesText}
+                    onSubtitleLanguagesTextChange={setSubtitleLanguagesText}
+                    subtitleFormat={subtitleFormat}
+                    onSubtitleFormatChange={setSubtitleFormat}
+                    subtitleHint={subtitleHint}
+                  />
+
+                  <DownloadStatsBar 
+                    queuedCount={queuedCount}
+                    activeCount={activeCount}
+                    failedCount={failedCount}
+                    doneCount={doneCount}
+                    statusFilter={statusFilter}
+                    onStatusFilterChange={setStatusFilter}
+                    onStartQueue={handleStartQueue}
+                    showStartQueue={showStartQueue}
+                    onRetryFailed={handleRetryFailed}
+                    canRetryFailed={canFillMoreSlots && jobs.some((job) => job.status === "Failed")}
+                    sortMode={sortMode}
+                    onSortModeChange={setSortMode}
+                  />
+                </div>
+              </div>
+            </div>
           </header>
         </FadeInItem>
 
         <DownloadList 
-          jobs={visibleJobs}
+          liveJobs={visibleLiveJobs}
+          recentJobs={visibleRecentJobs}
           totalJobs={jobs.length}
+          hasVisibleJobs={hasVisibleJobs}
           overflowCount={overflowCount}
           hasCompletedJobs={hasCompletedJobs}
+          statusFilter={statusFilter}
+          onResetFilter={() => setStatusFilter("all")}
           selectedIds={selectedIds}
           onToggleSelection={handleToggleSelection}
           onRetrySelected={handleRetrySelected}

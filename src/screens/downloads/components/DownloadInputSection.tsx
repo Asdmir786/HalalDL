@@ -47,6 +47,7 @@ interface DownloadInputSectionProps {
   selectedPreset: string;
   onPresetChange: (val: string) => void;
   presets: Preset[];
+  isDirectImageUrl: boolean;
   addMode: "queue" | "start";
   setAddMode: (mode: "queue" | "start") => void;
   
@@ -77,6 +78,7 @@ interface DownloadInputSectionProps {
 export function DownloadInputSection({
   url, setUrl, isAdding, autoPasteLinks, onAdd,
   selectedPreset, onPresetChange, presets,
+  isDirectImageUrl,
   addMode, setAddMode,
   showOutputConfig, onToggleOutputConfig,
   filenameBase, onFilenameChange,
@@ -333,26 +335,36 @@ export function DownloadInputSection({
   }, [autoPasteLinks, handleUrlChange, url]);
 
   return (
-    <div className="flex flex-col gap-2.5 rounded-xl border border-muted/45 bg-muted/20 p-2.5 shadow-sm glass-card">
-      <div className="flex flex-col gap-2.5 lg:flex-row">
+    <div className="relative flex flex-col gap-2 rounded-2xl border border-white/10 bg-[linear-gradient(180deg,rgba(255,255,255,0.04),rgba(255,255,255,0.015))] p-2.5 shadow-[0_14px_40px_rgba(0,0,0,0.18)] glass-card">
+      <div className="pointer-events-none absolute inset-0 rounded-2xl bg-[radial-gradient(circle_at_top_left,rgba(56,189,248,0.08),transparent_42%)]" />
+      <div className="relative flex items-center justify-between gap-2">
+        <div className="text-[10px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">
+          Add Download
+        </div>
+        <div className="text-[11px] text-muted-foreground">
+          {addMode === "start" ? "Starts when a slot is free" : "Added to queue"}
+        </div>
+      </div>
+      <div className="relative flex flex-col gap-2 md:flex-row">
         <div className="flex-1 relative">
           <Input
-            placeholder="Paste video or playlist URL here..."
+            id="download-url-input"
+            placeholder="Paste a video, playlist, or direct media URL"
             value={url}
             onChange={(e) => handleUrlChange(e.target.value)}
             onFocus={(e) => handleUrlFocus(e.currentTarget)}
             onKeyDown={(e) => e.key === "Enter" && !isAdding && onAdd()}
-            className="h-10 border-muted bg-background shadow-sm focus-visible:ring-1"
+            className="h-11 rounded-xl border-white/10 bg-background/90 px-4 shadow-sm focus-visible:ring-1"
           />
         </div>
         
-        <div className="flex flex-wrap items-center justify-end gap-2">
-          <div className="flex h-10 items-center gap-0.5 rounded-xl border border-muted bg-background/80 p-0.5 shadow-sm">
+        <div className="flex flex-wrap items-center justify-end gap-2 md:shrink-0">
+          <div className="flex h-10 items-center gap-0.5 rounded-xl border border-white/10 bg-background/70 p-0.5 shadow-sm">
             <MotionButton
               type="button"
               variant={addMode === "queue" ? "secondary" : "ghost"}
               size="sm"
-              className="h-8 px-3 text-[10px] uppercase font-bold tracking-wider rounded-lg gap-1.5 data-[state=active]:shadow-sm"
+              className="h-8 gap-1.5 rounded-lg px-3 text-[10px] font-semibold uppercase tracking-wider data-[state=active]:shadow-sm"
               onClick={() => setAddMode("queue")}
               data-state={addMode === "queue" ? "active" : "inactive"}
             >
@@ -363,7 +375,7 @@ export function DownloadInputSection({
               type="button"
               variant={addMode === "start" ? "secondary" : "ghost"}
               size="sm"
-              className="h-8 px-3 text-[10px] uppercase font-bold tracking-wider rounded-lg gap-1.5 data-[state=active]:shadow-sm"
+              className="h-8 gap-1.5 rounded-lg px-3 text-[10px] font-semibold uppercase tracking-wider data-[state=active]:shadow-sm"
               onClick={() => setAddMode("start")}
               data-state={addMode === "start" ? "active" : "inactive"}
             >
@@ -375,10 +387,10 @@ export function DownloadInputSection({
           <MotionButton
             onClick={onAdd}
             disabled={!url.trim() || isAdding}
-            className="h-10 px-4 rounded-xl bg-linear-to-r from-primary/95 via-primary to-primary/85 hover:from-primary hover:to-primary shadow-md shadow-primary/20"
+            className="h-10 rounded-xl bg-linear-to-r from-primary/95 via-primary to-primary/85 px-4 shadow-md shadow-primary/20 hover:from-primary hover:to-primary"
           >
             <Plus className="w-4 h-4 mr-2" />
-            {isAdding ? "Adding..." : addMode === "start" ? "Start" : "Queue"}
+            {isAdding ? "Adding..." : addMode === "start" ? "Start Download" : "Add to Queue"}
           </MotionButton>
         </div>
       </div>
@@ -390,97 +402,112 @@ export function DownloadInputSection({
       {probeMessage && (
         <div
           aria-live="polite"
-          className={`rounded-lg border px-3 py-2 shadow-sm transition-colors ${probeMessage.tone}`}
+          className={`rounded-lg border px-3 py-2 transition-colors ${probeMessage.tone}`}
         >
-          <div className="flex items-start gap-2.5">
-            <div className={`mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-full ${probeMessage.iconTone}`}>
-              <probeMessage.icon className={`h-4 w-4 ${probeMessage.spin ? "animate-spin" : ""}`} />
+          <div className="flex items-center gap-2">
+            <div className={`flex h-6 w-6 shrink-0 items-center justify-center rounded-full ${probeMessage.iconTone}`}>
+              <probeMessage.icon className={`h-3.5 w-3.5 ${probeMessage.spin ? "animate-spin" : ""}`} />
             </div>
-            <div className="min-w-0 flex-1">
-              <div className="flex items-center gap-2">
-                <p className="truncate text-[12px] font-semibold">{probeMessage.title}</p>
-                <span className="rounded-full border border-current/15 bg-background/50 px-2 py-0.5 text-[9px] font-bold uppercase tracking-[0.18em]">
-                  {probeMessage.badge}
-                </span>
-              </div>
-              <p className="mt-1 text-[11px] leading-4 opacity-90">
-                {probeMessage.description}
-              </p>
-            </div>
+            <p className="min-w-0 flex-1 truncate text-[12px]">
+              <span className="font-semibold">{probeMessage.title}</span>
+              <span className="ml-2 opacity-80">{probeMessage.description}</span>
+            </p>
           </div>
         </div>
       )}
 
-      <div className="rounded-xl border border-muted/60 bg-background/80 p-2.5 shadow-sm">
-        <div className="grid gap-1.5">
-          <div className="flex items-center justify-between gap-2">
-            <label className="text-[10px] font-semibold uppercase tracking-[0.16em] text-muted-foreground">
-              Preset
-            </label>
-            {!isCustomPreset && selectedPresetConfig && (
-              <div className="truncate text-[10px] text-muted-foreground">
-                {selectedPresetGroupLabel}
-              </div>
+      <div className="relative rounded-xl border border-white/10 bg-background/75 p-2 shadow-sm">
+          <div className="grid gap-1.5">
+            <div className="flex items-center justify-between gap-2">
+              <label className="text-[10px] font-semibold uppercase tracking-[0.16em] text-muted-foreground">
+                Preset
+              </label>
+              {!isCustomPreset && selectedPresetConfig && (
+                <div className="truncate rounded-full border border-white/10 bg-white/5 px-2 py-0.5 text-[10px] text-muted-foreground">
+                  {selectedPresetGroupLabel}
+                </div>
+              )}
+            </div>
+            <Select
+              value={selectedPreset}
+              onValueChange={onPresetChange}
+              disabled={isDirectImageUrl}
+            >
+              <SelectTrigger className="h-10 rounded-lg border-white/10 bg-background/90 px-3 shadow-sm focus:ring-1 disabled:cursor-not-allowed disabled:opacity-70">
+                {isDirectImageUrl ? (
+                  <div className="min-w-0 text-left">
+                    <div className="truncate text-sm font-semibold">Direct image detected</div>
+                  </div>
+                ) : isCustomPreset ? (
+                  <div className="min-w-0 text-left">
+                    <div className="truncate text-sm font-semibold">Custom configuration</div>
+                  </div>
+                ) : selectedPresetConfig ? (
+                  <div className="min-w-0 text-left">
+                    <div className="truncate text-sm font-semibold">{selectedPresetConfig.name}</div>
+                  </div>
+                ) : (
+                  <SelectValue placeholder="Choose preset" />
+                )}
+              </SelectTrigger>
+              <SelectContent className="max-h-[360px] overflow-y-auto rounded-2xl border-border/70 bg-popover/98 p-1.5 shadow-2xl" position="popper" sideOffset={6} align="start">
+                <SelectItem value="custom" className="rounded-xl py-2.5 font-semibold text-primary">
+                  <div className="flex min-w-0 flex-col">
+                    <span className="text-sm">Custom configuration</span>
+                    <span className="text-[11px] font-normal text-muted-foreground">
+                      Manual control over format, subtitles, folder, and filename rules
+                    </span>
+                  </div>
+                </SelectItem>
+                <SelectSeparator />
+                {presetGroups.map((entry, index) => (
+                  <div key={entry.group}>
+                    <SelectGroup>
+                      <SelectLabel className="py-1.5 text-[10px] uppercase tracking-wider text-muted-foreground/80">
+                        {entry.label}
+                      </SelectLabel>
+                      {entry.presets.map((preset) => (
+                        <SelectItem key={preset.id} value={preset.id} title={preset.description} className="rounded-xl py-2.5">
+                          <div className="flex min-w-0 flex-col">
+                            <span className="truncate text-sm font-medium">{preset.name}</span>
+                            <span className="truncate text-[11px] font-normal text-muted-foreground">
+                              {preset.description}
+                            </span>
+                          </div>
+                        </SelectItem>
+                      ))}
+                    </SelectGroup>
+                    {index < presetGroups.length - 1 && <SelectSeparator />}
+                  </div>
+                ))}
+              </SelectContent>
+            </Select>
+            {isDirectImageUrl ? (
+              <p className="text-[11px] text-muted-foreground">
+                Direct image links use the original file, so presets and output conversion stay disabled.
+              </p>
+            ) : (
+              <p className="text-[11px] text-muted-foreground">
+                {selectedPresetConfig?.description || "Use a preset for repeatable output settings."}
+              </p>
             )}
           </div>
-          <Select value={selectedPreset} onValueChange={onPresetChange}>
-            <SelectTrigger className="h-9 rounded-lg border-muted bg-background px-3 shadow-sm focus:ring-1">
-              {isCustomPreset ? (
-                <div className="min-w-0 text-left">
-                  <div className="truncate text-sm font-semibold">Custom configuration</div>
-                </div>
-              ) : selectedPresetConfig ? (
-                <div className="min-w-0 text-left">
-                  <div className="truncate text-sm font-semibold">{selectedPresetConfig.name}</div>
-                </div>
-              ) : (
-                <SelectValue placeholder="Choose preset" />
-              )}
-            </SelectTrigger>
-            <SelectContent className="max-h-[360px] overflow-y-auto rounded-2xl border-border/70 bg-popover/98 p-1.5 shadow-2xl" position="popper" sideOffset={6} align="start">
-              <SelectItem value="custom" className="rounded-xl py-2.5 font-semibold text-primary">
-                <div className="flex min-w-0 flex-col">
-                  <span className="text-sm">Custom configuration</span>
-                  <span className="text-[11px] font-normal text-muted-foreground">
-                    Manual control over format, subtitles, folder, and filename rules
-                  </span>
-                </div>
-              </SelectItem>
-              <SelectSeparator />
-              {presetGroups.map((entry, index) => (
-                <div key={entry.group}>
-                  <SelectGroup>
-                    <SelectLabel className="py-1.5 text-[10px] uppercase tracking-wider text-muted-foreground/80">
-                      {entry.label}
-                    </SelectLabel>
-                    {entry.presets.map((preset) => (
-                      <SelectItem key={preset.id} value={preset.id} title={preset.description} className="rounded-xl py-2.5">
-                        <div className="flex min-w-0 flex-col">
-                          <span className="truncate text-sm font-medium">{preset.name}</span>
-                          <span className="truncate text-[11px] font-normal text-muted-foreground">
-                            {preset.description}
-                          </span>
-                        </div>
-                      </SelectItem>
-                    ))}
-                  </SelectGroup>
-                  {index < presetGroups.length - 1 && <SelectSeparator />}
-                </div>
-              ))}
-            </SelectContent>
-          </Select>
-        </div>
       </div>
 
       <div className="flex justify-center">
         <MotionButton
           variant="ghost"
           size="sm"
-          className="h-6 text-[10px] text-muted-foreground hover:text-foreground flex items-center gap-1 opacity-80 hover:opacity-100 transition-all"
+          className="h-6 text-[10px] text-muted-foreground hover:text-foreground flex items-center gap-1 opacity-80 hover:opacity-100 transition-all disabled:cursor-not-allowed disabled:opacity-45"
           onClick={onToggleOutputConfig}
+          disabled={isDirectImageUrl}
         >
           <Settings2 className="w-3 h-3" />
-          {showOutputConfig ? "Hide Output Options" : "Show Output Options"}
+          {isDirectImageUrl
+            ? "Direct images keep original output"
+            : showOutputConfig
+              ? "Hide Output Options"
+              : "Show Output Options"}
           {showOutputConfig ? (
             <ChevronUp className="w-3 h-3" />
           ) : (
