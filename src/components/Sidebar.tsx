@@ -53,7 +53,7 @@ export function Sidebar() {
   );
 
   const queuedCount = useMemo(
-    () => jobs.filter((job) => job.status === "Queued").length,
+    () => jobs.filter((job) => job.status === "Queued" || job.status === "Paused" || job.status === "Stopped").length,
     [jobs]
   );
 

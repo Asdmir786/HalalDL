@@ -3,6 +3,7 @@ import {
   CheckCircle2,
   ChevronDown,
   ChevronUp,
+  Clipboard,
   Clock3,
   LoaderCircle,
   Play,
@@ -10,7 +11,7 @@ import {
   Settings2,
   Sparkles,
 } from "lucide-react";
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, type KeyboardEvent } from "react";
 import { MotionButton } from "@/components/motion/MotionButton";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectGroup, SelectItem, SelectLabel, SelectSeparator, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -113,6 +114,7 @@ export function DownloadInputSection({
   });
   const probeCacheRef = useRef(new Map<string, UrlProbeResult>());
   const probeRequestRef = useRef(0);
+  const inputRef = useRef<HTMLInputElement | null>(null);
   const presetGroups = useMemo(() => groupPresetsForSelect(presets), [presets]);
   const selectedPresetConfig = useMemo(
     () => (selectedPreset === "custom" ? null : resolvePresetById(presets, selectedPreset) ?? null),
@@ -334,6 +336,34 @@ export function DownloadInputSection({
       });
   }, [autoPasteLinks, handleUrlChange, url]);
 
+  const handlePasteFromClipboard = useCallback(async () => {
+    try {
+      const text = await readTextFromClipboard();
+      const normalized = pickSupportedUrlFromText(text) || text.trim();
+      if (!normalized) return;
+      handleUrlChange(normalized);
+      window.setTimeout(() => {
+        inputRef.current?.focus();
+      }, 0);
+    } catch {
+      void 0;
+    }
+  }, [handleUrlChange]);
+
+  const handleUrlKeyDown = useCallback((e: KeyboardEvent<HTMLInputElement>) => {
+    if (e.key === "Enter" && !isAdding) {
+      onAdd();
+      return;
+    }
+
+    const isWindowsPasteFallback = e.metaKey && e.key.toLowerCase() === "v";
+    const isShiftInsert = e.shiftKey && e.key === "Insert";
+    if (isWindowsPasteFallback || isShiftInsert) {
+      e.preventDefault();
+      void handlePasteFromClipboard();
+    }
+  }, [handlePasteFromClipboard, isAdding, onAdd]);
+
   return (
     <div className="relative flex flex-col gap-2 rounded-2xl border border-white/10 bg-[linear-gradient(180deg,rgba(255,255,255,0.04),rgba(255,255,255,0.015))] p-2.5 shadow-[0_14px_40px_rgba(0,0,0,0.18)] glass-card">
       <div className="pointer-events-none absolute inset-0 rounded-2xl bg-[radial-gradient(circle_at_top_left,rgba(56,189,248,0.08),transparent_42%)]" />
@@ -343,14 +373,25 @@ export function DownloadInputSection({
             id="download-url-input"
             placeholder="Paste a video, playlist, or direct media URL"
             value={url}
+            ref={inputRef}
             onChange={(e) => handleUrlChange(e.target.value)}
             onFocus={(e) => handleUrlFocus(e.currentTarget)}
-            onKeyDown={(e) => e.key === "Enter" && !isAdding && onAdd()}
+            onKeyDown={handleUrlKeyDown}
             className="h-11 rounded-xl border-white/10 bg-background/90 px-4 shadow-sm focus-visible:ring-1"
           />
         </div>
         
         <div className="flex flex-wrap items-center justify-end gap-2 md:shrink-0">
+          <MotionButton
+            type="button"
+            variant="outline"
+            size="sm"
+            className="h-10 rounded-xl border-white/10 bg-background/70 px-3 text-[11px] font-semibold"
+            onClick={() => void handlePasteFromClipboard()}
+          >
+            <Clipboard className="mr-1.5 h-3.5 w-3.5" />
+            Paste
+          </MotionButton>
           <div className="flex h-10 items-center gap-0.5 rounded-xl border border-white/10 bg-background/70 p-0.5 shadow-sm">
             <MotionButton
               type="button"

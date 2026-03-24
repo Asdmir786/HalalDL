@@ -32,6 +32,10 @@ interface DownloadListProps {
   onRemoveJob: (id: string) => void;
   onViewLogs: (id: string) => void;
   onRetryJob: (id: string) => void;
+  onPauseJob: (id: string) => void | Promise<void>;
+  onStopJob: (id: string) => void | Promise<void>;
+  onResumePausedJob: (id: string) => void;
+  onChangePausedPreset: (id: string, presetId: string) => void;
   queueMetaById: Map<string, { position: number; statusLabel: string; detail: string }>;
   itemVariants: Variants;
   formatRelativeTime: (ts: number) => string;
@@ -47,8 +51,8 @@ const FILTER_EMPTY_COPY: Record<DownloadStatusFilter, { title: string; body: str
     body: "Queue something up or start waiting jobs to see live progress here.",
   },
   queued: {
-    title: "No queued jobs",
-    body: "Everything is either running already or has finished.",
+    title: "No queue items",
+    body: "Nothing is waiting, paused, or stopped right now.",
   },
   failed: {
     title: "No failed jobs in view",
@@ -112,6 +116,10 @@ export function DownloadList({
   onRemoveJob,
   onViewLogs,
   onRetryJob,
+  onPauseJob,
+  onStopJob,
+  onResumePausedJob,
+  onChangePausedPreset,
   queueMetaById,
   itemVariants,
   formatRelativeTime,
@@ -121,7 +129,7 @@ export function DownloadList({
 
   return (
     <FadeInItem className="flex min-h-0 flex-1 flex-col px-4 pb-6">
-      <div className="relative flex min-h-[320px] flex-col rounded-[24px] border border-white/8 bg-[linear-gradient(180deg,rgba(255,255,255,0.035),rgba(255,255,255,0.015))] shadow-[0_18px_60px_rgba(0,0,0,0.18)] backdrop-blur-xl">
+      <div className="relative flex min-h-[320px] flex-col overflow-hidden rounded-[28px]">
         {totalJobs === 0 ? (
           <div className="relative flex min-h-[560px] min-w-0 flex-col items-center justify-center overflow-hidden px-8 py-12">
             <div className="absolute inset-0 bg-linear-to-b from-transparent via-background/45 to-background" />
@@ -284,7 +292,7 @@ export function DownloadList({
               <div className="flex-1" />
 
               <div className="text-[11px] text-muted-foreground">
-                {liveJobs.length > 0 ? `${liveJobs.length} live` : `${recentJobs.length} recent`}
+                {liveJobs.length > 0 ? `${liveJobs.length} in queue` : `${recentJobs.length} recent`}
               </div>
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
@@ -315,11 +323,11 @@ export function DownloadList({
               </DropdownMenu>
             </div>
 
-              <div className="flex flex-col gap-2.5 px-4 pb-12 pt-2">
+              <div className="flex flex-col gap-3 pb-12 pt-2">
                 {liveJobs.length > 0 && (
-                  <section className="flex flex-col gap-1.5">
+                  <section className="flex flex-col gap-1.5 px-4">
                     <SectionHeader
-                      title="Live Queue"
+                      title="Queue"
                       count={liveJobs.length}
                       accentClassName="bg-sky-400 shadow-[0_0_16px_rgba(56,189,248,0.65)]"
                     />
@@ -335,6 +343,10 @@ export function DownloadList({
                             onRemove={onRemoveJob}
                             onViewLogs={onViewLogs}
                             onRetry={onRetryJob}
+                            onPause={onPauseJob}
+                            onStop={onStopJob}
+                            onResume={onResumePausedJob}
+                            onChangePreset={onChangePausedPreset}
                             queueMeta={queueMetaById.get(job.id)}
                             itemVariants={itemVariants}
                             formatRelativeTime={formatRelativeTime}
@@ -346,9 +358,9 @@ export function DownloadList({
                 )}
 
                 {recentJobs.length > 0 && (
-                  <section className="relative overflow-hidden rounded-[30px] border border-white/8 bg-[linear-gradient(180deg,rgba(11,19,30,0.98),rgba(8,14,24,0.96))] shadow-[0_18px_60px_rgba(0,0,0,0.18)]">
+                  <section className="relative -mx-px overflow-hidden border-y border-white/6 bg-[linear-gradient(180deg,rgba(10,18,29,0.98),rgba(7,13,22,0.97))] px-4 py-3 shadow-[inset_0_1px_0_rgba(255,255,255,0.02)]">
                     <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_top,rgba(16,185,129,0.08),transparent_38%)]" />
-                    <div className="relative flex flex-col gap-2 p-3">
+                    <div className="relative flex flex-col gap-2">
                       <SectionHeader
                         title="Recent Results"
                         count={recentJobs.length}
@@ -380,6 +392,10 @@ export function DownloadList({
                                 onRemove={onRemoveJob}
                                 onViewLogs={onViewLogs}
                                 onRetry={onRetryJob}
+                                onPause={onPauseJob}
+                                onStop={onStopJob}
+                                onResume={onResumePausedJob}
+                                onChangePreset={onChangePausedPreset}
                                 queueMeta={queueMetaById.get(job.id)}
                                 itemVariants={itemVariants}
                                 formatRelativeTime={formatRelativeTime}

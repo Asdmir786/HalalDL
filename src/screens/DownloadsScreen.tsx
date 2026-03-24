@@ -15,7 +15,17 @@ import {
 import { resolveExistingPresetId } from "@/lib/preset-display";
 
 import { FadeInStagger, FadeInItem } from "@/components/motion/StaggerContainer";
-import { fetchMetadata, cleanupThumbnailByJobId, retryFailedJobs, startQueuedJobs, isDirectImageUrl } from "@/lib/downloader";
+import {
+  changePausedJobPreset,
+  cleanupThumbnailByJobId,
+  fetchMetadata,
+  isDirectImageUrl,
+  pauseActiveDownload,
+  resumePausedDownload,
+  retryFailedJobs,
+  startQueuedJobs,
+  stopPostProcessingJob,
+} from "@/lib/downloader";
 import { copyFilesToClipboard } from "@/lib/commands";
 import { toast } from "sonner";
 
@@ -238,9 +248,11 @@ export function DownloadsScreen() {
   const getStatusRank = (status: string) => {
     if (status === "Downloading" || status === "Post-processing") return 0;
     if (status === "Queued") return 1;
-    if (status === "Failed") return 2;
-    if (status === "Done") return 3;
-    return 4;
+    if (status === "Paused") return 2;
+    if (status === "Stopped") return 3;
+    if (status === "Failed") return 4;
+    if (status === "Done") return 5;
+    return 6;
   };
 
   const sortedJobs = useMemo(() => {
@@ -252,7 +264,10 @@ export function DownloadsScreen() {
       return copy.sort((a, b) => {
         const rankDiff = getStatusRank(a.status) - getStatusRank(b.status);
         if (rankDiff !== 0) return rankDiff;
-        if (a.status === "Queued" && b.status === "Queued") {
+        if (
+          (a.status === "Queued" || a.status === "Paused" || a.status === "Stopped") &&
+          (b.status === "Queued" || b.status === "Paused" || b.status === "Stopped")
+        ) {
           const ao = typeof a.queueOrder === "number" ? a.queueOrder : a.createdAt;
           const bo = typeof b.queueOrder === "number" ? b.queueOrder : b.createdAt;
           return bo - ao;
@@ -273,7 +288,7 @@ export function DownloadsScreen() {
       if (status === "active") {
         return jobStatus === "Downloading" || jobStatus === "Post-processing";
       }
-      if (status === "queued") return jobStatus === "Queued";
+      if (status === "queued") return jobStatus === "Queued" || jobStatus === "Paused" || jobStatus === "Stopped";
       if (status === "failed") return jobStatus === "Failed";
       if (status === "done") return jobStatus === "Done";
       return true;
@@ -288,7 +303,9 @@ export function DownloadsScreen() {
         (job) =>
           job.status === "Downloading" ||
           job.status === "Post-processing" ||
-          job.status === "Queued"
+          job.status === "Queued" ||
+          job.status === "Paused" ||
+          job.status === "Stopped"
       ),
     [sortedJobs]
   );
@@ -327,6 +344,10 @@ export function DownloadsScreen() {
   const hasVisibleJobs = visibleLiveJobs.length > 0 || visibleRecentJobs.length > 0;
 
   const queuedCount = useMemo(
+    () => jobs.filter((job) => job.status === "Queued" || job.status === "Paused" || job.status === "Stopped").length,
+    [jobs]
+  );
+  const startableQueuedCount = useMemo(
     () => jobs.filter((job) => job.status === "Queued").length,
     [jobs]
   );
@@ -552,11 +573,27 @@ export function DownloadsScreen() {
     setScreen("logs");
   };
 
+  const handlePauseJob = async (jobId: string) => {
+    await pauseActiveDownload(jobId);
+  };
+
+  const handleStopJob = async (jobId: string) => {
+    await stopPostProcessingJob(jobId);
+  };
+
+  const handleResumePausedJob = (jobId: string) => {
+    resumePausedDownload(jobId);
+  };
+
+  const handleChangePausedPreset = (jobId: string, presetId: string) => {
+    changePausedJobPreset(jobId, presetId);
+  };
+
   const canFillMoreSlots = activeCount < (settings.maxConcurrency || 1);
   const canCopySelected = jobs.some(
     (job) => selectedIds.includes(job.id) && job.status === "Done" && Boolean(job.outputPath)
   );
-  const showStartQueue = queuedCount > 0 && activeCount === 0;
+  const showStartQueue = startableQueuedCount > 0 && activeCount === 0;
   const destinationLabel = customDownloadDir.trim() || settings.defaultDownloadDir || "Default folder";
 
   return (
@@ -658,6 +695,10 @@ export function DownloadsScreen() {
           onRemoveJob={handleRemoveJob}
           onViewLogs={handleViewLogs}
           onRetryJob={(jobId) => retryFailedJobs([jobId])}
+          onPauseJob={handlePauseJob}
+          onStopJob={handleStopJob}
+          onResumePausedJob={handleResumePausedJob}
+          onChangePausedPreset={handleChangePausedPreset}
           queueMetaById={queueMetaById}
           itemVariants={itemVariants}
           formatRelativeTime={formatRelativeTime}

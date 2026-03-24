@@ -1,8 +1,8 @@
-import { Command } from "@tauri-apps/plugin-shell";
+import { Child, Command } from "@tauri-apps/plugin-shell";
 import { useDownloadsStore } from "@/store/downloads";
 import { useLogsStore } from "@/store/logs";
 import { usePresetsStore } from "@/store/presets";
-import { resolvePresetById } from "@/lib/preset-display";
+import { canonicalizePresetId, resolvePresetById } from "@/lib/preset-display";
 import { useSettingsStore } from "@/store/settings";
 import { useRuntimeStore } from "@/store/runtime";
 import { join } from "@tauri-apps/api/path";
@@ -30,6 +30,17 @@ const ACTIVE_JOB_STATUSES = new Set<DownloadJob["status"]>([
 ]);
 
 const startingJobs = new Set<string>();
+const activeYtDlpChildren = new Map<string, Child>();
+const activeFfmpegChildren = new Map<string, Child>();
+const holdRequestedJobs = new Map<string, "pause" | "stop">();
+
+function consumeHoldRequest(jobId: string) {
+  const request = holdRequestedJobs.get(jobId);
+  if (request) {
+    holdRequestedJobs.delete(jobId);
+  }
+  return request;
+}
 
 function getQueueOrder(job: DownloadJob) {
   return typeof job.queueOrder === "number" ? job.queueOrder : job.createdAt;
@@ -134,6 +145,136 @@ export function retryFailedJobs(jobIds?: string[]) {
   return started;
 }
 
+export async function pauseActiveDownload(jobId: string) {
+  const { jobs, updateJob } = useDownloadsStore.getState();
+  const { addLog } = useLogsStore.getState();
+  const job = jobs.find((candidate) => candidate.id === jobId);
+  const child = activeYtDlpChildren.get(jobId);
+
+  if (!job || job.status !== "Downloading" || !child) {
+    return false;
+  }
+
+  holdRequestedJobs.set(jobId, "pause");
+  updateJob(jobId, {
+    statusDetail: "Pausing download...",
+    speed: undefined,
+    eta: undefined,
+    resumeBehavior: "continue",
+  });
+
+  try {
+    await child.kill();
+    addLog({ level: "info", message: "Pause requested for active yt-dlp download", jobId });
+    return true;
+  } catch (error) {
+    holdRequestedJobs.delete(jobId);
+    addLog({ level: "error", message: `Failed to pause download: ${String(error)}`, jobId });
+    updateJob(jobId, {
+      statusDetail: "Could not pause download",
+    });
+    return false;
+  }
+}
+
+export async function stopPostProcessingJob(jobId: string) {
+  const { jobs, updateJob } = useDownloadsStore.getState();
+  const { addLog } = useLogsStore.getState();
+  const job = jobs.find((candidate) => candidate.id === jobId);
+  const child = activeFfmpegChildren.get(jobId) ?? activeYtDlpChildren.get(jobId);
+
+  if (!job || job.status !== "Post-processing" || !child) {
+    return false;
+  }
+
+  holdRequestedJobs.set(jobId, "stop");
+  updateJob(jobId, {
+    statusDetail: "Stopping current process...",
+    speed: undefined,
+    eta: undefined,
+    resumeBehavior: "restart",
+  });
+
+  try {
+    await child.kill();
+    addLog({ level: "info", message: "Stop requested for active post-processing job", jobId });
+    return true;
+  } catch (error) {
+    holdRequestedJobs.delete(jobId);
+    addLog({ level: "error", message: `Failed to stop processing job: ${String(error)}`, jobId });
+    updateJob(jobId, {
+      statusDetail: "Could not stop current process",
+    });
+    return false;
+  }
+}
+
+export function resumePausedDownload(jobId: string) {
+  const { jobs, updateJob } = useDownloadsStore.getState();
+  const { queuePaused } = useRuntimeStore.getState();
+  const job = jobs.find((candidate) => candidate.id === jobId);
+
+  if (!job || (job.status !== "Paused" && job.status !== "Stopped")) {
+    return false;
+  }
+
+  const willRestart = job.resumeBehavior === "restart";
+  updateJob(jobId, {
+    status: "Queued",
+    phase: "Resolving formats",
+    statusDetail: queuePaused
+      ? "Queue paused"
+      : willRestart
+        ? "Restarting with new preset"
+        : "Resuming download",
+    progress: willRestart ? 0 : job.progress,
+    speed: undefined,
+    eta: undefined,
+    ffmpegProgressKnown: undefined,
+  });
+
+  if (!queuePaused) {
+    startQueuedJobs([jobId]);
+  }
+
+  return true;
+}
+
+export function changePausedJobPreset(jobId: string, presetId: string) {
+  const { jobs, updateJob } = useDownloadsStore.getState();
+  const job = jobs.find((candidate) => candidate.id === jobId);
+
+  if (!job || (job.status !== "Paused" && job.status !== "Stopped")) {
+    return false;
+  }
+
+  const nextPresetId = canonicalizePresetId(presetId);
+  const preservedOverrides = {
+    downloadDir: job.overrides?.downloadDir,
+    filenameTemplate: job.overrides?.filenameTemplate,
+    origin: job.overrides?.origin,
+  };
+
+  updateJob(jobId, {
+    presetId: nextPresetId,
+    overrides: preservedOverrides,
+    progress: 0,
+    speed: undefined,
+    eta: undefined,
+    phase: "Resolving formats",
+    statusDetail:
+      job.status === "Stopped"
+        ? "Preset changed. Restart to run again with the new preset."
+        : "Preset changed. Resume to restart with the new preset.",
+    resumeBehavior: "restart",
+    fallbackUsed: false,
+    fallbackFormat: undefined,
+    ffmpegProgressKnown: undefined,
+  });
+
+  return true;
+}
+
 async function probeMediaDurationSeconds(
   inputPath: string,
   jobId: string,
@@ -227,6 +368,46 @@ export async function startDownload(jobId: string) {
 
   const preset = resolvePresetById(presets, job.presetId) ?? presets[0];
   const subtitlePreferences = getSubtitlePreferences(job);
+
+  const finalizePausedDownload = async (detail = "Paused. Resume to continue.") => {
+    const latestJob = useDownloadsStore.getState().jobs.find((candidate) => candidate.id === jobId);
+    updateJob(jobId, {
+      status: "Paused",
+      phase: latestJob?.phase ?? "Downloading streams",
+      statusDetail: detail,
+      speed: undefined,
+      eta: undefined,
+      ffmpegProgressKnown: undefined,
+      resumeBehavior: latestJob?.resumeBehavior ?? job.resumeBehavior ?? "continue",
+    });
+  };
+
+  const finalizeStoppedDownload = async (
+    detail = "Stopped during processing. Restart to run again."
+  ) => {
+    const latestJob = useDownloadsStore.getState().jobs.find((candidate) => candidate.id === jobId);
+    updateJob(jobId, {
+      status: "Stopped",
+      phase: latestJob?.phase ?? "Converting with FFmpeg",
+      statusDetail: detail,
+      speed: undefined,
+      eta: undefined,
+      ffmpegProgressKnown: undefined,
+      resumeBehavior: "restart",
+      progress: 0,
+    });
+  };
+
+  const finalizeHoldRequest = async () => {
+    const request = consumeHoldRequest(jobId);
+    if (!request) return false;
+    if (request === "pause") {
+      await finalizePausedDownload();
+    } else {
+      await finalizeStoppedDownload();
+    }
+    return true;
+  };
 
   const finalizeSuccessfulDownload = async (lastKnownOutputPath?: string) => {
     updateJob(jobId, {
@@ -552,6 +733,11 @@ export async function startDownload(jobId: string) {
     addLog({ level: "info", message: "File collision policy: rename (unique filename per job)", jobId });
   }
 
+  if (job.resumeBehavior === "restart") {
+    args.push("--no-continue");
+    addLog({ level: "info", message: "Restarting paused job from the beginning", jobId });
+  }
+
   args.push("--ignore-config", "--newline", "--no-colors", "--no-playlist");
   args.push("--print", "after_move:__HALALDL_OUTPUT__:%(filepath)s");
 
@@ -777,9 +963,13 @@ export async function startDownload(jobId: string) {
       aria2Error: boolean;
     }>((resolve) => {
       let settled = false;
+      let childRef: Child | null = null;
       const finish = (code: number) => {
         if (settled) return;
         settled = true;
+        if (childRef && activeYtDlpChildren.get(jobId)?.pid === childRef.pid) {
+          activeYtDlpChildren.delete(jobId);
+        }
         resolve({ code, lastKnownOutputPath, formatUnavailable, aria2Error });
       };
 
@@ -801,10 +991,15 @@ export async function startDownload(jobId: string) {
         finish(1);
       });
 
-      cmd.spawn().catch((e) => {
-        addLog({ level: "error", message: `Failed to spawn process: ${e}`, jobId });
-        finish(1);
-      });
+      cmd.spawn()
+        .then((child) => {
+          childRef = child;
+          activeYtDlpChildren.set(jobId, child);
+        })
+        .catch((e) => {
+          addLog({ level: "error", message: `Failed to spawn process: ${e}`, jobId });
+          finish(1);
+        });
     });
   };
 
@@ -837,6 +1032,10 @@ export async function startDownload(jobId: string) {
   activeArgs = resolvedInitialArgs;
   let result = initialResult;
 
+  if (await finalizeHoldRequest()) {
+    return;
+  }
+
   let didFallback = false;
 
   if (result.code !== 0 && result.formatUnavailable) {
@@ -853,6 +1052,9 @@ export async function startDownload(jobId: string) {
       const fallbackRun = await runAttemptWithDownloaderFallback(attempt.args);
       activeArgs = fallbackRun.effectiveArgs;
       result = fallbackRun.attemptResult;
+      if (await finalizeHoldRequest()) {
+        return;
+      }
       if (result.code === 0) {
         didFallback = true;
         addLog({ level: "info", message: `Fallback succeeded with format: ${attempt.format}`, jobId });
@@ -917,6 +1119,7 @@ export async function startDownload(jobId: string) {
       const ffmpegResult = await new Promise<{ code: number; stderr: string }>((resolve) => {
         let stdoutBuffer = "";
         let stderrBuffer = "";
+        let childRef: Child | null = null;
         const progressState: {
           outTimeUs?: number;
           speed?: string;
@@ -996,6 +1199,9 @@ export async function startDownload(jobId: string) {
         ffmpegCmd.on("close", (data) => {
           flushProgressLine(stdoutBuffer);
           flushStderrLine(stderrBuffer);
+          if (childRef && activeFfmpegChildren.get(jobId)?.pid === childRef.pid) {
+            activeFfmpegChildren.delete(jobId);
+          }
           resolve({
             code: typeof data.code === "number" ? data.code : 1,
             stderr: stderrBuffer,
@@ -1004,16 +1210,35 @@ export async function startDownload(jobId: string) {
 
         ffmpegCmd.on("error", (error) => {
           const message = String(error);
+          if (childRef && activeFfmpegChildren.get(jobId)?.pid === childRef.pid) {
+            activeFfmpegChildren.delete(jobId);
+          }
           addLog({ level: "error", message: `FFmpeg process error: ${message}`, jobId });
           resolve({ code: 1, stderr: message });
         });
 
-        ffmpegCmd.spawn().catch((error) => {
-          const message = String(error);
-          addLog({ level: "error", message: `Failed to spawn FFmpeg: ${message}`, jobId });
-          resolve({ code: 1, stderr: message });
-        });
+        ffmpegCmd.spawn()
+          .then((child) => {
+            childRef = child;
+            activeFfmpegChildren.set(jobId, child);
+          })
+          .catch((error) => {
+            const message = String(error);
+            addLog({ level: "error", message: `Failed to spawn FFmpeg: ${message}`, jobId });
+            resolve({ code: 1, stderr: message });
+          });
       });
+
+      const holdRequest = consumeHoldRequest(jobId);
+      if (holdRequest) {
+        try { await deleteFile(tmpPath); } catch { void 0; }
+        if (holdRequest === "stop") {
+          await finalizeStoppedDownload("Stopped during FFmpeg processing. Restart to run again.");
+        } else {
+          await finalizePausedDownload();
+        }
+        return;
+      }
 
       if (ffmpegResult.code === 0) {
         addLog({ level: "info", message: "FFmpeg conversion succeeded, replacing original file", jobId });
@@ -1037,6 +1262,9 @@ export async function startDownload(jobId: string) {
   if (result.code === 0) {
     await finalizeSuccessfulDownload(result.lastKnownOutputPath);
   } else {
+    if (await finalizeHoldRequest()) {
+      return;
+    }
     if (result.formatUnavailable) {
       addLog({ level: "error", message: "Fallback failed: format unavailable after retry", jobId });
     }

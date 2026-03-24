@@ -4,6 +4,8 @@ import {
   CheckCircle2,
   Sparkles,
   Download,
+  PauseCircle,
+  Square,
   type LucideIcon,
 } from "lucide-react";
 import type { DownloadJob } from "@/store/downloads";
@@ -28,6 +30,16 @@ const STATUS_META: Record<string, StatusMeta> = {
     Icon: Clock,
     badgeClassName:
       "text-yellow-300 border-yellow-500/20 bg-yellow-500/10 shadow-[0_0_0_1px_rgba(234,179,8,0.12)]",
+  },
+  Paused: {
+    Icon: PauseCircle,
+    badgeClassName:
+      "text-amber-200 border-amber-500/20 bg-amber-500/10 shadow-[0_0_0_1px_rgba(245,158,11,0.12)]",
+  },
+  Stopped: {
+    Icon: Square,
+    badgeClassName:
+      "text-orange-200 border-orange-500/20 bg-orange-500/10 shadow-[0_0_0_1px_rgba(249,115,22,0.12)]",
   },
   Failed: {
     Icon: AlertTriangle,

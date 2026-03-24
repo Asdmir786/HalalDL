@@ -1,4 +1,12 @@
-export { retryFailedJobs, startDownload, startQueuedJobs } from "./core";
+export {
+  changePausedJobPreset,
+  pauseActiveDownload,
+  resumePausedDownload,
+  retryFailedJobs,
+  startDownload,
+  startQueuedJobs,
+  stopPostProcessingJob,
+} from "./core";
 export { fetchMetadata, fetchMediaInfo, type MediaMetadataProbe } from "./metadata";
 export { cleanupThumbnailByJobId } from "./thumbnails";
 export {
