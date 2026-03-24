@@ -13,12 +13,13 @@ jobs:
     runs-on: windows-latest
     timeout-minutes: 90
     env:
+      FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: "true"
       SCCACHE_GHA_ENABLED: "true"
       RUSTC_WRAPPER: sccache
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
 
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v5
         with:
           node-version: 22
 
@@ -42,7 +43,7 @@ jobs:
           "store_path=$storePath" | Out-File -FilePath $env:GITHUB_OUTPUT -Append -Encoding utf8
 
       - name: Cache pnpm store
-        uses: actions/cache@v4
+        uses: actions/cache@v5
         with:
           path: ${{ steps.pnpm-store.outputs.store_path }}
           key: ${{ runner.os }}-pnpm-store-${{ hashFiles('pnpm-lock.yaml') }}
@@ -95,7 +96,7 @@ jobs:
 
       - name: Upload build artifacts
         if: success()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v6
         with:
           name: HalalDL-nightly-${{ github.sha }}
           path: out/*
@@ -103,7 +104,7 @@ jobs:
 
       - name: Upload logs (always)
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v6
         with:
           name: HalalDL-nightly-logs-${{ github.run_id }}
           path: |

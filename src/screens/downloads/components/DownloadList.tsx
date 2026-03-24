@@ -128,8 +128,8 @@ export function DownloadList({
   const filterEmptyCopy = FILTER_EMPTY_COPY[statusFilter];
 
   return (
-    <FadeInItem className="flex min-h-0 flex-1 flex-col px-4 pb-6">
-      <div className="relative flex min-h-[320px] flex-col overflow-hidden rounded-[28px]">
+    <FadeInItem className="flex flex-col px-4 pb-10">
+      <div className="relative flex min-h-[320px] flex-col rounded-[28px]">
         {totalJobs === 0 ? (
           <div className="relative flex min-h-[560px] min-w-0 flex-col items-center justify-center overflow-hidden px-8 py-12">
             <div className="absolute inset-0 bg-linear-to-b from-transparent via-background/45 to-background" />

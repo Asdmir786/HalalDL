@@ -603,7 +603,7 @@ export function DownloadsScreen() {
         <div className="absolute right-[-4rem] top-10 h-72 w-72 rounded-full bg-emerald-500/8 blur-3xl" />
         <div className="absolute inset-x-0 top-0 h-64 bg-[linear-gradient(180deg,rgba(255,255,255,0.035),transparent)]" />
       </div>
-      <FadeInStagger className="relative flex min-h-full flex-col pb-10">
+      <FadeInStagger className="relative flex flex-col pb-10">
         <FadeInItem className="shrink-0">
           <header className="px-4 pb-2 pt-3">
             <div className="rounded-[24px] border border-white/10 bg-[linear-gradient(180deg,rgba(255,255,255,0.05),rgba(255,255,255,0.02))] shadow-[0_20px_80px_rgba(0,0,0,0.22)] backdrop-blur-xl">
