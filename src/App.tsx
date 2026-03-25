@@ -463,7 +463,12 @@ export default function App() {
       const latestSettings = useSettingsStore.getState().settings;
       const latestTools = useToolsStore.getState().tools;
       const getTool = (id: string) => latestTools.find((tool) => tool.id === id);
-      const newlyAvailableTools: Array<{ id: string; name: string; latestVersion: string }> = [];
+      const newlyAvailableTools: Array<{
+        id: string;
+        name: string;
+        currentVersion: string;
+        latestVersion: string;
+      }> = [];
 
       if (latestSettings.checkAppUpdatesInBackground) {
         const appUpdate = await checkAndStoreAppUpdate().catch(() => {
@@ -510,17 +515,18 @@ export default function App() {
               const currentTool = getTool(id);
               const updateAvailable = isUpdateAvailable(currentTool?.version, latestVersion ?? undefined);
 
-              if (
-                updateAvailable &&
-                latestVersion &&
-                lastNotifiedToolVersionsRef.current[id] !== latestVersion
-              ) {
-                newlyAvailableTools.push({
-                  id,
-                  name: currentTool?.name ?? id,
-                  latestVersion,
-                });
-              }
+                if (
+                  updateAvailable &&
+                  latestVersion &&
+                  lastNotifiedToolVersionsRef.current[id] !== latestVersion
+                ) {
+                  newlyAvailableTools.push({
+                    id,
+                    name: currentTool?.name ?? id,
+                    currentVersion: currentTool?.version ?? "unknown",
+                    latestVersion,
+                  });
+                }
 
               return {
                 id,
@@ -558,12 +564,14 @@ export default function App() {
           const tool = newlyAvailableTools[0];
           await notifyUser(
             `${tool.name} update available`,
-            `${tool.latestVersion} is ready to install from the Tools screen.`
+            `Current: ${tool.currentVersion} • Latest: ${tool.latestVersion}. Install it from the Tools screen.`
           );
         } else if (newlyAvailableTools.length > 1) {
           await notifyUser(
             `${newlyAvailableTools.length} tool updates available`,
-            newlyAvailableTools.map((tool) => tool.name).join(", ")
+            newlyAvailableTools
+              .map((tool) => `${tool.name} ${tool.currentVersion} -> ${tool.latestVersion}`)
+              .join(" • ")
           );
         }
 
