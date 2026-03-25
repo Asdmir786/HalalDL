@@ -360,8 +360,8 @@ export function DownloadInputSection({
   }, [handlePasteFromClipboard, isAdding, onAdd]);
 
   return (
-    <div className="flex flex-col gap-2 rounded-2xl border border-white/8 bg-white/[0.03] p-2">
-      <div className="flex flex-col gap-2 xl:flex-row xl:items-center">
+    <div className="flex flex-col gap-1.5 rounded-2xl border border-white/8 bg-white/[0.03] p-1.5">
+      <div className="flex flex-col gap-1.5 xl:flex-row xl:items-center">
         <div className="relative min-w-0 flex-1">
           <Input
             id="download-url-input"
@@ -371,27 +371,27 @@ export function DownloadInputSection({
             onChange={(e) => handleUrlChange(e.target.value)}
             onFocus={(e) => handleUrlFocus(e.currentTarget)}
             onKeyDown={handleUrlKeyDown}
-            className="h-11 rounded-xl border-white/10 bg-background/90 px-4 shadow-sm focus-visible:ring-1"
+            className="h-10 rounded-xl border-white/10 bg-background/90 px-3.5 shadow-sm focus-visible:ring-1"
           />
         </div>
 
-        <div className="flex flex-wrap items-center gap-2 xl:shrink-0 xl:justify-end">
+        <div className="flex flex-wrap items-center gap-1.5 xl:shrink-0 xl:justify-end">
           <MotionButton
             type="button"
             variant="outline"
             size="sm"
-            className="h-10 rounded-xl border-white/10 bg-background/70 px-3 text-[11px] font-semibold"
+            className="h-9 rounded-xl border-white/10 bg-background/70 px-3 text-[11px] font-semibold"
             onClick={() => void handlePasteFromClipboard()}
           >
             <Clipboard className="mr-1.5 h-3.5 w-3.5" />
             Paste
           </MotionButton>
-          <div className="flex h-10 items-center gap-0.5 rounded-xl border border-white/10 bg-background/70 p-0.5 shadow-sm">
+          <div className="flex h-9 items-center gap-0.5 rounded-xl border border-white/10 bg-background/70 p-0.5 shadow-sm">
             <MotionButton
               type="button"
               variant={addMode === "queue" ? "secondary" : "ghost"}
               size="sm"
-              className="h-8 gap-1.5 rounded-lg px-3 text-[10px] font-semibold uppercase tracking-wider data-[state=active]:shadow-sm"
+              className="h-7 gap-1.5 rounded-lg px-3 text-[10px] font-semibold uppercase tracking-wider data-[state=active]:shadow-sm"
               onClick={() => setAddMode("queue")}
               data-state={addMode === "queue" ? "active" : "inactive"}
             >
@@ -402,7 +402,7 @@ export function DownloadInputSection({
               type="button"
               variant={addMode === "start" ? "secondary" : "ghost"}
               size="sm"
-              className="h-8 gap-1.5 rounded-lg px-3 text-[10px] font-semibold uppercase tracking-wider data-[state=active]:shadow-sm"
+              className="h-7 gap-1.5 rounded-lg px-3 text-[10px] font-semibold uppercase tracking-wider data-[state=active]:shadow-sm"
               onClick={() => setAddMode("start")}
               data-state={addMode === "start" ? "active" : "inactive"}
             >
@@ -414,7 +414,7 @@ export function DownloadInputSection({
           <MotionButton
             onClick={onAdd}
             disabled={!url.trim() || isAdding}
-            className="h-10 rounded-xl bg-linear-to-r from-primary/95 via-primary to-primary/85 px-4 shadow-md shadow-primary/20 hover:from-primary hover:to-primary"
+            className="h-9 rounded-xl bg-linear-to-r from-primary/95 via-primary to-primary/85 px-4 shadow-md shadow-primary/20 hover:from-primary hover:to-primary"
           >
             <Plus className="mr-2 h-4 w-4" />
             {isAdding ? "Adding..." : addMode === "start" ? "Start" : "Add"}
@@ -427,7 +427,7 @@ export function DownloadInputSection({
       )}
 
       {probeMessage && (
-        <div aria-live="polite" className="flex items-center gap-2 px-1 text-[11px] text-muted-foreground">
+        <div aria-live="polite" className="flex items-center gap-1.5 px-1 text-[11px] text-muted-foreground">
           <div className={`flex h-5 w-5 shrink-0 items-center justify-center rounded-full ${probeMessage.iconTone}`}>
             <probeMessage.icon className={`h-3 w-3 ${probeMessage.spin ? "animate-spin" : ""}`} />
           </div>
@@ -438,8 +438,8 @@ export function DownloadInputSection({
         </div>
       )}
 
-      <div className="rounded-xl border border-white/8 bg-background/65 px-3 py-2.5 shadow-sm">
-        <div className="space-y-2">
+      <div className="rounded-xl border border-white/8 bg-background/65 px-3 py-2 shadow-sm">
+        <div className="space-y-1.5">
           <div className="flex items-center justify-between gap-3">
             <div className="min-w-0">
               <label className="text-[10px] font-semibold uppercase tracking-[0.16em] text-muted-foreground">

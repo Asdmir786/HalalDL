@@ -603,12 +603,12 @@ export function DownloadsScreen() {
         <div className="absolute right-[-4rem] top-10 h-72 w-72 rounded-full bg-emerald-500/8 blur-3xl" />
         <div className="absolute inset-x-0 top-0 h-64 bg-[linear-gradient(180deg,rgba(255,255,255,0.035),transparent)]" />
       </div>
-      <FadeInStagger className="relative pb-10">
+      <FadeInStagger className="relative pb-8">
         <FadeInItem className="shrink-0">
-          <header className="px-4 pb-2 pt-3">
+          <header className="px-4 pb-1.5 pt-2.5">
             <div className="rounded-[24px] border border-white/10 bg-[linear-gradient(180deg,rgba(255,255,255,0.05),rgba(255,255,255,0.02))] shadow-[0_20px_80px_rgba(0,0,0,0.22)] backdrop-blur-xl">
-              <div className="px-3 py-2.5">
-                <div className="space-y-2">
+              <div className="px-3 py-2">
+                <div className="space-y-1.5">
                   <div className="flex flex-col gap-1 sm:flex-row sm:items-end sm:justify-between">
                     <div>
                       <h2 className="text-[1.45rem] font-bold tracking-tight">Downloads</h2>

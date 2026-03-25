@@ -73,9 +73,9 @@ export function DownloadStatsBar({
   ];
 
   return (
-    <div className="flex flex-col gap-2 border-t border-white/6 pt-2">
-      <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
-        <div className="flex shrink-0 flex-wrap items-center gap-2">
+    <div className="flex flex-col gap-1.5 border-t border-white/6 pt-1.5">
+      <div className="flex flex-col gap-1.5 sm:flex-row sm:items-center sm:justify-between">
+        <div className="flex shrink-0 flex-wrap items-center gap-1.5">
           <div className="flex h-7 items-center gap-1 rounded-full border border-white/8 bg-white/5 px-1.5 py-1">
             <ArrowUpDown className="h-3 w-3 text-muted-foreground" />
             <button
@@ -132,7 +132,7 @@ export function DownloadStatsBar({
         </div>
       </div>
 
-      <div className="flex min-w-0 flex-nowrap items-center gap-1.5 overflow-x-auto pb-1 sm:pb-0 [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden">
+      <div className="flex min-w-0 flex-nowrap items-center gap-1.5 overflow-x-auto sm:pb-0 [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden">
         {filters.map(({ id, label, count, tone }) => {
           const isActive = statusFilter === id;
 
