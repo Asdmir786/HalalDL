@@ -73,16 +73,16 @@ export function DownloadStatsBar({
   ];
 
   return (
-    <div className="flex flex-col gap-2 border-t border-white/10 pt-2">
+    <div className="flex flex-col gap-2 border-t border-white/6 pt-2">
       <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
         <div className="flex shrink-0 flex-wrap items-center gap-2">
-          <div className="flex h-8 items-center gap-1 rounded-full border border-border/50 bg-muted/20 px-1.5 py-1">
+          <div className="flex h-7 items-center gap-1 rounded-full border border-white/8 bg-white/5 px-1.5 py-1">
             <ArrowUpDown className="h-3 w-3 text-muted-foreground" />
             <button
               type="button"
               onClick={() => onSortModeChange("newest")}
               className={cn(
-                "rounded-full px-2 py-0.5 text-[11px] font-medium transition-colors",
+                "rounded-full px-2 py-0.5 text-[10px] font-medium transition-colors",
                 sortMode === "newest"
                   ? "bg-primary text-primary-foreground shadow-sm"
                   : "text-muted-foreground hover:text-foreground"
@@ -94,7 +94,7 @@ export function DownloadStatsBar({
               type="button"
               onClick={() => onSortModeChange("status")}
               className={cn(
-                "rounded-full px-2 py-0.5 text-[11px] font-medium transition-colors",
+                "rounded-full px-2 py-0.5 text-[10px] font-medium transition-colors",
                 sortMode === "status"
                   ? "bg-primary text-primary-foreground shadow-sm"
                   : "text-muted-foreground hover:text-foreground"
@@ -111,10 +111,10 @@ export function DownloadStatsBar({
               size="sm"
               onClick={onRetryFailed}
               disabled={!canRetryFailed}
-              className="h-8 rounded-full border-destructive/30 px-3 text-xs font-semibold text-destructive gap-1.5 transition-all hover:bg-destructive/10 disabled:opacity-40"
+              className="h-7 rounded-full border-destructive/25 px-3 text-[10px] font-semibold text-destructive gap-1.5 transition-all hover:bg-destructive/10 disabled:opacity-40"
             >
               <RotateCcw className="h-3.5 w-3.5" />
-              Retry Failed
+              Retry
             </MotionButton>
           )}
           {showStartQueue && (
@@ -123,7 +123,7 @@ export function DownloadStatsBar({
               variant="default"
               size="sm"
               onClick={onStartQueue}
-              className="h-8 rounded-full bg-linear-to-r from-primary/95 via-primary to-primary/85 px-4 text-xs font-semibold gap-1.5 shadow-md shadow-primary/20 transition-all hover:from-primary hover:to-primary"
+              className="h-7 rounded-full bg-linear-to-r from-primary/95 via-primary to-primary/85 px-3 text-[10px] font-semibold gap-1.5 shadow-md shadow-primary/20 transition-all hover:from-primary hover:to-primary"
             >
               <Play className="h-3.5 w-3.5" />
               Start Queue
@@ -142,7 +142,7 @@ export function DownloadStatsBar({
               type="button"
               onClick={() => onStatusFilterChange(id)}
               className={cn(
-                "group inline-flex h-8 shrink-0 items-center gap-1.5 rounded-full border px-2.5 text-[11px] font-semibold transition-all",
+                "group inline-flex h-7 shrink-0 items-center gap-1.5 rounded-full border px-2.5 text-[10px] font-semibold transition-all",
                 tone,
                 isActive && "shadow-[0_8px_30px_rgba(0,0,0,0.18)] ring-1 ring-white/10",
               )}

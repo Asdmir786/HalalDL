@@ -607,15 +607,14 @@ export function DownloadsScreen() {
         <FadeInItem className="shrink-0">
           <header className="px-4 pb-2 pt-3">
             <div className="rounded-[24px] border border-white/10 bg-[linear-gradient(180deg,rgba(255,255,255,0.05),rgba(255,255,255,0.02))] shadow-[0_20px_80px_rgba(0,0,0,0.22)] backdrop-blur-xl">
-              <div className="px-3 py-3">
+              <div className="px-3 py-2.5">
                 <div className="space-y-2">
-                  <div className="flex flex-col gap-1.5">
-                    <div className="inline-flex w-fit items-center gap-2 rounded-full border border-sky-400/20 bg-sky-400/10 px-2.5 py-1 text-[10px] font-semibold uppercase tracking-[0.18em] text-sky-200">
-                      Launch Panel
-                    </div>
-                    <h2 className="text-[1.45rem] font-bold tracking-tight">Downloads</h2>
-                    <div className="text-xs text-muted-foreground">
-                      {isCustomPreset ? "Custom configuration" : selectedPresetConfig?.name || "Default"} • {destinationLabel}
+                  <div className="flex flex-col gap-1 sm:flex-row sm:items-end sm:justify-between">
+                    <div>
+                      <h2 className="text-[1.45rem] font-bold tracking-tight">Downloads</h2>
+                      <div className="text-[11px] text-muted-foreground">
+                        {isCustomPreset ? "Custom" : selectedPresetConfig?.name || "Default"} • {destinationLabel}
+                      </div>
                     </div>
                   </div>
 
