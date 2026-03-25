@@ -597,7 +597,7 @@ export function DownloadsScreen() {
   const destinationLabel = customDownloadDir.trim() || settings.defaultDownloadDir || "Default folder";
 
   return (
-    <div className="relative mx-auto min-h-full w-full max-w-6xl overflow-x-hidden bg-background" role="main">
+    <div className="relative mx-auto w-full max-w-6xl overflow-x-hidden bg-background pb-10" role="main">
       <div className="pointer-events-none absolute inset-0 overflow-hidden">
         <div className="absolute left-10 top-0 h-56 w-56 rounded-full bg-sky-500/10 blur-3xl" />
         <div className="absolute right-[-4rem] top-10 h-72 w-72 rounded-full bg-emerald-500/8 blur-3xl" />

@@ -66,6 +66,9 @@ jobs:
         with:
           tool: sccache
 
+      - name: Expose GitHub runtime for sccache
+        uses: crazy-max/ghaction-github-runtime@v3
+
       - name: sccache stats (pre)
         shell: pwsh
         run: sccache --show-stats
