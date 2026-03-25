@@ -636,7 +636,14 @@ export default function App() {
               <QuickDownloadPanel />
             </motion.div>
           ) : (
-            <PageTransition key={currentScreen} className="h-full w-full overflow-hidden">
+            <PageTransition
+              key={currentScreen}
+              className={
+                currentScreen === "downloads"
+                  ? "h-full w-full overflow-y-auto overflow-x-hidden"
+                  : "h-full w-full overflow-hidden"
+              }
+            >
               <Suspense fallback={<LoadingFallback />}>
                 {renderScreen()}
               </Suspense>

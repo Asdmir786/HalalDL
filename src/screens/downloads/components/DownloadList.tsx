@@ -128,8 +128,8 @@ export function DownloadList({
   const filterEmptyCopy = FILTER_EMPTY_COPY[statusFilter];
 
   return (
-    <FadeInItem className="flex flex-col px-4 pb-10">
-      <div className="relative flex min-h-[320px] flex-col rounded-[28px]">
+    <FadeInItem className="shrink-0 px-4 pb-10">
+      <div className="relative min-h-[320px] rounded-[28px]">
         {totalJobs === 0 ? (
           <div className="relative flex min-h-[560px] min-w-0 flex-col items-center justify-center overflow-hidden px-8 py-12">
             <div className="absolute inset-0 bg-linear-to-b from-transparent via-background/45 to-background" />
@@ -323,15 +323,15 @@ export function DownloadList({
               </DropdownMenu>
             </div>
 
-              <div className="flex flex-col gap-3 pb-12 pt-2">
+              <div className="space-y-3 pb-12 pt-2">
                 {liveJobs.length > 0 && (
-                  <section className="flex flex-col gap-1.5 px-4">
+                  <section className="space-y-1.5 px-4">
                     <SectionHeader
                       title="Queue"
                       count={liveJobs.length}
                       accentClassName="bg-sky-400 shadow-[0_0_16px_rgba(56,189,248,0.65)]"
                     />
-                    <div className="flex flex-col gap-1.5">
+                    <div className="space-y-1.5">
                       <AnimatePresence mode="popLayout" initial={false}>
                         {liveJobs.map((job) => (
                           <DownloadItem
@@ -360,7 +360,7 @@ export function DownloadList({
                 {recentJobs.length > 0 && (
                   <section className="relative -mx-px overflow-hidden border-y border-white/6 bg-[linear-gradient(180deg,rgba(10,18,29,0.98),rgba(7,13,22,0.97))] px-4 py-3 shadow-[inset_0_1px_0_rgba(255,255,255,0.02)]">
                     <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_top,rgba(16,185,129,0.08),transparent_38%)]" />
-                    <div className="relative flex flex-col gap-2">
+                    <div className="relative space-y-2">
                       <SectionHeader
                         title="Recent Results"
                         count={recentJobs.length}
@@ -380,7 +380,7 @@ export function DownloadList({
                         }
                       />
                       <div className="rounded-[24px] border border-white/6 bg-black/10 p-1.5 shadow-[inset_0_1px_0_rgba(255,255,255,0.03)]">
-                        <div className="flex flex-col gap-1.5">
+                        <div className="space-y-1.5">
                           <AnimatePresence mode="popLayout" initial={false}>
                             {recentJobs.map((job) => (
                               <DownloadItem

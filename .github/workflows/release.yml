@@ -21,9 +21,9 @@ jobs:
       SCCACHE_GHA_ENABLED: "true"
       RUSTC_WRAPPER: sccache
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v6
 
-      - uses: actions/setup-node@v5
+      - uses: actions/setup-node@v6
         with:
           node-version: 22
 
@@ -61,13 +61,14 @@ jobs:
       - name: Install Rust toolchain
         uses: dtolnay/rust-toolchain@stable
 
-      - name: Setup sccache
-        uses: mozilla-actions/sccache-action@v0.0.9
+      - name: Install sccache
+        uses: taiki-e/install-action@v2
+        with:
+          tool: sccache
 
       - name: sccache stats (pre)
         shell: pwsh
-        run: |
-          if ($env:SCCACHE_PATH) { & $env:SCCACHE_PATH --show-stats } else { sccache --show-stats }
+        run: sccache --show-stats
 
       - name: Rust cache
         uses: swatinem/rust-cache@v2
@@ -95,13 +96,14 @@ jobs:
       - name: sccache stats (post)
         if: always()
         shell: pwsh
-        run: |
-          if ($env:SCCACHE_PATH) { & $env:SCCACHE_PATH --show-stats } else { sccache --show-stats }
+        run: sccache --show-stats
 
       - name: Upload release assets
-        uses: softprops/action-gh-release@v2
+        uses: ncipollo/release-action@v1
         with:
-          files: out/*
+          artifacts: "out/*"
+          allowUpdates: true
+          replacesArtifacts: true
           draft: ${{ github.event_name != 'workflow_dispatch' || inputs.draft }}
           prerelease: false
 
