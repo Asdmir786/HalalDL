@@ -19,13 +19,16 @@ import {
   changePausedJobPreset,
   cleanupThumbnailByJobId,
   fetchMetadata,
+  inspectInstagramMedia,
   isDirectImageUrl,
   pauseActiveDownload,
   resumePausedDownload,
   retryFailedJobs,
   startQueuedJobs,
   stopPostProcessingJob,
+  type InstagramMediaSummary,
 } from "@/lib/downloader";
+import { isInstagramUrl } from "@/lib/media-engine";
 import { copyFilesToClipboard } from "@/lib/commands";
 import { getExplicitOutputPaths } from "@/lib/output-paths";
 import { toast } from "sonner";
@@ -147,6 +150,7 @@ export function DownloadsScreen() {
 
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
   const [isAdding, setIsAdding] = useState(false);
+  const [instagramMediaSummary, setInstagramMediaSummary] = useState<InstagramMediaSummary | null>(null);
 
   // Handle Drag & Drop Pending URL
   useEffect(() => {
@@ -208,6 +212,32 @@ export function DownloadsScreen() {
     }, 0);
     return () => window.clearTimeout(timer);
   }, [applyPresetSubtitleDefaults, presets, selectedPreset, settings.preferredSubtitleLanguages]);
+
+  useEffect(() => {
+    const trimmed = url.trim();
+    let cancelled = false;
+
+    if (!trimmed || !isInstagramUrl(trimmed)) {
+      setInstagramMediaSummary(null);
+      return;
+    }
+
+    inspectInstagramMedia(trimmed)
+      .then((summary) => {
+        if (!cancelled) {
+          setInstagramMediaSummary(summary);
+        }
+      })
+      .catch(() => {
+        if (!cancelled) {
+          setInstagramMediaSummary(null);
+        }
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [url]);
 
   const prevJobsCountRef = useRef(jobs.length);
   useEffect(() => {
@@ -451,13 +481,16 @@ export function DownloadsScreen() {
 
       const presetIdToUse = isDirectImageInput
         ? "default"
+        : instagramMediaSummary?.isImageOnly
+          ? "default"
         : isCustomPreset
           ? "default"
           : selectedPreset;
-      const safeOverrides = isDirectImageInput
-        ? customDirTrimmed
-          ? { downloadDir: customDirTrimmed }
-          : undefined
+      const safeOverrides = isDirectImageInput || instagramMediaSummary?.isImageOnly
+        ? {
+            ...(customDirTrimmed ? { downloadDir: customDirTrimmed } : {}),
+            ...(showOutputConfig || isCustomPreset ? { filenameTemplate: finalTemplate } : {}),
+          }
         : overrides;
       const id = addJob(trimmedUrl, presetIdToUse, safeOverrides);
 
@@ -651,6 +684,7 @@ export function DownloadsScreen() {
                     subtitleFormat={subtitleFormat}
                     onSubtitleFormatChange={setSubtitleFormat}
                     subtitleHint={subtitleHint}
+                    instagramMediaSummary={instagramMediaSummary}
                   />
 
                   <DownloadStatsBar 

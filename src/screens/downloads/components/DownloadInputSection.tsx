@@ -31,6 +31,7 @@ import {
 } from "@/lib/preset-display";
 import {
   getProbeHostLabel,
+  type InstagramMediaSummary,
   pickSupportedUrlFromText,
   probeMediaUrl,
   quickProbeMediaUrl,
@@ -72,6 +73,7 @@ interface DownloadInputSectionProps {
   subtitleFormat: SubtitleFormat;
   onSubtitleFormatChange: (val: SubtitleFormat) => void;
   subtitleHint: string;
+  instagramMediaSummary: InstagramMediaSummary | null;
 }
 
 export function DownloadInputSection({
@@ -96,6 +98,7 @@ export function DownloadInputSection({
   subtitleFormat,
   onSubtitleFormatChange,
   subtitleHint,
+  instagramMediaSummary,
 }: DownloadInputSectionProps) {
   const [probeState, setProbeState] = useState<{
     url: string;
@@ -359,6 +362,20 @@ export function DownloadInputSection({
     }
   }, [handlePasteFromClipboard, isAdding, onAdd]);
 
+  const isInstagramImageOnly = instagramMediaSummary?.isImageOnly ?? false;
+  const instagramPresetMessage = useMemo(() => {
+    if (!instagramMediaSummary) return null;
+    if (instagramMediaSummary.isImageOnly) {
+      return instagramMediaSummary.kind === "carousel"
+        ? `Image carousel detected (${instagramMediaSummary.itemCount} items). Presets are disabled and original files will be kept.`
+        : "Instagram image detected. Presets are disabled and the original file will be kept.";
+    }
+    if (instagramMediaSummary.isMixedCarousel) {
+      return `Mixed carousel detected (${instagramMediaSummary.itemCount} items). Presets only affect video items; images stay original.`;
+    }
+    return null;
+  }, [instagramMediaSummary]);
+
   return (
     <div className="flex flex-col gap-1.5 rounded-2xl border border-white/8 bg-white/[0.03] p-1.5">
       <div className="flex flex-col gap-1.5 xl:flex-row xl:items-center">
@@ -456,7 +473,7 @@ export function DownloadInputSection({
               size="sm"
               className="h-7 shrink-0 rounded-full px-2.5 text-[10px] text-muted-foreground hover:text-foreground disabled:cursor-not-allowed disabled:opacity-45"
               onClick={onToggleOutputConfig}
-              disabled={isDirectImageUrl}
+              disabled={isDirectImageUrl || isInstagramImageOnly}
             >
               <Settings2 className="mr-1 h-3 w-3" />
               {showOutputConfig ? "Hide options" : "Options"}
@@ -470,12 +487,16 @@ export function DownloadInputSection({
           <Select
             value={selectedPreset}
             onValueChange={onPresetChange}
-            disabled={isDirectImageUrl}
+            disabled={isDirectImageUrl || isInstagramImageOnly}
           >
             <SelectTrigger className="h-10 rounded-lg border-white/10 bg-background/90 px-3 shadow-sm focus:ring-1 disabled:cursor-not-allowed disabled:opacity-70">
               {isDirectImageUrl ? (
                 <div className="min-w-0 text-left">
                   <div className="truncate text-sm font-semibold">Direct image detected</div>
+                </div>
+              ) : isInstagramImageOnly ? (
+                <div className="min-w-0 text-left">
+                  <div className="truncate text-sm font-semibold">No preset needed</div>
                 </div>
               ) : isCustomPreset ? (
                 <div className="min-w-0 text-left">
@@ -521,10 +542,15 @@ export function DownloadInputSection({
               ))}
             </SelectContent>
           </Select>
+          {instagramPresetMessage && (
+            <p className="text-[11px] text-muted-foreground">
+              {instagramPresetMessage}
+            </p>
+          )}
         </div>
       </div>
 
-      {showOutputConfig && (
+      {showOutputConfig && !isInstagramImageOnly && (
         <DownloadOutputOptions
           filenameBase={filenameBase}
           onFilenameChange={onFilenameChange}

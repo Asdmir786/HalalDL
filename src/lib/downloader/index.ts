@@ -8,6 +8,7 @@ export {
   stopPostProcessingJob,
 } from "./core";
 export { fetchMetadata, fetchMediaInfo, type MediaMetadataProbe } from "./metadata";
+export { inspectInstagramMedia, type InstagramMediaSummary } from "./instagram";
 export { cleanupThumbnailByJobId } from "./thumbnails";
 export {
   probeMediaUrl,

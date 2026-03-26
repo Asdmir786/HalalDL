@@ -27,6 +27,16 @@ type InstagramDownloadResult =
       failDetail: string;
     };
 
+export interface InstagramMediaSummary {
+  kind: InstagramResolveResult["kind"];
+  itemCount: number;
+  hasImage: boolean;
+  hasVideo: boolean;
+  isImageOnly: boolean;
+  isVideoOnly: boolean;
+  isMixedCarousel: boolean;
+}
+
 const VIDEO_CONTAINER_OVERRIDES = new Set(["webm", "mkv", "mov", "avi"]);
 
 type PostProcessPlan =
@@ -259,6 +269,22 @@ export async function fetchInstagramMediaInfo(url: string) {
     hasManualSubtitles: false,
     hasAutoSubtitles: false,
     availableSubtitleLanguages: [] as string[],
+  };
+}
+
+export async function inspectInstagramMedia(url: string): Promise<InstagramMediaSummary> {
+  const resolved = await resolveInstagramWithDownloadgram(url);
+  const hasImage = resolved.items.some((item) => item.type === "image");
+  const hasVideo = resolved.items.some((item) => item.type === "video");
+
+  return {
+    kind: resolved.kind,
+    itemCount: resolved.items.length,
+    hasImage,
+    hasVideo,
+    isImageOnly: hasImage && !hasVideo,
+    isVideoOnly: hasVideo && !hasImage,
+    isMixedCarousel: resolved.kind === "carousel" && hasImage && hasVideo,
   };
 }
 
