@@ -27,6 +27,7 @@ import {
   stopPostProcessingJob,
 } from "@/lib/downloader";
 import { copyFilesToClipboard } from "@/lib/commands";
+import { getExplicitOutputPaths } from "@/lib/output-paths";
 import { toast } from "sonner";
 
 import { DownloadInputSection } from "./downloads/components/DownloadInputSection";
@@ -523,10 +524,9 @@ export function DownloadsScreen() {
         (job) =>
           selectedIds.includes(job.id) &&
           job.status === "Done" &&
-          Boolean(job.outputPath)
+          getExplicitOutputPaths(job).length > 0
       )
-      .map((job) => job.outputPath!)
-      .filter(Boolean);
+      .flatMap((job) => getExplicitOutputPaths(job));
 
     if (copyablePaths.length === 0) return;
 
@@ -591,7 +591,7 @@ export function DownloadsScreen() {
 
   const canFillMoreSlots = activeCount < (settings.maxConcurrency || 1);
   const canCopySelected = jobs.some(
-    (job) => selectedIds.includes(job.id) && job.status === "Done" && Boolean(job.outputPath)
+    (job) => selectedIds.includes(job.id) && job.status === "Done" && getExplicitOutputPaths(job).length > 0
   );
   const showStartQueue = startableQueuedCount > 0 && activeCount === 0;
   const destinationLabel = customDownloadDir.trim() || settings.defaultDownloadDir || "Default folder";

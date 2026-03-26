@@ -17,6 +17,7 @@ import { useHistoryStore, extractDomain, type HistoryEntry } from "@/store/histo
 import { stat } from "@tauri-apps/plugin-fs";
 import { createId } from "@/lib/id";
 import type { DownloadJob } from "@/store/downloads";
+import { getExplicitOutputPaths } from "@/lib/output-paths";
 import {
   normalizeSubtitlePreferences,
   resolveSubtitleLanguages,
@@ -409,7 +410,10 @@ export async function startDownload(jobId: string) {
     return true;
   };
 
-  const finalizeSuccessfulDownload = async (lastKnownOutputPath?: string) => {
+  const finalizeSuccessfulDownload = async (
+    lastKnownOutputPath?: string,
+    explicitOutputPaths?: string[]
+  ) => {
     updateJob(jobId, {
       status: "Post-processing",
       phase: "Generating thumbnail",
@@ -423,9 +427,19 @@ export async function startDownload(jobId: string) {
       const { settings } = useSettingsStore.getState();
       const finalJob = useDownloadsStore.getState().jobs.find((j) => j.id === jobId);
       const outputPathToUse = lastKnownOutputPath || finalJob?.outputPath;
+      const clipboardPaths = explicitOutputPaths?.length
+        ? explicitOutputPaths
+        : finalJob
+          ? getExplicitOutputPaths(finalJob)
+          : outputPathToUse
+            ? [outputPathToUse]
+            : [];
 
       if (lastKnownOutputPath && finalJob?.outputPath !== lastKnownOutputPath) {
-        updateJob(jobId, { outputPath: lastKnownOutputPath });
+        updateJob(jobId, {
+          outputPath: lastKnownOutputPath,
+          ...(explicitOutputPaths?.length ? { outputPaths: explicitOutputPaths } : {}),
+        });
       }
 
       if (settings.notifications && finalJob) {
@@ -433,8 +447,8 @@ export async function startDownload(jobId: string) {
         sendDownloadCompleteNotification("Download Finished", `${title} has been downloaded successfully.`);
       }
 
-      if (settings.autoCopyFile && outputPathToUse) {
-        copyFilesToClipboard([outputPathToUse]).catch((e) => {
+      if (settings.autoCopyFile && clipboardPaths.length > 0) {
+        copyFilesToClipboard(clipboardPaths).catch((e) => {
           addLog({ level: "error", message: `Auto-copy failed: ${e}`, jobId });
         });
       }
@@ -453,6 +467,7 @@ export async function startDownload(jobId: string) {
     const doneJob = useDownloadsStore.getState().jobs.find((j) => j.id === jobId);
     if (doneJob) {
       const finalPath = lastKnownOutputPath || doneJob.outputPath;
+      const explicitPaths = explicitOutputPaths?.length ? explicitOutputPaths : getExplicitOutputPaths(doneJob);
       let fileSize: number | undefined;
       if (finalPath) {
         try {
@@ -470,6 +485,7 @@ export async function startDownload(jobId: string) {
         format: doneJob.overrides?.format || doneJob.fallbackFormat,
         fileSize,
         outputPath: finalPath,
+        outputPaths: explicitPaths,
         presetId: doneJob.presetId,
         presetName: preset?.name,
         downloadedAt: Date.now(),
@@ -499,6 +515,7 @@ export async function startDownload(jobId: string) {
         thumbnail: failedJob.thumbnail,
         format: failedJob.overrides?.format,
         outputPath: failedJob.outputPath,
+        outputPaths: failedJob.outputPaths,
         presetId: failedJob.presetId,
         presetName: preset?.name,
         downloadedAt: Date.now(),
@@ -523,7 +540,7 @@ export async function startDownload(jobId: string) {
     });
 
     if (instagramResult.code === 0) {
-      await finalizeSuccessfulDownload(instagramResult.lastKnownOutputPath);
+      await finalizeSuccessfulDownload(instagramResult.lastKnownOutputPath, instagramResult.outputPaths);
     } else {
       await finalizeFailedDownload(instagramResult.failDetail);
     }

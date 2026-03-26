@@ -13,6 +13,7 @@ import { useDownloadsStore } from "@/store/downloads";
 import { usePresetsStore } from "@/store/presets";
 import { MotionButton } from "@/components/motion/MotionButton";
 import { revealInExplorer, deleteFile, openFile, copyFilesToClipboard } from "@/lib/commands";
+import { getExplicitOutputPaths } from "@/lib/output-paths";
 import { ContextMenu, ContextMenuContent, ContextMenuItem, ContextMenuTrigger, ContextMenuSeparator } from "@/components/ui/context-menu";
 import { Select, SelectContent, SelectGroup, SelectItem, SelectLabel, SelectSeparator, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { toast } from "sonner";
@@ -104,20 +105,24 @@ export function DownloadItem({
   const selectedPresetGroupLabel = selectedPresetConfig
     ? PRESET_GROUP_LABELS[getPresetGroup(selectedPresetConfig)]
     : "Preset";
+  const explicitOutputPaths = getExplicitOutputPaths(job);
 
   const handleCopyLink = (url: string) => {
     navigator.clipboard.writeText(url);
     toast.success("Link copied to clipboard");
   };
 
-  const handleCopyFile = async (path: string) => {
+  const handleCopyFiles = async () => {
+    if (explicitOutputPaths.length === 0) return;
     try {
-      await copyFilesToClipboard([path]);
-      toast.success("File copied to clipboard");
+      await copyFilesToClipboard(explicitOutputPaths);
+      toast.success(
+        `${explicitOutputPaths.length} file${explicitOutputPaths.length === 1 ? "" : "s"} copied to clipboard`
+      );
     } catch (e) {
       const message = e instanceof Error ? e.message : String(e);
-      toast.error(`Failed to copy file: ${message}`);
-      addLog({ level: "error", message: `Copy file failed: ${message}` });
+      toast.error(`Failed to copy files: ${message}`);
+      addLog({ level: "error", message: `Copy files failed: ${message}` });
     }
   };
 
@@ -686,9 +691,9 @@ export function DownloadItem({
                 <FolderOpen className="mr-2 h-3.5 w-3.5" />
                 Show in Explorer
               </ContextMenuItem>
-              <ContextMenuItem onClick={() => handleCopyFile(job.outputPath!)}>
+              <ContextMenuItem onClick={() => void handleCopyFiles()}>
                 <Copy className="mr-2 h-3.5 w-3.5" />
-                Copy File
+                {explicitOutputPaths.length > 1 ? "Copy Files" : "Copy File"}
               </ContextMenuItem>
               <ContextMenuSeparator />
             </>

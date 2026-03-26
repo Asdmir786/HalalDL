@@ -8,6 +8,7 @@ export interface HistoryEntry {
   format?: string;
   fileSize?: number;
   outputPath?: string;
+  outputPaths?: string[];
   presetId: string;
   presetName?: string;
   downloadedAt: number;

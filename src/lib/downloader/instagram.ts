@@ -19,6 +19,7 @@ type InstagramDownloadResult =
   | {
       code: 0;
       lastKnownOutputPath: string;
+      outputPaths: string[];
       resolved: InstagramResolveResult;
     }
   | {
@@ -130,6 +131,7 @@ export async function downloadInstagramJob(options: {
   }
 
   let firstWrittenPath: string | null = null;
+  const writtenPaths: string[] = [];
   let wroteAny = false;
 
   for (const item of resolved.items) {
@@ -143,12 +145,17 @@ export async function downloadInstagramJob(options: {
     }
 
     const plannedExt = getPlannedOutputExtension(item, postProcessPlan);
+    const existingDestination =
+      resolved.kind === "carousel"
+        ? await getCollectionItemPath(outputPath, item, plannedExt)
+        : outputPath;
     const destination =
       resolved.kind === "carousel"
         ? await resolveCollectionItemPath(outputPath, item, settings.fileCollision, plannedExt)
         : outputPath;
 
     if (!destination) {
+      writtenPaths.push(existingDestination);
       addLog({
         level: "info",
         message: `Skipping existing Instagram item ${item.index + 1}/${resolved.items.length}`,
@@ -157,18 +164,19 @@ export async function downloadInstagramJob(options: {
       continue;
     }
 
-    updateJob(job.id, {
-      status: "Downloading",
-      phase: "Downloading streams",
+      updateJob(job.id, {
+        status: "Downloading",
+        phase: "Downloading streams",
       statusDetail:
         resolved.items.length === 1
           ? "Downloading Instagram media"
           : `Downloading Instagram item ${item.index + 1}/${resolved.items.length}`,
       progress: Math.round((item.index / resolved.items.length) * 100),
-      speed: undefined,
-      eta: undefined,
-      ...(resolved.kind === "carousel" ? { outputPath } : { outputPath: destination }),
-    });
+        speed: undefined,
+        eta: undefined,
+        outputPaths: [...writtenPaths, destination],
+        ...(resolved.kind === "carousel" ? { outputPath } : { outputPath: destination }),
+      });
 
     addLog({
       level: "info",
@@ -208,6 +216,7 @@ export async function downloadInstagramJob(options: {
 
       wroteAny = true;
       firstWrittenPath ??= destination;
+      writtenPaths.push(destination);
     } catch (error) {
       return {
         code: 1,
@@ -227,6 +236,7 @@ export async function downloadInstagramJob(options: {
   const lastKnownOutputPath = resolved.kind === "carousel" ? outputPath : firstWrittenPath ?? outputPath;
   updateJob(job.id, {
     outputPath: lastKnownOutputPath,
+    outputPaths: writtenPaths.length ? writtenPaths : [lastKnownOutputPath],
     title,
     progress: 100,
     phase: "Generating thumbnail",
@@ -236,6 +246,7 @@ export async function downloadInstagramJob(options: {
   return {
     code: 0,
     lastKnownOutputPath,
+    outputPaths: writtenPaths.length ? writtenPaths : [lastKnownOutputPath],
     resolved,
   };
 }
@@ -333,8 +344,15 @@ async function resolveCollectionItemPath(
   collision: Settings["fileCollision"],
   ext: string
 ): Promise<string | null> {
-  const base = `${String(item.index + 1).padStart(2, "0")}`;
-  return resolveFilePath(collectionDir, `${base}.${ext}`, collision);
+  return resolveFilePath(collectionDir, buildCollectionItemFilename(item, ext), collision);
+}
+
+async function getCollectionItemPath(
+  collectionDir: string,
+  item: InstagramMediaItem,
+  ext: string
+): Promise<string> {
+  return join(collectionDir, buildCollectionItemFilename(item, ext));
 }
 
 async function resolveFilePath(
@@ -360,6 +378,11 @@ async function resolveFilePath(
     counter += 1;
   }
   return candidate;
+}
+
+function buildCollectionItemFilename(item: InstagramMediaItem, ext: string) {
+  const base = `${String(item.index + 1).padStart(2, "0")}`;
+  return `${base}.${ext}`;
 }
 
 function renderTemplateStem(

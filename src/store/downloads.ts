@@ -40,6 +40,7 @@ export interface DownloadJob {
   statusDetail?: string;
   presetId: string;
   outputPath?: string;
+  outputPaths?: string[];
   createdAt: number;
   statusChangedAt?: number;
   queueOrder?: number;

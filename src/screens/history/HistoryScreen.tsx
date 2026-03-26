@@ -14,6 +14,7 @@ import { exists, readDir } from "@tauri-apps/plugin-fs";
 import { toast } from "sonner";
 import { History as HistoryIcon } from "lucide-react";
 import { copyFilesToClipboard } from "@/lib/commands";
+import { getExplicitOutputPaths } from "@/lib/output-paths";
 
 type PathParts = {
   dir: string;
@@ -413,10 +414,10 @@ export function HistoryScreen() {
         .filter(
           (entry) =>
             entry.status === "completed" &&
-            Boolean(entry.outputPath) &&
+            getExplicitOutputPaths(entry).length > 0 &&
             fileExistsMap[entry.id] === true
         )
-        .map((entry) => entry.outputPath!),
+        .flatMap((entry) => getExplicitOutputPaths(entry)),
     [filtered, fileExistsMap]
   );
 
@@ -427,10 +428,10 @@ export function HistoryScreen() {
           (entry) =>
             selectedIdsFiltered.includes(entry.id) &&
             entry.status === "completed" &&
-            Boolean(entry.outputPath) &&
+            getExplicitOutputPaths(entry).length > 0 &&
             fileExistsMap[entry.id] === true
         )
-        .map((entry) => entry.outputPath!),
+        .flatMap((entry) => getExplicitOutputPaths(entry)),
     [entries, fileExistsMap, selectedIdsFiltered]
   );
 

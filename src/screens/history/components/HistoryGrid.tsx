@@ -17,6 +17,7 @@ import { toast } from "sonner";
 import { Checkbox } from "@/components/ui/checkbox";
 import { HistoryDetails } from "./HistoryDetails";
 import { useState } from "react";
+import { getExplicitOutputPaths } from "@/lib/output-paths";
 
 interface HistoryGridProps {
   entry: HistoryEntry;
@@ -47,6 +48,7 @@ export function HistoryGrid({
   const addJob = useDownloadsStore((s) => s.addJob);
   const setScreen = useNavigationStore((s) => s.setScreen);
   const toggleFavorite = useHistoryStore((s) => s.toggleFavorite);
+  const explicitOutputPaths = getExplicitOutputPaths(entry);
 
   const handleRedownload = () => {
     addJob(entry.url, entry.presetId, entry.overrides);
@@ -75,9 +77,11 @@ export function HistoryGrid({
   };
 
   const handleCopyFile = () => {
-    if (entry.outputPath && fileExists) {
-      copyFilesToClipboard([entry.outputPath]);
-      toast.success("File copied to clipboard");
+    if (explicitOutputPaths.length > 0 && fileExists) {
+      copyFilesToClipboard(explicitOutputPaths);
+      toast.success(
+        `${explicitOutputPaths.length} file${explicitOutputPaths.length === 1 ? "" : "s"} copied to clipboard`
+      );
     }
   };
 
@@ -207,9 +211,9 @@ export function HistoryGrid({
           </ContextMenuItem>
         )}
         {isCompleted && entry.outputPath && fileExists && (
-          <ContextMenuItem onClick={handleCopyFile}>
-            <Copy className="w-3.5 h-3.5 mr-2" /> Copy File
-          </ContextMenuItem>
+            <ContextMenuItem onClick={handleCopyFile}>
+              <Copy className="w-3.5 h-3.5 mr-2" /> {explicitOutputPaths.length > 1 ? "Copy Files" : "Copy File"}
+            </ContextMenuItem>
         )}
         <ContextMenuSeparator />
         <ContextMenuItem onClick={handleCopyUrl}>
