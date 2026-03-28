@@ -439,12 +439,10 @@ export function HistoryScreen() {
     if (filteredCopyablePaths.length === 0) return;
     try {
       await copyFilesToClipboard(filteredCopyablePaths);
-      toast.success(
-        `${filteredCopyablePaths.length} file${filteredCopyablePaths.length === 1 ? "" : "s"} copied to clipboard`
-      );
+      toast.success("Copied to clipboard");
     } catch (e) {
       const message = e instanceof Error ? e.message : String(e);
-      toast.error(`Failed to copy files: ${message}`);
+      toast.error(`Failed to copy: ${message}`);
     }
   }, [filteredCopyablePaths]);
 
@@ -452,12 +450,10 @@ export function HistoryScreen() {
     if (selectedCopyablePaths.length === 0) return;
     try {
       await copyFilesToClipboard(selectedCopyablePaths);
-      toast.success(
-        `${selectedCopyablePaths.length} file${selectedCopyablePaths.length === 1 ? "" : "s"} copied to clipboard`
-      );
+      toast.success("Copied to clipboard");
     } catch (e) {
       const message = e instanceof Error ? e.message : String(e);
-      toast.error(`Failed to copy files: ${message}`);
+      toast.error(`Failed to copy: ${message}`);
     }
   }, [selectedCopyablePaths]);
 

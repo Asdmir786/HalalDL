@@ -2,7 +2,7 @@ import { useCallback, useEffect, useState } from "react";
 import {
   Info,
   ExternalLink,
-  Github,
+  FolderGit2,
   RefreshCw,
   CheckCircle2,
   ArrowUpCircle,
@@ -390,7 +390,7 @@ export function AboutSection() {
       {/* Links */}
       <div className="grid grid-cols-1 gap-2.5 sm:grid-cols-2 xl:grid-cols-3">
         <LinkCard
-          icon={Github}
+          icon={FolderGit2}
           title="Source Code"
           description="View on GitHub"
           onClick={() => openUrl(REPO_URL)}

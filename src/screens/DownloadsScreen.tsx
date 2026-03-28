@@ -565,12 +565,10 @@ export function DownloadsScreen() {
 
     try {
       await copyFilesToClipboard(copyablePaths);
-      toast.success(
-        `${copyablePaths.length} file${copyablePaths.length === 1 ? "" : "s"} copied to clipboard`
-      );
+      toast.success("Copied to clipboard");
     } catch (e) {
       const message = e instanceof Error ? e.message : String(e);
-      toast.error(`Failed to copy files: ${message}`);
+      toast.error(`Failed to copy: ${message}`);
     }
   };
 

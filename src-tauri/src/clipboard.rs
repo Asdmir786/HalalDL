@@ -4,11 +4,14 @@ use std::fs;
 pub fn copy_files_to_clipboard(paths: Vec<String>) -> Result<(), String> {
     #[cfg(target_os = "windows")]
     {
+        use image::codecs::png::PngEncoder;
+        use image::{ExtendedColorType, ImageEncoder, ImageReader};
         use std::ffi::OsStr;
+        use std::io::Cursor;
         use std::mem::size_of;
         use std::os::windows::ffi::OsStrExt;
+        use std::path::{Path, PathBuf};
         use std::ptr;
-        use std::path::PathBuf;
         use windows_sys::Win32::Foundation::GetLastError;
         use windows_sys::Win32::System::DataExchange::{CloseClipboard, EmptyClipboard, OpenClipboard, RegisterClipboardFormatW, SetClipboardData};
         use windows_sys::Win32::System::Memory::{GlobalAlloc, GlobalLock, GlobalUnlock, GMEM_MOVEABLE, GMEM_ZEROINIT};
@@ -18,10 +21,102 @@ pub fn copy_files_to_clipboard(paths: Vec<String>) -> Result<(), String> {
         }
 
         const CF_HDROP: u32 = 0x000F;
-        const CF_UNICODETEXT: u32 = 13;
+        const CF_DIB: u32 = 8;
 
         if paths.is_empty() {
             return Err("No files provided".to_string());
+        }
+
+        fn is_single_image_clipboard_candidate(path: &Path) -> bool {
+            matches!(
+                path.extension()
+                    .and_then(|value| value.to_str())
+                    .map(|value| value.to_ascii_lowercase())
+                    .as_deref(),
+                Some("png" | "jpg" | "jpeg" | "bmp" | "webp")
+            )
+        }
+
+        fn make_png_format_name() -> Vec<u16> {
+            OsStr::new("PNG")
+                .encode_wide()
+                .chain(std::iter::once(0))
+                .collect()
+        }
+
+        fn make_clipboard_format_name(name: &str) -> Vec<u16> {
+            OsStr::new(name)
+                .encode_wide()
+                .chain(std::iter::once(0))
+                .collect()
+        }
+
+        fn load_image_clipboard_payload(path: &Path) -> Option<(Vec<u8>, Vec<u8>)> {
+            if !is_single_image_clipboard_candidate(path) {
+                return None;
+            }
+
+            let reader = ImageReader::open(path).ok()?;
+            let image = reader.decode().ok()?.into_rgba8();
+            let (width, height) = image.dimensions();
+            if width == 0 || height == 0 {
+                return None;
+            }
+
+            let mut dib = Vec::with_capacity(40 + image.len());
+            dib.extend_from_slice(&40u32.to_le_bytes());
+            dib.extend_from_slice(&(width as i32).to_le_bytes());
+            dib.extend_from_slice(&(-(height as i32)).to_le_bytes());
+            dib.extend_from_slice(&1u16.to_le_bytes());
+            dib.extend_from_slice(&32u16.to_le_bytes());
+            dib.extend_from_slice(&0u32.to_le_bytes());
+            dib.extend_from_slice(&(width.saturating_mul(height).saturating_mul(4)).to_le_bytes());
+            dib.extend_from_slice(&0i32.to_le_bytes());
+            dib.extend_from_slice(&0i32.to_le_bytes());
+            dib.extend_from_slice(&0u32.to_le_bytes());
+            dib.extend_from_slice(&0u32.to_le_bytes());
+
+            for pixel in image.pixels() {
+                dib.push(pixel[2]);
+                dib.push(pixel[1]);
+                dib.push(pixel[0]);
+                dib.push(pixel[3]);
+            }
+
+            let mut png = Vec::new();
+            let encoder = PngEncoder::new(Cursor::new(&mut png));
+            encoder
+                .write_image(image.as_raw(), width, height, ExtendedColorType::Rgba8)
+                .ok()?;
+
+            Some((dib, png))
+        }
+
+        unsafe fn set_clipboard_bytes(format_id: u32, bytes: &[u8]) -> bool {
+            if bytes.is_empty() {
+                return false;
+            }
+
+            let handle = GlobalAlloc((GMEM_MOVEABLE | GMEM_ZEROINIT) as u32, bytes.len());
+            if handle.is_null() {
+                return false;
+            }
+
+            let locked = GlobalLock(handle) as *mut u8;
+            if locked.is_null() {
+                GlobalFree(handle);
+                return false;
+            }
+
+            ptr::copy_nonoverlapping(bytes.as_ptr(), locked, bytes.len());
+            GlobalUnlock(handle);
+
+            if SetClipboardData(format_id, handle).is_null() {
+                GlobalFree(handle);
+                return false;
+            }
+
+            true
         }
 
         fn normalize_input_path(raw: &str) -> String {
@@ -185,10 +280,18 @@ pub fn copy_files_to_clipboard(paths: Vec<String>) -> Result<(), String> {
                 return Err(format!("SetClipboardData(CF_HDROP) failed: {}", GetLastError()));
             }
 
-            let format_name: Vec<u16> = OsStr::new("Preferred DropEffect")
-                .encode_wide()
-                .chain(std::iter::once(0))
-                .collect();
+            if valid_paths.len() == 1 {
+                if let Some((dib_bytes, png_bytes)) = load_image_clipboard_payload(&valid_paths[0]) {
+                    let _ = set_clipboard_bytes(CF_DIB, &dib_bytes);
+
+                    let png_format_id = RegisterClipboardFormatW(make_png_format_name().as_ptr());
+                    if png_format_id != 0 {
+                        let _ = set_clipboard_bytes(png_format_id, &png_bytes);
+                    }
+                }
+            }
+
+            let format_name = make_clipboard_format_name("Preferred DropEffect");
             let format_id = RegisterClipboardFormatW(format_name.as_ptr());
             if format_id != 0 {
                 let effect_bytes_size = size_of::<u32>();
@@ -204,61 +307,6 @@ pub fn copy_files_to_clipboard(paths: Vec<String>) -> Result<(), String> {
                     } else {
                         GlobalFree(hglobal_effect);
                     }
-                }
-            }
-
-            let first_path = &valid_paths[0];
-
-            let filenamew_format_name: Vec<u16> = OsStr::new("FileNameW")
-                .encode_wide()
-                .chain(std::iter::once(0))
-                .collect();
-            let filenamew_format_id = RegisterClipboardFormatW(filenamew_format_name.as_ptr());
-            if filenamew_format_id != 0 {
-                let mut first_wide = strip_extended_prefix_wide(first_path.as_os_str().encode_wide().collect());
-                first_wide.push(0);
-
-                let bytes_size = first_wide.len() * size_of::<u16>();
-                let hglobal_filenamew = GlobalAlloc((GMEM_MOVEABLE | GMEM_ZEROINIT) as u32, bytes_size);
-                if !hglobal_filenamew.is_null() {
-                    let locked = GlobalLock(hglobal_filenamew) as *mut u16;
-                    if !locked.is_null() {
-                        ptr::copy_nonoverlapping(first_wide.as_ptr(), locked, first_wide.len());
-                        GlobalUnlock(hglobal_filenamew);
-                        if SetClipboardData(filenamew_format_id, hglobal_filenamew).is_null() {
-                            GlobalFree(hglobal_filenamew);
-                        }
-                    } else {
-                        GlobalFree(hglobal_filenamew);
-                    }
-                }
-            }
-
-            let mut text_wide: Vec<u16> = Vec::new();
-            for (idx, p) in valid_paths.iter().enumerate() {
-                let wide = strip_extended_prefix_wide(p.as_os_str().encode_wide().collect());
-                if wide.is_empty() {
-                    continue;
-                }
-                text_wide.extend(wide);
-                if idx + 1 < valid_paths.len() {
-                    text_wide.extend_from_slice(&[13, 10]); // \r\n
-                }
-            }
-            text_wide.push(0);
-
-            let text_bytes_size = text_wide.len() * size_of::<u16>();
-            let hglobal_text = GlobalAlloc((GMEM_MOVEABLE | GMEM_ZEROINIT) as u32, text_bytes_size);
-            if !hglobal_text.is_null() {
-                let locked = GlobalLock(hglobal_text) as *mut u16;
-                if !locked.is_null() {
-                    ptr::copy_nonoverlapping(text_wide.as_ptr(), locked, text_wide.len());
-                    GlobalUnlock(hglobal_text);
-                    if SetClipboardData(CF_UNICODETEXT, hglobal_text).is_null() {
-                        GlobalFree(hglobal_text);
-                    }
-                } else {
-                    GlobalFree(hglobal_text);
                 }
             }
 

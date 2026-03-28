@@ -45,11 +45,6 @@ pub async fn download_url_to_file(url: String, dest: String, referer: Option<Str
         return Err(format!("HTTP {}: {}", resp.status(), url));
     }
 
-    let bytes = resp.bytes().await.map_err(|e| format!("Read body failed: {}", e))?;
-    if bytes.is_empty() {
-        return Err("Empty response body".to_string());
-    }
-
     let dest_path = Path::new(&dest);
     if let Some(parent) = dest_path.parent() {
         if !parent.exists() {
@@ -60,8 +55,23 @@ pub async fn download_url_to_file(url: String, dest: String, referer: Option<Str
 
     let mut file = tokio::fs::File::create(&dest).await
         .map_err(|e| format!("File create failed: {}", e))?;
-    file.write_all(&bytes).await
-        .map_err(|e| format!("File write failed: {}", e))?;
+    let mut stream = resp.bytes_stream();
+    let mut wrote_any = false;
+
+    while let Some(chunk) = stream.next().await {
+        let chunk = chunk.map_err(|e| format!("Read body failed: {}", e))?;
+        if chunk.is_empty() {
+            continue;
+        }
+        wrote_any = true;
+        file.write_all(&chunk).await
+            .map_err(|e| format!("File write failed: {}", e))?;
+    }
+
+    if !wrote_any {
+        return Err("Empty response body".to_string());
+    }
+
     file.flush().await
         .map_err(|e| format!("File flush failed: {}", e))?;
 

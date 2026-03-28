@@ -273,7 +273,7 @@ export function DownloadList({
                       disabled={!canCopySelected}
                     >
                       <Copy className="h-3.5 w-3.5" />
-                      Copy Files
+                      Copy
                     </MotionButton>
                     <MotionButton
                       type="button"

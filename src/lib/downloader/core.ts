@@ -1043,10 +1043,8 @@ export async function startDownload(jobId: string) {
     return { effectiveArgs, attemptResult };
   };
 
-  let activeArgs = [...args];
   const { effectiveArgs: resolvedInitialArgs, attemptResult: initialResult } =
-    await runAttemptWithDownloaderFallback(activeArgs);
-  activeArgs = resolvedInitialArgs;
+    await runAttemptWithDownloaderFallback([...args]);
   let result = initialResult;
 
   if (await finalizeHoldRequest()) {
@@ -1056,7 +1054,7 @@ export async function startDownload(jobId: string) {
   let didFallback = false;
 
   if (result.code !== 0 && result.formatUnavailable) {
-    const fallbackAttempts = buildFallbackAttempts(activeArgs);
+    const fallbackAttempts = buildFallbackAttempts(resolvedInitialArgs);
 
     for (const [index, attempt] of fallbackAttempts.entries()) {
       updateJob(jobId, {
@@ -1067,7 +1065,6 @@ export async function startDownload(jobId: string) {
       addLog({ level: "warn", message: `Falling back to format: ${attempt.format}`, jobId });
       addLog({ level: "info", message: `Retrying with fallback format:\n${ytDlp.path} ${fallbackQuoted}`, jobId });
       const fallbackRun = await runAttemptWithDownloaderFallback(attempt.args);
-      activeArgs = fallbackRun.effectiveArgs;
       result = fallbackRun.attemptResult;
       if (await finalizeHoldRequest()) {
         return;

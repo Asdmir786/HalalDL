@@ -79,9 +79,7 @@ export function HistoryGrid({
   const handleCopyFile = () => {
     if (explicitOutputPaths.length > 0 && fileExists) {
       copyFilesToClipboard(explicitOutputPaths);
-      toast.success(
-        `${explicitOutputPaths.length} file${explicitOutputPaths.length === 1 ? "" : "s"} copied to clipboard`
-      );
+      toast.success("Copied to clipboard");
     }
   };
 
@@ -212,7 +210,7 @@ export function HistoryGrid({
         )}
         {isCompleted && entry.outputPath && fileExists && (
             <ContextMenuItem onClick={handleCopyFile}>
-              <Copy className="w-3.5 h-3.5 mr-2" /> {explicitOutputPaths.length > 1 ? "Copy Files" : "Copy File"}
+              <Copy className="w-3.5 h-3.5 mr-2" /> Copy
             </ContextMenuItem>
         )}
         <ContextMenuSeparator />

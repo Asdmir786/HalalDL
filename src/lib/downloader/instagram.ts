@@ -50,6 +50,19 @@ type PostProcessPlan =
       label: string;
     };
 
+type PlannedInstagramItem = {
+  item: InstagramMediaItem;
+  destination: string;
+  downloadPath: string;
+  shouldPostProcess: boolean;
+};
+
+const INSTAGRAM_CAROUSEL_DOWNLOAD_CONCURRENCY = 2;
+const INSTAGRAM_STATUS_PROGRESS_SHARE = {
+  downloadOnly: 95,
+  withPostProcess: 70,
+} as const;
+
 export async function downloadInstagramJob(options: {
   job: DownloadJob;
   preset: Preset;
@@ -90,6 +103,7 @@ export async function downloadInstagramJob(options: {
   const rootDir = await resolveRootDirectory(job, settings);
   const filenameTemplate = getFilenameTemplate(job, settings);
   const postProcessPlan = buildPostProcessPlan(job, preset);
+  const activePostProcessPlan = postProcessPlan.mode === "none" ? null : postProcessPlan;
 
   if (postProcessPlan.mode === "audio" && !resolved.items.some((item) => item.type === "video")) {
     return {
@@ -141,8 +155,9 @@ export async function downloadInstagramJob(options: {
   }
 
   let firstWrittenPath: string | null = null;
-  const writtenPaths: string[] = [];
+  const writtenPathByIndex = new Map<number, string>();
   let wroteAny = false;
+  const plannedItems: PlannedInstagramItem[] = [];
 
   for (const item of resolved.items) {
     if (item.type === "image" && postProcessPlan.mode === "audio") {
@@ -165,7 +180,7 @@ export async function downloadInstagramJob(options: {
         : outputPath;
 
     if (!destination) {
-      writtenPaths.push(existingDestination);
+      writtenPathByIndex.set(item.index, existingDestination);
       addLog({
         level: "info",
         message: `Skipping existing Instagram item ${item.index + 1}/${resolved.items.length}`,
@@ -174,65 +189,121 @@ export async function downloadInstagramJob(options: {
       continue;
     }
 
-      updateJob(job.id, {
-        status: "Downloading",
-        phase: "Downloading streams",
-      statusDetail:
-        resolved.items.length === 1
-          ? "Downloading Instagram media"
-          : `Downloading Instagram item ${item.index + 1}/${resolved.items.length}`,
-      progress: Math.round((item.index / resolved.items.length) * 100),
-        speed: undefined,
-        eta: undefined,
-        outputPaths: [...writtenPaths, destination],
-        ...(resolved.kind === "carousel" ? { outputPath } : { outputPath: destination }),
-      });
+    const sourceExt = inferItemExtension(item);
+    const shouldPostProcess = item.type === "video" && activePostProcessPlan !== null;
+    const downloadPath = shouldPostProcess
+      ? `${destination}.source.${sourceExt}`
+      : destination;
+
+    plannedItems.push({
+      item,
+      destination,
+      downloadPath,
+      shouldPostProcess,
+    });
+  }
+
+  const expectedOutputPaths = resolved.items
+    .map((item) => writtenPathByIndex.get(item.index) ?? plannedItems.find((candidate) => candidate.item.index === item.index)?.destination)
+    .filter((value): value is string => Boolean(value));
+
+  if (plannedItems.length > 0) {
+    const hasMultiplePlannedItems = plannedItems.length > 1;
+    updateJob(job.id, {
+      status: "Downloading",
+      phase: "Downloading streams",
+      statusDetail: getInstagramDownloadStartLabel(
+        plannedItems.length,
+        Math.min(plannedItems.length, INSTAGRAM_CAROUSEL_DOWNLOAD_CONCURRENCY)
+      ),
+      progress: 0,
+      speed: undefined,
+      eta: undefined,
+      outputPaths: expectedOutputPaths,
+      ...(resolved.kind === "carousel" ? { outputPath } : { outputPath: plannedItems[0]?.destination ?? outputPath }),
+    });
 
     addLog({
       level: "info",
-      message: `Downloading Instagram ${item.type} ${item.index + 1}/${resolved.items.length} → ${destination}`,
+      message:
+        hasMultiplePlannedItems
+          ? `Instagram carousel download started with ${Math.min(plannedItems.length, INSTAGRAM_CAROUSEL_DOWNLOAD_CONCURRENCY)} parallel fetches for ${plannedItems.length} item(s)`
+          : "Downloading Instagram media",
       jobId: job.id,
     });
+  }
 
-    try {
-      const sourceExt = inferItemExtension(item);
-      const shouldPostProcess = item.type === "video" && postProcessPlan.mode !== "none";
-      const downloadPath = shouldPostProcess
-        ? `${destination}.source.${sourceExt}`
-        : destination;
+  let completedDownloads = 0;
+  try {
+    await runWithConcurrency(plannedItems, INSTAGRAM_CAROUSEL_DOWNLOAD_CONCURRENCY, async (planned) => {
+      addLog({
+        level: "info",
+        message: `Downloading Instagram ${planned.item.type} ${planned.item.index + 1}/${resolved.items.length} → ${planned.destination}`,
+        jobId: job.id,
+      });
 
-      await downloadUrlToFile(item.downloadUrl, downloadPath, job.url);
+      await downloadUrlToFile(planned.item.downloadUrl, planned.downloadPath, job.url);
+      wroteAny = true;
+      firstWrittenPath ??= planned.destination;
+      completedDownloads += 1;
 
-      if (shouldPostProcess) {
-        const converted = await runFfmpegPostProcess({
-          job,
-          item,
-          updateJob,
-          addLog,
-          inputPath: downloadPath,
-          outputPath: destination,
-          plan: postProcessPlan,
-        });
-        if (!converted.ok) {
-          return {
-            code: 1,
-            failDetail: converted.failDetail,
-          };
-        }
-        await deleteFile(downloadPath).catch(() => {
-          void 0;
-        });
+      if (!planned.shouldPostProcess) {
+        writtenPathByIndex.set(planned.item.index, planned.destination);
       }
 
-      wroteAny = true;
-      firstWrittenPath ??= destination;
-      writtenPaths.push(destination);
-    } catch (error) {
+      const hasPostProcessItems = plannedItems.some((candidate) => candidate.shouldPostProcess);
+      const downloadShare = hasPostProcessItems
+        ? INSTAGRAM_STATUS_PROGRESS_SHARE.withPostProcess
+        : INSTAGRAM_STATUS_PROGRESS_SHARE.downloadOnly;
+      updateJob(job.id, {
+        status: "Downloading",
+        phase: "Downloading streams",
+        statusDetail: getInstagramDownloadProgressLabel(
+          completedDownloads,
+          plannedItems.length,
+          hasPostProcessItems
+        ),
+        progress: Math.max(1, Math.round((completedDownloads / plannedItems.length) * downloadShare)),
+        outputPaths: expectedOutputPaths,
+        ...(resolved.kind === "carousel" ? { outputPath } : { outputPath: planned.destination }),
+      });
+    });
+  } catch (error) {
+    return {
+      code: 1,
+      failDetail: `Instagram download failed: ${String(error)}`,
+    };
+  }
+
+  const postProcessItems = plannedItems.filter((planned) => planned.shouldPostProcess);
+  for (let index = 0; index < postProcessItems.length; index += 1) {
+    const planned = postProcessItems[index];
+    const converted = await runFfmpegPostProcess({
+      job,
+      item: planned.item,
+      updateJob,
+      addLog,
+      inputPath: planned.downloadPath,
+      outputPath: planned.destination,
+      plan: activePostProcessPlan!,
+    });
+    if (!converted.ok) {
       return {
         code: 1,
-        failDetail: `Instagram download failed: ${String(error)}`,
+        failDetail: converted.failDetail,
       };
     }
+    await deleteFile(planned.downloadPath).catch(() => {
+      void 0;
+    });
+    writtenPathByIndex.set(planned.item.index, planned.destination);
+    updateJob(job.id, {
+      status: "Post-processing",
+      phase: "Converting with FFmpeg",
+      progress: 70 + Math.round(((index + 1) / postProcessItems.length) * 25),
+      outputPaths: expectedOutputPaths,
+      ...(resolved.kind === "carousel" ? { outputPath } : { outputPath: planned.destination }),
+    });
   }
 
   if (!wroteAny) {
@@ -243,6 +314,9 @@ export async function downloadInstagramJob(options: {
     });
   }
 
+  const writtenPaths = resolved.items
+    .map((item) => writtenPathByIndex.get(item.index))
+    .filter((value): value is string => Boolean(value));
   const lastKnownOutputPath = resolved.kind === "carousel" ? outputPath : firstWrittenPath ?? outputPath;
   updateJob(job.id, {
     outputPath: lastKnownOutputPath,
@@ -259,6 +333,53 @@ export async function downloadInstagramJob(options: {
     outputPaths: writtenPaths.length ? writtenPaths : [lastKnownOutputPath],
     resolved,
   };
+}
+
+async function runWithConcurrency<T>(
+  items: T[],
+  concurrency: number,
+  worker: (item: T, index: number) => Promise<void>
+) {
+  if (items.length === 0) return;
+
+  const limit = Math.max(1, Math.min(concurrency, items.length));
+  let cursor = 0;
+
+  await Promise.all(
+    Array.from({ length: limit }, async () => {
+      while (cursor < items.length) {
+        const currentIndex = cursor;
+        cursor += 1;
+        await worker(items[currentIndex], currentIndex);
+      }
+    })
+  );
+}
+
+function getInstagramDownloadStartLabel(totalItems: number, parallelCount: number) {
+  if (totalItems <= 1) {
+    return "Downloading Instagram media";
+  }
+
+  return `Downloading carousel (${parallelCount} at a time)`;
+}
+
+function getInstagramDownloadProgressLabel(
+  completedDownloads: number,
+  totalItems: number,
+  hasPostProcessItems: boolean
+) {
+  if (completedDownloads >= totalItems) {
+    return hasPostProcessItems
+      ? "Downloads finished, preparing conversion"
+      : "Finalizing Instagram download";
+  }
+
+  if (totalItems <= 1) {
+    return "Downloading Instagram media";
+  }
+
+  return `Carousel downloaded ${completedDownloads}/${totalItems}`;
 }
 
 export async function fetchInstagramMediaInfo(url: string) {
@@ -443,8 +564,16 @@ function renderSingleFilename(
 }
 
 function sanitizePathSegment(input: string): string {
-  return input
-    .replace(/[<>:"/\\|?*\u0000-\u001f]/g, "-")
+  let sanitized = "";
+
+  for (const char of input) {
+    const code = char.charCodeAt(0);
+    const isControl = code >= 0 && code <= 31;
+    const isReserved = '<>:"/\\|?*'.includes(char);
+    sanitized += isControl || isReserved ? "-" : char;
+  }
+
+  return sanitized
     .replace(/\s+/g, " ")
     .replace(/\.+$/g, "")
     .trim();

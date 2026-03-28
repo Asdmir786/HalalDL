@@ -116,13 +116,11 @@ export function DownloadItem({
     if (explicitOutputPaths.length === 0) return;
     try {
       await copyFilesToClipboard(explicitOutputPaths);
-      toast.success(
-        `${explicitOutputPaths.length} file${explicitOutputPaths.length === 1 ? "" : "s"} copied to clipboard`
-      );
+      toast.success("Copied to clipboard");
     } catch (e) {
       const message = e instanceof Error ? e.message : String(e);
-      toast.error(`Failed to copy files: ${message}`);
-      addLog({ level: "error", message: `Copy files failed: ${message}` });
+      toast.error(`Failed to copy: ${message}`);
+      addLog({ level: "error", message: `Copy failed: ${message}` });
     }
   };
 
@@ -693,7 +691,7 @@ export function DownloadItem({
               </ContextMenuItem>
               <ContextMenuItem onClick={() => void handleCopyFiles()}>
                 <Copy className="mr-2 h-3.5 w-3.5" />
-                {explicitOutputPaths.length > 1 ? "Copy Files" : "Copy File"}
+                Copy
               </ContextMenuItem>
               <ContextMenuSeparator />
             </>
