@@ -125,10 +125,10 @@ export const useDownloadsStore = create<DownloadsState>((set) => ({
   moveJob: (id, direction) =>
     set((state) => {
       const job = state.jobs.find((j) => j.id === id);
-      if (!job || (job.status !== "Queued" && job.status !== "Paused")) return state;
+      if (!job || (job.status !== "Queued" && job.status !== "Paused" && job.status !== "Stopped")) return state;
 
       const queued = state.jobs
-        .filter((j) => j.status === "Queued" || j.status === "Paused")
+        .filter((j) => j.status === "Queued" || j.status === "Paused" || j.status === "Stopped")
         .map((j) => ({ ...j, queueOrder: typeof j.queueOrder === "number" ? j.queueOrder : j.createdAt }));
 
       queued.sort((a, b) => (b.queueOrder || 0) - (a.queueOrder || 0));
@@ -154,7 +154,7 @@ export const useDownloadsStore = create<DownloadsState>((set) => ({
     set((state) => {
       const setIds = new Set(orderedIds);
       const queuedAll = state.jobs
-        .filter((j) => j.status === "Queued" || j.status === "Paused")
+        .filter((j) => j.status === "Queued" || j.status === "Paused" || j.status === "Stopped")
         .map((j) => ({ ...j, queueOrder: typeof j.queueOrder === "number" ? j.queueOrder : j.createdAt }))
         .sort((a, b) => (b.queueOrder || 0) - (a.queueOrder || 0));
 

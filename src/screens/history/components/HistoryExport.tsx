@@ -72,9 +72,10 @@ export function HistoryExport({ entries }: HistoryExportProps) {
           size="sm"
           whileHover={{ scale: 1.05 }}
           whileTap={{ scale: 0.95 }}
+          className="rounded-full"
         >
           <Download className="w-4 h-4 mr-2" />
-          Export
+          Export Archive
         </MotionButton>
       </DropdownMenuTrigger>
       <DropdownMenuContent align="end">

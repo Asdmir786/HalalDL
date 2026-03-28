@@ -354,9 +354,8 @@ export function DownloadInputSection({
       return;
     }
 
-    const isWindowsPasteFallback = e.metaKey && e.key.toLowerCase() === "v";
     const isShiftInsert = e.shiftKey && e.key === "Insert";
-    if (isWindowsPasteFallback || isShiftInsert) {
+    if (isShiftInsert) {
       e.preventDefault();
       void handlePasteFromClipboard();
     }

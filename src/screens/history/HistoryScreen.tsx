@@ -473,6 +473,10 @@ export function HistoryScreen() {
         <div className="p-8 pb-4">
           <HistoryHeader
             totalCount={entries.length}
+            filteredCount={filtered.length}
+            completedCount={entries.filter((entry) => entry.status === "completed").length}
+            failedCount={entries.filter((entry) => entry.status === "failed").length}
+            selectedCount={selectedIdsFiltered.length}
             search={search}
             onSearchChange={setSearch}
             statusFilter={statusFilter}
@@ -490,53 +494,53 @@ export function HistoryScreen() {
             onClearAll={handleClearAll}
           >
             {selectedIdsFiltered.length > 0 && (
-              <>
+              <div className="flex flex-wrap items-center gap-2">
                 <button
                   onClick={handleSelectAllFiltered}
-                  className="text-xs text-muted-foreground hover:text-foreground px-2 py-1 rounded-md hover:bg-muted"
+                  className="rounded-full border border-border/40 bg-background/45 px-3 py-1.5 text-xs font-medium text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
                 >
-                  Select all
+                  Select Visible
                 </button>
                 <button
                   onClick={handleClearSelection}
-                  className="text-xs text-muted-foreground hover:text-foreground px-2 py-1 rounded-md hover:bg-muted"
+                  className="rounded-full border border-border/40 bg-background/45 px-3 py-1.5 text-xs font-medium text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
                 >
-                  Clear
+                  Clear Selection
                 </button>
                 <button
                   onClick={() => void handleCopySelectedFiles()}
                   disabled={selectedCopyablePaths.length === 0}
-                  className={`text-xs px-2 py-1 rounded-md ${
+                  className={`rounded-full px-3 py-1.5 text-xs font-semibold transition-colors ${
                     selectedCopyablePaths.length === 0
-                      ? "text-muted-foreground/50 cursor-not-allowed"
-                      : "text-muted-foreground hover:text-foreground hover:bg-muted"
+                      ? "cursor-not-allowed border border-border/30 bg-muted/30 text-muted-foreground/50"
+                      : "border border-blue-500/20 bg-blue-500/10 text-blue-300 hover:bg-blue-500/20"
                   }`}
                 >
-                  Copy selected files {selectedCopyablePaths.length > 0 ? `(${selectedCopyablePaths.length})` : ""}
+                  Copy Selection {selectedCopyablePaths.length > 0 ? `(${selectedCopyablePaths.length})` : ""}
                 </button>
-              </>
+              </div>
             )}
             <button
               onClick={() => void handleCopyFilteredFiles()}
               disabled={filteredCopyablePaths.length === 0}
-              className={`text-xs font-semibold px-3 py-1.5 rounded-full transition-colors ${
+              className={`rounded-full px-3 py-1.5 text-xs font-semibold transition-colors ${
                 filteredCopyablePaths.length === 0
                   ? "text-muted-foreground/60 bg-muted/40 cursor-not-allowed"
                   : "bg-blue-500/10 text-blue-300 hover:bg-blue-500/20"
               }`}
             >
-              Copy filtered files {filteredCopyablePaths.length > 0 ? `(${filteredCopyablePaths.length})` : ""}
+              Copy Shown {filteredCopyablePaths.length > 0 ? `(${filteredCopyablePaths.length})` : ""}
             </button>
             <button
               onClick={handleBulkRedownload}
               disabled={selectedIdsFiltered.length === 0}
-              className={`text-xs font-semibold px-3 py-1.5 rounded-full transition-colors ${
+              className={`rounded-full px-3 py-1.5 text-xs font-semibold transition-colors ${
                 selectedIdsFiltered.length === 0
                   ? "text-muted-foreground/60 bg-muted/40 cursor-not-allowed"
                   : "bg-primary text-primary-foreground hover:bg-primary/90"
               }`}
             >
-              Re-download selected {selectedIdsFiltered.length > 0 ? `(${selectedIdsFiltered.length})` : ""}
+              Re-download {selectedIdsFiltered.length > 0 ? `(${selectedIdsFiltered.length})` : ""}
             </button>
             <HistoryExport entries={entries} />
           </HistoryHeader>
