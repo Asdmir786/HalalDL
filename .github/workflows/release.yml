@@ -26,13 +26,12 @@ jobs:
       - uses: actions/setup-node@v6
         with:
           node-version: 22
-          cache: pnpm
 
       - name: Enable Corepack pnpm
         shell: pwsh
         run: |
           corepack enable
-          corepack install
+          corepack prepare pnpm@10.33.0 --activate
 
       - name: Show tool versions
         shell: pwsh
@@ -40,6 +39,21 @@ jobs:
           node -v
           npm -v
           pnpm -v
+
+      - name: Get pnpm store path
+        id: pnpm-store
+        shell: pwsh
+        run: |
+          $storePath = pnpm store path
+          "store_path=$storePath" | Out-File -FilePath $env:GITHUB_OUTPUT -Append -Encoding utf8
+
+      - name: Cache pnpm store
+        uses: actions/cache@v5
+        with:
+          path: ${{ steps.pnpm-store.outputs.store_path }}
+          key: ${{ runner.os }}-pnpm-store-${{ hashFiles('pnpm-lock.yaml') }}
+          restore-keys: |
+            ${{ runner.os }}-pnpm-store-
 
       - name: Install pnpm dependencies
         shell: pwsh
@@ -49,16 +63,21 @@ jobs:
         uses: dtolnay/rust-toolchain@stable
 
       - name: Install sccache
-        uses: taiki-e/install-action@v2
-        with:
-          tool: sccache
-
-      - name: Add cargo bin to PATH
         shell: pwsh
         run: |
-          $cargoBin = Join-Path $env:USERPROFILE ".cargo\bin"
-          $cargoBin | Out-File -FilePath $env:GITHUB_PATH -Append -Encoding utf8
-          $env:PATH = "$cargoBin;$env:PATH"
+          $release = Invoke-RestMethod -Uri "https://api.github.com/repos/mozilla/sccache/releases/latest" -Headers @{ "User-Agent" = "HalalDL-CI" }
+          $asset = $release.assets | Where-Object { $_.name -match "x86_64-pc-windows-msvc\\.tar\\.gz$" } | Select-Object -First 1
+          if (-not $asset) { throw "Unable to find Windows sccache asset" }
+          $archivePath = Join-Path $env:RUNNER_TEMP $asset.name
+          Invoke-WebRequest -Uri $asset.browser_download_url -OutFile $archivePath
+          $extractDir = Join-Path $env:RUNNER_TEMP "sccache"
+          if (Test-Path $extractDir) { Remove-Item -Recurse -Force $extractDir }
+          New-Item -ItemType Directory -Path $extractDir | Out-Null
+          tar -xf $archivePath -C $extractDir
+          $binaryDir = Split-Path -Parent ((Get-ChildItem -Path $extractDir -Recurse -Filter sccache.exe | Select-Object -First 1).FullName)
+          if (-not $binaryDir) { throw "sccache.exe not found after extraction" }
+          $binaryDir | Out-File -FilePath $env:GITHUB_PATH -Append -Encoding utf8
+          $env:PATH = "$binaryDir;$env:PATH"
           Get-Command sccache -ErrorAction Stop | Out-Host
 
       - name: Expose GitHub runtime for sccache
