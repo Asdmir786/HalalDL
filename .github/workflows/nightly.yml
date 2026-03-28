@@ -14,20 +14,17 @@ jobs:
     timeout-minutes: 90
     env:
       FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: "true"
-      SCCACHE_GHA_ENABLED: "true"
-      RUSTC_WRAPPER: sccache
     steps:
       - uses: actions/checkout@v6
+
+      - name: Install pnpm
+        uses: pnpm/action-setup@v5
 
       - uses: actions/setup-node@v6
         with:
           node-version: 22
-
-      - name: Enable Corepack pnpm
-        shell: pwsh
-        run: |
-          corepack enable
-          corepack prepare pnpm@10.33.0 --activate
+          cache: pnpm
+          cache-dependency-path: pnpm-lock.yaml
 
       - name: Show tool versions
         shell: pwsh
@@ -36,52 +33,12 @@ jobs:
           npm -v
           pnpm -v
 
-      - name: Get pnpm store path
-        id: pnpm-store
-        shell: pwsh
-        run: |
-          $storePath = pnpm store path
-          "store_path=$storePath" | Out-File -FilePath $env:GITHUB_OUTPUT -Append -Encoding utf8
-
-      - name: Cache pnpm store
-        uses: actions/cache@v5
-        with:
-          path: ${{ steps.pnpm-store.outputs.store_path }}
-          key: ${{ runner.os }}-pnpm-store-${{ hashFiles('pnpm-lock.yaml') }}
-          restore-keys: |
-            ${{ runner.os }}-pnpm-store-
-
       - name: Install pnpm dependencies
         shell: pwsh
         run: pnpm install --frozen-lockfile
 
       - name: Install Rust toolchain
         uses: dtolnay/rust-toolchain@stable
-
-      - name: Install sccache
-        shell: pwsh
-        run: |
-          $release = Invoke-RestMethod -Uri "https://api.github.com/repos/mozilla/sccache/releases/latest" -Headers @{ "User-Agent" = "HalalDL-CI" }
-          $asset = $release.assets | Where-Object { $_.name -match "x86_64-pc-windows-msvc\\.tar\\.gz$" } | Select-Object -First 1
-          if (-not $asset) { throw "Unable to find Windows sccache asset" }
-          $archivePath = Join-Path $env:RUNNER_TEMP $asset.name
-          Invoke-WebRequest -Uri $asset.browser_download_url -OutFile $archivePath
-          $extractDir = Join-Path $env:RUNNER_TEMP "sccache"
-          if (Test-Path $extractDir) { Remove-Item -Recurse -Force $extractDir }
-          New-Item -ItemType Directory -Path $extractDir | Out-Null
-          tar -xf $archivePath -C $extractDir
-          $binaryDir = Split-Path -Parent ((Get-ChildItem -Path $extractDir -Recurse -Filter sccache.exe | Select-Object -First 1).FullName)
-          if (-not $binaryDir) { throw "sccache.exe not found after extraction" }
-          $binaryDir | Out-File -FilePath $env:GITHUB_PATH -Append -Encoding utf8
-          $env:PATH = "$binaryDir;$env:PATH"
-          Get-Command sccache -ErrorAction Stop | Out-Host
-
-      - name: Expose GitHub runtime for sccache
-        uses: crazy-max/ghaction-github-runtime@v3
-
-      - name: sccache stats (pre)
-        shell: pwsh
-        run: sccache --show-stats
 
       - name: Rust cache
         uses: swatinem/rust-cache@v2
@@ -105,11 +62,6 @@ jobs:
             "{0} *{1}" -f $hash.Hash.ToLowerInvariant(), $_.Name
           }
           $hashLines | Set-Content -Path out/SHA256SUMS.txt -Encoding ascii
-
-      - name: sccache stats (post)
-        if: always()
-        shell: pwsh
-        run: sccache --show-stats
 
       - name: Upload build artifacts
         if: success()
