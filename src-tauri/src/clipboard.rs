@@ -22,6 +22,7 @@ pub fn copy_files_to_clipboard(paths: Vec<String>) -> Result<(), String> {
 
         const CF_HDROP: u32 = 0x000F;
         const CF_DIB: u32 = 8;
+        const CF_UNICODETEXT: u32 = 13;
 
         if paths.is_empty() {
             return Err("No files provided".to_string());
@@ -169,6 +170,22 @@ pub fn copy_files_to_clipboard(paths: Vec<String>) -> Result<(), String> {
             wide
         }
 
+        fn make_clipboard_text(paths: &[PathBuf]) -> Vec<u8> {
+            let text = paths
+                .iter()
+                .map(|path| path.display().to_string())
+                .collect::<Vec<_>>()
+                .join("\r\n");
+            let mut wide: Vec<u16> = text.encode_utf16().collect();
+            wide.push(0);
+
+            let mut bytes = Vec::with_capacity(wide.len() * size_of::<u16>());
+            for unit in wide {
+                bytes.extend_from_slice(&unit.to_le_bytes());
+            }
+            bytes
+        }
+
         #[repr(C)]
         struct Point {
             x: i32,
@@ -221,6 +238,7 @@ pub fn copy_files_to_clipboard(paths: Vec<String>) -> Result<(), String> {
             return Err("No valid files provided".to_string());
         }
 
+        let clipboard_text = make_clipboard_text(&valid_paths);
         let dropfiles_size = size_of::<DropFiles>();
         let bytes_size = dropfiles_size + (wide_list.len() * size_of::<u16>());
 
@@ -274,13 +292,13 @@ pub fn copy_files_to_clipboard(paths: Vec<String>) -> Result<(), String> {
                 return Err(format!("EmptyClipboard failed: {}", GetLastError()));
             }
 
-            if SetClipboardData(CF_HDROP, hglobal).is_null() {
-                CloseClipboard();
+            let text_copied = set_clipboard_bytes(CF_UNICODETEXT, &clipboard_text);
+            let file_drop_copied = SetClipboardData(CF_HDROP, hglobal).is_null() == false;
+            if !file_drop_copied {
                 GlobalFree(hglobal);
-                return Err(format!("SetClipboardData(CF_HDROP) failed: {}", GetLastError()));
             }
 
-            if valid_paths.len() == 1 {
+            if valid_paths.len() == 1 && file_drop_copied {
                 if let Some((dib_bytes, png_bytes)) = load_image_clipboard_payload(&valid_paths[0]) {
                     let _ = set_clipboard_bytes(CF_DIB, &dib_bytes);
 
@@ -293,7 +311,7 @@ pub fn copy_files_to_clipboard(paths: Vec<String>) -> Result<(), String> {
 
             let format_name = make_clipboard_format_name("Preferred DropEffect");
             let format_id = RegisterClipboardFormatW(format_name.as_ptr());
-            if format_id != 0 {
+            if format_id != 0 && file_drop_copied {
                 let effect_bytes_size = size_of::<u32>();
                 let hglobal_effect = GlobalAlloc((GMEM_MOVEABLE | GMEM_ZEROINIT) as u32, effect_bytes_size);
                 if !hglobal_effect.is_null() {
@@ -311,6 +329,10 @@ pub fn copy_files_to_clipboard(paths: Vec<String>) -> Result<(), String> {
             }
 
             CloseClipboard();
+
+            if !text_copied && !file_drop_copied {
+                return Err("Failed to write any clipboard data".to_string());
+            }
         }
 
         Ok(())

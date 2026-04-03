@@ -1,5 +1,6 @@
 import { dirname } from "@tauri-apps/api/path";
 import { invoke } from "@tauri-apps/api/core";
+import { exists, readDir } from "@tauri-apps/plugin-fs";
 import { revealItemInDir, openPath } from "@tauri-apps/plugin-opener";
 import { useLogsStore } from "@/store/logs";
 import { toast } from "sonner";
@@ -43,6 +44,84 @@ function stripAnsiSimple(input: string): string {
     out += input[i];
   }
   return out;
+}
+
+function getPathParts(path: string) {
+  const slashIdx = path.lastIndexOf("/");
+  const backslashIdx = path.lastIndexOf("\\");
+  const lastSepIdx = Math.max(slashIdx, backslashIdx);
+  const sep = backslashIdx >= slashIdx ? "\\" : "/";
+  const dir = lastSepIdx >= 0 ? path.slice(0, lastSepIdx) : "";
+  const base = lastSepIdx >= 0 ? path.slice(lastSepIdx + 1) : path;
+  const dotIdx = base.lastIndexOf(".");
+  const ext = dotIdx > 0 ? base.slice(dotIdx + 1) : "";
+  const baseNoExt = dotIdx > 0 ? base.slice(0, dotIdx) : base;
+  return { dir, base, ext, baseNoExt, sep };
+}
+
+function extractBracketedJobId(path: string): string | null {
+  const match = path.match(/\[([0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12})\]/i);
+  return match?.[1] ?? null;
+}
+
+function looksFinalMediaName(name: string): boolean {
+  return !name.endsWith(".part") && !name.includes(".converting.");
+}
+
+async function resolveExistingClipboardPath(path: string): Promise<string | null> {
+  const normalized = normalizeFsPath(path);
+  if (!normalized) return null;
+  if (await exists(normalized)) return normalized;
+
+  const { dir, baseNoExt } = getPathParts(normalized);
+  if (!dir) return null;
+
+  const entries = await readDir(dir);
+  const files = entries
+    .map((entry) => entry.name)
+    .filter((name): name is string => Boolean(name));
+
+  const jobId = extractBracketedJobId(normalized);
+  if (jobId) {
+    const byJobId = files.find((name) => name.includes(`[${jobId}]`) && looksFinalMediaName(name));
+    if (byJobId) {
+      return `${dir}\\${byJobId}`;
+    }
+  }
+
+  const byStem = files.find((name) => name.startsWith(baseNoExt) && looksFinalMediaName(name));
+  if (byStem) {
+    return `${dir}\\${byStem}`;
+  }
+
+  return null;
+}
+
+async function waitForClipboardPaths(paths: string[]): Promise<string[]> {
+  const attempts = 12;
+  for (let attempt = 0; attempt < attempts; attempt += 1) {
+    const resolved = (
+      await Promise.all(
+        paths.map(async (path) => {
+          try {
+            return await resolveExistingClipboardPath(path);
+          } catch {
+            return null;
+          }
+        })
+      )
+    ).filter((value): value is string => Boolean(value));
+
+    if (resolved.length > 0) {
+      return resolved;
+    }
+
+    if (attempt < attempts - 1) {
+      await new Promise((resolve) => window.setTimeout(resolve, 150));
+    }
+  }
+
+  return [];
 }
 
 export async function revealInExplorer(path: string) {
@@ -143,8 +222,14 @@ export async function openFile(path: string) {
 }
 
 export async function copyFilesToClipboard(paths: string[]) {
-  const resolved = paths.map(normalizeFsPath).filter(Boolean);
-  if (!resolved.length) return;
+  const requested = paths.map(normalizeFsPath).filter(Boolean);
+  if (!requested.length) return;
+
+  const resolved = await waitForClipboardPaths(requested);
+  if (!resolved.length) {
+    throw new Error("No valid files provided");
+  }
+
   await invoke("copy_files_to_clipboard", { paths: resolved });
 }
 

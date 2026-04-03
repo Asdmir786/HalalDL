@@ -76,10 +76,15 @@ export function HistoryGrid({
     if (entry.outputPath) revealInExplorer(entry.outputPath);
   };
 
-  const handleCopyFile = () => {
+  const handleCopyFile = async () => {
     if (explicitOutputPaths.length > 0 && fileExists) {
-      copyFilesToClipboard(explicitOutputPaths);
-      toast.success("Copied to clipboard");
+      try {
+        await copyFilesToClipboard(explicitOutputPaths);
+        toast.success("Copied to clipboard");
+      } catch (e) {
+        const message = e instanceof Error ? e.message : String(e);
+        toast.error(`Failed to copy: ${message}`);
+      }
     }
   };
 
@@ -209,7 +214,7 @@ export function HistoryGrid({
           </ContextMenuItem>
         )}
         {isCompleted && entry.outputPath && fileExists && (
-            <ContextMenuItem onClick={handleCopyFile}>
+            <ContextMenuItem onClick={() => void handleCopyFile()}>
               <Copy className="w-3.5 h-3.5 mr-2" /> Copy
             </ContextMenuItem>
         )}
