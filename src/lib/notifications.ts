@@ -10,6 +10,7 @@ type NotificationKind = "info" | "success" | "error";
 
 const APP_UPDATE_NOTIFY_KEY = "halaldl:lastNotifiedAppUpdateVersion";
 const TOOL_UPDATE_NOTIFY_KEY = "halaldl:lastNotifiedToolUpdateVersions";
+const PENDING_DESKTOP_ATTENTION_KEY = "halaldl:pendingDesktopAttentionTarget";
 let desktopPermissionCache: boolean | null = null;
 
 async function ensureDesktopNotificationPermission() {
@@ -48,6 +49,7 @@ async function sendDesktopNotification(
   sendNotification({
     title,
     body,
+    autoCancel: true,
     ...(target ? { extra: buildAttentionExtra(target) } : {}),
   });
 }
@@ -78,6 +80,9 @@ export async function notifyUser(
 
   if (useDesktop) {
     if (useSettingsStore.getState().settings.notifications) {
+      if (target) {
+        writePendingDesktopAttentionTarget(target);
+      }
       await sendDesktopNotification(title, description, target);
     }
     return;
@@ -139,4 +144,53 @@ export function writeLastNotifiedToolUpdateVersions(versions: Record<string, str
   } catch {
     void 0;
   }
+}
+
+export function readPendingDesktopAttentionTarget() {
+  try {
+    const raw = localStorage.getItem(PENDING_DESKTOP_ATTENTION_KEY);
+    if (!raw) return null;
+    const parsed = JSON.parse(raw) as AttentionTargetInput | null;
+    if (!parsed || typeof parsed !== "object") return null;
+    if (
+      parsed.screen !== "downloads" &&
+      parsed.screen !== "presets" &&
+      parsed.screen !== "tools" &&
+      parsed.screen !== "logs" &&
+      parsed.screen !== "history" &&
+      parsed.screen !== "settings"
+    ) {
+      return null;
+    }
+    if (typeof parsed.reason !== "string" || !parsed.reason.trim()) {
+      return null;
+    }
+    return parsed;
+  } catch {
+    return null;
+  }
+}
+
+export function writePendingDesktopAttentionTarget(target: AttentionTargetInput) {
+  try {
+    localStorage.setItem(PENDING_DESKTOP_ATTENTION_KEY, JSON.stringify(target));
+  } catch {
+    void 0;
+  }
+}
+
+export function clearPendingDesktopAttentionTarget() {
+  try {
+    localStorage.removeItem(PENDING_DESKTOP_ATTENTION_KEY);
+  } catch {
+    void 0;
+  }
+}
+
+export async function consumePendingDesktopAttentionTarget() {
+  const target = readPendingDesktopAttentionTarget();
+  if (!target) return false;
+  clearPendingDesktopAttentionTarget();
+  await activateAttentionTarget(target);
+  return true;
 }

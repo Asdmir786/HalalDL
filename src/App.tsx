@@ -38,6 +38,7 @@ import {
 } from "@/lib/commands";
 import { checkAndStoreAppUpdate } from "@/lib/app-updates/service";
 import {
+  consumePendingDesktopAttentionTarget,
   notifyUser,
   readLastNotifiedAppUpdateVersion,
   readLastNotifiedToolUpdateVersions,
@@ -470,6 +471,34 @@ export default function App() {
       }
     };
   }, [addClipboardDownload, processLaunchUrls]);
+
+  useEffect(() => {
+    const tryConsumePendingTarget = () => {
+      if (document.visibilityState !== "visible" || !document.hasFocus()) {
+        return;
+      }
+      void consumePendingDesktopAttentionTarget().catch((error) => {
+        console.error(error);
+      });
+    };
+
+    const handleFocus = () => {
+      tryConsumePendingTarget();
+    };
+
+    const handleVisibilityChange = () => {
+      tryConsumePendingTarget();
+    };
+
+    window.addEventListener("focus", handleFocus);
+    document.addEventListener("visibilitychange", handleVisibilityChange);
+    window.setTimeout(tryConsumePendingTarget, 150);
+
+    return () => {
+      window.removeEventListener("focus", handleFocus);
+      document.removeEventListener("visibilitychange", handleVisibilityChange);
+    };
+  }, []);
 
   useEffect(() => {
     if (!settings.enableBackgroundUpdateChecks) return;
