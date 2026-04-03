@@ -444,7 +444,18 @@ export async function startDownload(jobId: string) {
 
       if (settings.notifications && finalJob) {
         const title = finalJob.title || "Download Complete";
-        sendDownloadCompleteNotification("Download Finished", `${title} has been downloaded successfully.`);
+        sendDownloadCompleteNotification(
+          "Download Finished",
+          `${title} has been downloaded successfully.`,
+          {
+            screen: "downloads",
+            targetType: "job",
+            targetId: jobId,
+            section: "recent",
+            reason: "download-finished",
+            actionLabel: "Show download",
+          }
+        );
       }
 
       if (settings.autoCopyFile && clipboardPaths.length > 0) {

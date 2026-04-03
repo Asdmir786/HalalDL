@@ -29,6 +29,7 @@ import {
 import { toast } from "sonner";
 import { getAppMode } from "@/lib/tools/app-mode";
 import { startQueuedJobs } from "@/lib/downloader";
+import { isDemoModeEnabled, seedMarketingDemoState } from "@/lib/demo-mode";
 
 export function usePersistenceInit(): MutableRefObject<boolean> {
   const { setSettings } = useSettingsStore();
@@ -74,6 +75,13 @@ export function usePersistenceInit(): MutableRefObject<boolean> {
       if (initialized.current) return;
 
       try {
+        if (isDemoModeEnabled()) {
+          seedMarketingDemoState();
+          initialized.current = true;
+          addLog({ level: "info", message: "Marketing demo mode seeded" });
+          return;
+        }
+
         const currentMode = getAppMode();
         const lastModeKey = "halaldl:lastAppMode";
         const fullSwitchKey = "halaldl:fullSwitchAutoInstall";

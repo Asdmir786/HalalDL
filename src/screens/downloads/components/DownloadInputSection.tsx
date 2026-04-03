@@ -376,7 +376,7 @@ export function DownloadInputSection({
   }, [instagramMediaSummary]);
 
   return (
-    <div className="flex flex-col gap-1.5 rounded-2xl border border-white/8 bg-white/[0.03] p-1.5">
+    <div className="flex flex-col gap-1.5 rounded-2xl border border-border/60 bg-card/60 p-1.5 dark:border-white/8 dark:bg-white/[0.03]">
       <div className="flex flex-col gap-1.5 xl:flex-row xl:items-center">
         <div className="relative min-w-0 flex-1">
           <Input
@@ -387,7 +387,7 @@ export function DownloadInputSection({
             onChange={(e) => handleUrlChange(e.target.value)}
             onFocus={(e) => handleUrlFocus(e.currentTarget)}
             onKeyDown={handleUrlKeyDown}
-            className="h-10 rounded-xl border-white/10 bg-background/90 px-3.5 shadow-sm focus-visible:ring-1"
+            className="h-10 rounded-xl border-border/65 bg-background/95 px-3.5 shadow-sm focus-visible:ring-1 dark:border-white/10 dark:bg-background/90"
           />
         </div>
 
@@ -396,13 +396,13 @@ export function DownloadInputSection({
             type="button"
             variant="outline"
             size="sm"
-            className="h-9 rounded-xl border-white/10 bg-background/70 px-3 text-[11px] font-semibold"
+            className="h-9 rounded-xl border-border/65 bg-background/88 px-3 text-[11px] font-semibold dark:border-white/10 dark:bg-background/70"
             onClick={() => void handlePasteFromClipboard()}
           >
             <Clipboard className="mr-1.5 h-3.5 w-3.5" />
             Paste
           </MotionButton>
-          <div className="flex h-9 items-center gap-0.5 rounded-xl border border-white/10 bg-background/70 p-0.5 shadow-sm">
+          <div className="flex h-9 items-center gap-0.5 rounded-xl border border-border/65 bg-background/88 p-0.5 shadow-sm dark:border-white/10 dark:bg-background/70">
             <MotionButton
               type="button"
               variant={addMode === "queue" ? "secondary" : "ghost"}
@@ -454,7 +454,7 @@ export function DownloadInputSection({
         </div>
       )}
 
-      <div className="rounded-xl border border-white/8 bg-background/65 px-3 py-2 shadow-sm">
+      <div className="rounded-xl border border-border/60 bg-background/82 px-3 py-2 shadow-sm dark:border-white/8 dark:bg-background/65">
         <div className="space-y-1.5">
           <div className="flex items-center justify-between gap-3">
             <div className="min-w-0">
@@ -488,7 +488,7 @@ export function DownloadInputSection({
             onValueChange={onPresetChange}
             disabled={isDirectImageUrl || isInstagramImageOnly}
           >
-            <SelectTrigger className="h-10 rounded-lg border-white/10 bg-background/90 px-3 shadow-sm focus:ring-1 disabled:cursor-not-allowed disabled:opacity-70">
+            <SelectTrigger className="h-10 rounded-lg border-border/65 bg-background/95 px-3 shadow-sm focus:ring-1 disabled:cursor-not-allowed disabled:opacity-70 dark:border-white/10 dark:bg-background/90">
               {isDirectImageUrl ? (
                 <div className="min-w-0 text-left">
                   <div className="truncate text-sm font-semibold">Direct image detected</div>

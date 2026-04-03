@@ -84,7 +84,7 @@ export function HistoryHeader({
 
   return (
     <div className="flex flex-col gap-4">
-      <FadeInItem className="rounded-[28px] border border-border/40 bg-[linear-gradient(135deg,rgba(17,24,39,0.72),rgba(10,15,27,0.94))] p-5 shadow-[0_24px_70px_rgba(2,6,23,0.22)]">
+      <FadeInItem className="rounded-[28px] border border-border/55 bg-[linear-gradient(135deg,rgba(248,250,252,0.98),rgba(241,245,249,0.96))] p-5 shadow-[0_24px_70px_rgba(15,23,42,0.08)] dark:border-border/40 dark:bg-[linear-gradient(135deg,rgba(17,24,39,0.72),rgba(10,15,27,0.94))] dark:shadow-[0_24px_70px_rgba(2,6,23,0.22)]">
         <div className="flex flex-col gap-4">
           <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
             <div className="min-w-0 space-y-2">
@@ -102,13 +102,13 @@ export function HistoryHeader({
 
             {totalCount > 0 && (
               <div className="flex flex-wrap items-center gap-2 lg:justify-end">
-                <div className="flex items-center rounded-full border border-border/50 bg-background/40 p-1">
+                <div className="flex items-center rounded-full border border-border/60 bg-background/80 p-1 shadow-sm dark:border-border/50 dark:bg-background/40 dark:shadow-none">
                   <button
                     onClick={() => onViewModeChange("list")}
                     className={cn(
                       "rounded-full px-3 py-1.5 text-xs font-semibold transition-all",
                       viewMode === "list"
-                        ? "bg-background text-foreground shadow-sm"
+                        ? "bg-card text-foreground shadow-sm dark:bg-background"
                         : "text-muted-foreground hover:text-foreground"
                     )}
                     title="List view"
@@ -123,7 +123,7 @@ export function HistoryHeader({
                     className={cn(
                       "rounded-full px-3 py-1.5 text-xs font-semibold transition-all",
                       viewMode === "grid"
-                        ? "bg-background text-foreground shadow-sm"
+                        ? "bg-card text-foreground shadow-sm dark:bg-background"
                         : "text-muted-foreground hover:text-foreground"
                     )}
                     title="Grid view"
@@ -178,7 +178,7 @@ export function HistoryHeader({
       </FadeInItem>
 
       {totalCount > 0 && (
-        <FadeInItem className="rounded-2xl border border-border/40 bg-card/35 p-4 backdrop-blur-sm">
+        <FadeInItem className="rounded-2xl border border-border/50 bg-card/72 p-4 backdrop-blur-sm dark:border-border/40 dark:bg-card/35">
           <div className="flex flex-col gap-3">
             <div className="flex flex-col gap-3 lg:flex-row lg:items-center">
               <div className="relative flex-1">
@@ -187,7 +187,7 @@ export function HistoryHeader({
                   value={search}
                   onChange={(e) => onSearchChange(e.target.value)}
                   placeholder="Search titles, links, or sources"
-                  className="h-11 rounded-xl border-border/40 bg-background/55 pl-10 pr-9"
+                  className="h-11 rounded-xl border-border/55 bg-background/88 pl-10 pr-9 dark:border-border/40 dark:bg-background/55"
                 />
                 {search && (
                   <button
@@ -199,7 +199,7 @@ export function HistoryHeader({
                 )}
               </div>
 
-              <div className="inline-flex items-center gap-2 rounded-full border border-border/50 bg-background/45 px-3 py-2 text-xs text-muted-foreground">
+              <div className="inline-flex items-center gap-2 rounded-full border border-border/55 bg-background/82 px-3 py-2 text-xs text-muted-foreground dark:border-border/50 dark:bg-background/45">
                 <Filter className="h-3.5 w-3.5" />
                 {activeFilterCount > 0
                   ? `${activeFilterCount} filter${activeFilterCount === 1 ? "" : "s"} active`
@@ -263,7 +263,7 @@ export function HistoryHeader({
 
 function FilterSection({ label, children }: { label: string; children: React.ReactNode }) {
   return (
-    <div className="rounded-xl border border-border/30 bg-background/35 px-3 py-3">
+    <div className="rounded-xl border border-border/45 bg-background/82 px-3 py-3 dark:border-border/30 dark:bg-background/35">
       <div className="mb-2 text-[10px] font-semibold uppercase tracking-[0.22em] text-muted-foreground">
         {label}
       </div>
@@ -284,7 +284,7 @@ function SummaryPill({
   icon?: React.ReactNode;
 }) {
   return (
-    <div className="rounded-2xl border border-border/35 bg-background/35 px-4 py-3">
+    <div className="rounded-2xl border border-border/50 bg-background/82 px-4 py-3 shadow-sm dark:border-border/35 dark:bg-background/35 dark:shadow-none">
       <div className="mb-2 flex items-center justify-between gap-2">
         <span className="text-[10px] font-semibold uppercase tracking-[0.22em] text-muted-foreground">
           {label}

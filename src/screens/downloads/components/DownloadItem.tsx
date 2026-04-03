@@ -25,6 +25,8 @@ import { getStatusMeta, PHASE_ORDER, type Phase } from "../constants";
 interface DownloadItemProps {
   job: DownloadJob;
   section?: "live" | "recent";
+  spotlighted?: boolean;
+  spotlightReason?: string | null;
   isSelected: boolean;
   onToggleSelection: (id: string) => void;
   onRemove: (id: string) => void;
@@ -46,6 +48,8 @@ interface DownloadItemProps {
 export function DownloadItem({
   job,
   section = "live",
+  spotlighted = false,
+  spotlightReason = null,
   isSelected,
   onToggleSelection,
   onRemove,
@@ -152,6 +156,7 @@ export function DownloadItem({
       <ContextMenu>
         <ContextMenuTrigger>
           <div
+            data-job-id={job.id}
             onDoubleClick={() => {
               if (job.status === "Done" && job.outputPath) {
                 openFile(job.outputPath);
@@ -160,23 +165,33 @@ export function DownloadItem({
             className={cn(
               "group relative flex gap-3 overflow-hidden rounded-2xl border py-3 pl-14 pr-3 backdrop-blur-md shadow-sm transition-all duration-300",
               isActiveJob &&
-                "border-sky-400/15 bg-[linear-gradient(135deg,rgba(56,189,248,0.08),rgba(15,23,42,0.86)_45%,rgba(15,23,42,0.96))] shadow-[0_14px_45px_rgba(14,165,233,0.12)] hover:border-sky-300/25",
+                "border-sky-500/25 bg-sky-500/[0.08] shadow-[0_14px_45px_rgba(14,165,233,0.10)] hover:border-sky-500/35 dark:bg-[linear-gradient(135deg,rgba(56,189,248,0.08),rgba(15,23,42,0.86)_45%,rgba(15,23,42,0.96))] dark:hover:border-sky-300/25",
               isQueuedJob &&
-                "border-yellow-400/12 bg-[linear-gradient(135deg,rgba(250,204,21,0.06),rgba(15,23,42,0.82)_40%,rgba(15,23,42,0.94))] hover:border-yellow-300/20",
+                "border-yellow-500/20 bg-yellow-500/[0.07] hover:border-yellow-500/30 dark:bg-[linear-gradient(135deg,rgba(250,204,21,0.06),rgba(15,23,42,0.82)_40%,rgba(15,23,42,0.94))] dark:hover:border-yellow-300/20",
               isPausedJob &&
-                "border-amber-400/14 bg-[linear-gradient(135deg,rgba(245,158,11,0.06),rgba(15,23,42,0.82)_40%,rgba(15,23,42,0.95))] hover:border-amber-300/22",
+                "border-amber-500/22 bg-amber-500/[0.07] hover:border-amber-500/30 dark:bg-[linear-gradient(135deg,rgba(245,158,11,0.06),rgba(15,23,42,0.82)_40%,rgba(15,23,42,0.95))] dark:hover:border-amber-300/22",
               isStoppedJob &&
-                "border-orange-400/14 bg-[linear-gradient(135deg,rgba(249,115,22,0.06),rgba(15,23,42,0.82)_40%,rgba(15,23,42,0.95))] hover:border-orange-300/22",
+                "border-orange-500/22 bg-orange-500/[0.07] hover:border-orange-500/30 dark:bg-[linear-gradient(135deg,rgba(249,115,22,0.06),rgba(15,23,42,0.82)_40%,rgba(15,23,42,0.95))] dark:hover:border-orange-300/22",
               !isActiveJob &&
                 !isQueuedJob &&
                 !isPausedJob &&
                 !isStoppedJob &&
                 !isRecentResult &&
-                "border-white/6 bg-background/45 hover:border-white/12 hover:bg-background/60",
+                "border-border/55 bg-card/74 hover:border-border/80 hover:bg-card/90 dark:border-white/6 dark:bg-background/45 dark:hover:border-white/12 dark:hover:bg-background/60",
               isRecentResult &&
-                "border-white/5 bg-background/28 opacity-[0.96] hover:border-white/10 hover:bg-background/40"
+                "border-border/50 bg-card/68 opacity-[0.98] hover:border-border/80 hover:bg-card/84 dark:border-white/5 dark:bg-background/28 dark:hover:border-white/10 dark:hover:bg-background/40"
+              ,
+              spotlighted &&
+                "border-emerald-400/35 bg-emerald-500/[0.10] shadow-[0_0_0_1px_rgba(52,211,153,0.20),0_18px_44px_rgba(16,185,129,0.14)]"
             )}
           >
+            {spotlighted && (
+              <>
+                <div className="pointer-events-none absolute inset-0 rounded-2xl bg-linear-to-r from-emerald-400/12 via-sky-400/8 to-transparent" />
+                <div className="pointer-events-none absolute inset-y-3 left-0 w-1 rounded-full bg-linear-to-b from-emerald-300 via-emerald-500 to-sky-400 shadow-[0_0_22px_rgba(16,185,129,0.55)]" />
+                <div className="pointer-events-none absolute inset-x-10 top-0 h-px bg-linear-to-r from-transparent via-emerald-200/80 to-transparent opacity-90" />
+              </>
+            )}
             {isActiveJob && (
               <div className="pointer-events-none absolute inset-x-10 top-0 h-16 bg-sky-400/10 blur-3xl" />
             )}
@@ -192,14 +207,14 @@ export function DownloadItem({
                 "absolute left-4 top-1/2 z-20 flex h-7 w-7 -translate-y-1/2 items-center justify-center rounded-full border transition-all",
                 isSelected
                   ? "border-primary/70 bg-primary text-primary-foreground"
-                  : "border-white/12 bg-black/10 text-transparent hover:border-white/25 hover:bg-white/10"
+                  : "border-border/65 bg-background/82 text-transparent hover:border-border/90 hover:bg-card/95 dark:border-white/12 dark:bg-black/10 dark:hover:border-white/25 dark:hover:bg-white/10"
               )}
             >
               <Check className="h-3.5 w-3.5" />
             </button>
             {/* Thumbnail Column */}
             <div className="relative z-10 flex items-center gap-3">
-              <div className="relative aspect-video w-24 overflow-hidden rounded-lg bg-black/20 ring-1 ring-white/10 shadow-inner transition-all group-hover:shadow-md">
+              <div className="relative aspect-video w-24 overflow-hidden rounded-lg bg-muted/35 ring-1 ring-border/55 shadow-inner transition-all group-hover:shadow-md dark:bg-black/20 dark:ring-white/10">
                 {job.thumbnail && !thumbError ? (
                   <img
                     src={job.thumbnail}
@@ -224,13 +239,20 @@ export function DownloadItem({
               {/* Header */}
               <div className="flex items-start justify-between gap-3">
                 <div className="min-w-0 flex flex-col gap-1">
-                    <h4 className="truncate pr-2 text-[15px] font-semibold leading-tight text-foreground/90 transition-colors group-hover:text-primary">
-                    {job.title || job.url}
-                    </h4>
+                    <div className="flex items-center gap-2">
+                      <h4 className="truncate pr-2 text-[15px] font-semibold leading-tight text-foreground/90 transition-colors group-hover:text-primary">
+                        {job.title || job.url}
+                      </h4>
+                      {spotlighted && (
+                        <span className="shrink-0 rounded-full border border-emerald-400/30 bg-emerald-400/10 px-2 py-0.5 text-[9px] font-semibold uppercase tracking-[0.16em] text-emerald-700 dark:text-emerald-200">
+                          {spotlightReason === "download-finished" ? "Just finished" : "Open here"}
+                        </span>
+                      )}
+                    </div>
                     <div className="flex flex-wrap items-center gap-1.5 text-[10px] font-medium text-muted-foreground">
                         {isActiveJob && (
                             <>
-                              <span className="whitespace-nowrap shrink-0 rounded-full border border-sky-400/20 bg-sky-400/10 px-1.5 py-0.5 text-[9px] font-semibold text-sky-200">
+                              <span className="whitespace-nowrap shrink-0 rounded-full border border-sky-400/20 bg-sky-400/10 px-1.5 py-0.5 text-[9px] font-semibold text-sky-700 dark:text-sky-200">
                                 Live
                               </span>
                               <span className="w-0.5 h-0.5 rounded-full bg-muted-foreground/50" />
@@ -249,7 +271,7 @@ export function DownloadItem({
                             <>
                               <span className="w-0.5 h-0.5 rounded-full bg-muted-foreground/50" />
                               <span
-                                className="whitespace-nowrap shrink-0 rounded-full border border-yellow-500/25 bg-yellow-500/10 px-1.5 py-0.5 text-[9px] font-semibold text-yellow-300"
+                                className="whitespace-nowrap shrink-0 rounded-full border border-yellow-500/25 bg-yellow-500/10 px-1.5 py-0.5 text-[9px] font-semibold text-yellow-700 dark:text-yellow-300"
                                 title={`Queue position ${queueMeta.position}`}
                               >
                                 #{queueMeta.position} in queue
@@ -291,7 +313,7 @@ export function DownloadItem({
                             type="button"
                             variant="secondary"
                             size="sm"
-                            className="h-7 rounded-full border border-amber-500/20 bg-amber-500/10 px-3 text-[11px] text-amber-200 shadow-sm gap-1.5 hover:bg-amber-500/20"
+                            className="h-7 rounded-full border border-amber-500/20 bg-amber-500/10 px-3 text-[11px] text-amber-700 shadow-sm gap-1.5 hover:bg-amber-500/20 dark:text-amber-200"
                             onClick={(e) => {
                               e.stopPropagation();
                               void onPause(job.id);
@@ -305,7 +327,7 @@ export function DownloadItem({
                             type="button"
                             variant="secondary"
                             size="sm"
-                            className="h-7 rounded-full border border-orange-500/20 bg-orange-500/10 px-3 text-[11px] text-orange-200 shadow-sm gap-1.5 hover:bg-orange-500/20"
+                            className="h-7 rounded-full border border-orange-500/20 bg-orange-500/10 px-3 text-[11px] text-orange-700 shadow-sm gap-1.5 hover:bg-orange-500/20 dark:text-orange-200"
                             onClick={(e) => {
                               e.stopPropagation();
                               void onStop(job.id);
@@ -474,7 +496,7 @@ export function DownloadItem({
                           <span className="text-[10px] font-semibold uppercase tracking-[0.14em] text-muted-foreground">
                             {isStoppedJob ? "Restart Preset" : "Resume Preset"}
                           </span>
-                          <span className="truncate rounded-full border border-white/10 bg-white/5 px-2 py-0.5 text-[10px] text-muted-foreground">
+                          <span className="truncate rounded-full border border-border/60 bg-background/85 px-2 py-0.5 text-[10px] text-muted-foreground dark:border-white/10 dark:bg-white/5">
                             {selectedPresetGroupLabel}
                           </span>
                         </div>
@@ -482,7 +504,7 @@ export function DownloadItem({
                           value={job.presetId}
                           onValueChange={(value) => onChangePreset(job.id, value)}
                         >
-                          <SelectTrigger className="h-9 rounded-lg border-white/10 bg-background/85 px-3 text-left text-[12px] shadow-sm focus:ring-1">
+                          <SelectTrigger className="h-9 rounded-lg border-border/65 bg-background/92 px-3 text-left text-[12px] shadow-sm focus:ring-1 dark:border-white/10 dark:bg-background/85">
                             <SelectValue placeholder="Choose preset" />
                           </SelectTrigger>
                           <SelectContent className="max-h-[320px] overflow-y-auto rounded-2xl border-border/70 bg-popover/98 p-1.5 shadow-2xl">

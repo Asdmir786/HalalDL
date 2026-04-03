@@ -1,4 +1,5 @@
 import { useToolsStore } from "@/store/tools";
+import { useAttentionStore } from "@/store/attention";
 import { MotionButton } from "@/components/motion/MotionButton";
 import { FadeInStagger, FadeInItem } from "@/components/motion/StaggerContainer";
 import {
@@ -9,7 +10,7 @@ import {
   Trash2,
   Info,
 } from "lucide-react";
-import { useRef, useLayoutEffect, type UIEvent } from "react";
+import { useEffect, useLayoutEffect, useRef, useState, type UIEvent } from "react";
 import { ToolRow } from "./components/ToolRow";
 import { ToolsProgressModal } from "./components/ToolsProgressModal";
 import { useDownloadProgressModal } from "./hooks/useDownloadProgressModal";
@@ -22,6 +23,11 @@ export function ToolsScreen() {
 
   const scrollRef = useRef<HTMLDivElement>(null);
   const scrollTopRef = useRef(0);
+  const attentionTarget = useAttentionStore((state) => state.target);
+  const clearAttentionTarget = useAttentionStore((state) => state.clearTarget);
+  const [spotlightToolId, setSpotlightToolId] = useState<string | null>(null);
+  const [spotlightToken, setSpotlightToken] = useState<number | null>(null);
+  const [spotlightReason, setSpotlightReason] = useState<string | null>(null);
 
   useLayoutEffect(() => {
     const el = scrollRef.current;
@@ -35,6 +41,43 @@ export function ToolsScreen() {
 
   const modal = useDownloadProgressModal(tools);
   const actions = useToolActions(modal.modalApi);
+
+  useEffect(() => {
+    if (!attentionTarget || attentionTarget.screen !== "tools") return;
+
+    const nextToken = attentionTarget.token;
+    const nextToolId =
+      attentionTarget.targetType === "tool" ? attentionTarget.targetId ?? null : null;
+
+    setSpotlightToken(nextToken);
+    setSpotlightToolId(nextToolId);
+    setSpotlightReason(attentionTarget.reason);
+
+    const scrollTarget = () => {
+      const container = scrollRef.current;
+      if (!container) return;
+      if (nextToolId) {
+        const row = container.querySelector<HTMLElement>(`[data-tool-id="${nextToolId}"]`);
+        row?.scrollIntoView({ behavior: "smooth", block: "center" });
+        return;
+      }
+      container.scrollTo({ top: 0, behavior: "smooth" });
+    };
+
+    const raf = window.requestAnimationFrame(scrollTarget);
+    clearAttentionTarget(nextToken);
+
+    const timeout = window.setTimeout(() => {
+      setSpotlightToken((current) => (current === nextToken ? null : current));
+      setSpotlightToolId((current) => (current === nextToolId ? null : current));
+      setSpotlightReason((current) => (current === attentionTarget.reason ? null : current));
+    }, 4200);
+
+    return () => {
+      window.cancelAnimationFrame(raf);
+      window.clearTimeout(timeout);
+    };
+  }, [attentionTarget, clearAttentionTarget]);
 
   return (
     <div
@@ -114,6 +157,8 @@ export function ToolsScreen() {
                     isLast={i === tools.length - 1}
                     isBusy={!!actions.busyTools[tool.id]}
                     isTransferActive={modal.isTransferActive}
+                    spotlighted={spotlightToken !== null && spotlightToolId === tool.id}
+                    spotlightReason={spotlightReason}
                     onRefresh={actions.refreshTool}
                     onInstallOrUpdate={actions.installOrUpdate}
                     onPipUpgrade={actions.handlePipUpgrade}

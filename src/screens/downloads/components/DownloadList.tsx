@@ -1,10 +1,11 @@
-import type { ReactNode } from "react";
+import { useEffect, useState, type ReactNode } from "react";
 import { AnimatePresence, motion, Variants } from "framer-motion";
 import { CheckCircle2, Copy, Download, Layers, MoreHorizontal, Plus, RotateCcw, Settings, Sparkles, Upload, X } from "lucide-react";
 
 import { DownloadItem } from "./DownloadItem";
 import { MotionButton } from "@/components/motion/MotionButton";
 import { FadeInItem } from "@/components/motion/StaggerContainer";
+import { useAttentionStore } from "@/store/attention";
 import { useNavigationStore } from "@/store/navigation";
 import { type DownloadJob } from "@/store/downloads";
 import { exportJobTemplate, importJobTemplate } from "@/lib/job-templates";
@@ -76,7 +77,7 @@ function SectionHeader({
   action?: ReactNode;
 }) {
   return (
-    <div className="sticky top-0 z-10 flex items-center justify-between gap-3 rounded-2xl border border-white/8 bg-background/88 px-4 py-3 backdrop-blur-xl">
+    <div className="sticky top-0 z-10 flex items-center justify-between gap-3 rounded-2xl border border-border/60 bg-background/92 px-4 py-3 backdrop-blur-xl dark:border-white/8 dark:bg-background/88">
       <div className="min-w-0 flex-1">
         <div className="flex items-center gap-2">
           <span className={`h-2 w-2 rounded-full ${accentClassName}`} />
@@ -86,7 +87,7 @@ function SectionHeader({
         </div>
       </div>
       <div className="flex items-center gap-2">
-        <div className="rounded-full border border-white/10 bg-white/5 px-2 py-1 text-[10px] font-semibold tabular-nums text-muted-foreground">
+        <div className="rounded-full border border-border/60 bg-card/80 px-2 py-1 text-[10px] font-semibold tabular-nums text-muted-foreground dark:border-white/10 dark:bg-white/5">
           {count}
         </div>
         {action}
@@ -125,7 +126,47 @@ export function DownloadList({
   formatRelativeTime,
 }: DownloadListProps) {
   const { setScreen } = useNavigationStore();
+  const attentionTarget = useAttentionStore((state) => state.target);
+  const clearAttentionTarget = useAttentionStore((state) => state.clearTarget);
+  const [spotlightJobId, setSpotlightJobId] = useState<string | null>(null);
+  const [spotlightReason, setSpotlightReason] = useState<string | null>(null);
+  const [spotlightToken, setSpotlightToken] = useState<number | null>(null);
   const filterEmptyCopy = FILTER_EMPTY_COPY[statusFilter];
+
+  useEffect(() => {
+    if (!attentionTarget || attentionTarget.screen !== "downloads") return;
+
+    const nextToken = attentionTarget.token;
+    const nextJobId =
+      attentionTarget.targetType === "job" ? attentionTarget.targetId ?? null : null;
+
+    setSpotlightToken(nextToken);
+    setSpotlightJobId(nextJobId);
+    setSpotlightReason(attentionTarget.reason);
+
+    const raf = window.requestAnimationFrame(() => {
+      if (nextJobId) {
+        document
+          .querySelector<HTMLElement>(`[data-job-id="${nextJobId}"]`)
+          ?.scrollIntoView({ behavior: "smooth", block: "center" });
+        return;
+      }
+      window.scrollTo({ top: 0, behavior: "smooth" });
+    });
+
+    clearAttentionTarget(nextToken);
+
+    const timeout = window.setTimeout(() => {
+      setSpotlightToken((current) => (current === nextToken ? null : current));
+      setSpotlightJobId((current) => (current === nextJobId ? null : current));
+      setSpotlightReason((current) => (current === attentionTarget.reason ? null : current));
+    }, 4200);
+
+    return () => {
+      window.cancelAnimationFrame(raf);
+      window.clearTimeout(timeout);
+    };
+  }, [attentionTarget, clearAttentionTarget]);
 
   return (
     <FadeInItem className="shrink-0 px-4 pb-10">
@@ -142,13 +183,13 @@ export function DownloadList({
             >
               <div className="group relative mb-8 cursor-default">
                 <div className="absolute -inset-4 rounded-full bg-primary/20 opacity-0 blur-xl transition-opacity duration-700 group-hover:opacity-100" />
-                <div className="relative flex h-20 w-20 items-center justify-center rounded-2xl border border-white/10 bg-background/50 shadow-2xl transition-all duration-500 group-hover:scale-105">
+                <div className="relative flex h-20 w-20 items-center justify-center rounded-2xl border border-border/60 bg-card/80 shadow-2xl transition-all duration-500 group-hover:scale-105 dark:border-white/10 dark:bg-background/50">
                   <Download className="h-8 w-8 text-primary/80" />
                 </div>
-                <div className="absolute -right-2 -top-2 flex h-8 w-8 items-center justify-center rounded-lg border border-white/10 bg-background/50 shadow-lg">
+                <div className="absolute -right-2 -top-2 flex h-8 w-8 items-center justify-center rounded-lg border border-border/60 bg-card/80 shadow-lg dark:border-white/10 dark:bg-background/50">
                   <Sparkles className="h-4 w-4 text-yellow-500/80" />
                 </div>
-                <div className="absolute -bottom-2 -left-2 flex h-8 w-8 items-center justify-center rounded-lg border border-white/10 bg-background/50 shadow-lg">
+                <div className="absolute -bottom-2 -left-2 flex h-8 w-8 items-center justify-center rounded-lg border border-border/60 bg-card/80 shadow-lg dark:border-white/10 dark:bg-background/50">
                   <Layers className="h-4 w-4 text-blue-500/80" />
                 </div>
               </div>
@@ -161,15 +202,15 @@ export function DownloadList({
               </p>
 
               <div className="mb-4 grid w-full gap-2 text-left text-[11px] text-muted-foreground sm:grid-cols-3">
-                <div className="rounded-xl border border-white/5 bg-white/5 p-3">
+                <div className="rounded-xl border border-border/55 bg-card/70 p-3 dark:border-white/5 dark:bg-white/5">
                   <div className="font-semibold text-foreground/90">Paste link</div>
                   <div className="mt-1 leading-5">Drop in a video, playlist, or supported direct media URL.</div>
                 </div>
-                <div className="rounded-xl border border-white/5 bg-white/5 p-3">
+                <div className="rounded-xl border border-border/55 bg-card/70 p-3 dark:border-white/5 dark:bg-white/5">
                   <div className="font-semibold text-foreground/90">Choose output</div>
                   <div className="mt-1 leading-5">Preset-first workflow with custom options when you need them.</div>
                 </div>
-                <div className="rounded-xl border border-white/5 bg-white/5 p-3">
+                <div className="rounded-xl border border-border/55 bg-card/70 p-3 dark:border-white/5 dark:bg-white/5">
                   <div className="font-semibold text-foreground/90">Track progress</div>
                   <div className="mt-1 leading-5">Running jobs, queue order, and recent results stay separated.</div>
                 </div>
@@ -178,7 +219,7 @@ export function DownloadList({
               <div className="grid w-full grid-cols-2 gap-3">
                 <button
                   type="button"
-                  className="col-span-2 flex cursor-pointer items-center gap-3 rounded-xl border border-white/5 bg-white/5 p-3 text-left transition-colors hover:bg-white/10 active:scale-[0.98]"
+                  className="col-span-2 flex cursor-pointer items-center gap-3 rounded-xl border border-border/55 bg-card/72 p-3 text-left transition-colors hover:bg-card/90 active:scale-[0.98] dark:border-white/5 dark:bg-white/5 dark:hover:bg-white/10"
                   onClick={() => document.getElementById("download-url-input")?.focus()}
                 >
                   <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-primary/10">
@@ -192,7 +233,7 @@ export function DownloadList({
 
                 <button
                   type="button"
-                  className="flex cursor-pointer items-center gap-3 rounded-xl border border-white/5 bg-white/5 p-3 text-left transition-colors hover:bg-white/10 active:scale-[0.98]"
+                  className="flex cursor-pointer items-center gap-3 rounded-xl border border-border/55 bg-card/72 p-3 text-left transition-colors hover:bg-card/90 active:scale-[0.98] dark:border-white/5 dark:bg-white/5 dark:hover:bg-white/10"
                   onClick={() => setScreen("presets")}
                 >
                   <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-purple-500/10">
@@ -206,7 +247,7 @@ export function DownloadList({
 
                 <button
                   type="button"
-                  className="flex cursor-pointer items-center gap-3 rounded-xl border border-white/5 bg-white/5 p-3 text-left transition-colors hover:bg-white/10 active:scale-[0.98]"
+                  className="flex cursor-pointer items-center gap-3 rounded-xl border border-border/55 bg-card/72 p-3 text-left transition-colors hover:bg-card/90 active:scale-[0.98] dark:border-white/5 dark:bg-white/5 dark:hover:bg-white/10"
                   onClick={() => setScreen("tools")}
                 >
                   <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-blue-500/10">
@@ -222,7 +263,7 @@ export function DownloadList({
           </div>
         ) : !hasVisibleJobs ? (
           <div className="flex min-h-[420px] min-w-0 flex-col items-center justify-center gap-3 px-8 py-10 text-center">
-            <div className="rounded-full border border-white/10 bg-white/5 px-3 py-1 text-[10px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">
+            <div className="rounded-full border border-border/60 bg-card/75 px-3 py-1 text-[10px] font-semibold uppercase tracking-[0.18em] text-muted-foreground dark:border-white/10 dark:bg-white/5">
               Filter Active
             </div>
             <h3 className="text-xl font-semibold tracking-tight">{filterEmptyCopy.title}</h3>
@@ -239,7 +280,7 @@ export function DownloadList({
           </div>
         ) : (
           <>
-            <div className="sticky top-0 z-20 flex shrink-0 flex-wrap items-center justify-end gap-2 border-b border-white/6 bg-background/75 px-4 py-2 backdrop-blur-xl">
+            <div className="sticky top-0 z-20 flex shrink-0 flex-wrap items-center justify-end gap-2 border-b border-border/45 bg-background/85 px-4 py-2 backdrop-blur-xl dark:border-white/6 dark:bg-background/75">
               <AnimatePresence>
                 {selectedIds.length > 0 && (
                   <motion.div
@@ -248,7 +289,7 @@ export function DownloadList({
                     exit={{ opacity: 0, x: 20 }}
                     className="flex flex-wrap items-center gap-2"
                   >
-                    <div className="rounded-full border border-white/10 bg-white/5 px-2.5 py-1 text-[11px] font-semibold text-foreground/85">
+                    <div className="rounded-full border border-border/60 bg-card/75 px-2.5 py-1 text-[11px] font-semibold text-foreground/85 dark:border-white/10 dark:bg-white/5">
                       {selectedIds.length} selected
                     </div>
                     {selectedFailedCount > 0 && (
@@ -268,7 +309,7 @@ export function DownloadList({
                       type="button"
                       variant="secondary"
                       size="sm"
-                      className="h-7 rounded-full border border-blue-500/20 bg-blue-500/10 px-3 text-[11px] text-blue-300 shadow-sm gap-1.5 hover:bg-blue-500/20"
+                      className="h-7 rounded-full border border-blue-500/20 bg-blue-500/10 px-3 text-[11px] text-blue-700 shadow-sm gap-1.5 hover:bg-blue-500/20 dark:text-blue-300"
                       onClick={onCopySelected}
                       disabled={!canCopySelected}
                     >
@@ -338,6 +379,8 @@ export function DownloadList({
                             key={job.id}
                             job={job}
                             section="live"
+                            spotlighted={spotlightToken !== null && spotlightJobId === job.id}
+                            spotlightReason={spotlightReason}
                             isSelected={selectedIds.includes(job.id)}
                             onToggleSelection={onToggleSelection}
                             onRemove={onRemoveJob}
@@ -358,7 +401,7 @@ export function DownloadList({
                 )}
 
                 {recentJobs.length > 0 && (
-                  <section className="relative -mx-px overflow-hidden border-y border-white/6 bg-[linear-gradient(180deg,rgba(10,18,29,0.98),rgba(7,13,22,0.97))] px-4 py-3 shadow-[inset_0_1px_0_rgba(255,255,255,0.02)]">
+                  <section className="relative -mx-px overflow-hidden border-y border-border/45 bg-[linear-gradient(180deg,rgba(248,250,252,0.96),rgba(241,245,249,0.92))] px-4 py-3 shadow-[inset_0_1px_0_rgba(255,255,255,0.55)] dark:border-white/6 dark:bg-[linear-gradient(180deg,rgba(10,18,29,0.98),rgba(7,13,22,0.97))] dark:shadow-[inset_0_1px_0_rgba(255,255,255,0.02)]">
                     <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_top,rgba(16,185,129,0.08),transparent_38%)]" />
                     <div className="relative space-y-2">
                       <SectionHeader
@@ -371,7 +414,7 @@ export function DownloadList({
                               type="button"
                               variant="ghost"
                               size="sm"
-                              className="h-9 shrink-0 rounded-full border border-muted/60 bg-background/65 px-3 text-[11px] text-muted-foreground gap-1.5 transition-colors hover:border-muted hover:text-foreground"
+                              className="h-9 shrink-0 rounded-full border border-border/60 bg-background/80 px-3 text-[11px] text-muted-foreground gap-1.5 transition-colors hover:border-border hover:text-foreground dark:border-muted/60 dark:bg-background/65 dark:hover:border-muted"
                               onClick={() => setScreen("history")}
                             >
                               +{overflowCount} more in History
@@ -379,7 +422,7 @@ export function DownloadList({
                           ) : undefined
                         }
                       />
-                      <div className="rounded-[24px] border border-white/6 bg-black/10 p-1.5 shadow-[inset_0_1px_0_rgba(255,255,255,0.03)]">
+                      <div className="rounded-[24px] border border-border/50 bg-card/72 p-1.5 shadow-[inset_0_1px_0_rgba(255,255,255,0.55)] dark:border-white/6 dark:bg-black/10 dark:shadow-[inset_0_1px_0_rgba(255,255,255,0.03)]">
                         <div className="space-y-1.5">
                           <AnimatePresence mode="popLayout" initial={false}>
                             {recentJobs.map((job) => (
@@ -387,6 +430,8 @@ export function DownloadList({
                                 key={job.id}
                                 job={job}
                                 section="recent"
+                                spotlighted={spotlightToken !== null && spotlightJobId === job.id}
+                                spotlightReason={spotlightReason}
                                 isSelected={selectedIds.includes(job.id)}
                                 onToggleSelection={onToggleSelection}
                                 onRemove={onRemoveJob}

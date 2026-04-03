@@ -1,5 +1,19 @@
 # Changelog
 
+## 0.4.0 - 2026-04-03
+- **Tray / Quick Downloads**: Added a dedicated quick download panel, richer tray actions, configurable tray click behavior, launch-at-login tray options, and a smoother clipboard-to-download flow without opening the full app every time.
+- **Subtitles / Presets**: Added subtitle-aware built-in presets, a new **Subtitles Only** preset, preferred subtitle language settings, and clearer preset grouping/details across the quick panel and main Downloads screen.
+- **App Updates**: Reworked the app update flow with release-aware package selection, checksum-verified installer downloads, better in-app update messaging, and safer install handoff once active downloads are finished.
+- **Notifications / Attention Routing**: Desktop notifications are now actionable instead of dead text. Clicking a tool update, app update, or completed download notification can restore HalalDL, open the right screen, and spotlight the exact tool/download that needs attention.
+- **Instagram Downloads**: Added DownloadGram-backed Instagram resolution for tougher posts, better carousel handling, explicit output-file tracking/copying, and support for image-only Instagram presets.
+- **Downloads / Queue**: Added hold controls for paused and stopped jobs, restored recent results behavior, made `Start now` the default add mode, and refined the downloads layout, launch panel, and scrolling behavior.
+- **Downloads / Validation**: Improved link checks with faster host recognition, better live verification states, and clearer supported/unsupported/unknown feedback before starting a job.
+- **Clipboard / Windows**: Improved file copy behavior for completed downloads and fixed the Windows paste shortcut in the URL flow.
+- **History / UI**: Refined the History header with clearer archive stats, filters, and view controls so stored jobs are easier to scan and manage.
+- **Tools / Packaging**: Replaced FFmpeg `7z` extraction with a simpler ZIP essentials flow, hardened extraction/verification, and improved tool update notifications to include current versions.
+- **UI Polish**: Added smoother in-app spotlight/highlight states for routed notifications so tools, downloads, and update sections are easier to locate at a glance.
+- **Tooling / CI**: Updated Windows CI and build tooling for newer Node and Rust workflows.
+
 ## 0.3.9 - 2026-03-12
 - **Tools**: Full Mode setup no longer waits for the four-tool startup scan before opening the install flow. Startup now checks the local app-managed bin first and can go straight into setup.
 - **Tools**: Removed the duplicate per-tool success popup after installs/updates. Tool setup now stays in a single modal flow instead of stacking a second congratulations dialog on restart.

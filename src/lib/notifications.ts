@@ -1,8 +1,10 @@
 import { isPermissionGranted, requestPermission, sendNotification } from "@tauri-apps/plugin-notification";
 import { toast } from "sonner";
+import { activateAttentionTarget, buildAttentionExtra, getAttentionActionLabel } from "@/lib/attention";
 import { isMainWindowVisible } from "@/lib/commands";
 import { useLogsStore } from "@/store/logs";
 import { useSettingsStore } from "@/store/settings";
+import type { AttentionTargetInput } from "@/store/attention";
 
 type NotificationKind = "info" | "success" | "error";
 
@@ -33,13 +35,21 @@ async function ensureDesktopNotificationPermission() {
   }
 }
 
-async function sendDesktopNotification(title: string, body: string) {
+async function sendDesktopNotification(
+  title: string,
+  body: string,
+  target?: AttentionTargetInput
+) {
   const permissionGranted = await ensureDesktopNotificationPermission();
   if (!permissionGranted) {
     return;
   }
 
-  sendNotification({ title, body });
+  sendNotification({
+    title,
+    body,
+    ...(target ? { extra: buildAttentionExtra(target) } : {}),
+  });
 }
 
 async function shouldUseDesktopNotification() {
@@ -61,26 +71,39 @@ async function shouldUseDesktopNotification() {
 export async function notifyUser(
   title: string,
   description: string,
-  kind: NotificationKind = "info"
+  kind: NotificationKind = "info",
+  target?: AttentionTargetInput
 ) {
   const useDesktop = await shouldUseDesktopNotification();
 
   if (useDesktop) {
     if (useSettingsStore.getState().settings.notifications) {
-      await sendDesktopNotification(title, description);
+      await sendDesktopNotification(title, description, target);
     }
     return;
   }
 
+  const toastOptions = target
+    ? {
+        description,
+        action: {
+          label: getAttentionActionLabel(target),
+          onClick: () => {
+            void activateAttentionTarget(target);
+          },
+        },
+      }
+    : { description };
+
   if (kind === "success") {
-    toast.success(title, { description });
+    toast.success(title, toastOptions);
     return;
   }
   if (kind === "error") {
-    toast.error(title, { description });
+    toast.error(title, toastOptions);
     return;
   }
-  toast.info(title, { description });
+  toast.info(title, toastOptions);
 }
 
 export function readLastNotifiedAppUpdateVersion() {

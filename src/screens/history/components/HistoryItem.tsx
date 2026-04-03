@@ -106,9 +106,9 @@ export function HistoryItem({
       <ContextMenuTrigger asChild>
         <div
           className={cn(
-            "group relative flex items-center gap-3 rounded-xl border border-transparent px-4 py-3",
-            "bg-card/30 backdrop-blur-sm transition-all duration-200",
-            "hover:bg-card/60 hover:border-border/50 hover:shadow-sm cursor-default"
+            "group relative flex items-center gap-3 rounded-xl border border-border/50 px-4 py-3",
+            "bg-card/72 backdrop-blur-sm transition-all duration-200 dark:border-transparent dark:bg-card/30",
+            "hover:bg-card/92 hover:border-border/80 hover:shadow-sm cursor-default dark:hover:bg-card/60 dark:hover:border-border/50"
           )}
           onDoubleClick={() => isCompleted && fileExists && handleOpen()}
         >
@@ -116,7 +116,7 @@ export function HistoryItem({
             <Checkbox
               checked={isSelected}
               onCheckedChange={() => onToggleSelection(entry.id)}
-              className="border-white/20 data-[state=checked]:bg-primary data-[state=checked]:border-primary"
+              className="border-border/65 data-[state=checked]:bg-primary data-[state=checked]:border-primary dark:border-white/20"
             />
           </div>
           {/* Thumbnail */}

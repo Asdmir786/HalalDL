@@ -513,7 +513,7 @@ export function HistoryScreen() {
                   className={`rounded-full px-3 py-1.5 text-xs font-semibold transition-colors ${
                     selectedCopyablePaths.length === 0
                       ? "cursor-not-allowed border border-border/30 bg-muted/30 text-muted-foreground/50"
-                      : "border border-blue-500/20 bg-blue-500/10 text-blue-300 hover:bg-blue-500/20"
+                      : "border border-blue-500/20 bg-blue-500/10 text-blue-700 hover:bg-blue-500/20 dark:text-blue-300"
                   }`}
                 >
                   Copy Selection {selectedCopyablePaths.length > 0 ? `(${selectedCopyablePaths.length})` : ""}
@@ -526,7 +526,7 @@ export function HistoryScreen() {
               className={`rounded-full px-3 py-1.5 text-xs font-semibold transition-colors ${
                 filteredCopyablePaths.length === 0
                   ? "text-muted-foreground/60 bg-muted/40 cursor-not-allowed"
-                  : "bg-blue-500/10 text-blue-300 hover:bg-blue-500/20"
+                  : "bg-blue-500/10 text-blue-700 hover:bg-blue-500/20 dark:text-blue-300"
               }`}
             >
               Copy Shown {filteredCopyablePaths.length > 0 ? `(${filteredCopyablePaths.length})` : ""}

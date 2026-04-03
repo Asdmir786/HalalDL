@@ -1,7 +1,8 @@
 import { appDataDir, join } from "@tauri-apps/api/path";
 import { exists } from "@tauri-apps/plugin-fs";
 import { useLogsStore } from "@/store/logs";
-import { sendNotification, requestPermission, isPermissionGranted } from '@tauri-apps/plugin-notification';
+import { notifyUser } from "@/lib/notifications";
+import type { AttentionTargetInput } from "@/store/attention";
 
 export type ToolResolution = {
   command: string;
@@ -52,20 +53,13 @@ export function isYouTubeUrl(url: string): boolean {
   }
 }
 
-export async function sendDownloadCompleteNotification(title: string, body: string) {
+export async function sendDownloadCompleteNotification(
+  title: string,
+  body: string,
+  target?: AttentionTargetInput
+) {
   try {
-    let permissionGranted = await isPermissionGranted();
-    if (!permissionGranted) {
-      const permission = await requestPermission();
-      permissionGranted = permission === 'granted';
-    }
-    
-    if (permissionGranted) {
-      sendNotification({
-        title,
-        body,
-      });
-    }
+    await notifyUser(title, body, "success", target);
   } catch (error) {
     useLogsStore.getState().addLog({ level: "warn", message: `Failed to send notification: ${String(error)}` });
   }

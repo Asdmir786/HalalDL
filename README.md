@@ -20,6 +20,7 @@ WinGet catalog updates can lag behind GitHub Releases, so the latest GitHub rele
 
 - **Local-first:** no account, no tracking, no cloud dependency
 - **Beginner-friendly:** paste a URL, pick a preset, and go
+- **Fast clipboard flow:** quick tray downloads and auto-paste keep repeat downloads moving
 - **Transparent:** raw logs stay visible instead of being hidden behind vague progress messages
 - **Flexible:** Full and Lite builds let you choose between convenience and control
 
@@ -84,7 +85,10 @@ The repo is public so you can inspect the source, workflows, and release process
 ## Features
 
 - High-quality video and audio downloads from supported platforms
-- Built-in presets for common formats and devices
+- Built-in presets for common formats, devices, and subtitle workflows
+- Quick tray downloads with clipboard-aware preset launching
+- In-app release checks with verified update downloads
+- Better Instagram support including carousel and image-only handling
 - Full transparency through raw `yt-dlp` output
 - Tools management for `yt-dlp`, `ffmpeg`, `aria2`, and optional runtime support
 - Download history with media-focused organization

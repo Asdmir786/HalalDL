@@ -107,9 +107,9 @@ export function HistoryGrid({
       <ContextMenuTrigger asChild>
         <div
           className={cn(
-            "group relative flex flex-col rounded-xl border border-transparent overflow-hidden",
-            "bg-card/30 backdrop-blur-sm transition-all duration-200",
-            "hover:bg-card/60 hover:border-border/50 hover:shadow-sm cursor-default"
+            "group relative flex flex-col rounded-xl border border-border/50 overflow-hidden",
+            "bg-card/72 backdrop-blur-sm transition-all duration-200 dark:border-transparent dark:bg-card/30",
+            "hover:bg-card/92 hover:border-border/80 hover:shadow-sm cursor-default dark:hover:bg-card/60 dark:hover:border-border/50"
           )}
           onDoubleClick={() => isCompleted && fileExists && handleOpen()}
         >
@@ -131,7 +131,7 @@ export function HistoryGrid({
                     <Checkbox
                         checked={isSelected}
                         onCheckedChange={() => onToggleSelection(entry.id)}
-                        className="border-white/50 bg-black/20 data-[state=checked]:bg-primary data-[state=checked]:border-primary backdrop-blur-sm"
+                        className="border-border/70 bg-background/85 data-[state=checked]:bg-primary data-[state=checked]:border-primary backdrop-blur-sm dark:border-white/50 dark:bg-black/20"
                     />
                 </div>
 
@@ -152,7 +152,7 @@ export function HistoryGrid({
                                 e.stopPropagation();
                                 handleOpen();
                             }}
-                            className="p-3 rounded-full bg-white/10 hover:bg-white/20 text-white backdrop-blur-md transition-transform hover:scale-110"
+                            className="rounded-full bg-background/85 p-3 text-foreground shadow-sm backdrop-blur-md transition-transform hover:scale-110 hover:bg-background dark:bg-white/10 dark:text-white dark:hover:bg-white/20"
                         >
                             <Play className="w-6 h-6 fill-current" />
                         </button>

@@ -632,12 +632,12 @@ export function DownloadsScreen() {
       <div className="pointer-events-none absolute inset-0 overflow-hidden">
         <div className="absolute left-10 top-0 h-56 w-56 rounded-full bg-sky-500/10 blur-3xl" />
         <div className="absolute right-[-4rem] top-10 h-72 w-72 rounded-full bg-emerald-500/8 blur-3xl" />
-        <div className="absolute inset-x-0 top-0 h-64 bg-[linear-gradient(180deg,rgba(255,255,255,0.035),transparent)]" />
+        <div className="absolute inset-x-0 top-0 h-64 bg-[linear-gradient(180deg,rgba(148,163,184,0.08),transparent)] dark:bg-[linear-gradient(180deg,rgba(255,255,255,0.035),transparent)]" />
       </div>
       <FadeInStagger className="relative pb-8">
         <FadeInItem className="shrink-0">
           <header className="px-4 pb-1.5 pt-2.5">
-            <div className="rounded-[24px] border border-white/10 bg-[linear-gradient(180deg,rgba(255,255,255,0.05),rgba(255,255,255,0.02))] shadow-[0_20px_80px_rgba(0,0,0,0.22)] backdrop-blur-xl">
+            <div className="rounded-[24px] border border-border/60 bg-card/78 shadow-[0_20px_60px_rgba(15,23,42,0.08)] backdrop-blur-xl dark:border-white/10 dark:bg-[linear-gradient(180deg,rgba(255,255,255,0.05),rgba(255,255,255,0.02))] dark:shadow-[0_20px_80px_rgba(0,0,0,0.22)]">
               <div className="px-3 py-2">
                 <div className="space-y-1.5">
                   <div className="flex flex-col gap-1 sm:flex-row sm:items-end sm:justify-between">

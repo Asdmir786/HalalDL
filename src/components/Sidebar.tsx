@@ -21,6 +21,7 @@ import { useEffect, useMemo, useState } from "react";
 import { useDownloadsStore } from "@/store/downloads";
 import { useAppUpdateStore } from "@/store/app-update";
 import { Progress } from "@/components/ui/progress";
+import { isDemoModeEnabled } from "@/lib/demo-mode";
 
 const NAV_ITEMS: { id: Screen; label: string; icon: LucideIcon }[] = [
   { id: "downloads", label: "Downloads", icon: HardDriveDownload },
@@ -36,11 +37,14 @@ import { motion } from "framer-motion";
 export function Sidebar() {
   const { currentScreen, setScreen, sidebarCollapsed, toggleSidebar } = useNavigationStore();
   const jobs = useDownloadsStore((s) => s.jobs);
-  const [version, setVersion] = useState("...");
+  const [version, setVersion] = useState(() => (isDemoModeEnabled() ? "0.4.0" : "..."));
   const appMode = String(import.meta.env.VITE_APP_MODE ?? "").trim().toUpperCase();
   const appModeLabel = appMode === "FULL" ? "Full" : "Lite";
 
   useEffect(() => {
+    if (isDemoModeEnabled()) {
+      return;
+    }
     getVersion().then(setVersion).catch(() => setVersion("unknown"));
   }, []);
 
@@ -88,7 +92,8 @@ export function Sidebar() {
       return {
         Icon: ArrowDownToLine,
         count: activeCount + queuedCount,
-        badgeClassName: "border border-white/20 bg-white/10 text-foreground/90 backdrop-blur-xl shadow-sm",
+        badgeClassName:
+          "border border-sky-500/25 bg-sky-500/12 text-sky-800 shadow-sm backdrop-blur-xl dark:text-sky-100",
         iconClassName: "text-foreground/95",
       };
     }
@@ -96,7 +101,8 @@ export function Sidebar() {
       return {
         Icon: Clock3,
         count: queuedCount,
-        badgeClassName: "border border-white/15 bg-white/5 text-foreground/80 backdrop-blur-xl",
+        badgeClassName:
+          "border border-amber-500/25 bg-amber-500/10 text-amber-800 backdrop-blur-xl dark:text-amber-200",
         iconClassName: "text-foreground/85",
       };
     }
@@ -104,7 +110,8 @@ export function Sidebar() {
       return {
         Icon: AlertTriangle,
         count: failedCount,
-        badgeClassName: "border border-white/10 bg-background/70 text-foreground/75 backdrop-blur-xl",
+        badgeClassName:
+          "border border-destructive/20 bg-destructive/10 text-destructive backdrop-blur-xl",
         iconClassName: "text-foreground/80",
       };
     }
@@ -133,7 +140,7 @@ export function Sidebar() {
 
   return (
     <aside className={cn(
-      "border-r border-white/10 glass flex flex-col h-full transition-all duration-300 ease-in-out relative",
+      "glass flex flex-col h-full border-r border-border/55 transition-all duration-300 ease-in-out relative dark:border-white/10",
       sidebarCollapsed ? "w-16" : "w-64"
     )}>
       <div className={cn(
@@ -214,7 +221,7 @@ export function Sidebar() {
                     </span>
                   )}
                   {isSettingsItem && showUpdateDot && (
-                    <span className="inline-flex items-center gap-1 rounded-full border border-blue-500/30 bg-blue-500/10 px-2 py-0.5 text-[9px] font-semibold text-blue-400">
+                    <span className="inline-flex items-center gap-1 rounded-full border border-blue-500/30 bg-blue-500/10 px-2 py-0.5 text-[9px] font-semibold text-blue-700 dark:text-blue-300">
                       <span className="w-1.5 h-1.5 rounded-full bg-blue-500 animate-pulse" />
                       Update
                     </span>
@@ -228,7 +235,7 @@ export function Sidebar() {
 
       {showGlobalProgress && (
         <div className={cn("px-3 pb-3", sidebarCollapsed && "px-2")}>
-          <div className={cn("rounded-xl border border-white/10 bg-muted/10 glass-card", sidebarCollapsed ? "p-2" : "p-3")}>
+          <div className={cn("glass-card rounded-xl bg-muted/25 dark:bg-muted/10", sidebarCollapsed ? "p-2" : "p-3")}>
             {!sidebarCollapsed && (
               <div className="flex items-center justify-between mb-2">
                 <span className="inline-flex items-center gap-1.5 text-xs font-semibold text-foreground/90">

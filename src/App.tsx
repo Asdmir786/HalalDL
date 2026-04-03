@@ -1,4 +1,5 @@
 import { Sidebar } from "@/components/Sidebar";
+import { activateAttentionTarget, parseAttentionExtra } from "@/lib/attention";
 import { useNavigationStore } from "@/store/navigation";
 import { Toaster } from "@/components/ui/sonner";
 import { PersistenceManager } from "@/components/PersistenceManager";
@@ -11,6 +12,7 @@ import { GlobalDragDrop } from "@/components/GlobalDragDrop";
 import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Cpu, Sparkles, Zap } from "lucide-react";
 import { listen } from "@tauri-apps/api/event";
+import { onAction } from "@tauri-apps/plugin-notification";
 import { QuickDownloadPanel } from "@/components/QuickDownloadPanel";
 import { useRuntimeStore } from "@/store/runtime";
 import { useDownloadsStore } from "@/store/downloads";
@@ -345,6 +347,7 @@ export default function App() {
   useEffect(() => {
     let disposeTray: (() => void) | undefined;
     let disposeDeepLinks: (() => void) | undefined;
+    let disposeNotificationAction: { unregister: () => Promise<void> } | undefined;
     const handleAction = async (action: TrayActionPayload["action"]) => {
       const latestSettings = useSettingsStore.getState().settings;
       const runtime = useRuntimeStore.getState();
@@ -449,9 +452,22 @@ export default function App() {
       disposeDeepLinks = unlisten;
     });
 
+    void onAction((notification) => {
+      const target = parseAttentionExtra(notification.extra);
+      if (!target) return;
+      void activateAttentionTarget(target, { restoreWindow: true }).catch((error) => {
+        console.error(error);
+      });
+    }).then((listener) => {
+      disposeNotificationAction = listener;
+    });
+
     return () => {
       if (disposeTray) disposeTray();
       if (disposeDeepLinks) disposeDeepLinks();
+      if (disposeNotificationAction) {
+        void disposeNotificationAction.unregister();
+      }
     };
   }, [addClipboardDownload, processLaunchUrls]);
 
@@ -481,7 +497,15 @@ export default function App() {
         ) {
           await notifyUser(
             "HalalDL update available",
-            `Version ${appUpdate.resolved.latestVersion} is ready to install from Settings.`
+            `Version ${appUpdate.resolved.latestVersion} is ready to install from Settings.`,
+            "info",
+            {
+              screen: "settings",
+              targetType: "section",
+              targetId: "about",
+              reason: "app-update-available",
+              actionLabel: "Open About",
+            }
           );
           lastNotifiedAppVersionRef.current = appUpdate.resolved.latestVersion;
           writeLastNotifiedAppUpdateVersion(appUpdate.resolved.latestVersion);
@@ -564,14 +588,28 @@ export default function App() {
           const tool = newlyAvailableTools[0];
           await notifyUser(
             `${tool.name} update available`,
-            `Current: ${tool.currentVersion} • Latest: ${tool.latestVersion}. Install it from the Tools screen.`
+            `Current: ${tool.currentVersion} • Latest: ${tool.latestVersion}. Install it from the Tools screen.`,
+            "info",
+            {
+              screen: "tools",
+              targetType: "tool",
+              targetId: tool.id,
+              reason: "tool-update-available",
+              actionLabel: "Open Tools",
+            }
           );
         } else if (newlyAvailableTools.length > 1) {
           await notifyUser(
             `${newlyAvailableTools.length} tool updates available`,
             newlyAvailableTools
               .map((tool) => `${tool.name} ${tool.currentVersion} -> ${tool.latestVersion}`)
-              .join(" • ")
+              .join(" • "),
+            "info",
+            {
+              screen: "tools",
+              reason: "multiple-tool-updates-available",
+              actionLabel: "Open Tools",
+            }
           );
         }
 

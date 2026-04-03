@@ -40,21 +40,21 @@ export function DownloadStatsBar({
       label: "All",
       count: totalCount,
       tone:
-        "border-white/10 bg-white/5 text-foreground/85 hover:border-white/15 hover:bg-white/10",
+        "border-border/65 bg-card/70 text-foreground/85 hover:border-border/85 hover:bg-card/90 dark:border-white/10 dark:bg-white/5 dark:hover:border-white/15 dark:hover:bg-white/10",
     },
     {
       id: "active" as const,
       label: "Active",
       count: activeCount,
       tone:
-        "border-sky-500/20 bg-sky-500/10 text-sky-300 hover:border-sky-400/30 hover:bg-sky-500/15",
+        "border-sky-500/25 bg-sky-500/12 text-sky-700 hover:border-sky-500/35 hover:bg-sky-500/18 dark:text-sky-300",
     },
     {
       id: "queued" as const,
       label: "Queued",
       count: queuedCount,
       tone:
-        "border-yellow-500/20 bg-yellow-500/10 text-yellow-300 hover:border-yellow-400/30 hover:bg-yellow-500/15",
+        "border-yellow-500/25 bg-yellow-500/12 text-yellow-700 hover:border-yellow-500/35 hover:bg-yellow-500/18 dark:text-yellow-300",
     },
     {
       id: "failed" as const,
@@ -68,15 +68,15 @@ export function DownloadStatsBar({
       label: "Done",
       count: doneCount,
       tone:
-        "border-emerald-500/20 bg-emerald-500/10 text-emerald-300 hover:border-emerald-400/30 hover:bg-emerald-500/15",
+        "border-emerald-500/25 bg-emerald-500/12 text-emerald-700 hover:border-emerald-500/35 hover:bg-emerald-500/18 dark:text-emerald-300",
     },
   ];
 
   return (
-    <div className="flex flex-col gap-1.5 border-t border-white/6 pt-1.5">
+    <div className="flex flex-col gap-1.5 border-t border-border/50 pt-1.5 dark:border-white/6">
       <div className="flex flex-col gap-1.5 sm:flex-row sm:items-center sm:justify-between">
         <div className="flex shrink-0 flex-wrap items-center gap-1.5">
-          <div className="flex h-7 items-center gap-1 rounded-full border border-white/8 bg-white/5 px-1.5 py-1">
+          <div className="flex h-7 items-center gap-1 rounded-full border border-border/60 bg-card/70 px-1.5 py-1 dark:border-white/8 dark:bg-white/5">
             <ArrowUpDown className="h-3 w-3 text-muted-foreground" />
             <button
               type="button"
@@ -144,11 +144,11 @@ export function DownloadStatsBar({
               className={cn(
                 "group inline-flex h-7 shrink-0 items-center gap-1.5 rounded-full border px-2.5 text-[10px] font-semibold transition-all",
                 tone,
-                isActive && "shadow-[0_8px_30px_rgba(0,0,0,0.18)] ring-1 ring-white/10",
+                isActive && "shadow-[0_8px_30px_rgba(15,23,42,0.12)] ring-1 ring-border/60 dark:ring-white/10 dark:shadow-[0_8px_30px_rgba(0,0,0,0.18)]",
               )}
             >
               <span>{label}</span>
-              <span className="rounded-full bg-black/10 px-1.5 py-0.5 text-[10px] tabular-nums">
+              <span className="rounded-full bg-foreground/[0.06] px-1.5 py-0.5 text-[10px] tabular-nums dark:bg-black/10">
                 {count}
               </span>
             </button>

@@ -26,6 +26,7 @@ import { toast } from "sonner";
 import { useDownloadsStore } from "@/store/downloads";
 import { checkAndStoreAppUpdate } from "@/lib/app-updates/service";
 import { notifyUser } from "@/lib/notifications";
+import { isDemoModeEnabled } from "@/lib/demo-mode";
 import {
   Dialog,
   DialogContent,
@@ -55,7 +56,7 @@ async function openUrl(url: string) {
 }
 
 export function AboutSection() {
-  const [version, setVersion] = useState("...");
+  const [version, setVersion] = useState(() => (isDemoModeEnabled() ? "0.4.0" : "..."));
   const [latestVersion, setLatestVersion] = useState<string | null>(null);
   const [releaseUrl, setReleaseUrl] = useState<string>(RELEASES_URL);
   const [downloadUrl, setDownloadUrl] = useState<string | null>(null);
@@ -82,6 +83,9 @@ export function AboutSection() {
     activeJobCount === 0 && Boolean(verifiedInstallerPath);
 
   useEffect(() => {
+    if (isDemoModeEnabled()) {
+      return;
+    }
     getVersion()
       .then(setVersion)
       .catch(() => setVersion("unknown"));
@@ -151,7 +155,14 @@ export function AboutSection() {
       await notifyUser(
         "HalalDL update ready",
         "The verified installer has been downloaded and is ready to run.",
-        "success"
+        "success",
+        {
+          screen: "settings",
+          targetType: "section",
+          targetId: "about",
+          reason: "app-update-ready",
+          actionLabel: "Open About",
+        }
       );
       setVerifiedInstallerPath(verifiedPath);
     } catch (error) {
@@ -202,7 +213,7 @@ export function AboutSection() {
               <Badge
                 variant="outline"
                 className={cn(
-                  "text-[10px] h-5 px-2 font-semibold tracking-wide border-white/10",
+                  "h-5 border-border/60 px-2 text-[10px] font-semibold tracking-wide dark:border-white/10",
                   appModeLabel === "Full"
                     ? "text-primary"
                     : "text-muted-foreground"
@@ -212,7 +223,7 @@ export function AboutSection() {
               </Badge>
               <Badge
                 variant="outline"
-                className="h-5 max-w-full px-2 text-[10px] font-semibold tracking-wide border-white/10"
+                className="h-5 max-w-full border-border/60 px-2 text-[10px] font-semibold tracking-wide dark:border-white/10"
               >
                 {formatInstallerLabel(
                   storeUpdate.installContext?.installerType ?? "unknown"
@@ -247,7 +258,7 @@ export function AboutSection() {
           <div className="flex items-start gap-2.5 rounded-lg border border-green-500/20 bg-green-500/5 px-4 py-3">
             <CheckCircle2 className="w-5 h-5 text-green-500 shrink-0" />
             <div className="min-w-0">
-              <p className="text-sm font-medium text-green-400">
+              <p className="text-sm font-medium text-green-700 dark:text-green-400">
                 You're up to date!
               </p>
               <p className="text-xs text-muted-foreground">
@@ -261,9 +272,9 @@ export function AboutSection() {
           <div className="rounded-lg border border-blue-500/20 bg-blue-500/5 px-4 py-4">
             <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
               <div className="flex min-w-0 items-start gap-2.5">
-              <ArrowUpCircle className="w-5 h-5 text-blue-400 shrink-0" />
+              <ArrowUpCircle className="w-5 h-5 shrink-0 text-blue-600 dark:text-blue-400" />
                 <div className="min-w-0 space-y-1">
-                <p className="text-sm font-medium text-blue-400">
+                <p className="text-sm font-medium text-blue-700 dark:text-blue-400">
                   Update available — v{latestVersion}
                 </p>
                   <p className="text-xs text-muted-foreground">
@@ -278,7 +289,7 @@ export function AboutSection() {
                     </div>
                   )}
                 {verifiedInstallerPath && (
-                  <p className="text-xs text-green-400">
+                  <p className="text-xs text-green-700 dark:text-green-400">
                     Update ready. SHA-256 checksum verified.
                   </p>
                 )}
@@ -346,7 +357,7 @@ export function AboutSection() {
           <div className="flex items-start gap-2.5 rounded-lg border border-green-500/20 bg-green-500/5 px-4 py-3">
             <CheckCircle2 className="w-5 h-5 text-green-500 shrink-0" />
             <div className="min-w-0">
-              <p className="text-sm font-medium text-green-400">
+              <p className="text-sm font-medium text-green-700 dark:text-green-400">
                 Update ready to install
               </p>
               <p className="text-xs text-muted-foreground">
@@ -361,7 +372,7 @@ export function AboutSection() {
           <div className="flex items-start gap-2.5 rounded-lg border border-amber-500/20 bg-amber-500/5 px-4 py-3">
             <Info className="w-5 h-5 text-amber-400 shrink-0" />
             <div className="min-w-0">
-              <p className="text-sm font-medium text-amber-300">
+              <p className="text-sm font-medium text-amber-700 dark:text-amber-300">
                 Finish active downloads before installing
               </p>
               <p className="text-xs text-muted-foreground">
@@ -436,7 +447,7 @@ export function AboutSection() {
               </div>
             </div>
             {activeJobCount > 0 && (
-              <p className="text-amber-400">
+              <p className="text-amber-700 dark:text-amber-400">
                 Active downloads are still running. Finish them before
                 installing.
               </p>

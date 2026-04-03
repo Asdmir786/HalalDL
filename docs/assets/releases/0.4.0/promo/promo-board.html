@@ -1,0 +1,641 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>HalalDL 0.4.0 Promo Board</title>
+    <style>
+      :root {
+        --ink: #0f172a;
+        --ink-soft: #334155;
+        --muted: #64748b;
+        --line: rgba(15, 23, 42, 0.08);
+        --panel: rgba(255, 255, 255, 0.82);
+        --navy-1: #081120;
+        --navy-2: #0f1f38;
+        --cyan: #38bdf8;
+        --teal: #2dd4bf;
+        --amber: #f59e0b;
+        --rose: #fb7185;
+        --offwhite: #f4f7fb;
+      }
+
+      * {
+        box-sizing: border-box;
+      }
+
+      body {
+        margin: 0;
+        font-family: "Segoe UI", "Inter", system-ui, sans-serif;
+        background:
+          radial-gradient(circle at top left, rgba(56, 189, 248, 0.12), transparent 24%),
+          radial-gradient(circle at bottom right, rgba(45, 212, 191, 0.14), transparent 28%),
+          #e9eef5;
+        color: var(--ink);
+      }
+
+      .theme-dark body {
+        background:
+          radial-gradient(circle at top left, rgba(56, 189, 248, 0.1), transparent 22%),
+          radial-gradient(circle at bottom right, rgba(45, 212, 191, 0.12), transparent 26%),
+          #07101d;
+        color: #f8fafc;
+      }
+
+      .board {
+        width: 1664px;
+        margin: 0 auto;
+        padding: 32px;
+        display: grid;
+        gap: 28px;
+      }
+
+      .artboard {
+        position: relative;
+        width: 1600px;
+        height: 900px;
+        overflow: hidden;
+        border-radius: 42px;
+        background: linear-gradient(180deg, #ffffff 0%, #f7f9fc 100%);
+        box-shadow: 0 32px 90px rgba(15, 23, 42, 0.12);
+      }
+
+      .theme-dark .artboard {
+        background: linear-gradient(180deg, #091321 0%, #0d1729 100%);
+        box-shadow: 0 32px 90px rgba(2, 6, 23, 0.46);
+        color: #f8fafc;
+      }
+
+      .artboard::before {
+        content: "";
+        position: absolute;
+        inset: 0;
+        background:
+          radial-gradient(circle at top left, rgba(56, 189, 248, 0.1), transparent 28%),
+          radial-gradient(circle at bottom right, rgba(45, 212, 191, 0.1), transparent 28%);
+        pointer-events: none;
+      }
+
+      .theme-dark .artboard::before {
+        background:
+          radial-gradient(circle at top left, rgba(56, 189, 248, 0.1), transparent 24%),
+          radial-gradient(circle at bottom right, rgba(45, 212, 191, 0.12), transparent 26%);
+      }
+
+      .hero {
+        background:
+          radial-gradient(circle at top right, rgba(45, 212, 191, 0.14), transparent 28%),
+          radial-gradient(circle at bottom left, rgba(56, 189, 248, 0.12), transparent 32%),
+          linear-gradient(180deg, #f9fcff 0%, #eef6ff 100%);
+        color: var(--ink);
+      }
+
+      .hero::before {
+        background:
+          radial-gradient(circle at top left, rgba(255, 255, 255, 0.2), transparent 22%),
+          radial-gradient(circle at bottom right, rgba(45, 212, 191, 0.1), transparent 28%);
+      }
+
+      .theme-dark .hero {
+        background:
+          radial-gradient(circle at top right, rgba(45, 212, 191, 0.18), transparent 28%),
+          radial-gradient(circle at bottom left, rgba(56, 189, 248, 0.16), transparent 32%),
+          linear-gradient(180deg, var(--navy-1) 0%, var(--navy-2) 100%);
+        color: white;
+      }
+
+      .theme-dark .hero::before {
+        background:
+          radial-gradient(circle at top left, rgba(255, 255, 255, 0.06), transparent 22%),
+          radial-gradient(circle at bottom right, rgba(45, 212, 191, 0.16), transparent 28%);
+      }
+
+      .hero-grid {
+        position: relative;
+        z-index: 1;
+        height: 100%;
+        padding: 70px 74px;
+        display: grid;
+        grid-template-columns: 560px 1fr;
+        gap: 46px;
+        align-items: center;
+      }
+
+      .eyebrow {
+        display: inline-flex;
+        align-items: center;
+        gap: 10px;
+        min-height: 44px;
+        padding: 0 18px;
+        border-radius: 999px;
+        border: 1px solid rgba(255, 255, 255, 0.14);
+        background: rgba(255, 255, 255, 0.08);
+        font-size: 16px;
+        font-weight: 800;
+        letter-spacing: 0.16em;
+        text-transform: uppercase;
+      }
+
+      .light .eyebrow {
+        border-color: rgba(15, 23, 42, 0.08);
+        background: rgba(255, 255, 255, 0.88);
+        color: #0f172a;
+      }
+
+      .theme-dark .eyebrow,
+      .theme-dark .light .eyebrow {
+        border-color: rgba(255, 255, 255, 0.1);
+        background: rgba(255, 255, 255, 0.06);
+        color: #f8fafc;
+      }
+
+      h1,
+      h2 {
+        margin: 0;
+        letter-spacing: -0.05em;
+        line-height: 0.96;
+      }
+
+      h1 {
+        margin-top: 26px;
+        font-size: 106px;
+        max-width: 520px;
+      }
+
+      h2 {
+        margin-top: 22px;
+        font-size: 74px;
+        max-width: 560px;
+      }
+
+      .hero-subtitle,
+      .feature-copy p {
+        margin: 24px 0 0;
+        font-size: 27px;
+        line-height: 1.42;
+      }
+
+      .hero-subtitle {
+        max-width: 520px;
+        color: var(--ink-soft);
+      }
+
+      .theme-dark .hero-subtitle {
+        color: rgba(255, 255, 255, 0.82);
+      }
+
+      .feature-copy p {
+        max-width: 520px;
+        color: var(--ink-soft);
+      }
+
+      .theme-dark .feature-copy p {
+        color: rgba(226, 232, 240, 0.78);
+      }
+
+      .chip-row {
+        margin-top: 34px;
+        display: flex;
+        flex-wrap: wrap;
+        gap: 12px;
+      }
+
+      .chip {
+        display: inline-flex;
+        align-items: center;
+        min-height: 44px;
+        padding: 0 18px;
+        border-radius: 999px;
+        font-size: 18px;
+        font-weight: 700;
+        letter-spacing: -0.02em;
+      }
+
+      .hero .chip,
+      .light .chip {
+        color: var(--ink);
+        border: 1px solid rgba(15, 23, 42, 0.08);
+        background: rgba(255, 255, 255, 0.9);
+      }
+
+      .theme-dark .hero .chip,
+      .theme-dark .chip,
+      .theme-dark .light .chip {
+        color: #f8fafc;
+        border-color: rgba(255, 255, 255, 0.1);
+        background: rgba(255, 255, 255, 0.06);
+      }
+
+      .hero-visual {
+        position: relative;
+        height: 100%;
+        display: flex;
+        align-items: flex-end;
+        justify-content: flex-end;
+      }
+
+      .frame {
+        position: relative;
+        overflow: hidden;
+        border-radius: 34px;
+        border: 1px solid rgba(255, 255, 255, 0.1);
+        background: rgba(255, 255, 255, 0.08);
+        box-shadow: 0 26px 70px rgba(2, 6, 23, 0.34);
+      }
+
+      .hero .frame {
+        width: 860px;
+        height: 620px;
+        transform: perspective(1800px) rotateX(10deg) rotateY(-13deg);
+        transform-origin: center center;
+      }
+
+      .frame img {
+        display: block;
+        width: 100%;
+        height: 100%;
+        object-fit: cover;
+      }
+
+      .hero .frame img {
+        object-position: center top;
+      }
+
+      .floating-note {
+        position: absolute;
+        right: 32px;
+        bottom: 34px;
+        padding: 18px 20px;
+        border-radius: 22px;
+        background: rgba(255, 255, 255, 0.88);
+        backdrop-filter: blur(20px);
+        border: 1px solid rgba(15, 23, 42, 0.08);
+        box-shadow: 0 20px 40px rgba(15, 23, 42, 0.14);
+      }
+
+      .theme-dark .floating-note {
+        background: rgba(8, 17, 32, 0.82);
+        border-color: rgba(255, 255, 255, 0.12);
+        box-shadow: 0 20px 40px rgba(2, 6, 23, 0.25);
+      }
+
+      .floating-note strong {
+        display: block;
+        font-size: 18px;
+        letter-spacing: -0.02em;
+        color: var(--ink);
+      }
+
+      .floating-note span {
+        display: block;
+        margin-top: 4px;
+        font-size: 15px;
+        color: var(--muted);
+      }
+
+      .theme-dark .floating-note strong {
+        color: #f8fafc;
+      }
+
+      .theme-dark .floating-note span {
+        color: rgba(255, 255, 255, 0.7);
+      }
+
+      .feature {
+        display: grid;
+        grid-template-columns: 520px 1fr;
+        gap: 54px;
+        align-items: center;
+        padding: 66px 70px;
+      }
+
+      .feature.alt {
+        grid-template-columns: 1fr 520px;
+      }
+
+      .feature.alt .feature-copy {
+        order: 2;
+      }
+
+      .feature.alt .feature-visual {
+        order: 1;
+      }
+
+      .feature-copy {
+        position: relative;
+        z-index: 1;
+      }
+
+      .mini-list {
+        margin: 32px 0 0;
+        display: grid;
+        gap: 14px;
+      }
+
+      .mini-item {
+        display: flex;
+        align-items: center;
+        gap: 14px;
+        min-height: 58px;
+        padding: 0 20px;
+        border-radius: 18px;
+        border: 1px solid rgba(15, 23, 42, 0.08);
+        background: rgba(255, 255, 255, 0.86);
+        box-shadow: 0 12px 30px rgba(15, 23, 42, 0.06);
+        font-size: 20px;
+        font-weight: 700;
+        letter-spacing: -0.02em;
+      }
+
+      .theme-dark .mini-item {
+        border-color: rgba(255, 255, 255, 0.08);
+        background: rgba(255, 255, 255, 0.05);
+        box-shadow: none;
+        color: #f8fafc;
+      }
+
+      .mini-dot {
+        width: 10px;
+        height: 10px;
+        border-radius: 999px;
+        flex: 0 0 auto;
+      }
+
+      .feature-visual {
+        position: relative;
+        z-index: 1;
+        display: flex;
+        justify-content: center;
+        align-items: center;
+      }
+
+      .feature-visual .frame {
+        width: 900px;
+        height: 620px;
+        border: 1px solid rgba(15, 23, 42, 0.08);
+        background: linear-gradient(180deg, rgba(255, 255, 255, 0.92), rgba(241, 245, 249, 0.9));
+        box-shadow: 0 28px 70px rgba(15, 23, 42, 0.12);
+      }
+
+      .theme-dark .feature-visual .frame {
+        border-color: rgba(255, 255, 255, 0.08);
+        background: linear-gradient(180deg, rgba(255, 255, 255, 0.04), rgba(255, 255, 255, 0.02));
+        box-shadow: 0 26px 70px rgba(2, 6, 23, 0.36);
+      }
+
+      .feature-visual .frame img {
+        object-position: center top;
+      }
+
+      .download-theme {
+        background:
+          radial-gradient(circle at top right, rgba(56, 189, 248, 0.18), transparent 26%),
+          linear-gradient(180deg, #f7fbff 0%, #edf6ff 100%);
+      }
+
+      .preset-theme {
+        background:
+          radial-gradient(circle at top left, rgba(245, 158, 11, 0.16), transparent 28%),
+          linear-gradient(180deg, #fffdf9 0%, #fff7ed 100%);
+      }
+
+      .history-theme {
+        background:
+          radial-gradient(circle at top right, rgba(251, 113, 133, 0.16), transparent 26%),
+          linear-gradient(180deg, #fff8fb 0%, #fff1f2 100%);
+      }
+
+      .update-theme {
+        background:
+          radial-gradient(circle at top left, rgba(45, 212, 191, 0.16), transparent 28%),
+          linear-gradient(180deg, #f4fbfa 0%, #ecfeff 100%);
+      }
+
+      .preset-theme .mini-item {
+        background: linear-gradient(180deg, rgba(255, 251, 235, 0.96), rgba(255, 255, 255, 0.94));
+      }
+
+      .download-theme .mini-item {
+        background: linear-gradient(180deg, rgba(239, 248, 255, 0.96), rgba(255, 255, 255, 0.94));
+      }
+
+      #quick-flow .mini-item {
+        background: linear-gradient(180deg, rgba(241, 245, 249, 0.98), rgba(255, 255, 255, 0.95));
+      }
+
+      .history-theme .mini-item {
+        background: linear-gradient(180deg, rgba(255, 241, 242, 0.96), rgba(255, 255, 255, 0.94));
+      }
+
+      .update-theme .mini-item {
+        background: linear-gradient(180deg, rgba(240, 253, 250, 0.96), rgba(255, 255, 255, 0.94));
+      }
+
+      .preset-theme .feature-visual .frame {
+        background: linear-gradient(180deg, rgba(255, 251, 235, 0.98), rgba(255, 255, 255, 0.94));
+      }
+
+      .download-theme .feature-visual .frame {
+        background: linear-gradient(180deg, rgba(239, 248, 255, 0.98), rgba(255, 255, 255, 0.94));
+      }
+
+      #quick-flow .feature-visual .frame {
+        background: linear-gradient(180deg, rgba(248, 250, 252, 0.98), rgba(255, 255, 255, 0.94));
+      }
+
+      .history-theme .feature-visual .frame {
+        background: linear-gradient(180deg, rgba(255, 241, 242, 0.98), rgba(255, 255, 255, 0.94));
+      }
+
+      .update-theme .feature-visual .frame {
+        background: linear-gradient(180deg, rgba(240, 253, 250, 0.98), rgba(255, 255, 255, 0.94));
+      }
+
+      .theme-dark .download-theme {
+        background:
+          radial-gradient(circle at top right, rgba(56, 189, 248, 0.16), transparent 24%),
+          linear-gradient(180deg, #081424 0%, #0c1d31 100%);
+      }
+
+      .theme-dark .preset-theme {
+        background:
+          radial-gradient(circle at top left, rgba(245, 158, 11, 0.12), transparent 24%),
+          linear-gradient(180deg, #10131f 0%, #1a1622 100%);
+      }
+
+      .theme-dark .history-theme {
+        background:
+          radial-gradient(circle at top right, rgba(251, 113, 133, 0.12), transparent 24%),
+          linear-gradient(180deg, #12131d 0%, #201521 100%);
+      }
+
+      .theme-dark .update-theme {
+        background:
+          radial-gradient(circle at top left, rgba(45, 212, 191, 0.12), transparent 24%),
+          linear-gradient(180deg, #08141b 0%, #102028 100%);
+      }
+
+      .theme-dark .preset-theme .mini-item {
+        background: linear-gradient(180deg, rgba(245, 158, 11, 0.1), rgba(255, 255, 255, 0.04));
+      }
+
+      .theme-dark .download-theme .mini-item {
+        background: linear-gradient(180deg, rgba(56, 189, 248, 0.1), rgba(255, 255, 255, 0.04));
+      }
+
+      .theme-dark #quick-flow .mini-item {
+        background: linear-gradient(180deg, rgba(148, 163, 184, 0.08), rgba(255, 255, 255, 0.04));
+      }
+
+      .theme-dark .history-theme .mini-item {
+        background: linear-gradient(180deg, rgba(251, 113, 133, 0.1), rgba(255, 255, 255, 0.04));
+      }
+
+      .theme-dark .update-theme .mini-item {
+        background: linear-gradient(180deg, rgba(45, 212, 191, 0.1), rgba(255, 255, 255, 0.04));
+      }
+    </style>
+    <script>
+      (() => {
+        const theme = new URLSearchParams(window.location.search).get("theme");
+        if (theme === "dark") document.documentElement.classList.add("theme-dark");
+      })();
+    </script>
+  </head>
+  <body>
+    <main class="board">
+      <section class="artboard hero" id="hero">
+        <div class="hero-grid">
+          <div>
+            <div class="eyebrow">HalalDL 0.4.0</div>
+            <h1>Faster flow. Cleaner output.</h1>
+            <p class="hero-subtitle">
+              A tighter queue, smarter presets, and a release path that finally feels polished.
+            </p>
+            <div class="chip-row">
+              <div class="chip">Quick tray actions</div>
+              <div class="chip">Subtitle-first presets</div>
+              <div class="chip">Cleaner history</div>
+              <div class="chip">In-app updates</div>
+            </div>
+          </div>
+
+          <div class="hero-visual">
+            <div class="frame">
+              <img src="../screenshots/downloads.png" alt="HalalDL downloads screen" />
+            </div>
+            <div class="floating-note">
+              <strong>Queue built for repeat use</strong>
+              <span>Live progress, pause controls, and cleaner recent results</span>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <section class="artboard light preset-theme" id="subtitle-presets">
+        <div class="feature">
+          <div class="feature-copy">
+            <div class="eyebrow">Presets</div>
+            <h2>Preset workflows got smarter</h2>
+            <p>Subtitle-ready defaults and clearer preset intent make repeat downloads much easier to trust.</p>
+            <div class="mini-list">
+              <div class="mini-item"><span class="mini-dot" style="background:#f59e0b"></span>Subtitles Only preset</div>
+              <div class="mini-item"><span class="mini-dot" style="background:#f97316"></span>Preferred subtitle languages</div>
+              <div class="mini-item"><span class="mini-dot" style="background:#fb7185"></span>Cleaner quick-download preset choices</div>
+            </div>
+          </div>
+
+          <div class="feature-visual">
+            <div class="frame">
+              <img src="../screenshots/presets.png" alt="Preset grid with subtitle-aware presets" />
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <section class="artboard light download-theme" id="downloads-refresh">
+        <div class="feature alt">
+          <div class="feature-copy">
+            <div class="eyebrow">Downloads</div>
+            <h2>The queue feels calmer now</h2>
+            <p>The main surface is easier to scan, easier to control, and better for quick repeat grabs.</p>
+            <div class="mini-list">
+              <div class="mini-item"><span class="mini-dot" style="background:#38bdf8"></span>Cleaner active vs queued separation</div>
+              <div class="mini-item"><span class="mini-dot" style="background:#2dd4bf"></span>Better pause and resume control</div>
+              <div class="mini-item"><span class="mini-dot" style="background:#60a5fa"></span>Stronger recent-results handoff</div>
+            </div>
+          </div>
+
+          <div class="feature-visual">
+            <div class="frame">
+              <img src="../screenshots/downloads.png" alt="Downloads queue screen" />
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <section class="artboard light" id="quick-flow">
+        <div class="feature">
+          <div class="feature-copy">
+            <div class="eyebrow">Quick Flow</div>
+            <h2>Tray actions finally feel deliberate</h2>
+            <p>Quick-download behavior is now configurable enough to feel intentional instead of bolted on.</p>
+            <div class="mini-list">
+              <div class="mini-item"><span class="mini-dot" style="background:#22c55e"></span>Default quick preset</div>
+              <div class="mini-item"><span class="mini-dot" style="background:#38bdf8"></span>Tray click behavior</div>
+              <div class="mini-item"><span class="mini-dot" style="background:#0f172a"></span>Start mode and destination rules</div>
+            </div>
+          </div>
+
+          <div class="feature-visual">
+            <div class="frame">
+              <img src="../screenshots/behavior-tray-lower.png" alt="Quick download and tray settings" />
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <section class="artboard light history-theme" id="history-refresh">
+        <div class="feature alt">
+          <div class="feature-copy">
+            <div class="eyebrow">History</div>
+            <h2>Archive review is much cleaner</h2>
+            <p>Finished jobs are easier to revisit, filter, and relaunch without feeling buried in a dump.</p>
+            <div class="mini-list">
+              <div class="mini-item"><span class="mini-dot" style="background:#fb7185"></span>Sharper archive summary</div>
+              <div class="mini-item"><span class="mini-dot" style="background:#f97316"></span>Better filter layout</div>
+              <div class="mini-item"><span class="mini-dot" style="background:#ef4444"></span>Faster retry path</div>
+            </div>
+          </div>
+
+          <div class="feature-visual">
+            <div class="frame">
+              <img src="../screenshots/history.png" alt="History archive screen" />
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <section class="artboard light update-theme" id="update-flow">
+        <div class="feature">
+          <div class="feature-copy">
+            <div class="eyebrow">Updates</div>
+            <h2>Release handoff looks trustworthy</h2>
+            <p>The About screen now carries a real update state with package guidance instead of dead space.</p>
+            <div class="mini-list">
+              <div class="mini-item"><span class="mini-dot" style="background:#2dd4bf"></span>Visible app update state</div>
+              <div class="mini-item"><span class="mini-dot" style="background:#14b8a6"></span>Preferred package messaging</div>
+              <div class="mini-item"><span class="mini-dot" style="background:#0ea5e9"></span>Checksum-first install framing</div>
+            </div>
+          </div>
+
+          <div class="feature-visual">
+            <div class="frame">
+              <img src="../screenshots/about-update.png" alt="About screen with in-app update available state" />
+            </div>
+          </div>
+        </div>
+      </section>
+    </main>
+  </body>
+</html>

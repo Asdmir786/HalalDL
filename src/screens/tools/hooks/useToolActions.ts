@@ -170,7 +170,11 @@ export function useToolActions(modalApi: ModalApi) {
     setModalDone(true);
     setModalCurrentStatus("Restarting...");
     pushModalLog("Restarting app to apply changes...");
-    await notifyUser("Tool update finished", summary, "success");
+    await notifyUser("Tool update finished", summary, "success", {
+      screen: "tools",
+      reason: "tool-update-finished",
+      actionLabel: "Open Tools",
+    });
 
     try {
       await relaunch();

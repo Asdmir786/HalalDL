@@ -50,14 +50,14 @@ The next implementation slice should replace filename-only selection with a rele
 
 ```json
 {
-  "version": "0.3.9",
+  "version": "0.4.0",
   "publishedAt": "2026-03-13T00:00:00Z",
   "packages": [
     {
       "mode": "FULL",
       "installerType": "msi",
-      "assetName": "HalalDL-Full-v0.3.9-win10+11-x64.msi",
-      "url": "https://github.com/Asdmir786/HalalDL/releases/download/v0.3.9/HalalDL-Full-v0.3.9-win10+11-x64.msi",
+      "assetName": "HalalDL-Full-v0.4.0-win10+11-x64.msi",
+      "url": "https://github.com/Asdmir786/HalalDL/releases/download/v0.4.0/HalalDL-Full-v0.4.0-win10+11-x64.msi",
       "sha256": "..."
     }
   ]

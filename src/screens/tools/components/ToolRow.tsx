@@ -40,6 +40,8 @@ export interface ToolRowProps {
   isLast: boolean;
   isBusy: boolean;
   isTransferActive: boolean;
+  spotlighted?: boolean;
+  spotlightReason?: string | null;
   onRefresh: (id: string) => void;
   onInstallOrUpdate: (tool: Tool) => void;
   onPipUpgrade: (tool: Tool) => void;
@@ -56,6 +58,8 @@ export function ToolRow({
   isLast,
   isBusy,
   isTransferActive,
+  spotlighted = false,
+  spotlightReason = null,
   onRefresh,
   onInstallOrUpdate,
   onPipUpgrade,
@@ -71,13 +75,23 @@ export function ToolRow({
 
   return (
     <div
+      data-tool-id={tool.id}
       className={cn(
-        "flex items-center gap-4 px-5 py-4 transition-colors hover:bg-muted/30",
+        "relative flex items-center gap-4 px-5 py-4 transition-all duration-500 hover:bg-muted/30",
+        spotlighted &&
+          "bg-primary/[0.09] shadow-[0_0_0_1px_rgba(99,102,241,0.18),0_16px_42px_rgba(59,130,246,0.14)]",
         !isLast && "border-b border-white/4"
       )}
     >
+      {spotlighted && (
+        <>
+          <div className="pointer-events-none absolute inset-0 rounded-xl bg-linear-to-r from-primary/10 via-sky-400/8 to-transparent" />
+          <div className="pointer-events-none absolute inset-y-2 left-0 w-1 rounded-full bg-linear-to-b from-sky-400 via-primary to-sky-400 shadow-[0_0_18px_rgba(56,189,248,0.55)]" />
+          <div className="pointer-events-none absolute inset-x-8 top-0 h-px bg-linear-to-r from-transparent via-sky-300/70 to-transparent opacity-80" />
+        </>
+      )}
       {/* Status indicator + info */}
-      <div className="flex items-center gap-3.5 flex-1 min-w-0">
+      <div className="relative z-10 flex items-center gap-3.5 flex-1 min-w-0">
         <div
           className={cn(
             "w-2.5 h-2.5 rounded-full shrink-0 ring-4 transition-colors",
@@ -116,6 +130,14 @@ export function ToolRow({
                 Nightly
               </Badge>
             )}
+            {spotlighted && (
+              <Badge
+                variant="outline"
+                className="h-4 border-sky-400/30 bg-sky-400/10 px-1.5 text-[9px] font-semibold text-sky-700 dark:text-sky-200"
+              >
+                {spotlightReason === "tool-update-available" ? "Update here" : "Open here"}
+              </Badge>
+            )}
           </div>
           <p className="text-[11px] text-muted-foreground truncate" title={tool.systemPath || tool.path || ""}>
             {tool.mode === "Manual" && tool.path
@@ -128,7 +150,7 @@ export function ToolRow({
       </div>
 
       {/* Version info */}
-      <div className="hidden sm:flex flex-col items-end gap-0.5 text-xs font-mono shrink-0 min-w-[170px]">
+      <div className="relative z-10 hidden sm:flex flex-col items-end gap-0.5 text-xs font-mono shrink-0 min-w-[170px]">
         {tool.version ? (
           <div className="flex items-center gap-2">
             <span className="text-muted-foreground">{tool.version}</span>
@@ -164,7 +186,7 @@ export function ToolRow({
       </div>
 
       {/* Primary action + overflow */}
-      <div className="flex items-center gap-1.5 shrink-0">
+      <div className="relative z-10 flex items-center gap-1.5 shrink-0">
         {isBusy ? (
           <MotionButton
             variant="outline"
