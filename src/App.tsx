@@ -1,5 +1,5 @@
 import { Sidebar } from "@/components/Sidebar";
-import { activateAttentionTarget, parseAttentionExtra } from "@/lib/attention";
+import { activateAttentionTarget, parseAttentionSearchParams } from "@/lib/attention";
 import { useNavigationStore } from "@/store/navigation";
 import { Toaster } from "@/components/ui/sonner";
 import { PersistenceManager } from "@/components/PersistenceManager";
@@ -12,7 +12,6 @@ import { GlobalDragDrop } from "@/components/GlobalDragDrop";
 import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Cpu, Sparkles, Zap } from "lucide-react";
 import { listen } from "@tauri-apps/api/event";
-import { onAction } from "@tauri-apps/plugin-notification";
 import { QuickDownloadPanel } from "@/components/QuickDownloadPanel";
 import { useRuntimeStore } from "@/store/runtime";
 import { useDownloadsStore } from "@/store/downloads";
@@ -38,7 +37,6 @@ import {
 } from "@/lib/commands";
 import { checkAndStoreAppUpdate } from "@/lib/app-updates/service";
 import {
-  consumePendingDesktopAttentionTarget,
   notifyUser,
   readLastNotifiedAppUpdateVersion,
   readLastNotifiedToolUpdateVersions,
@@ -308,6 +306,13 @@ export default function App() {
           continue;
         }
 
+        if (action === "attention") {
+          const target = parseAttentionSearchParams(parsed.searchParams);
+          if (!target) continue;
+          await activateAttentionTarget(target, { restoreWindow: true });
+          continue;
+        }
+
         if (action !== "download") continue;
 
         const targetUrl = parsed.searchParams.get("url");
@@ -348,7 +353,6 @@ export default function App() {
   useEffect(() => {
     let disposeTray: (() => void) | undefined;
     let disposeDeepLinks: (() => void) | undefined;
-    let disposeNotificationAction: { unregister: () => Promise<void> } | undefined;
     const handleAction = async (action: TrayActionPayload["action"]) => {
       const latestSettings = useSettingsStore.getState().settings;
       const runtime = useRuntimeStore.getState();
@@ -453,52 +457,11 @@ export default function App() {
       disposeDeepLinks = unlisten;
     });
 
-    void onAction((notification) => {
-      const target = parseAttentionExtra(notification.extra);
-      if (!target) return;
-      void activateAttentionTarget(target, { restoreWindow: true }).catch((error) => {
-        console.error(error);
-      });
-    }).then((listener) => {
-      disposeNotificationAction = listener;
-    });
-
     return () => {
       if (disposeTray) disposeTray();
       if (disposeDeepLinks) disposeDeepLinks();
-      if (disposeNotificationAction) {
-        void disposeNotificationAction.unregister();
-      }
     };
   }, [addClipboardDownload, processLaunchUrls]);
-
-  useEffect(() => {
-    const tryConsumePendingTarget = () => {
-      if (document.visibilityState !== "visible" || !document.hasFocus()) {
-        return;
-      }
-      void consumePendingDesktopAttentionTarget().catch((error) => {
-        console.error(error);
-      });
-    };
-
-    const handleFocus = () => {
-      tryConsumePendingTarget();
-    };
-
-    const handleVisibilityChange = () => {
-      tryConsumePendingTarget();
-    };
-
-    window.addEventListener("focus", handleFocus);
-    document.addEventListener("visibilitychange", handleVisibilityChange);
-    window.setTimeout(tryConsumePendingTarget, 150);
-
-    return () => {
-      window.removeEventListener("focus", handleFocus);
-      document.removeEventListener("visibilitychange", handleVisibilityChange);
-    };
-  }, []);
 
   useEffect(() => {
     if (!settings.enableBackgroundUpdateChecks) return;

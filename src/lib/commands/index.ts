@@ -58,6 +58,8 @@ export {
   wasLaunchedFromAutostart,
   setAutostartEnabled,
   takePendingLaunchUrls,
+  sendNativeWindowsToast,
   type RuntimeSettingsSyncPayload,
   type TrayStatePayload,
+  type NativeWindowsToastPayload,
 } from "./runtime-commands";

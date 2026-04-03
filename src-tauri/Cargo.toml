@@ -35,6 +35,8 @@ tokio = { version = "1", features = ["full"] }
 indicator = "0.4.4"
 tauri-plugin-process = "2.3.1"
 windows-sys = { version = "0.61.2", features = ["Win32_Foundation", "Win32_System_DataExchange", "Win32_System_Memory", "Win32_UI_WindowsAndMessaging"] }
+windows = { version = "0.62.2", features = ["Data_Xml_Dom", "UI_Notifications", "Win32_Foundation", "Win32_System_Com"] }
+winreg = "0.56.0"
 sha2 = "0.10"
 tauri-plugin-positioner = "2"
 image = { version = "0.25", default-features = false, features = ["bmp", "gif", "jpeg", "png", "webp"] }

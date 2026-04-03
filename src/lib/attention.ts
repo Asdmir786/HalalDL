@@ -3,12 +3,6 @@ import { useAttentionStore, type AttentionTargetInput } from "@/store/attention"
 import { useNavigationStore } from "@/store/navigation";
 import { useRuntimeStore } from "@/store/runtime";
 
-const EXTRA_KEY = "__halaldl_attention__";
-
-type AttentionExtra = AttentionTargetInput & {
-  [EXTRA_KEY]: true;
-};
-
 export function getAttentionActionLabel(target: AttentionTargetInput) {
   if (target.actionLabel) return target.actionLabel;
   if (target.screen === "tools") return "Open Tools";
@@ -38,19 +32,20 @@ export async function activateAttentionTarget(
   }
 }
 
-export function buildAttentionExtra(target: AttentionTargetInput): Record<string, unknown> {
-  const payload: AttentionExtra = {
-    ...target,
-    actionLabel: getAttentionActionLabel(target),
-    [EXTRA_KEY]: true,
-  };
-  return payload as unknown as Record<string, unknown>;
+export function buildAttentionDeepLink(target: AttentionTargetInput) {
+  const params = new URLSearchParams();
+  params.set("screen", target.screen);
+  params.set("reason", target.reason);
+  if (target.targetType) params.set("targetType", target.targetType);
+  if (target.targetId) params.set("targetId", target.targetId);
+  if (target.section) params.set("section", target.section);
+  if (target.actionLabel) params.set("actionLabel", target.actionLabel);
+  return `halaldl://attention?${params.toString()}`;
 }
 
-export function parseAttentionExtra(extra: Record<string, unknown> | undefined | null) {
-  if (!extra || extra[EXTRA_KEY] !== true) return null;
-  const screen = extra.screen;
-  const reason = extra.reason;
+export function parseAttentionSearchParams(params: URLSearchParams) {
+  const screen = params.get("screen");
+  const reason = params.get("reason");
   if (
     screen !== "downloads" &&
     screen !== "presets" &&
@@ -61,27 +56,23 @@ export function parseAttentionExtra(extra: Record<string, unknown> | undefined |
   ) {
     return null;
   }
-  if (typeof reason !== "string" || !reason.trim()) {
+  if (!reason?.trim()) {
     return null;
   }
 
-  const targetType =
-    extra.targetType === "tool" || extra.targetType === "job" || extra.targetType === "section"
-      ? extra.targetType
-      : undefined;
-  const targetId = typeof extra.targetId === "string" && extra.targetId.trim() ? extra.targetId : undefined;
-  const section = extra.section === "live" || extra.section === "recent" ? extra.section : undefined;
-  const actionLabel =
-    typeof extra.actionLabel === "string" && extra.actionLabel.trim()
-      ? extra.actionLabel
-      : undefined;
+  const targetType = params.get("targetType");
+  const targetId = params.get("targetId");
+  const section = params.get("section");
+  const actionLabel = params.get("actionLabel");
 
   return {
     screen,
     reason,
-    ...(targetType ? { targetType } : {}),
-    ...(targetId ? { targetId } : {}),
-    ...(section ? { section } : {}),
-    ...(actionLabel ? { actionLabel } : {}),
+    ...(targetType === "tool" || targetType === "job" || targetType === "section"
+      ? { targetType }
+      : {}),
+    ...(targetId?.trim() ? { targetId } : {}),
+    ...(section === "live" || section === "recent" ? { section } : {}),
+    ...(actionLabel?.trim() ? { actionLabel } : {}),
   } satisfies AttentionTargetInput;
 }

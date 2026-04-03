@@ -15,6 +15,12 @@ export interface TrayStatePayload {
   toolUpdateCount: number;
 }
 
+export interface NativeWindowsToastPayload {
+  title: string;
+  body: string;
+  launch?: string;
+}
+
 export async function syncRuntimeSettings(payload: RuntimeSettingsSyncPayload) {
   return invoke("sync_runtime_settings", { payload });
 }
@@ -53,4 +59,8 @@ export async function setAutostartEnabled(enabled: boolean) {
 
 export async function takePendingLaunchUrls(): Promise<string[]> {
   return invoke<string[]>("take_pending_launch_urls");
+}
+
+export async function sendNativeWindowsToast(payload: NativeWindowsToastPayload) {
+  return invoke("send_native_windows_toast", { payload });
 }

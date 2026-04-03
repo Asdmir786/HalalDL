@@ -5,6 +5,7 @@ mod download;
 mod extract;
 mod file_commands;
 mod fs_utils;
+mod notifications;
 mod runtime;
 mod shell;
 mod tools;
@@ -73,6 +74,7 @@ pub fn run() {
             runtime::was_launched_from_autostart,
             runtime::set_autostart_enabled,
             runtime::take_pending_launch_urls,
+            notifications::send_native_windows_toast,
             app_update::get_install_context,
             app_update::download_and_verify_app_update,
             tools::resolve_system_tool_path,
