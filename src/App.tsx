@@ -1,7 +1,6 @@
 import { Sidebar } from "@/components/Sidebar";
 import { activateAttentionTarget, parseAttentionSearchParams } from "@/lib/attention";
 import { useNavigationStore } from "@/store/navigation";
-import { Toaster } from "@/components/ui/sonner";
 import { PersistenceManager } from "@/components/PersistenceManager";
 import { UpgradePrompt } from "@/components/UpgradePrompt";
 import { AnimatePresence, motion } from "framer-motion";
@@ -689,7 +688,6 @@ export default function App() {
           )}
         </AnimatePresence>
       </main>
-      <Toaster />
       {windowMode === "full" && <UpgradePrompt />}
     </div>
   );

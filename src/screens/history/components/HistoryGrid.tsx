@@ -17,7 +17,7 @@ import { toast } from "sonner";
 import { Checkbox } from "@/components/ui/checkbox";
 import { HistoryDetails } from "./HistoryDetails";
 import { useState } from "react";
-import { getExplicitOutputPaths } from "@/lib/output-paths";
+import { getExplicitOutputPaths, getPreferredThumbnailSource } from "@/lib/output-paths";
 
 interface HistoryGridProps {
   entry: HistoryEntry;
@@ -105,6 +105,7 @@ export function HistoryGrid({
   const isCompleted = entry.status === "completed";
   const relative = formatRelativeTime(entry.downloadedAt);
   const sizeStr = formatBytes(entry.fileSize);
+  const displayThumbnail = getPreferredThumbnailSource(entry);
 
   return (
     <>
@@ -120,9 +121,9 @@ export function HistoryGrid({
         >
             {/* Thumbnail */}
             <div className="relative aspect-video w-full bg-muted/50 overflow-hidden flex items-center justify-center">
-                {entry.thumbnail ? (
+                {displayThumbnail ? (
                     <img
-                        src={entry.thumbnail}
+                        src={displayThumbnail}
                         alt=""
                         className="w-full h-full object-cover transition-transform duration-300 group-hover:scale-105"
                         loading="lazy"

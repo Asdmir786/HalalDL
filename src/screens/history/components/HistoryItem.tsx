@@ -16,7 +16,7 @@ import { toast } from "sonner";
 import { Checkbox } from "@/components/ui/checkbox";
 import { HistoryDetails } from "./HistoryDetails";
 import { useState } from "react";
-import { getExplicitOutputPaths } from "@/lib/output-paths";
+import { getExplicitOutputPaths, getPreferredThumbnailSource } from "@/lib/output-paths";
 
 interface HistoryItemProps {
   entry: HistoryEntry;
@@ -104,6 +104,7 @@ export function HistoryItem({
   const isCompleted = entry.status === "completed";
   const relative = formatRelativeTime(entry.downloadedAt);
   const sizeStr = formatBytes(entry.fileSize);
+  const displayThumbnail = getPreferredThumbnailSource(entry);
 
   return (
     <>
@@ -126,9 +127,9 @@ export function HistoryItem({
           </div>
           {/* Thumbnail */}
           <div className="relative w-14 h-10 rounded-md overflow-hidden bg-muted/50 shrink-0 flex items-center justify-center">
-            {entry.thumbnail ? (
+            {displayThumbnail ? (
               <img
-                src={entry.thumbnail}
+                src={displayThumbnail}
                 alt=""
                 className="w-full h-full object-cover"
                 loading="lazy"
