@@ -27,6 +27,9 @@ Use [RELEASE_TEMPLATE.md](./RELEASE_TEMPLATE.md) and include:
 - Checksum verification note
 - Known limitations
 - Upgrade notes
+- Optional embedded images in the release body (`1-2` is usually enough)
+- Prefer `docs/assets/releases/[VERSION]/promo/hero.png` near the top
+- Prefer one supporting image later in the post such as `notification-spotlight.png` or `update-flow.png`
 
 ## Post-Release
 
