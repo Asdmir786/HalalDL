@@ -273,6 +273,10 @@ export function DownloadsScreen() {
     return new Date(ts).toLocaleDateString();
   };
 
+  const formatDownloadCount = useCallback((count: number) => {
+    return `${count} download${count === 1 ? "" : "s"}`;
+  }, []);
+
   const [sortMode, setSortMode] = useState<"newest" | "status">("newest");
   const [statusFilter, setStatusFilter] = useState<DownloadStatusFilter>("all");
 
@@ -549,9 +553,13 @@ export function DownloadsScreen() {
   const handleRetrySelected = () => {
     if (!selectedIds.length) return;
     retryFailedJobs(selectedIds);
+    toast.success(`Retrying ${formatDownloadCount(selectedFailedCount)}`);
   };
 
   const handleCopySelected = async () => {
+    const selectedDoneCount = jobs.filter(
+      (job) => selectedIds.includes(job.id) && job.status === "Done" && getExplicitOutputPaths(job).length > 0
+    ).length;
     const copyablePaths = jobs
       .filter(
         (job) =>
@@ -565,7 +573,9 @@ export function DownloadsScreen() {
 
     try {
       await copyFilesToClipboard(copyablePaths);
-      toast.success("Copied to clipboard");
+      toast.success("Copied to clipboard", {
+        description: `${copyablePaths.length} file${copyablePaths.length === 1 ? "" : "s"} from ${formatDownloadCount(selectedDoneCount)}`,
+      });
     } catch (e) {
       const message = e instanceof Error ? e.message : String(e);
       toast.error(`Failed to copy: ${message}`);
@@ -574,11 +584,13 @@ export function DownloadsScreen() {
 
   const handleRemoveSelected = () => {
     if (!selectedIds.length) return;
+    const removedCount = selectedIds.length;
     selectedIds.forEach((id) => {
       void cleanupThumbnailByJobId(id);
       removeJob(id);
     });
     setSelectedIds([]);
+    toast.success(`Removed ${formatDownloadCount(removedCount)}`);
   };
 
   const handleClearCompleted = () => {
@@ -591,6 +603,9 @@ export function DownloadsScreen() {
     setSelectedIds((prev) =>
       prev.filter((id) => !completed.some((job) => job.id === id))
     );
+    toast.success("Cleared completed downloads", {
+      description: formatDownloadCount(completed.length),
+    });
   };
 
   const handleRemoveJob = (jobId: string) => {

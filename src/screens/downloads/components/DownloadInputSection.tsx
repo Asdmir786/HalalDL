@@ -116,6 +116,7 @@ export function DownloadInputSection({
   const probeCacheRef = useRef(new Map<string, UrlProbeResult>());
   const probeRequestRef = useRef(0);
   const inputRef = useRef<HTMLInputElement | null>(null);
+  const urlRef = useRef(url);
   const presetGroups = useMemo(() => groupPresetsForSelect(presets), [presets]);
   const selectedPresetConfig = useMemo(
     () => (selectedPreset === "custom" ? null : resolvePresetById(presets, selectedPreset) ?? null),
@@ -126,6 +127,10 @@ export function DownloadInputSection({
     setUrl(val);
     setDupDismissed(false);
   }, [setUrl]);
+
+  useEffect(() => {
+    urlRef.current = url;
+  }, [url]);
 
   useEffect(() => {
     const trimmed = url.trim();
@@ -317,22 +322,59 @@ export function DownloadInputSection({
     };
   }, [probeState.host, probeState.result, probeState.verified, probeStatus]);
 
-  const handleUrlFocus = useCallback((el: HTMLInputElement | null) => {
+  const tryAutoPasteClipboard = useCallback(async (target?: HTMLInputElement | null) => {
     if (!autoPasteLinks) return;
-    if (url.trim()) return;
+    if (urlRef.current.trim()) return;
 
-    readTextFromClipboard()
-      .then((text) => {
-        if (!el) return;
-        if (el.value.trim()) return;
-        const supportedUrl = pickSupportedUrlFromText(text);
-        if (!supportedUrl) return;
-        handleUrlChange(supportedUrl);
-      })
-      .catch(() => {
-        void 0;
-      });
-  }, [autoPasteLinks, handleUrlChange, url]);
+    try {
+      const text = await readTextFromClipboard();
+      if (urlRef.current.trim()) return;
+
+      const supportedUrl = pickSupportedUrlFromText(text);
+      if (!supportedUrl) return;
+
+      const currentTarget = target ?? inputRef.current;
+      if (currentTarget?.value.trim()) return;
+
+      handleUrlChange(supportedUrl);
+    } catch {
+      void 0;
+    }
+  }, [autoPasteLinks, handleUrlChange]);
+
+  useEffect(() => {
+    if (!autoPasteLinks) return;
+    const timer = window.setTimeout(() => {
+      void tryAutoPasteClipboard();
+    }, 0);
+    return () => {
+      window.clearTimeout(timer);
+    };
+  }, [autoPasteLinks, tryAutoPasteClipboard]);
+
+  useEffect(() => {
+    if (!autoPasteLinks) return;
+
+    const handleWindowFocus = () => {
+      void tryAutoPasteClipboard();
+    };
+    const handleVisibilityChange = () => {
+      if (document.visibilityState !== "visible") return;
+      void tryAutoPasteClipboard();
+    };
+
+    window.addEventListener("focus", handleWindowFocus);
+    document.addEventListener("visibilitychange", handleVisibilityChange);
+
+    return () => {
+      window.removeEventListener("focus", handleWindowFocus);
+      document.removeEventListener("visibilitychange", handleVisibilityChange);
+    };
+  }, [autoPasteLinks, tryAutoPasteClipboard]);
+
+  const handleUrlFocus = useCallback((el: HTMLInputElement | null) => {
+    void tryAutoPasteClipboard(el);
+  }, [tryAutoPasteClipboard]);
 
   const handlePasteFromClipboard = useCallback(async () => {
     try {

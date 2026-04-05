@@ -96,7 +96,7 @@ export function BehaviorSection({
         <Switch checked={autoCopyFile} onCheckedChange={onAutoCopyChange} />
       </SettingRow>
 
-      <SettingRow icon={Link2} label="Auto-Paste Links" description="When the URL box is focused, paste a supported link from clipboard.">
+      <SettingRow icon={Link2} label="Auto-Paste Links" description="Auto-fill a supported clipboard link when Downloads opens, regains focus, or the URL box is focused.">
         <Switch checked={autoPasteLinks} onCheckedChange={onAutoPasteLinksChange} />
       </SettingRow>
 
