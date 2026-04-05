@@ -35,6 +35,10 @@ const activeYtDlpChildren = new Map<string, Child>();
 const activeFfmpegChildren = new Map<string, Child>();
 const holdRequestedJobs = new Map<string, "pause" | "stop">();
 
+function decodeShellChunk(decoder: TextDecoder, chunk: string | Uint8Array, stream = true): string {
+  return typeof chunk === "string" ? chunk : decoder.decode(chunk, { stream });
+}
+
 function consumeHoldRequest(jobId: string) {
   const request = holdRequestedJobs.get(jobId);
   if (request) {
@@ -427,18 +431,18 @@ export async function startDownload(jobId: string) {
       const { settings } = useSettingsStore.getState();
       const finalJob = useDownloadsStore.getState().jobs.find((j) => j.id === jobId);
       const outputPathToUse = lastKnownOutputPath || finalJob?.outputPath;
-      const clipboardPaths = explicitOutputPaths?.length
+      const resolvedOutputPaths = explicitOutputPaths?.length
         ? explicitOutputPaths
-        : finalJob
-          ? getExplicitOutputPaths(finalJob)
-          : outputPathToUse
-            ? [outputPathToUse]
+        : outputPathToUse
+          ? [outputPathToUse]
+          : finalJob
+            ? getExplicitOutputPaths(finalJob)
             : [];
 
       if (lastKnownOutputPath && finalJob?.outputPath !== lastKnownOutputPath) {
         updateJob(jobId, {
           outputPath: lastKnownOutputPath,
-          ...(explicitOutputPaths?.length ? { outputPaths: explicitOutputPaths } : {}),
+          ...(resolvedOutputPaths.length ? { outputPaths: resolvedOutputPaths } : {}),
         });
       }
 
@@ -458,8 +462,8 @@ export async function startDownload(jobId: string) {
         );
       }
 
-      if (settings.autoCopyFile && clipboardPaths.length > 0) {
-        copyFilesToClipboard(clipboardPaths).catch((e) => {
+      if (settings.autoCopyFile && resolvedOutputPaths.length > 0) {
+        copyFilesToClipboard(resolvedOutputPaths).catch((e) => {
           addLog({ level: "error", message: `Auto-copy failed: ${e}`, jobId });
         });
       }
@@ -876,7 +880,7 @@ export async function startDownload(jobId: string) {
   };
 
   const runDownload = async (runArgs: string[]) => {
-    const cmd = Command.create(ytDlp.command, runArgs, { env: ytDlpEnv() });
+    const cmd = Command.create(ytDlp.command, runArgs, { env: ytDlpEnv(), encoding: "raw" });
     let lastKnownOutputPath: string | undefined;
     let formatUnavailable = false;
     let aria2Error = false;
@@ -886,6 +890,8 @@ export async function startDownload(jobId: string) {
     const UPDATE_INTERVAL = 500;
     let stdoutBuffer = "";
     let stderrBuffer = "";
+    const stdoutDecoder = new TextDecoder();
+    const stderrDecoder = new TextDecoder();
 
     const flushStdoutLine = (line: string) => {
       const trimmedLine = line.replace(/\r/g, "");
@@ -971,14 +977,14 @@ export async function startDownload(jobId: string) {
     };
 
     cmd.stdout.on("data", (chunk) => {
-      stdoutBuffer += chunk;
+      stdoutBuffer += decodeShellChunk(stdoutDecoder, chunk);
       const parts = stdoutBuffer.split(/\n/);
       stdoutBuffer = parts.pop() ?? "";
       for (const part of parts) flushStdoutLine(part);
     });
 
     cmd.stderr.on("data", (chunk) => {
-      stderrBuffer += chunk;
+      stderrBuffer += decodeShellChunk(stderrDecoder, chunk);
       const parts = stderrBuffer.split(/\n/);
       stderrBuffer = parts.pop() ?? "";
       for (const part of parts) flushStderrLine(part);
@@ -1002,6 +1008,8 @@ export async function startDownload(jobId: string) {
       };
 
       cmd.on("close", (data) => {
+        stdoutBuffer += stdoutDecoder.decode();
+        stderrBuffer += stderrDecoder.decode();
         flushStdoutLine(stdoutBuffer);
         flushStderrLine(stderrBuffer);
         const code = typeof data.code === "number" ? data.code : 1;

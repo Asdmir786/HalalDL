@@ -21,6 +21,19 @@ export interface MediaMetadataProbe {
   availableSubtitleLanguages: string[];
 }
 
+function decodeShellOutput(output: string | Uint8Array): string {
+  return typeof output === "string" ? output : new TextDecoder().decode(output);
+}
+
+function isTauriLocalAssetUrl(value: string): boolean {
+  try {
+    const parsed = new URL(value);
+    return parsed.hostname === "tauri.localhost" || parsed.hostname === "asset.localhost";
+  } catch {
+    return false;
+  }
+}
+
 function extractLanguageKeys(value: unknown): string[] {
   if (!value || typeof value !== "object" || Array.isArray(value)) return [];
   return Object.keys(value as Record<string, unknown>)
@@ -38,15 +51,17 @@ export async function fetchMediaInfo(url: string): Promise<MediaMetadataProbe> {
   const command = Command.create(
     ytDlp.command,
     ["--dump-single-json", "--skip-download", "--no-playlist", "--referer", url, url],
-    { env: ytDlpEnv() }
+    { env: ytDlpEnv(), encoding: "raw" }
   );
   const result = await command.execute();
+  const stdout = decodeShellOutput(result.stdout);
+  const stderr = decodeShellOutput(result.stderr);
 
   if (result.code !== 0) {
-    throw new Error(result.stderr.trim() || `yt-dlp exited with code ${result.code}`);
+    throw new Error(stderr.trim() || `yt-dlp exited with code ${result.code}`);
   }
 
-  const payload = JSON.parse(result.stdout);
+  const payload = JSON.parse(stdout);
   const manualLanguages = extractLanguageKeys(payload?.subtitles);
   const autoLanguages = extractLanguageKeys(payload?.automatic_captions);
   const mergedLanguages = Array.from(new Set([...manualLanguages, ...autoLanguages]));
@@ -109,6 +124,11 @@ export async function fetchMetadata(jobId: string) {
     }
 
     if (thumbnailUrl && /^https?:/i.test(thumbnailUrl) && thumbnailUrl.toUpperCase() !== "NA") {
+      if (isTauriLocalAssetUrl(thumbnailUrl)) {
+        updateJob(jobId, { thumbnail: thumbnailUrl, thumbnailStatus: "ready" });
+        return;
+      }
+
       const urlExt = (
         thumbnailUrl.split("?")[0].match(/\.(jpe?g|webp|png)$/i)?.[1] || "jpg"
       ).toLowerCase();
@@ -148,20 +168,22 @@ export async function fetchMetadata(jobId: string) {
     const mediaCmd = Command.create(
       (await resolveTool("yt-dlp")).command,
       ["-f", "best", "-g", "--no-playlist", "--referer", job.url, job.url],
-      { env: ytDlpEnv() }
+      { env: ytDlpEnv(), encoding: "raw" }
     );
 
     const mediaOutput = await mediaCmd.execute();
-    if (mediaOutput.stderr.trim()) {
+    const mediaStdout = decodeShellOutput(mediaOutput.stdout);
+    const mediaStderr = decodeShellOutput(mediaOutput.stderr);
+    if (mediaStderr.trim()) {
       addLog({
         level: "warn",
-        message: `[meta] Media URL stderr: ${mediaOutput.stderr.trim().substring(0, 300)}`,
+        message: `[meta] Media URL stderr: ${mediaStderr.trim().substring(0, 300)}`,
         jobId,
       });
     }
 
     if (mediaOutput.code === 0) {
-      const mediaUrl = mediaOutput.stdout
+      const mediaUrl = mediaStdout
         .split(/\r?\n/)
         .map((line) => line.trim())
         .find(Boolean);
