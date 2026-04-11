@@ -132,6 +132,7 @@ export function DownloadList({
   const [spotlightReason, setSpotlightReason] = useState<string | null>(null);
   const [spotlightToken, setSpotlightToken] = useState<number | null>(null);
   const filterEmptyCopy = FILTER_EMPTY_COPY[statusFilter];
+  const latestDoneJobId = recentJobs.find((job) => job.status === "Done")?.id ?? null;
 
   useEffect(() => {
     if (!attentionTarget || attentionTarget.screen !== "downloads") return;
@@ -381,6 +382,8 @@ export function DownloadList({
                             section="live"
                             spotlighted={spotlightToken !== null && spotlightJobId === job.id}
                             spotlightReason={spotlightReason}
+                            spotlightToken={spotlightToken}
+                            isLatestDone={latestDoneJobId === job.id}
                             isSelected={selectedIds.includes(job.id)}
                             onToggleSelection={onToggleSelection}
                             onRemove={onRemoveJob}
@@ -432,6 +435,8 @@ export function DownloadList({
                                 section="recent"
                                 spotlighted={spotlightToken !== null && spotlightJobId === job.id}
                                 spotlightReason={spotlightReason}
+                                spotlightToken={spotlightToken}
+                                isLatestDone={latestDoneJobId === job.id}
                                 isSelected={selectedIds.includes(job.id)}
                                 onToggleSelection={onToggleSelection}
                                 onRemove={onRemoveJob}

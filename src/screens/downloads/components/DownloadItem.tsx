@@ -4,7 +4,7 @@ import {
   X, FolderOpen, Terminal,
   Copy, RotateCcw, Play,
   Link, Clock, Pause, Square,
-  ArrowUp, ArrowDown, Check,
+  ArrowUp, ArrowDown, Check, HardDrive, Timer,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { DownloadJob } from "@/store/downloads";
@@ -19,7 +19,7 @@ import { Select, SelectContent, SelectGroup, SelectItem, SelectLabel, SelectSepa
 import { toast } from "sonner";
 import { PRESET_GROUP_LABELS, getPresetGroup, groupPresetsForSelect, resolvePresetById } from "@/lib/preset-display";
 import { isInstagramUrl } from "@/lib/media-engine";
-import { getJobTs } from "../utils";
+import { formatBytes, formatMediaDuration, getJobTs } from "../utils";
 import { getStatusMeta, PHASE_ORDER, type Phase } from "../constants";
 
 interface DownloadItemProps {
@@ -27,6 +27,8 @@ interface DownloadItemProps {
   section?: "live" | "recent";
   spotlighted?: boolean;
   spotlightReason?: string | null;
+  spotlightToken?: number | null;
+  isLatestDone?: boolean;
   isSelected: boolean;
   onToggleSelection: (id: string) => void;
   onRemove: (id: string) => void;
@@ -50,6 +52,8 @@ export function DownloadItem({
   section = "live",
   spotlighted = false,
   spotlightReason = null,
+  spotlightToken = null,
+  isLatestDone = false,
   isSelected,
   onToggleSelection,
   onRemove,
@@ -118,6 +122,13 @@ export function DownloadItem({
     ? PRESET_GROUP_LABELS[getPresetGroup(selectedPresetConfig)]
     : "Preset";
   const explicitOutputPaths = getExplicitOutputPaths(job);
+  const fileSizeLabel = job.status === "Done" ? formatBytes(job.fileSize) : "";
+  const fileSizeTitle =
+    explicitOutputPaths.length > 1
+      ? `Total output size across ${explicitOutputPaths.length} files`
+      : "File size";
+  const mediaDurationLabel = formatMediaDuration(job.mediaDurationSeconds);
+  const showStaticLatestMarker = isLatestDone && !spotlighted && job.status === "Done";
 
   const handleCopyLink = (url: string) => {
     navigator.clipboard.writeText(url);
@@ -190,15 +201,66 @@ export function DownloadItem({
                 "border-border/50 bg-card/68 opacity-[0.98] hover:border-border/80 hover:bg-card/84 dark:border-white/5 dark:bg-background/28 dark:hover:border-white/10 dark:hover:bg-background/40"
               ,
               spotlighted &&
-                "border-emerald-400/35 bg-emerald-500/[0.10] shadow-[0_0_0_1px_rgba(52,211,153,0.20),0_18px_44px_rgba(16,185,129,0.14)]"
+                "border-emerald-400/45 bg-emerald-500/[0.10] shadow-[0_0_0_1px_rgba(52,211,153,0.22),0_18px_44px_rgba(16,185,129,0.16)]"
             )}
           >
             {spotlighted && (
-              <>
-                <div className="pointer-events-none absolute inset-0 rounded-2xl bg-linear-to-r from-emerald-400/12 via-sky-400/8 to-transparent" />
-                <div className="pointer-events-none absolute inset-y-3 left-0 w-1 rounded-full bg-linear-to-b from-emerald-300 via-emerald-500 to-sky-400 shadow-[0_0_22px_rgba(16,185,129,0.55)]" />
-                <div className="pointer-events-none absolute inset-x-10 top-0 h-px bg-linear-to-r from-transparent via-emerald-200/80 to-transparent opacity-90" />
-              </>
+              <motion.div key={`spotlight-${spotlightToken ?? job.id}`} className="pointer-events-none absolute inset-0 rounded-2xl">
+                <motion.div
+                  className="absolute -inset-px rounded-2xl"
+                  style={{
+                    boxShadow:
+                      "0 0 0 1px rgba(52,211,153,0.34), 0 0 34px rgba(16,185,129,0.34), 0 18px 52px rgba(14,165,233,0.14)",
+                  }}
+                  initial={{ opacity: 0, scale: 0.985 }}
+                  animate={{ opacity: [0, 1, 0.72, 0.36], scale: [0.985, 1.012, 1, 1] }}
+                  transition={{ duration: 2.2, ease: "easeOut", times: [0, 0.22, 0.62, 1] }}
+                />
+                <motion.div
+                  className="absolute inset-0 rounded-2xl bg-linear-to-r from-emerald-400/16 via-sky-400/10 to-transparent"
+                  initial={{ opacity: 0 }}
+                  animate={{ opacity: [0, 0.95, 0.34] }}
+                  transition={{ duration: 2.4, ease: "easeOut", times: [0, 0.24, 1] }}
+                />
+                <motion.div
+                  className="absolute inset-y-3 left-0 w-1 rounded-full bg-linear-to-b from-emerald-200 via-emerald-500 to-sky-400 shadow-[0_0_24px_rgba(16,185,129,0.70)]"
+                  initial={{ opacity: 0, scaleY: 0.45 }}
+                  animate={{ opacity: [0, 1, 0.86], scaleY: [0.45, 1.08, 1] }}
+                  transition={{ duration: 1.2, ease: "easeOut" }}
+                />
+                <motion.div
+                  className="absolute -inset-y-8 -left-1/3 w-1/3 rotate-12 bg-linear-to-r from-transparent via-white/35 to-transparent blur-sm dark:via-white/22"
+                  initial={{ x: "-20%", opacity: 0 }}
+                  animate={{ x: ["-20%", "430%"], opacity: [0, 1, 0] }}
+                  transition={{ duration: 1.15, ease: [0.22, 1, 0.36, 1], delay: 0.18 }}
+                />
+                <motion.div
+                  className="absolute inset-x-10 top-0 h-px bg-linear-to-r from-transparent via-emerald-100/90 to-transparent"
+                  initial={{ opacity: 0, scaleX: 0.25 }}
+                  animate={{ opacity: [0, 1, 0.48], scaleX: [0.25, 1, 1] }}
+                  transition={{ duration: 1.6, ease: "easeOut" }}
+                />
+              </motion.div>
+            )}
+            {(spotlighted || showStaticLatestMarker) && (
+              <motion.div
+                key={`latest-mark-${spotlightToken ?? job.id}`}
+                className={cn(
+                  "pointer-events-none absolute right-3 top-3 z-20 hidden items-center gap-1.5 rounded-full border bg-background/85 px-2 py-1 text-[9px] font-semibold uppercase shadow-sm backdrop-blur-md dark:bg-background/70 sm:flex",
+                  isLatestDone
+                    ? "border-emerald-400/30 text-emerald-700 dark:text-emerald-200"
+                    : "border-sky-400/30 text-sky-700 dark:text-sky-200"
+                )}
+                initial={{ opacity: 0, y: -8, scale: 0.94 }}
+                animate={{ opacity: [0, 1, 1], y: [-8, 0, 0], scale: [0.94, 1.04, 1] }}
+                transition={{ duration: 0.8, ease: "easeOut", times: [0, 0.55, 1] }}
+              >
+                <span className={cn(
+                  "h-1.5 w-1.5 rounded-full shadow-[0_0_10px_rgba(52,211,153,0.85)]",
+                  isLatestDone ? "bg-emerald-400" : "bg-sky-400"
+                )} />
+                {isLatestDone ? "Latest" : "Open here"}
+              </motion.div>
             )}
             {isActiveJob && (
               <div className="pointer-events-none absolute inset-x-10 top-0 h-16 bg-sky-400/10 blur-3xl" />
@@ -252,9 +314,15 @@ export function DownloadItem({
                         {job.title || job.url}
                       </h4>
                       {spotlighted && (
-                        <span className="shrink-0 rounded-full border border-emerald-400/30 bg-emerald-400/10 px-2 py-0.5 text-[9px] font-semibold uppercase tracking-[0.16em] text-emerald-700 dark:text-emerald-200">
-                          {spotlightReason === "download-finished" ? "Just finished" : "Open here"}
-                        </span>
+                        <motion.span
+                          key={`spotlight-pill-${spotlightToken ?? job.id}`}
+                          className="shrink-0 rounded-full border border-emerald-400/30 bg-emerald-400/10 px-2 py-0.5 text-[9px] font-semibold uppercase text-emerald-700 dark:text-emerald-200"
+                          initial={{ opacity: 0, x: -4 }}
+                          animate={{ opacity: 1, x: 0 }}
+                          transition={{ duration: 0.35, ease: "easeOut", delay: 0.12 }}
+                        >
+                          {spotlightReason === "download-finished" && isLatestDone ? "Just finished" : "Open here"}
+                        </motion.span>
                       )}
                     </div>
                     <div className="flex flex-wrap items-center gap-1.5 text-[10px] font-medium text-muted-foreground">
@@ -274,6 +342,24 @@ export function DownloadItem({
                             <span className="truncate max-w-[220px] opacity-70" title={job.outputPath}>
                                 {job.outputPath.split(/[/\\]/).pop()}
                             </span>
+                        )}
+                        {fileSizeLabel && (
+                            <>
+                              <span className="w-0.5 h-0.5 rounded-full bg-muted-foreground/50" />
+                              <span className="flex shrink-0 items-center gap-1 whitespace-nowrap opacity-80" title={fileSizeTitle}>
+                                <HardDrive className="h-3 w-3 opacity-70" />
+                                {fileSizeLabel}
+                              </span>
+                            </>
+                        )}
+                        {mediaDurationLabel && (
+                            <>
+                              <span className="w-0.5 h-0.5 rounded-full bg-muted-foreground/50" />
+                              <span className="flex shrink-0 items-center gap-1 whitespace-nowrap opacity-80" title="Media duration">
+                                <Timer className="h-3 w-3 opacity-70" />
+                                {mediaDurationLabel}
+                              </span>
+                            </>
                         )}
                         {job.status === "Queued" && queueMeta && (
                             <>

@@ -9,6 +9,7 @@ export interface HistoryEntry {
   fileSize?: number;
   outputPath?: string;
   outputPaths?: string[];
+  mediaDurationSeconds?: number;
   presetId: string;
   presetName?: string;
   downloadedAt: number;
@@ -16,7 +17,13 @@ export interface HistoryEntry {
   domain: string;
   status: "completed" | "failed";
   failReason?: string;
-  overrides?: { filenameTemplate?: string; format?: string; downloadDir?: string };
+  overrides?: {
+    filenameTemplate?: string;
+    format?: string;
+    downloadDir?: string;
+    clipStartTime?: string;
+    clipEndTime?: string;
+  };
   isFavorite?: boolean;
   tags?: string[];
   notes?: string;

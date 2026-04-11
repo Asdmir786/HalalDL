@@ -5,6 +5,7 @@ import { usePresetsStore } from "@/store/presets";
 import { canonicalizePresetId, resolvePresetById } from "@/lib/preset-display";
 import { useSettingsStore } from "@/store/settings";
 import { useRuntimeStore } from "@/store/runtime";
+import { useAttentionStore } from "@/store/attention";
 import { join } from "@tauri-apps/api/path";
 import { OutputParser } from "@/lib/output-parser";
 import { copyFilesToClipboard, deleteFile, renameFile } from "@/lib/commands";
@@ -18,6 +19,7 @@ import { stat } from "@tauri-apps/plugin-fs";
 import { createId } from "@/lib/id";
 import type { DownloadJob } from "@/store/downloads";
 import { getExplicitOutputPaths } from "@/lib/output-paths";
+import { buildClipSection } from "@/lib/clip";
 import {
   normalizeSubtitlePreferences,
   resolveSubtitleLanguages,
@@ -49,6 +51,26 @@ function consumeHoldRequest(jobId: string) {
 
 function getQueueOrder(job: DownloadJob) {
   return typeof job.queueOrder === "number" ? job.queueOrder : job.createdAt;
+}
+
+async function getOutputFileSize(paths: string[]): Promise<number | undefined> {
+  const uniquePaths = Array.from(new Set(paths.map((path) => path.trim()).filter(Boolean)));
+  if (uniquePaths.length === 0) return undefined;
+
+  const sizes = await Promise.all(
+    uniquePaths.map(async (path) => {
+      try {
+        const info = await stat(path);
+        const size = Number(info.size);
+        return Number.isFinite(size) ? size : 0;
+      } catch {
+        return 0;
+      }
+    })
+  );
+
+  const total = sizes.reduce((sum, size) => sum + size, 0);
+  return total > 0 ? total : undefined;
 }
 
 function getReservedJobIds(jobs: DownloadJob[]) {
@@ -257,6 +279,8 @@ export function changePausedJobPreset(jobId: string, presetId: string) {
   const preservedOverrides = {
     downloadDir: job.overrides?.downloadDir,
     filenameTemplate: job.overrides?.filenameTemplate,
+    clipStartTime: job.overrides?.clipStartTime,
+    clipEndTime: job.overrides?.clipEndTime,
     origin: job.overrides?.origin,
   };
 
@@ -478,19 +502,23 @@ export async function startDownload(jobId: string) {
     }
 
     updateJob(jobId, { status: "Done", statusDetail: "Completed" });
+    useAttentionStore.getState().setTarget({
+      screen: "downloads",
+      targetType: "job",
+      targetId: jobId,
+      section: "recent",
+      reason: "download-finished",
+      actionLabel: "Show download",
+    });
 
     const doneJob = useDownloadsStore.getState().jobs.find((j) => j.id === jobId);
     if (doneJob) {
       const finalPath = lastKnownOutputPath || doneJob.outputPath;
       const explicitPaths = explicitOutputPaths?.length ? explicitOutputPaths : getExplicitOutputPaths(doneJob);
-      let fileSize: number | undefined;
-      if (finalPath) {
-        try {
-          const info = await stat(finalPath);
-          fileSize = info.size;
-        } catch {
-          void 0;
-        }
+      const resolvedOutputPaths = explicitPaths.length ? explicitPaths : finalPath ? [finalPath] : [];
+      const fileSize = await getOutputFileSize(resolvedOutputPaths);
+      if (typeof fileSize === "number") {
+        updateJob(jobId, { fileSize });
       }
       const entry: HistoryEntry = {
         id: createId(),
@@ -500,7 +528,8 @@ export async function startDownload(jobId: string) {
         format: doneJob.overrides?.format || doneJob.fallbackFormat,
         fileSize,
         outputPath: finalPath,
-        outputPaths: explicitPaths,
+        outputPaths: resolvedOutputPaths,
+        mediaDurationSeconds: doneJob.mediaDurationSeconds,
         presetId: doneJob.presetId,
         presetName: preset?.name,
         downloadedAt: Date.now(),
@@ -531,6 +560,7 @@ export async function startDownload(jobId: string) {
         format: failedJob.overrides?.format,
         outputPath: failedJob.outputPath,
         outputPaths: failedJob.outputPaths,
+        mediaDurationSeconds: failedJob.mediaDurationSeconds,
         presetId: failedJob.presetId,
         presetName: preset?.name,
         downloadedAt: Date.now(),
@@ -674,6 +704,7 @@ export async function startDownload(jobId: string) {
           availableSubtitleLanguages: info.availableSubtitleLanguages,
         };
         updateJob(jobId, {
+          ...(info.mediaDurationSeconds ? { mediaDurationSeconds: info.mediaDurationSeconds } : {}),
           subtitleStatus:
             info.hasManualSubtitles || info.hasAutoSubtitles ? "available" : "unavailable",
           hasManualSubtitles: info.hasManualSubtitles,
@@ -768,6 +799,12 @@ export async function startDownload(jobId: string) {
   if (job.resumeBehavior === "restart") {
     args.push("--no-continue");
     addLog({ level: "info", message: "Restarting paused job from the beginning", jobId });
+  }
+
+  const clipSection = buildClipSection(job.overrides?.clipStartTime, job.overrides?.clipEndTime);
+  if (clipSection) {
+    args.push("--download-sections", clipSection);
+    addLog({ level: "info", message: `Clip range applied: ${clipSection.slice(1)}`, jobId });
   }
 
   args.push("--ignore-config", "--newline", "--no-colors", "--no-playlist");

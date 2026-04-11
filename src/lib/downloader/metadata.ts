@@ -16,6 +16,7 @@ import {
 export interface MediaMetadataProbe {
   title: string;
   thumbnailUrl: string;
+  mediaDurationSeconds?: number;
   hasManualSubtitles: boolean;
   hasAutoSubtitles: boolean;
   availableSubtitleLanguages: string[];
@@ -65,10 +66,12 @@ export async function fetchMediaInfo(url: string): Promise<MediaMetadataProbe> {
   const manualLanguages = extractLanguageKeys(payload?.subtitles);
   const autoLanguages = extractLanguageKeys(payload?.automatic_captions);
   const mergedLanguages = Array.from(new Set([...manualLanguages, ...autoLanguages]));
+  const duration = Number(payload?.duration);
 
   return {
     title: String(payload?.title ?? "").trim(),
     thumbnailUrl: String(payload?.thumbnail ?? "").trim(),
+    mediaDurationSeconds: Number.isFinite(duration) && duration > 0 ? duration : undefined,
     hasManualSubtitles: manualLanguages.length > 0,
     hasAutoSubtitles: autoLanguages.length > 0,
     availableSubtitleLanguages: mergedLanguages,
@@ -102,6 +105,7 @@ export async function fetchMetadata(jobId: string) {
 
       updateJob(jobId, {
         ...(title ? { title } : {}),
+        ...(info.mediaDurationSeconds ? { mediaDurationSeconds: info.mediaDurationSeconds } : {}),
         subtitleStatus:
           info.hasManualSubtitles || info.hasAutoSubtitles ? "available" : "unavailable",
         hasManualSubtitles: info.hasManualSubtitles,

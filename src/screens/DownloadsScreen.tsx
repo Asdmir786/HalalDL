@@ -37,6 +37,7 @@ import { DownloadInputSection } from "./downloads/components/DownloadInputSectio
 import { DownloadStatsBar, type DownloadStatusFilter } from "./downloads/components/DownloadStatsBar";
 import { DownloadList } from "./downloads/components/DownloadList";
 import { getJobTs } from "./downloads/utils";
+import { buildClipSection } from "@/lib/clip";
 
 export function DownloadsScreen() {
   const { settings, updateSettings } = useSettingsStore();
@@ -58,6 +59,8 @@ export function DownloadsScreen() {
   const [subtitleLanguageMode, setSubtitleLanguageMode] = useState<"all" | "preferred" | "custom">("preferred");
   const [subtitleLanguagesText, setSubtitleLanguagesText] = useState("en.*, en");
   const [subtitleFormat, setSubtitleFormat] = useState<"original" | "srt" | "vtt">("srt");
+  const [clipStartTime, setClipStartTime] = useState("");
+  const [clipEndTime, setClipEndTime] = useState("");
 
   const { presets } = usePresetsStore();
   const selectedPreset = resolveExistingPresetId(presets, settings.downloadsSelectedPreset || "default");
@@ -183,6 +186,8 @@ export function DownloadsScreen() {
           )
         );
         setSubtitleFormat(subtitleDefaults.format);
+        setClipStartTime(composeDraft.overrides?.clipStartTime || "");
+        setClipEndTime(composeDraft.overrides?.clipEndTime || "");
         setComposeDraft(undefined);
       }, 0);
       return;
@@ -437,6 +442,28 @@ export function DownloadsScreen() {
     setIsAdding(true);
     try {
       const finalTemplate = `${filenameBase.trim() || "%(title)s"}.%(ext)s`;
+      const clipStartTrimmed = clipStartTime.trim();
+      const clipEndTrimmed = clipEndTime.trim();
+      const clipOverridesNeeded = Boolean(clipStartTrimmed || clipEndTrimmed);
+
+      if (clipOverridesNeeded && !buildClipSection(clipStartTrimmed, clipEndTrimmed)) {
+        toast.error("Clip times need a valid range", {
+          description: "Use seconds, mm:ss, or hh:mm:ss, and make sure the end is after the start.",
+        });
+        return;
+      }
+      if (clipOverridesNeeded && isInstagramUrl(trimmedUrl)) {
+        toast.error("Clip download is not available for Instagram yet", {
+          description: "Leave start and end blank for Instagram downloads.",
+        });
+        return;
+      }
+      if (clipOverridesNeeded && isDirectImageInput) {
+        toast.error("Clip download is only for timed media", {
+          description: "Images do not have a timeline, so leave start and end blank.",
+        });
+        return;
+      }
 
       const customDirTrimmed = customDownloadDir.trim();
       const selectedPresetConfig = presets.find((preset) => preset.id === selectedPreset);
@@ -461,11 +488,18 @@ export function DownloadsScreen() {
         showOutputConfig ||
         isCustomPreset ||
         Boolean(customDirTrimmed) ||
-        subtitleOverridesNeeded
+        subtitleOverridesNeeded ||
+        clipOverridesNeeded
           ? {
               ...(showOutputConfig || isCustomPreset ? { filenameTemplate: finalTemplate } : {}),
               ...(isCustomPreset ? { format: outputFormat } : {}),
               ...(customDirTrimmed ? { downloadDir: customDirTrimmed } : {}),
+              ...(clipOverridesNeeded
+                ? {
+                    ...(clipStartTrimmed ? { clipStartTime: clipStartTrimmed } : {}),
+                    ...(clipEndTrimmed ? { clipEndTime: clipEndTrimmed } : {}),
+                  }
+                : {}),
               ...(subtitleOverridesNeeded
                 ? {
                     subtitleMode,
@@ -539,6 +573,12 @@ export function DownloadsScreen() {
       : subtitleMode === "only"
         ? "Download subtitles only"
         : "Download sidecar subtitles when available";
+  const clipValidationMessage = useMemo(() => {
+    if (!clipStartTime.trim() && !clipEndTime.trim()) return null;
+    return buildClipSection(clipStartTime, clipEndTime)
+      ? null
+      : "Enter a valid range like 0:30 to 2:15. End time must be after start time.";
+  }, [clipEndTime, clipStartTime]);
 
   const handleRetryFailed = () => {
     retryFailedJobs();
@@ -697,6 +737,11 @@ export function DownloadsScreen() {
                     subtitleFormat={subtitleFormat}
                     onSubtitleFormatChange={setSubtitleFormat}
                     subtitleHint={subtitleHint}
+                    clipStartTime={clipStartTime}
+                    onClipStartTimeChange={setClipStartTime}
+                    clipEndTime={clipEndTime}
+                    onClipEndTimeChange={setClipEndTime}
+                    clipValidationMessage={clipValidationMessage}
                     instagramMediaSummary={instagramMediaSummary}
                   />
 

@@ -41,6 +41,8 @@ export interface DownloadJob {
   presetId: string;
   outputPath?: string;
   outputPaths?: string[];
+  fileSize?: number;
+  mediaDurationSeconds?: number;
   createdAt: number;
   statusChangedAt?: number;
   queueOrder?: number;
@@ -54,6 +56,8 @@ export interface DownloadJob {
     subtitleLanguages?: string[];
     subtitleFormat?: SubtitleFormat;
     subtitleOnly?: boolean;
+    clipStartTime?: string;
+    clipEndTime?: string;
     origin?: DownloadOrigin;
   };
   thumbnailStatus?: ThumbnailStatus;

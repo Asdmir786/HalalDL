@@ -176,6 +176,8 @@ function buildDemoJobs(now: number): DownloadJob[] {
       subtitleStatus: "idle",
       outputPath: "C:\\Users\\halal\\Downloads\\HalalDL\\source-audio.mp3",
       outputPaths: ["C:\\Users\\halal\\Downloads\\HalalDL\\source-audio.mp3"],
+      fileSize: 12400000,
+      mediaDurationSeconds: 605,
       overrides: { origin: "app" },
     },
     {
@@ -207,6 +209,7 @@ function buildDemoHistory(now: number): HistoryEntry[] {
       thumbnail: svgThumbnail("Audio Export", "#0f766e", "#14b8a6"),
       format: "mp3",
       fileSize: 12400000,
+      mediaDurationSeconds: 605,
       outputPath: "C:\\Users\\halal\\Downloads\\HalalDL\\source-audio.mp3",
       outputPaths: ["C:\\Users\\halal\\Downloads\\HalalDL\\source-audio.mp3"],
       presetId: "mp3",
@@ -226,6 +229,7 @@ function buildDemoHistory(now: number): HistoryEntry[] {
       thumbnail: svgThumbnail("Instagram Carousel", "#0f766e", "#1d4ed8"),
       format: "mp4",
       fileSize: 88400000,
+      mediaDurationSeconds: 74,
       outputPath: "C:\\Users\\halal\\Downloads\\HalalDL\\instagram-carousel\\slide-01.mp4",
       outputPaths: [
         "C:\\Users\\halal\\Downloads\\HalalDL\\instagram-carousel\\slide-01.mp4",
@@ -247,6 +251,7 @@ function buildDemoHistory(now: number): HistoryEntry[] {
       thumbnail: svgThumbnail("Lecture + Subs", "#1d4ed8", "#0f172a"),
       format: "mp4",
       fileSize: 164000000,
+      mediaDurationSeconds: 1805,
       outputPath: "C:\\Users\\halal\\Downloads\\HalalDL\\lecture-subs.mp4",
       outputPaths: [
         "C:\\Users\\halal\\Downloads\\HalalDL\\lecture-subs.mp4",
@@ -281,6 +286,7 @@ function buildDemoHistory(now: number): HistoryEntry[] {
       thumbnail: svgThumbnail("Quick Clip", "#f59e0b", "#b91c1c"),
       format: "mp4",
       fileSize: 36200000,
+      mediaDurationSeconds: 49,
       outputPath: "C:\\Users\\halal\\Downloads\\HalalDL\\quick-highlight.mp4",
       outputPaths: ["C:\\Users\\halal\\Downloads\\HalalDL\\quick-highlight.mp4"],
       presetId: "whatsapp-optimized",

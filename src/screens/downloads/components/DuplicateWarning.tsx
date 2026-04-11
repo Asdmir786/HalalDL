@@ -4,6 +4,7 @@ import { useHistoryStore } from "@/store/history";
 import { exists } from "@tauri-apps/plugin-fs";
 import { openFile } from "@/lib/commands";
 import { cn } from "@/lib/utils";
+import { formatBytes } from "../utils";
 
 interface DuplicateWarningProps {
   url: string;
@@ -20,13 +21,6 @@ function formatRelative(ts: number): string {
   const days = Math.floor(hours / 24);
   if (days < 7) return `${days}d ago`;
   return new Date(ts).toLocaleDateString();
-}
-
-function formatBytes(bytes: number | undefined): string {
-  if (!bytes) return "";
-  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(0)} KB`;
-  if (bytes < 1024 * 1024 * 1024) return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
-  return `${(bytes / (1024 * 1024 * 1024)).toFixed(2)} GB`;
 }
 
 /**

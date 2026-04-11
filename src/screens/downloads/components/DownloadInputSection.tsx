@@ -73,6 +73,11 @@ interface DownloadInputSectionProps {
   subtitleFormat: SubtitleFormat;
   onSubtitleFormatChange: (val: SubtitleFormat) => void;
   subtitleHint: string;
+  clipStartTime: string;
+  onClipStartTimeChange: (val: string) => void;
+  clipEndTime: string;
+  onClipEndTimeChange: (val: string) => void;
+  clipValidationMessage: string | null;
   instagramMediaSummary: InstagramMediaSummary | null;
 }
 
@@ -98,6 +103,11 @@ export function DownloadInputSection({
   subtitleFormat,
   onSubtitleFormatChange,
   subtitleHint,
+  clipStartTime,
+  onClipStartTimeChange,
+  clipEndTime,
+  onClipEndTimeChange,
+  clipValidationMessage,
   instagramMediaSummary,
 }: DownloadInputSectionProps) {
   const [probeState, setProbeState] = useState<{
@@ -612,6 +622,11 @@ export function DownloadInputSection({
           subtitleFormat={subtitleFormat}
           onSubtitleFormatChange={onSubtitleFormatChange}
           subtitleHint={subtitleHint}
+          clipStartTime={clipStartTime}
+          onClipStartTimeChange={onClipStartTimeChange}
+          clipEndTime={clipEndTime}
+          onClipEndTimeChange={onClipEndTimeChange}
+          clipValidationMessage={clipValidationMessage}
         />
       )}
     </div>

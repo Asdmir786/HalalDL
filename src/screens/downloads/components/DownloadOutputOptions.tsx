@@ -1,4 +1,4 @@
-import { Settings2, FolderOpen, Languages } from "lucide-react";
+import { Settings2, FolderOpen, Languages, Scissors } from "lucide-react";
 import { MotionButton } from "@/components/motion/MotionButton";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -30,6 +30,11 @@ interface DownloadOutputOptionsProps {
   subtitleFormat: SubtitleFormat;
   onSubtitleFormatChange: (val: SubtitleFormat) => void;
   subtitleHint: string;
+  clipStartTime: string;
+  onClipStartTimeChange: (val: string) => void;
+  clipEndTime: string;
+  onClipEndTimeChange: (val: string) => void;
+  clipValidationMessage: string | null;
 }
 
 export function DownloadOutputOptions({
@@ -52,6 +57,11 @@ export function DownloadOutputOptions({
   subtitleFormat,
   onSubtitleFormatChange,
   subtitleHint,
+  clipStartTime,
+  onClipStartTimeChange,
+  clipEndTime,
+  onClipEndTimeChange,
+  clipValidationMessage,
 }: DownloadOutputOptionsProps) {
   
   const insertPlaceholder = (placeholder: string) => {
@@ -160,6 +170,44 @@ export function DownloadOutputOptions({
               </MotionButton>
             </div>
           </div>
+       </div>
+
+       <div className="grid gap-3 rounded-xl border border-muted/40 bg-muted/15 p-3">
+         <div className="flex items-center justify-between gap-3">
+           <div className="flex items-center gap-2">
+             <Scissors className="h-4 w-4 text-primary/80" />
+             <label className="text-xs font-medium text-muted-foreground">Clip Download</label>
+           </div>
+           <span className="text-[10px] text-muted-foreground">Leave blank for full media</span>
+         </div>
+
+         <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+           <div className="grid gap-2">
+             <label className="text-xs font-medium text-muted-foreground">Start Time</label>
+             <Input
+               value={clipStartTime}
+               onChange={(e) => onClipStartTimeChange(e.target.value)}
+               placeholder="0:30"
+               className="h-9 bg-background/50 font-mono text-xs"
+             />
+           </div>
+           <div className="grid gap-2">
+             <label className="text-xs font-medium text-muted-foreground">End Time</label>
+             <Input
+               value={clipEndTime}
+               onChange={(e) => onClipEndTimeChange(e.target.value)}
+               placeholder="2:15"
+               className="h-9 bg-background/50 font-mono text-xs"
+             />
+           </div>
+         </div>
+
+         <p className={cn(
+           "text-[11px]",
+           clipValidationMessage ? "text-destructive" : "text-muted-foreground"
+         )}>
+           {clipValidationMessage || "Use seconds, mm:ss, or hh:mm:ss. Clips are cut at stream keyframes unless re-encoded."}
+         </p>
        </div>
 
        <div className="grid gap-3 rounded-xl border border-muted/40 bg-muted/15 p-3">
