@@ -245,6 +245,7 @@ export function PresetsScreen() {
                   name: data.name || "New Preset",
                   description: data.description || "",
                   args: data.args || [],
+                  filenameTemplate: data.filenameTemplate,
                   isBuiltIn: false,
                   group: data.group ?? "custom",
                   quickEligible: data.quickEligible ?? true,

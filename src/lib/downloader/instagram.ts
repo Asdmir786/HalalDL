@@ -101,7 +101,7 @@ export async function downloadInstagramJob(options: {
 
   const title = buildInstagramTitle(job.url, resolved);
   const rootDir = await resolveRootDirectory(job, settings);
-  const filenameTemplate = getFilenameTemplate(job, settings);
+  const filenameTemplate = getFilenameTemplate(job, preset, settings);
   const postProcessPlan = buildPostProcessPlan(job, preset);
   const activePostProcessPlan = postProcessPlan.mode === "none" ? null : postProcessPlan;
 
@@ -438,9 +438,12 @@ async function resolveRootDirectory(job: DownloadJob, settings: Settings): Promi
   return defaultDownloadDir();
 }
 
-function getFilenameTemplate(job: DownloadJob, settings: Settings): string {
+function getFilenameTemplate(job: DownloadJob, preset: Preset, settings: Settings): string {
   if (job.overrides?.filenameTemplate?.trim()) {
     return job.overrides.filenameTemplate.trim();
+  }
+  if (preset?.filenameTemplate?.trim()) {
+    return preset.filenameTemplate.trim();
   }
 
   return settings.fileCollision === "rename"

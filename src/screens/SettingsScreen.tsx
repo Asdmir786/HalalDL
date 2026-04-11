@@ -21,6 +21,8 @@ import { EngineSection } from "./settings/components/EngineSection";
 import { AboutSection } from "./settings/components/AboutSection";
 import { usePresetsStore } from "@/store/presets";
 import { getQuickEligiblePresets } from "@/lib/preset-display";
+import { storage } from "@/lib/storage";
+import { useLogsStore } from "@/store/logs";
 
 const SETTINGS_KEY_SET = new Set(SETTINGS_KEYS as unknown as string[]);
 const ACCENT_CLASSES = ACCENT_COLORS.map((c) => `accent-${c.id}`).filter((c) => c !== "accent-default");
@@ -47,6 +49,7 @@ const resolveDefaultSettings = async (): Promise<Settings> => {
 
 export function SettingsScreen() {
   const { settings, setSettings } = useSettingsStore();
+  const addLog = useLogsStore((state) => state.addLog);
   const presets = usePresetsStore((state) => state.presets);
   const quickPresetOptions = useMemo(
     () => getQuickEligiblePresets(presets).map((preset) => ({ id: preset.id, name: preset.name })),
@@ -63,6 +66,11 @@ export function SettingsScreen() {
   );
 
   const [resolvedDefaults, setResolvedDefaults] = useState<Settings | null>(null);
+  const latestDraftRef = useRef(draftSettings);
+  const latestDirtyRef = useRef(false);
+  const commitSettingsRef = useRef<(nextDraft: Settings, showToast?: boolean) => void>(() => {
+    void 0;
+  });
 
   useEffect(() => {
     let mounted = true;
@@ -112,6 +120,54 @@ export function SettingsScreen() {
     [savedSettings]
   );
 
+  const commitSettings = useCallback(
+    (nextDraft: Settings, showToast = false) => {
+      const committed = {
+        ...(useSettingsStore.getState().settings as unknown as Record<string, unknown>),
+        ...pickKnownSettings(nextDraft),
+      } as unknown as Settings;
+
+      setSettings(committed);
+      setEdits({});
+      void storage.saveSettings(committed).catch((e) => {
+        addLog({
+          level: "error",
+          message: `Failed to save settings: ${String(e)}`,
+        });
+      });
+
+      if (showToast) {
+        toast.success("Settings saved successfully");
+      }
+    },
+    [addLog, setSettings]
+  );
+
+  useEffect(() => {
+    latestDraftRef.current = draftSettings;
+    latestDirtyRef.current = isDirty;
+  }, [draftSettings, isDirty]);
+
+  useEffect(() => {
+    commitSettingsRef.current = commitSettings;
+  }, [commitSettings]);
+
+  useEffect(() => {
+    if (!isDirty) return;
+    const timer = window.setTimeout(() => {
+      commitSettings(draftSettings);
+    }, 250);
+    return () => window.clearTimeout(timer);
+  }, [commitSettings, draftSettings, isDirty]);
+
+  useEffect(
+    () => () => {
+      if (!latestDirtyRef.current) return;
+      commitSettingsRef.current(latestDraftRef.current);
+    },
+    []
+  );
+
   const applyTheme = useCallback((theme: Theme) => {
     const root = window.document.documentElement;
     root.classList.remove("light", "dark");
@@ -146,10 +202,8 @@ export function SettingsScreen() {
 
   const handleSave = useCallback(() => {
     if (!isDirty) return;
-    setSettings({ ...(settings as unknown as Record<string, unknown>), ...draftSettings } as unknown as Settings);
-    setEdits({});
-    toast.success("Settings saved successfully");
-  }, [draftSettings, isDirty, setSettings, settings]);
+    commitSettings(draftSettings, true);
+  }, [commitSettings, draftSettings, isDirty]);
 
   const [isResetting, setIsResetting] = useState(false);
 

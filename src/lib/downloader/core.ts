@@ -777,7 +777,10 @@ export async function startDownload(jobId: string) {
     settings.fileCollision === "rename"
       ? `%(title)s${inferredAudioOnly ? " [audio]" : " [video]"} [${jobId}].%(ext)s`
       : "%(title)s.%(ext)s";
-  const filenameTemplate = job.overrides?.filenameTemplate || defaultFilenameTemplate;
+  const filenameTemplate =
+    job.overrides?.filenameTemplate ||
+    preset.filenameTemplate?.trim() ||
+    defaultFilenameTemplate;
 
   if (downloadDir) {
     args.push("-o", await join(downloadDir, filenameTemplate));

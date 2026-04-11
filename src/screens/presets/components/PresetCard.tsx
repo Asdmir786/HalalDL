@@ -73,7 +73,19 @@ export function PresetCard({ preset, onDuplicate, onEdit, onDelete }: PresetCard
               {subtitleDetail}
             </Badge>
           )}
+          {preset.filenameTemplate?.trim() && (
+            <Badge variant="outline" className="text-[10px]">
+              Filename
+            </Badge>
+          )}
         </div>
+        {preset.filenameTemplate?.trim() && (
+          <div className="rounded-lg border border-muted/45 bg-muted/20 px-3 py-2 font-mono text-[10px] text-muted-foreground">
+            <div className="truncate" title={preset.filenameTemplate}>
+              {preset.filenameTemplate}
+            </div>
+          </div>
+        )}
         <div className="bg-muted/30 p-3 rounded-lg border border-muted/50 font-mono text-[10px] text-muted-foreground break-words relative group max-h-24 overflow-y-auto">
            <div className="line-clamp-4">
               yt-dlp {preset.args.join(" ")}

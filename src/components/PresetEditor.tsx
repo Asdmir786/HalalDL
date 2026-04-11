@@ -33,6 +33,7 @@ export function PresetEditor({ preset, isOpen, onClose, onSave }: PresetEditorPr
   const [name, setName] = useState(preset?.name ?? "");
   const [description, setDescription] = useState(preset?.description ?? "");
   const [args, setArgs] = useState(preset ? preset.args.join(" ") : "");
+  const [filenameTemplate, setFilenameTemplate] = useState(preset?.filenameTemplate ?? "");
   const [group, setGroup] = useState<PresetGroup>(preset?.group ?? "custom");
   const [quickEligible, setQuickEligible] = useState(preset?.quickEligible ?? true);
   const [subtitleMode, setSubtitleMode] = useState<"off" | "on" | "only">(
@@ -52,10 +53,12 @@ export function PresetEditor({ preset, isOpen, onClose, onSave }: PresetEditorPr
   );
 
   const handleSave = () => {
+    const trimmedFilenameTemplate = filenameTemplate.trim();
     onSave({
       name,
       description,
       args: args.split(" ").filter(a => a.trim() !== ""),
+      filenameTemplate: trimmedFilenameTemplate || undefined,
       group,
       quickEligible,
       subtitleMode,
@@ -120,6 +123,43 @@ export function PresetEditor({ preset, isOpen, onClose, onSave }: PresetEditorPr
               placeholder="-f bestvideo+bestaudio --merge-output-format mp4"
               className="font-mono text-xs"
             />
+          </div>
+          <div className="grid gap-2">
+            <div className="flex items-center justify-between gap-3">
+              <Label htmlFor="filename-template">Filename Template</Label>
+              <span className="text-[10px] text-muted-foreground">Optional</span>
+            </div>
+            <div className="flex gap-2">
+              <Input
+                id="filename-template"
+                value={filenameTemplate}
+                onChange={(e) => setFilenameTemplate(e.target.value)}
+                placeholder="%(title)s [%(id)s].%(ext)s"
+                className="font-mono text-xs"
+              />
+            </div>
+            <div className="flex flex-wrap gap-1.5">
+              {[
+                { label: "Title", value: "%(title)s" },
+                { label: "Date", value: "%(upload_date)s" },
+                { label: "ID", value: "%(id)s" },
+                { label: "Uploader", value: "%(uploader)s" },
+              ].map((chip) => (
+                <MotionButton
+                  key={chip.value}
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  className="h-7 rounded-lg px-2 text-[10px]"
+                  onClick={() => setFilenameTemplate((current) => current + chip.value)}
+                >
+                  {chip.label}
+                </MotionButton>
+              ))}
+            </div>
+            <p className="text-[11px] leading-5 text-muted-foreground">
+              Used when a download does not set its own filename. Keep <span className="font-mono">%(ext)s</span> if you want full yt-dlp control.
+            </p>
           </div>
           <div className="flex items-center justify-between rounded-lg border border-border/40 bg-muted/20 px-3 py-2.5">
             <div className="space-y-0.5">

@@ -24,6 +24,7 @@ export interface Preset {
   description: string;
   isBuiltIn: boolean;
   args: string[];
+  filenameTemplate?: string;
   group?: PresetGroup;
   featured?: boolean;
   quickEligible?: boolean;
