@@ -6,6 +6,7 @@ import type { Preset } from "@/store/presets";
 import type { Settings } from "@/store/settings";
 import type { SubtitlePreferences } from "@/lib/subtitles";
 import { deleteFile, downloadUrlToFile } from "@/lib/commands";
+import { ensureFilenameTemplateExtension } from "@/lib/output-paths";
 import {
   extractInstagramShortcode,
   getInstagramResourceType,
@@ -440,10 +441,10 @@ async function resolveRootDirectory(job: DownloadJob, settings: Settings): Promi
 
 function getFilenameTemplate(job: DownloadJob, preset: Preset, settings: Settings): string {
   if (job.overrides?.filenameTemplate?.trim()) {
-    return job.overrides.filenameTemplate.trim();
+    return ensureFilenameTemplateExtension(job.overrides.filenameTemplate);
   }
   if (preset?.filenameTemplate?.trim()) {
-    return preset.filenameTemplate.trim();
+    return ensureFilenameTemplateExtension(preset.filenameTemplate);
   }
 
   return settings.fileCollision === "rename"

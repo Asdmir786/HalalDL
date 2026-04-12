@@ -141,9 +141,11 @@ export function DownloadList({
     const nextJobId =
       attentionTarget.targetType === "job" ? attentionTarget.targetId ?? null : null;
 
-    setSpotlightToken(nextToken);
-    setSpotlightJobId(nextJobId);
-    setSpotlightReason(attentionTarget.reason);
+    const stateTimer = window.setTimeout(() => {
+      setSpotlightToken(nextToken);
+      setSpotlightJobId(nextJobId);
+      setSpotlightReason(attentionTarget.reason);
+    }, 0);
 
     const raf = window.requestAnimationFrame(() => {
       if (nextJobId) {
@@ -164,6 +166,7 @@ export function DownloadList({
     }, 4200);
 
     return () => {
+      window.clearTimeout(stateTimer);
       window.cancelAnimationFrame(raf);
       window.clearTimeout(timeout);
     };

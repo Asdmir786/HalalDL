@@ -18,7 +18,7 @@ import { useHistoryStore, extractDomain, type HistoryEntry } from "@/store/histo
 import { stat } from "@tauri-apps/plugin-fs";
 import { createId } from "@/lib/id";
 import type { DownloadJob } from "@/store/downloads";
-import { getExplicitOutputPaths } from "@/lib/output-paths";
+import { ensureFilenameTemplateExtension, getExplicitOutputPaths } from "@/lib/output-paths";
 import { buildClipSection } from "@/lib/clip";
 import {
   normalizeSubtitlePreferences,
@@ -777,10 +777,11 @@ export async function startDownload(jobId: string) {
     settings.fileCollision === "rename"
       ? `%(title)s${inferredAudioOnly ? " [audio]" : " [video]"} [${jobId}].%(ext)s`
       : "%(title)s.%(ext)s";
-  const filenameTemplate =
+  const filenameTemplate = ensureFilenameTemplateExtension(
     job.overrides?.filenameTemplate ||
-    preset.filenameTemplate?.trim() ||
-    defaultFilenameTemplate;
+      preset.filenameTemplate?.trim() ||
+      defaultFilenameTemplate
+  );
 
   if (downloadDir) {
     args.push("-o", await join(downloadDir, filenameTemplate));

@@ -49,9 +49,11 @@ export function ToolsScreen() {
     const nextToolId =
       attentionTarget.targetType === "tool" ? attentionTarget.targetId ?? null : null;
 
-    setSpotlightToken(nextToken);
-    setSpotlightToolId(nextToolId);
-    setSpotlightReason(attentionTarget.reason);
+    const stateTimer = window.setTimeout(() => {
+      setSpotlightToken(nextToken);
+      setSpotlightToolId(nextToolId);
+      setSpotlightReason(attentionTarget.reason);
+    }, 0);
 
     const scrollTarget = () => {
       const container = scrollRef.current;
@@ -74,6 +76,7 @@ export function ToolsScreen() {
     }, 4200);
 
     return () => {
+      window.clearTimeout(stateTimer);
       window.cancelAnimationFrame(raf);
       window.clearTimeout(timeout);
     };

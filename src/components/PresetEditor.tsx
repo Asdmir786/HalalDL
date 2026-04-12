@@ -158,7 +158,7 @@ export function PresetEditor({ preset, isOpen, onClose, onSave }: PresetEditorPr
               ))}
             </div>
             <p className="text-[11px] leading-5 text-muted-foreground">
-              Used when a download does not set its own filename. Keep <span className="font-mono">%(ext)s</span> if you want full yt-dlp control.
+              Used when a download does not set its own filename. HalalDL adds <span className="font-mono">.%(ext)s</span> if you leave it out.
             </p>
           </div>
           <div className="flex items-center justify-between rounded-lg border border-border/40 bg-muted/20 px-3 py-2.5">

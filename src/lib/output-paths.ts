@@ -52,3 +52,9 @@ export function getPreferredThumbnailSource(value: ThumbnailSourceLike): string 
 
   return value.thumbnail;
 }
+
+export function ensureFilenameTemplateExtension(template: string): string {
+  const trimmed = template.trim();
+  if (!trimmed || /%\(ext\)s/i.test(trimmed)) return trimmed;
+  return `${trimmed}.%(ext)s`;
+}

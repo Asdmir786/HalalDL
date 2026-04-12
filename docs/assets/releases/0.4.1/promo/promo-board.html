@@ -1,0 +1,746 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>HalalDL 0.4.1 Promo Board</title>
+    <style>
+      :root {
+        --bg: #f5f7f6;
+        --ink: #111312;
+        --muted: #5c6661;
+        --line: rgba(17, 19, 18, 0.12);
+        --panel: rgba(255, 255, 255, 0.86);
+        --panel-solid: #ffffff;
+        --dark: #101312;
+        --dark-2: #181d1b;
+        --green: #12d18e;
+        --cyan: #22c7d8;
+        --rose: #f05a7a;
+        --gold: #f2bd42;
+      }
+
+      * {
+        box-sizing: border-box;
+      }
+
+      body {
+        margin: 0;
+        min-height: 100vh;
+        display: grid;
+        place-items: center;
+        font-family:
+          "Segoe UI",
+          "Inter",
+          system-ui,
+          sans-serif;
+        color: var(--ink);
+        background: #dfe5e2;
+      }
+
+      .frame {
+        display: none;
+        position: relative;
+        width: 1600px;
+        height: 900px;
+        overflow: hidden;
+        background:
+          linear-gradient(135deg, rgba(18, 209, 142, 0.18), transparent 32%),
+          linear-gradient(315deg, rgba(240, 90, 122, 0.14), transparent 30%),
+          var(--bg);
+      }
+
+      body[data-capture="hero"] .hero,
+      body[data-capture="quick-panel"] .quick-panel,
+      body[data-capture="latest-glow"] .latest-glow,
+      body[data-capture="download-details"] .download-details,
+      body[data-capture="preset-filenames"] .preset-filenames,
+      body[data-capture="settings-fix"] .settings-fix {
+        display: block;
+      }
+
+      .texture {
+        position: absolute;
+        inset: 0;
+        pointer-events: none;
+        opacity: 0.26;
+        background-image:
+          linear-gradient(rgba(17, 19, 18, 0.055) 1px, transparent 1px),
+          linear-gradient(90deg, rgba(17, 19, 18, 0.055) 1px, transparent 1px);
+        background-size: 38px 38px;
+      }
+
+      .topbar {
+        position: absolute;
+        left: 64px;
+        right: 64px;
+        top: 44px;
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        z-index: 5;
+      }
+
+      .brand {
+        display: flex;
+        align-items: center;
+        gap: 14px;
+        font-weight: 800;
+        letter-spacing: 0.08em;
+        text-transform: uppercase;
+        font-size: 18px;
+      }
+
+      .brand-dot {
+        width: 17px;
+        height: 17px;
+        border-radius: 6px;
+        background: linear-gradient(135deg, var(--green), var(--cyan));
+        box-shadow: 0 0 28px rgba(18, 209, 142, 0.58);
+      }
+
+      .pill {
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+        border: 1px solid var(--line);
+        border-radius: 8px;
+        background: rgba(255, 255, 255, 0.72);
+        padding: 10px 14px;
+        font-size: 15px;
+        font-weight: 700;
+        color: var(--muted);
+      }
+
+      .content {
+        position: relative;
+        z-index: 2;
+        height: 100%;
+        padding: 128px 72px 64px;
+      }
+
+      h1 {
+        margin: 0;
+        max-width: 670px;
+        font-size: 86px;
+        line-height: 0.92;
+        letter-spacing: 0;
+      }
+
+      h2 {
+        margin: 0;
+        font-size: 58px;
+        line-height: 1;
+        letter-spacing: 0;
+      }
+
+      .lead {
+        margin: 26px 0 0;
+        max-width: 660px;
+        color: var(--muted);
+        font-size: 28px;
+        line-height: 1.35;
+        font-weight: 520;
+      }
+
+      .grid-two {
+        display: grid;
+        grid-template-columns: 590px 1fr;
+        gap: 56px;
+        align-items: center;
+        height: 100%;
+      }
+
+      .card {
+        position: relative;
+        border: 1px solid var(--line);
+        border-radius: 8px;
+        background: var(--panel);
+        box-shadow: 0 26px 70px rgba(17, 19, 18, 0.12);
+        backdrop-filter: blur(20px);
+      }
+
+      .app-shell {
+        overflow: hidden;
+        background: #101312;
+        color: #f7fbf9;
+        border-color: rgba(255, 255, 255, 0.14);
+      }
+
+      .app-header {
+        height: 58px;
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        padding: 0 22px;
+        border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+        background: rgba(255, 255, 255, 0.035);
+      }
+
+      .window-dots {
+        display: flex;
+        gap: 8px;
+      }
+
+      .window-dots span {
+        width: 11px;
+        height: 11px;
+        border-radius: 999px;
+        background: rgba(255, 255, 255, 0.28);
+      }
+
+      .window-dots span:nth-child(1) {
+        background: var(--rose);
+      }
+
+      .window-dots span:nth-child(2) {
+        background: var(--gold);
+      }
+
+      .window-dots span:nth-child(3) {
+        background: var(--green);
+      }
+
+      .mock-row {
+        display: grid;
+        grid-template-columns: 112px 1fr auto;
+        gap: 16px;
+        align-items: center;
+        margin: 18px;
+        padding: 14px;
+        border: 1px solid rgba(255, 255, 255, 0.1);
+        border-radius: 8px;
+        background: rgba(255, 255, 255, 0.055);
+      }
+
+      .thumb {
+        aspect-ratio: 16 / 9;
+        border-radius: 8px;
+        background:
+          linear-gradient(135deg, rgba(34, 199, 216, 0.48), rgba(240, 90, 122, 0.48)),
+          linear-gradient(45deg, #222827, #0f1312);
+        position: relative;
+        overflow: hidden;
+      }
+
+      .thumb::after {
+        content: "";
+        position: absolute;
+        inset: 16px 24px;
+        border: 2px solid rgba(255, 255, 255, 0.52);
+        transform: skewX(-16deg);
+      }
+
+      .row-title {
+        font-size: 22px;
+        font-weight: 800;
+      }
+
+      .row-meta {
+        margin-top: 8px;
+        display: flex;
+        flex-wrap: wrap;
+        gap: 8px;
+        color: rgba(247, 251, 249, 0.72);
+        font-size: 13px;
+        font-weight: 700;
+      }
+
+      .mini-chip {
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        min-height: 27px;
+        padding: 4px 9px;
+        border-radius: 8px;
+        border: 1px solid rgba(255, 255, 255, 0.12);
+        background: rgba(255, 255, 255, 0.07);
+      }
+
+      .status {
+        border-radius: 8px;
+        border: 1px solid rgba(18, 209, 142, 0.36);
+        background: rgba(18, 209, 142, 0.13);
+        color: #8ff0cd;
+        padding: 8px 12px;
+        font-size: 13px;
+        font-weight: 850;
+      }
+
+      .feature-list {
+        margin-top: 34px;
+        display: grid;
+        gap: 14px;
+        max-width: 640px;
+      }
+
+      .feature {
+        display: grid;
+        grid-template-columns: 40px 1fr;
+        gap: 14px;
+        align-items: start;
+        padding: 16px;
+        border: 1px solid var(--line);
+        border-radius: 8px;
+        background: rgba(255, 255, 255, 0.62);
+      }
+
+      .feature strong {
+        display: block;
+        font-size: 20px;
+      }
+
+      .feature span {
+        display: block;
+        margin-top: 5px;
+        color: var(--muted);
+        font-size: 16px;
+        line-height: 1.35;
+      }
+
+      .icon-box {
+        width: 40px;
+        height: 40px;
+        border-radius: 8px;
+        display: grid;
+        place-items: center;
+        background: var(--dark);
+        color: white;
+        font-weight: 900;
+      }
+
+      .hero .app-shell {
+        width: 780px;
+        margin-left: auto;
+      }
+
+      .hero .mock-row:first-of-type {
+        outline: 3px solid rgba(18, 209, 142, 0.54);
+        box-shadow: 0 0 0 10px rgba(18, 209, 142, 0.1);
+      }
+
+      .headline-tag {
+        display: inline-flex;
+        align-items: center;
+        gap: 10px;
+        margin-bottom: 22px;
+        border-radius: 8px;
+        border: 1px solid rgba(18, 209, 142, 0.3);
+        background: rgba(18, 209, 142, 0.1);
+        padding: 10px 14px;
+        color: #066845;
+        font-size: 15px;
+        font-weight: 850;
+      }
+
+      .quick-card {
+        width: 470px;
+        margin: 0 auto;
+        padding: 18px;
+        background: #101312;
+        color: white;
+      }
+
+      .quick-title {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        margin-bottom: 14px;
+      }
+
+      .input-like {
+        min-height: 48px;
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        padding: 0 14px;
+        border-radius: 8px;
+        border: 1px solid rgba(255, 255, 255, 0.12);
+        background: rgba(255, 255, 255, 0.06);
+        color: rgba(255, 255, 255, 0.72);
+        font-size: 14px;
+        font-weight: 650;
+      }
+
+      .compact-stack {
+        display: grid;
+        gap: 11px;
+      }
+
+      .summary-line {
+        display: flex;
+        gap: 8px;
+        flex-wrap: wrap;
+        font-size: 12px;
+        color: rgba(255, 255, 255, 0.72);
+      }
+
+      .download-button {
+        height: 54px;
+        border-radius: 8px;
+        display: grid;
+        place-items: center;
+        background: linear-gradient(135deg, var(--green), var(--cyan));
+        color: #07110d;
+        font-size: 18px;
+        font-weight: 900;
+        box-shadow: 0 18px 38px rgba(18, 209, 142, 0.26);
+      }
+
+      .keyboard {
+        display: inline-grid;
+        place-items: center;
+        min-width: 84px;
+        height: 38px;
+        border-radius: 8px;
+        border: 1px solid rgba(17, 19, 18, 0.2);
+        background: white;
+        font-weight: 900;
+        box-shadow: 0 5px 0 rgba(17, 19, 18, 0.12);
+      }
+
+      .glow-row {
+        position: relative;
+        outline: 2px solid rgba(18, 209, 142, 0.72);
+        box-shadow:
+          0 0 0 8px rgba(18, 209, 142, 0.12),
+          0 0 48px rgba(18, 209, 142, 0.42);
+      }
+
+      .glow-row::before {
+        content: "";
+        position: absolute;
+        inset: 0;
+        border-radius: 8px;
+        background: linear-gradient(110deg, transparent, rgba(255, 255, 255, 0.18), transparent);
+        transform: translateX(28%);
+      }
+
+      .latest-badge {
+        position: absolute;
+        right: 18px;
+        top: -14px;
+        border-radius: 8px;
+        padding: 8px 11px;
+        background: var(--green);
+        color: #07110d;
+        font-size: 12px;
+        font-weight: 950;
+        letter-spacing: 0.12em;
+        text-transform: uppercase;
+      }
+
+      .details-card {
+        width: 760px;
+        padding: 24px;
+        background: #101312;
+        color: white;
+      }
+
+      .details-card .thumb {
+        height: 260px;
+        margin-bottom: 20px;
+      }
+
+      .big-stats {
+        display: grid;
+        grid-template-columns: repeat(3, 1fr);
+        gap: 12px;
+        margin-top: 18px;
+      }
+
+      .stat {
+        padding: 16px;
+        border-radius: 8px;
+        border: 1px solid rgba(255, 255, 255, 0.12);
+        background: rgba(255, 255, 255, 0.06);
+      }
+
+      .stat small {
+        display: block;
+        color: rgba(255, 255, 255, 0.58);
+        font-weight: 750;
+        text-transform: uppercase;
+        letter-spacing: 0.08em;
+      }
+
+      .stat strong {
+        display: block;
+        margin-top: 7px;
+        font-size: 22px;
+      }
+
+      .form-card {
+        width: 760px;
+        padding: 24px;
+      }
+
+      .field {
+        margin-top: 18px;
+      }
+
+      .label {
+        display: flex;
+        justify-content: space-between;
+        color: var(--muted);
+        font-size: 14px;
+        font-weight: 800;
+        text-transform: uppercase;
+        letter-spacing: 0.08em;
+      }
+
+      .field-box {
+        margin-top: 9px;
+        min-height: 54px;
+        display: flex;
+        align-items: center;
+        padding: 0 14px;
+        border-radius: 8px;
+        border: 1px solid var(--line);
+        background: #f9fbfa;
+        font-family: Consolas, "SFMono-Regular", monospace;
+        font-size: 17px;
+      }
+
+      .chips {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 8px;
+        margin-top: 12px;
+      }
+
+      .chip-light {
+        border-radius: 8px;
+        border: 1px solid var(--line);
+        padding: 8px 11px;
+        background: white;
+        color: var(--muted);
+        font-weight: 800;
+      }
+
+      .settings-panel {
+        width: 760px;
+        padding: 22px;
+        background: #101312;
+        color: white;
+      }
+
+      .setting-row {
+        display: grid;
+        grid-template-columns: 1fr 220px auto;
+        gap: 14px;
+        align-items: center;
+        padding: 16px;
+        margin-top: 12px;
+        border-radius: 8px;
+        border: 1px solid rgba(255, 255, 255, 0.1);
+        background: rgba(255, 255, 255, 0.055);
+      }
+
+      .select-like {
+        border-radius: 8px;
+        border: 1px solid rgba(255, 255, 255, 0.12);
+        padding: 10px 12px;
+        color: #d7ffef;
+        font-weight: 800;
+        background: rgba(18, 209, 142, 0.12);
+      }
+
+      .saved {
+        border-radius: 8px;
+        padding: 8px 10px;
+        background: rgba(18, 209, 142, 0.18);
+        color: #8ff0cd;
+        font-weight: 900;
+      }
+
+      .footer-note {
+        position: absolute;
+        left: 72px;
+        bottom: 44px;
+        color: var(--muted);
+        font-size: 17px;
+        font-weight: 700;
+      }
+    </style>
+  </head>
+  <body data-capture="hero">
+    <section class="frame hero">
+      <div class="texture"></div>
+      <div class="topbar">
+        <div class="brand"><span class="brand-dot"></span> HalalDL</div>
+        <div class="pill">v0.4.1 • Precision Polish</div>
+      </div>
+      <div class="content grid-two">
+        <div>
+          <div class="headline-tag">Small release. Real daily fixes.</div>
+          <h1>Sharper downloads. Cleaner flow.</h1>
+          <p class="lead">Finished cards show size and duration, the quick panel fits better, settings persist, and presets can name files their own way.</p>
+        </div>
+        <div class="card app-shell">
+          <div class="app-header">
+            <strong>Recent Results</strong>
+            <div class="window-dots"><span></span><span></span><span></span></div>
+          </div>
+          <div class="mock-row glow-row">
+            <span class="latest-badge">Latest</span>
+            <div class="thumb"></div>
+            <div>
+              <div class="row-title">Build BIGGER 3D Forearms</div>
+              <div class="row-meta">
+                <span class="mini-chip">Done</span>
+                <span class="mini-chip">182.4 MB total</span>
+                <span class="mini-chip">12:45</span>
+              </div>
+            </div>
+            <div class="status">Done</div>
+          </div>
+          <div class="mock-row">
+            <div class="thumb"></div>
+            <div>
+              <div class="row-title">Instagram carousel export</div>
+              <div class="row-meta"><span class="mini-chip">8 files</span><span class="mini-chip">48.2 MB</span></div>
+            </div>
+            <div class="status">Saved</div>
+          </div>
+          <div class="mock-row">
+            <div class="thumb"></div>
+            <div>
+              <div class="row-title">Clip: lecture highlights</div>
+              <div class="row-meta"><span class="mini-chip">01:30 to 03:15</span><span class="mini-chip">MP4</span></div>
+            </div>
+            <div class="status">Done</div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section class="frame quick-panel">
+      <div class="texture"></div>
+      <div class="topbar"><div class="brand"><span class="brand-dot"></span> HalalDL</div><div class="pill">Issue #6</div></div>
+      <div class="content grid-two">
+        <div class="card quick-card">
+          <div class="quick-title"><strong>Quick Download</strong><span class="mini-chip">Clipboard ready</span></div>
+          <div class="compact-stack">
+            <div class="input-like">https://youtu.be/dQw4w9WgXcQ <span>Paste</span></div>
+            <div class="input-like">Preset: Best MP4 <span>Change</span></div>
+            <div class="summary-line"><span class="mini-chip">Downloads folder</span><span class="mini-chip">Start now</span><span class="mini-chip">Subs off</span></div>
+            <div class="download-button">Download</div>
+          </div>
+        </div>
+        <div>
+          <h2>Compact where it counts.</h2>
+          <p class="lead">The quick panel now keeps the action reachable instead of letting helper text push the button out of view.</p>
+          <div class="feature-list">
+            <div class="feature"><div class="icon-box">1</div><div><strong>Less repeated metadata</strong><span>Save location, start mode, and subtitles collapse into one readable summary.</span></div></div>
+            <div class="feature"><div class="icon-box">2</div><div><strong>Better small-screen flow</strong><span>The download button stays easier to reach on compact Windows setups.</span></div></div>
+            <div class="feature"><div class="icon-box">↵</div><div><strong>Keyboard friendly</strong><span>Paste, review, press Enter, move on.</span></div></div>
+          </div>
+        </div>
+      </div>
+      <div class="footer-note"><span class="keyboard">Enter</span> starts the download when the URL is ready.</div>
+    </section>
+
+    <section class="frame latest-glow">
+      <div class="texture"></div>
+      <div class="topbar"><div class="brand"><span class="brand-dot"></span> HalalDL</div><div class="pill">Notification spotlight</div></div>
+      <div class="content grid-two">
+        <div>
+          <h2>Glow once. Mark clearly.</h2>
+          <p class="lead">Clicked notifications now route to the right result with a finite glow and a clear latest marker.</p>
+          <div class="feature-list">
+            <div class="feature"><div class="icon-box">✓</div><div><strong>Just finished</strong><span>The newest completed card gets the spotlight, not the second-last result.</span></div></div>
+            <div class="feature"><div class="icon-box">✦</div><div><strong>Finite animation</strong><span>The glow calls attention, then settles down.</span></div></div>
+          </div>
+        </div>
+        <div class="card app-shell">
+          <div class="app-header"><strong>Recent Results</strong><span class="mini-chip">5 visible</span></div>
+          <div class="mock-row"><div class="thumb"></div><div><div class="row-title">Instagram post DW6-Z45kJjG</div><div class="row-meta"><span class="mini-chip">5m ago</span><span class="mini-chip">Done</span></div></div><div class="status">Done</div></div>
+          <div class="mock-row glow-row"><span class="latest-badge">Just finished</span><div class="thumb"></div><div><div class="row-title">Nanami vs Haruta Shigemo</div><div class="row-meta"><span class="mini-chip">Now</span><span class="mini-chip">74 MB</span><span class="mini-chip">2:12</span></div></div><div class="status">Done</div></div>
+          <div class="mock-row"><div class="thumb"></div><div><div class="row-title">Build BIGGER 3D Forearms</div><div class="row-meta"><span class="mini-chip">23h ago</span><span class="mini-chip">Done</span></div></div><div class="status">Done</div></div>
+        </div>
+      </div>
+    </section>
+
+    <section class="frame download-details">
+      <div class="texture"></div>
+      <div class="topbar"><div class="brand"><span class="brand-dot"></span> HalalDL</div><div class="pill">File size + duration + clips</div></div>
+      <div class="content grid-two">
+        <div class="card details-card">
+          <div class="thumb"></div>
+          <div class="row-title">Lecture highlights with subtitles</div>
+          <div class="row-meta"><span class="mini-chip">MP4</span><span class="mini-chip">English VTT</span><span class="mini-chip">Auto copied</span></div>
+          <div class="big-stats">
+            <div class="stat"><small>Total size</small><strong>248.7 MB</strong></div>
+            <div class="stat"><small>Duration</small><strong>18:05</strong></div>
+            <div class="stat"><small>Clip</small><strong>01:30-03:15</strong></div>
+          </div>
+        </div>
+        <div>
+          <h2>Cards tell the whole story.</h2>
+          <p class="lead">Finished results now show practical details without opening History or checking the file manually.</p>
+          <div class="feature-list">
+            <div class="feature"><div class="icon-box">MB</div><div><strong>Total output size</strong><span>Video, subtitles, and sidecars count together.</span></div></div>
+            <div class="feature"><div class="icon-box">⏱</div><div><strong>Timeline when it exists</strong><span>Images stay clean; timed media shows duration.</span></div></div>
+            <div class="feature"><div class="icon-box">✂</div><div><strong>Clip ranges</strong><span>Use seconds, mm:ss, or hh:mm:ss for precise downloads.</span></div></div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section class="frame preset-filenames">
+      <div class="texture"></div>
+      <div class="topbar"><div class="brand"><span class="brand-dot"></span> HalalDL</div><div class="pill">Issue #5</div></div>
+      <div class="content grid-two">
+        <div>
+          <h2>Presets can name files now.</h2>
+          <p class="lead">Filename templates live inside the preset, so a preset can shape the final output path every time.</p>
+          <div class="feature-list">
+            <div class="feature"><div class="icon-box">#5</div><div><strong>Preset-level templates</strong><span>Keep naming behavior with the preset instead of repeating it per download.</span></div></div>
+            <div class="feature"><div class="icon-box">EXT</div><div><strong>Extension safety</strong><span>Leave out %(ext)s and HalalDL adds it before download.</span></div></div>
+          </div>
+        </div>
+        <div class="card form-card">
+          <h2 style="font-size: 34px">WhatsApp Optimized</h2>
+          <div class="field">
+            <div class="label"><span>Filename template</span><span>Optional</span></div>
+            <div class="field-box">%(uploader)s/%(title)s [%(id)s].%(ext)s</div>
+            <div class="chips"><span class="chip-light">Title</span><span class="chip-light">Date</span><span class="chip-light">ID</span><span class="chip-light">Uploader</span></div>
+          </div>
+          <div class="field">
+            <div class="label"><span>Example output</span><span>Safe</span></div>
+            <div class="field-box">Creator/Clip title [a1b2c3].mp4</div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section class="frame settings-fix">
+      <div class="texture"></div>
+      <div class="topbar"><div class="brand"><span class="brand-dot"></span> HalalDL</div><div class="pill">Issue #7</div></div>
+      <div class="content grid-two">
+        <div class="card settings-panel">
+          <div class="app-header" style="margin: -22px -22px 14px"><strong>Settings • Behavior</strong><span class="saved">Saved</span></div>
+          <div class="setting-row"><div><strong>Tray left click</strong><br /><span style="color: rgba(255,255,255,.62)">Choose what one click does.</span></div><div class="select-like">Open main app</div><div class="saved">✓</div></div>
+          <div class="setting-row"><div><strong>Tray double click</strong><br /><span style="color: rgba(255,255,255,.62)">Keep the tray action predictable.</span></div><div class="select-like">Open main app</div><div class="saved">✓</div></div>
+          <div class="setting-row"><div><strong>Quick default preset</strong><br /><span style="color: rgba(255,255,255,.62)">Used by quick downloads.</span></div><div class="select-like">Best MP4</div><div class="saved">✓</div></div>
+        </div>
+        <div>
+          <h2>Settings stay changed.</h2>
+          <p class="lead">The Settings screen now commits changes automatically, so navigating away no longer silently throws away tray behavior edits.</p>
+          <div class="feature-list">
+            <div class="feature"><div class="icon-box">#7</div><div><strong>Persistence fix</strong><span>Tray left-click and double-click settings no longer revert after leaving Settings.</span></div></div>
+            <div class="feature"><div class="icon-box">✓</div><div><strong>Auto-commit</strong><span>Settings move from draft into saved state without requiring a fragile manual save moment.</span></div></div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <script>
+      const params = new URLSearchParams(window.location.search);
+      const capture = params.get("capture") || "hero";
+      document.body.dataset.capture = capture;
+      requestAnimationFrame(() => document.body.classList.add("ready"));
+    </script>
+  </body>
+</html>

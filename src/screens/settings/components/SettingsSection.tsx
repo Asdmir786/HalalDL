@@ -30,8 +30,10 @@ export function SettingsSection({ id, icon: Icon, title, description, children, 
       return;
     }
 
-    setOpen(true);
-    setSpotlightToken(attentionTarget.token);
+    const stateTimer = window.setTimeout(() => {
+      setOpen(true);
+      setSpotlightToken(attentionTarget.token);
+    }, 0);
 
     const raf = window.requestAnimationFrame(() => {
       document.getElementById(id)?.scrollIntoView({ behavior: "smooth", block: "start" });
@@ -44,6 +46,7 @@ export function SettingsSection({ id, icon: Icon, title, description, children, 
     }, 4200);
 
     return () => {
+      window.clearTimeout(stateTimer);
       window.cancelAnimationFrame(raf);
       window.clearTimeout(timeout);
     };

@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useMemo, useState } from "react";
 import { motion, Variants } from "framer-motion";
 import {
   X, FolderOpen, Terminal,
@@ -70,7 +70,7 @@ export function DownloadItem({
   const { addLog } = useLogsStore();
   const moveJob = useDownloadsStore((s) => s.moveJob);
   const { presets } = usePresetsStore();
-  const [thumbError, setThumbError] = useState(false);
+  const [thumbErrorSource, setThumbErrorSource] = useState<string | null>(null);
   const ts = getJobTs(job);
   const relative = formatRelativeTime(ts);
   const absolute = new Date(ts).toLocaleString();
@@ -82,9 +82,7 @@ export function DownloadItem({
   const thumbnailLoading =
     !displayThumbnail && job.thumbnailStatus !== "failed" && job.thumbnailStatus !== "ready";
 
-  useEffect(() => {
-    setThumbError(false);
-  }, [displayThumbnail]);
+  const thumbnailErrored = Boolean(displayThumbnail && thumbErrorSource === displayThumbnail);
 
   const statusMeta = getStatusMeta(job.status);
   const StatusIcon = statusMeta.Icon;
@@ -285,12 +283,12 @@ export function DownloadItem({
             {/* Thumbnail Column */}
             <div className="relative z-10 flex items-center gap-3">
               <div className="relative aspect-video w-24 overflow-hidden rounded-lg bg-muted/35 ring-1 ring-border/55 shadow-inner transition-all group-hover:shadow-md dark:bg-black/20 dark:ring-white/10">
-                {displayThumbnail && !thumbError ? (
+                {displayThumbnail && !thumbnailErrored ? (
                   <img
                     src={displayThumbnail}
                     alt="Thumbnail"
                     className="w-full h-full object-cover opacity-90 group-hover:opacity-100 transition-opacity"
-                    onError={() => setThumbError(true)}
+                    onError={() => setThumbErrorSource(displayThumbnail)}
                   />
                 ) : thumbnailLoading ? (
                   <div className="w-full h-full flex items-center justify-center">

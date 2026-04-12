@@ -35,7 +35,6 @@ class StorageManager {
         this.toolsStore = await load("tools.json", { autoSave: false, defaults: {} });
         this.historyStore = await load("history.json", { autoSave: false, defaults: {} });
         this.initError = null;
-        console.log("Storage initialized successfully");
       } catch (error) {
         const message = error instanceof Error ? error.message : String(error);
         this.initError = message;

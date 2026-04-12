@@ -1,5 +1,16 @@
 # Changelog
 
+## 0.4.1 - 2026-04-12
+- **Presets / Filenames (#5)**: Added preset-level filename templates so custom presets can define their own saved-file naming pattern without forcing every download to override it manually.
+- **Quick Download Panel (#6)**: Tightened the quick panel layout by reducing repeated metadata, shortening the URL/preset controls, and keeping the download action easier to reach on smaller screens and keyboard-first setups.
+- **Settings Persistence (#7)**: Fixed settings changes sometimes reverting after leaving Settings, including tray left-click and double-click behavior. Settings now commit automatically instead of waiting on a fragile draft state.
+- **Downloads / Output Details**: Finished download cards now show the total output file size. Multi-output jobs, such as video plus subtitle sidecars, report the combined output size.
+- **Downloads / Duration**: Video and audio downloads now show the source media duration when metadata is available, while image-only downloads stay clean and do not show a fake timeline.
+- **Downloads / Clip Mode**: Added optional clip start/end fields for timed media downloads, powered by yt-dlp download sections, with validation for invalid ranges and image-only inputs.
+- **Notifications / Latest Result**: Reworked the routed notification spotlight so the latest finished result gets a finite glow animation and a subtle marker instead of a static indefinite glow.
+- **Reliability / Filenames**: Filename templates that omit `%(ext)s` now automatically get `.%(ext)s` behavior at download time, preventing extensionless output files.
+- **Release Cleanup**: Fixed React hooks lint issues in the new attention/spotlight paths, removed a leftover startup console log, and completed lightweight release checks.
+
 ## 0.4.0 - 2026-04-04
 - **Tray / Quick Downloads**: Added a dedicated quick download panel, richer tray actions, configurable tray click behavior, launch-at-login tray options, and a smoother clipboard-to-download flow without opening the full app every time.
 - **Subtitles / Presets**: Added subtitle-aware built-in presets, a new **Subtitles Only** preset, preferred subtitle language settings, and clearer preset grouping/details across the quick panel and main Downloads screen.
