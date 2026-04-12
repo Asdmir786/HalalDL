@@ -2,6 +2,7 @@ import { Variants } from "framer-motion";
 import { useCallback, useEffect, useMemo, useState, useRef } from "react";
 import { open as openDialog } from "@tauri-apps/plugin-dialog";
 import { useDownloadsStore } from "@/store/downloads";
+import { useHistoryStore } from "@/store/history";
 import { usePresetsStore } from "@/store/presets";
 import { useSettingsStore } from "@/store/settings";
 import { useLogsStore } from "@/store/logs";
@@ -38,10 +39,12 @@ import { DownloadStatsBar, type DownloadStatusFilter } from "./downloads/compone
 import { DownloadList } from "./downloads/components/DownloadList";
 import { getJobTs } from "./downloads/utils";
 import { buildClipSection } from "@/lib/clip";
+import { normalizeUrlIdentity } from "@/lib/url-identity";
 
 export function DownloadsScreen() {
   const { settings, updateSettings } = useSettingsStore();
   const [url, setUrl] = useState("");
+  const persistenceReady = useRuntimeStore((state) => state.persistenceReady);
   
   // Derived state for addMode from settings
   const addMode = settings.downloadsAddMode;
@@ -78,10 +81,23 @@ export function DownloadsScreen() {
     composeDraft,
     setComposeDraft,
   } = useDownloadsStore();
+  const historyEntries = useHistoryStore((state) => state.entries);
   const { setActiveJobId } = useLogsStore();
   const { setScreen } = useNavigationStore();
   const isCustomPreset = selectedPreset === "custom";
   const isDirectImageInput = isDirectImageUrl(url.trim());
+  const shouldAutoPasteUrl = useCallback(
+    (candidate: string) => {
+      const candidateKey = normalizeUrlIdentity(candidate);
+      if (!candidateKey) return false;
+
+      return !(
+        jobs.some((job) => normalizeUrlIdentity(job.url) === candidateKey) ||
+        historyEntries.some((entry) => normalizeUrlIdentity(entry.url) === candidateKey)
+      );
+    },
+    [historyEntries, jobs]
+  );
 
   useEffect(() => {
     if (selectedPreset !== "custom" && settings.downloadsSelectedPreset !== selectedPreset) {
@@ -708,7 +724,8 @@ export function DownloadsScreen() {
                     url={url}
                     setUrl={setUrl}
                     isAdding={isAdding}
-                    autoPasteLinks={settings.autoPasteLinks}
+                    autoPasteLinks={settings.autoPasteLinks && persistenceReady}
+                    shouldAutoPasteUrl={shouldAutoPasteUrl}
                     onAdd={handleAdd}
                     selectedPreset={selectedPreset}
                     onPresetChange={handlePresetChange}

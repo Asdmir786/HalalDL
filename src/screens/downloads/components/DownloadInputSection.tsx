@@ -43,6 +43,7 @@ interface DownloadInputSectionProps {
   setUrl: (val: string) => void;
   isAdding: boolean;
   autoPasteLinks: boolean;
+  shouldAutoPasteUrl?: (url: string) => boolean;
   onAdd: () => void;
   selectedPreset: string;
   onPresetChange: (val: string) => void;
@@ -82,7 +83,7 @@ interface DownloadInputSectionProps {
 }
 
 export function DownloadInputSection({
-  url, setUrl, isAdding, autoPasteLinks, onAdd,
+  url, setUrl, isAdding, autoPasteLinks, shouldAutoPasteUrl, onAdd,
   selectedPreset, onPresetChange, presets,
   isDirectImageUrl,
   addMode, setAddMode,
@@ -342,6 +343,7 @@ export function DownloadInputSection({
 
       const supportedUrl = pickSupportedUrlFromText(text);
       if (!supportedUrl) return;
+      if (shouldAutoPasteUrl && !shouldAutoPasteUrl(supportedUrl)) return;
 
       const currentTarget = target ?? inputRef.current;
       if (currentTarget?.value.trim()) return;
@@ -350,7 +352,7 @@ export function DownloadInputSection({
     } catch {
       void 0;
     }
-  }, [autoPasteLinks, handleUrlChange]);
+  }, [autoPasteLinks, handleUrlChange, shouldAutoPasteUrl]);
 
   useEffect(() => {
     if (!autoPasteLinks) return;

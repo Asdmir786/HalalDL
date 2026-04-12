@@ -14,6 +14,7 @@ import { useToolsStore, type Tool } from "@/store/tools";
 import { useLogsStore } from "@/store/logs";
 import { useDownloadsStore, type DownloadJob } from "@/store/downloads";
 import { useHistoryStore, type HistoryEntry } from "@/store/history";
+import { useRuntimeStore } from "@/store/runtime";
 import { storage } from "@/lib/storage";
 import { canonicalizePresetId } from "@/lib/preset-display";
 import { invoke } from "@tauri-apps/api/core";
@@ -77,6 +78,7 @@ export function usePersistenceInit(): MutableRefObject<boolean> {
       try {
         if (isDemoModeEnabled()) {
           seedMarketingDemoState();
+          useRuntimeStore.getState().setPersistenceReady(true);
           initialized.current = true;
           addLog({ level: "info", message: "Marketing demo mode seeded" });
           return;
@@ -316,6 +318,7 @@ export function usePersistenceInit(): MutableRefObject<boolean> {
           });
         }
 
+        useRuntimeStore.getState().setPersistenceReady(true);
         initialized.current = true;
       } catch (e) {
         addLog({
@@ -323,6 +326,7 @@ export function usePersistenceInit(): MutableRefObject<boolean> {
           message: `Failed to load persistence: ${String(e)}`,
         });
         toast.error("Failed to load settings");
+        useRuntimeStore.getState().setPersistenceReady(true);
       }
     };
     init();

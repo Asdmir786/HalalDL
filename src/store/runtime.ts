@@ -23,6 +23,7 @@ export interface QuickDownloadDraft {
 interface RuntimeState {
   windowMode: WindowMode;
   queuePaused: boolean;
+  persistenceReady: boolean;
   lastFullScreen: Screen;
   trayStatus: TrayStatusState;
   quickDraft: QuickDownloadDraft | null;
@@ -30,6 +31,7 @@ interface RuntimeState {
   closeQuickMode: () => void;
   restoreFullMode: (screen?: Screen) => void;
   setQueuePaused: (paused: boolean) => void;
+  setPersistenceReady: (ready: boolean) => void;
   setTrayStatus: (next: Partial<TrayStatusState>) => void;
   applyComposeDraft: (draft: ComposeDraft, defaults: Pick<QuickDownloadDraft, "startMode" | "destinationMode">) => void;
 }
@@ -45,6 +47,7 @@ const DEFAULT_TRAY_STATUS: TrayStatusState = {
 export const useRuntimeStore = create<RuntimeState>((set) => ({
   windowMode: "full",
   queuePaused: false,
+  persistenceReady: false,
   lastFullScreen: "downloads",
   trayStatus: DEFAULT_TRAY_STATUS,
   quickDraft: null,
@@ -73,6 +76,7 @@ export const useRuntimeStore = create<RuntimeState>((set) => ({
         queuePaused: paused,
       },
     })),
+  setPersistenceReady: (ready) => set({ persistenceReady: ready }),
   setTrayStatus: (next) =>
     set((state) => ({
       trayStatus: {

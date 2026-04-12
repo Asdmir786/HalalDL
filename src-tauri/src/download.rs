@@ -1,10 +1,11 @@
+use futures_util::StreamExt;
+use sha2::{Digest, Sha256};
 use std::fs;
 use std::io::{Read, Write};
 use std::path::Path;
 use std::path::PathBuf;
-use futures_util::StreamExt;
+use std::time::Duration;
 use tauri::Emitter;
-use sha2::{Digest, Sha256};
 
 use crate::fs_utils::temp_path_for;
 
@@ -18,16 +19,23 @@ pub struct DownloadProgress {
 const MAX_DOWNLOAD_RETRIES: u8 = 3;
 
 pub fn emit_progress(app_handle: &tauri::AppHandle, tool: &str, percentage: f64, status: &str) {
-    let _ = app_handle.emit("download-progress", DownloadProgress {
-        tool: tool.to_string(),
-        percentage,
-        status: status.to_string(),
-    });
+    let _ = app_handle.emit(
+        "download-progress",
+        DownloadProgress {
+            tool: tool.to_string(),
+            percentage,
+            status: status.to_string(),
+        },
+    );
 }
 
 /// Download any URL directly to a local file (used for thumbnails).
 #[tauri::command]
-pub async fn download_url_to_file(url: String, dest: String, referer: Option<String>) -> Result<String, String> {
+pub async fn download_url_to_file(
+    url: String,
+    dest: String,
+    referer: Option<String>,
+) -> Result<String, String> {
     use tokio::io::AsyncWriteExt;
 
     let client = reqwest::Client::builder()
@@ -40,7 +48,10 @@ pub async fn download_url_to_file(url: String, dest: String, referer: Option<Str
         req = req.header("Referer", r);
     }
 
-    let resp = req.send().await.map_err(|e| format!("Download failed: {}", e))?;
+    let resp = req
+        .send()
+        .await
+        .map_err(|e| format!("Download failed: {}", e))?;
     if !resp.status().is_success() {
         return Err(format!("HTTP {}: {}", resp.status(), url));
     }
@@ -48,12 +59,12 @@ pub async fn download_url_to_file(url: String, dest: String, referer: Option<Str
     let dest_path = Path::new(&dest);
     if let Some(parent) = dest_path.parent() {
         if !parent.exists() {
-            fs::create_dir_all(parent)
-                .map_err(|e| format!("mkdir failed: {}", e))?;
+            fs::create_dir_all(parent).map_err(|e| format!("mkdir failed: {}", e))?;
         }
     }
 
-    let mut file = tokio::fs::File::create(&dest).await
+    let mut file = tokio::fs::File::create(&dest)
+        .await
         .map_err(|e| format!("File create failed: {}", e))?;
     let mut stream = resp.bytes_stream();
     let mut wrote_any = false;
@@ -64,7 +75,8 @@ pub async fn download_url_to_file(url: String, dest: String, referer: Option<Str
             continue;
         }
         wrote_any = true;
-        file.write_all(&chunk).await
+        file.write_all(&chunk)
+            .await
             .map_err(|e| format!("File write failed: {}", e))?;
     }
 
@@ -72,7 +84,8 @@ pub async fn download_url_to_file(url: String, dest: String, referer: Option<Str
         return Err("Empty response body".to_string());
     }
 
-    file.flush().await
+    file.flush()
+        .await
         .map_err(|e| format!("File flush failed: {}", e))?;
 
     Ok(dest)
@@ -115,7 +128,10 @@ pub async fn post_form_for_text(
         req = req.header(reqwest::header::ORIGIN, o);
     }
 
-    let resp = req.send().await.map_err(|e| format!("Request failed: {}", e))?;
+    let resp = req
+        .send()
+        .await
+        .map_err(|e| format!("Request failed: {}", e))?;
     if !resp.status().is_success() {
         return Err(format!("HTTP {}: {}", resp.status(), url));
     }
@@ -137,7 +153,10 @@ pub fn sha256_of_path(path: &Path) -> Result<String, String> {
         hasher.update(&buffer[..read]);
     }
     let hash = hasher.finalize();
-    Ok(hash.iter().map(|b| format!("{:02x}", b)).collect::<String>())
+    Ok(hash
+        .iter()
+        .map(|b| format!("{:02x}", b))
+        .collect::<String>())
 }
 
 pub async fn resolve_latest_aria2_zip_url(app_handle: &tauri::AppHandle) -> Result<String, String> {
@@ -178,6 +197,83 @@ pub async fn resolve_latest_aria2_zip_url(app_handle: &tauri::AppHandle) -> Resu
     Err("No matching aria2 Windows zip asset found".to_string())
 }
 
+pub async fn resolve_latest_ffmpeg_essentials_zip_url(
+    app_handle: &tauri::AppHandle,
+) -> Result<String, String> {
+    let client = reqwest::Client::builder()
+        .user_agent(format!("HalalDL/{}", app_handle.package_info().version))
+        .connect_timeout(Duration::from_secs(20))
+        .read_timeout(Duration::from_secs(45))
+        .build()
+        .map_err(|e| e.to_string())?;
+
+    let version_res = client
+        .get("https://www.gyan.dev/ffmpeg/builds/release-version")
+        .send()
+        .await
+        .map_err(|e| e.to_string())?;
+
+    if !version_res.status().is_success() {
+        return Err(format!(
+            "Gyan FFmpeg version check failed with status: {}",
+            version_res.status()
+        ));
+    }
+
+    let version = version_res
+        .text()
+        .await
+        .map_err(|e| e.to_string())?
+        .trim()
+        .split_whitespace()
+        .next()
+        .unwrap_or("")
+        .trim_start_matches('v')
+        .to_string();
+
+    if version.is_empty() {
+        return Err("Gyan FFmpeg latest release version was empty".to_string());
+    }
+
+    let release_res = client
+        .get(format!(
+            "https://api.github.com/repos/GyanD/codexffmpeg/releases/tags/{}",
+            version
+        ))
+        .header("Accept", "application/vnd.github+json")
+        .send()
+        .await
+        .map_err(|e| e.to_string())?;
+
+    if !release_res.status().is_success() {
+        return Err(format!(
+            "Gyan FFmpeg GitHub mirror lookup failed with status: {}",
+            release_res.status()
+        ));
+    }
+
+    let json: serde_json::Value = release_res.json().await.map_err(|e| e.to_string())?;
+    let assets = json
+        .get("assets")
+        .and_then(|v| v.as_array())
+        .ok_or_else(|| "Missing assets in Gyan FFmpeg GitHub release response".to_string())?;
+
+    for asset in assets {
+        let name = asset.get("name").and_then(|v| v.as_str()).unwrap_or("");
+        let lower = name.to_lowercase();
+        if lower.ends_with(".zip") && lower.contains("essentials_build") {
+            if let Some(url) = asset.get("browser_download_url").and_then(|v| v.as_str()) {
+                return Ok(url.to_string());
+            }
+        }
+    }
+
+    Err(format!(
+        "No matching FFmpeg Essentials ZIP asset found for {}",
+        version
+    ))
+}
+
 pub async fn download_to_temp(
     app_handle: &tauri::AppHandle,
     tool_name: &str,
@@ -186,6 +282,8 @@ pub async fn download_to_temp(
 ) -> Result<PathBuf, String> {
     let client = reqwest::Client::builder()
         .user_agent(format!("HalalDL/{}", app_handle.package_info().version))
+        .connect_timeout(Duration::from_secs(20))
+        .read_timeout(Duration::from_secs(45))
         .build()
         .map_err(|e| e.to_string())?;
 
@@ -224,16 +322,30 @@ async fn download_file_once(
     dest: &PathBuf,
 ) -> Result<PathBuf, String> {
     let response = client.get(url).send().await.map_err(|e| e.to_string())?;
-    
+
     if !response.status().is_success() {
-        return Err(format!("Download failed with status: {}", response.status()));
+        return Err(format!(
+            "Download failed with status: {}",
+            response.status()
+        ));
     }
 
     let total_size = response.content_length().unwrap_or(0);
-    
+    if total_size > 0 {
+        emit_progress(
+            app_handle,
+            tool_name,
+            0.0,
+            &format!(
+                "Downloading 0.0 / {:.1} MB...",
+                total_size as f64 / 1_048_576.0
+            ),
+        );
+    }
+
     let mut downloaded: u64 = 0;
     let mut stream = response.bytes_stream();
-    
+
     let temp_dest = temp_path_for(dest)?;
     if temp_dest.exists() {
         let _ = fs::remove_file(&temp_dest);
@@ -251,9 +363,25 @@ async fn download_file_once(
         if total_size > 0 {
             let percentage = (downloaded as f64 / total_size as f64) * 100.0;
             if percentage - last_percentage >= 1.0 || percentage >= 100.0 {
-                emit_progress(app_handle, tool_name, percentage, "Downloading...");
+                emit_progress(
+                    app_handle,
+                    tool_name,
+                    percentage,
+                    &format!(
+                        "Downloading {:.1} / {:.1} MB...",
+                        downloaded as f64 / 1_048_576.0,
+                        total_size as f64 / 1_048_576.0
+                    ),
+                );
                 last_percentage = percentage;
             }
+        } else {
+            emit_progress(
+                app_handle,
+                tool_name,
+                0.0,
+                &format!("Downloading {:.1} MB...", downloaded as f64 / 1_048_576.0),
+            );
         }
     }
 

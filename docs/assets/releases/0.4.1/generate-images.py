@@ -46,6 +46,14 @@ def multiline(draw, xy, text, fnt, fill, max_width, line_gap=10):
     return y
 
 
+def explicit_lines(draw, xy, lines, fnt, fill, line_gap=12):
+    x, y = xy
+    for line in lines:
+        draw.text((x, y), line, font=fnt, fill=fill)
+        y += text_size(draw, line, fnt)[1] + line_gap
+    return y
+
+
 def theme_values(theme):
     if theme == "dark":
         return {
@@ -114,8 +122,8 @@ def header(draw, c, label):
 def title_block(draw, c, title, body, tag, x=74, y=252, width=620):
     rr(draw, (x, y - 70, x + 260, y - 29), c, fill=(*c["accent"], 34), outline=(*c["accent"], 85), radius=8)
     draw.text((x + 15, y - 60), tag, font=font(15, "bold"), fill=c["accent"])
-    draw.text((x, y), title, font=font(74, "bold"), fill=c["ink"], spacing=0)
-    multiline(draw, (x, y + 185), body, font(27, "semibold"), c["muted"], width, 12)
+    title_bottom = explicit_lines(draw, (x, y), title.splitlines(), font(74, "bold"), c["ink"], 16)
+    multiline(draw, (x, title_bottom + 28), body, font(27, "semibold"), c["muted"], width, 12)
 
 
 def feature(draw, c, x, y, badge, title, body, width=620):
