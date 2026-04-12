@@ -40,6 +40,8 @@ interface DownloadItemProps {
   onChangePreset: (id: string, presetId: string) => void;
   queueMeta?: {
     position: number;
+    canMoveUp: boolean;
+    canMoveDown: boolean;
     statusLabel: string;
     detail: string;
   };
@@ -93,6 +95,10 @@ export function DownloadItem({
   const isPausedJob = job.status === "Paused";
   const isStoppedJob = job.status === "Stopped";
   const isHeldJob = isPausedJob || isStoppedJob;
+  const isQueueManagedJob = isQueuedJob || isHeldJob;
+  const canMoveUp = Boolean(queueMeta?.canMoveUp);
+  const canMoveDown = Boolean(queueMeta?.canMoveDown);
+  const canMoveInQueue = canMoveUp || canMoveDown;
   const isRecentResult = section === "recent";
   const footerDetail = job.status === "Queued"
     ? queueMeta?.detail || job.statusDetail || ""
@@ -625,30 +631,34 @@ export function DownloadItem({
                       </div>
 
                       <div className="flex items-center gap-2 md:self-end">
-                        <MotionButton
-                          variant="ghost"
-                          size="icon"
-                          className="h-9 w-9 rounded-full hover:bg-primary/10 hover:text-primary transition-colors"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            moveJob(job.id, "up");
-                          }}
-                          title="Move up"
-                        >
-                          <ArrowUp className="h-4 w-4" />
-                        </MotionButton>
-                        <MotionButton
-                          variant="ghost"
-                          size="icon"
-                          className="h-9 w-9 rounded-full hover:bg-primary/10 hover:text-primary transition-colors"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            moveJob(job.id, "down");
-                          }}
-                          title="Move down"
-                        >
-                          <ArrowDown className="h-4 w-4" />
-                        </MotionButton>
+                        {canMoveUp && (
+                          <MotionButton
+                            variant="ghost"
+                            size="icon"
+                            className="h-9 w-9 rounded-full hover:bg-primary/10 hover:text-primary transition-colors"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              moveJob(job.id, "up");
+                            }}
+                            title="Move up"
+                          >
+                            <ArrowUp className="h-4 w-4" />
+                          </MotionButton>
+                        )}
+                        {canMoveDown && (
+                          <MotionButton
+                            variant="ghost"
+                            size="icon"
+                            className="h-9 w-9 rounded-full hover:bg-primary/10 hover:text-primary transition-colors"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              moveJob(job.id, "down");
+                            }}
+                            title="Move down"
+                          >
+                            <ArrowDown className="h-4 w-4" />
+                          </MotionButton>
+                        )}
                         <MotionButton
                           type="button"
                           size="sm"
@@ -689,32 +699,36 @@ export function DownloadItem({
                       {footerDetail}
                     </div>
                     <div className="flex items-center gap-1 opacity-100 transition-all duration-300 md:translate-x-4 md:opacity-0 md:group-hover:translate-x-0 md:group-hover:opacity-100">
-                      {(job.status === "Queued" || job.status === "Paused" || job.status === "Stopped") && (
+                      {isQueueManagedJob && canMoveInQueue && (
                         <>
-                          <MotionButton
-                            variant="ghost"
-                            size="icon"
-                            className="w-8 h-8 rounded-full hover:bg-primary/10 hover:text-primary transition-colors"
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              moveJob(job.id, "up");
-                            }}
-                            title="Move up"
-                          >
-                            <ArrowUp className="w-4 h-4" />
-                          </MotionButton>
-                          <MotionButton
-                            variant="ghost"
-                            size="icon"
-                            className="w-8 h-8 rounded-full hover:bg-primary/10 hover:text-primary transition-colors"
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              moveJob(job.id, "down");
-                            }}
-                            title="Move down"
-                          >
-                            <ArrowDown className="w-4 h-4" />
-                          </MotionButton>
+                          {canMoveUp && (
+                            <MotionButton
+                              variant="ghost"
+                              size="icon"
+                              className="w-8 h-8 rounded-full hover:bg-primary/10 hover:text-primary transition-colors"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                moveJob(job.id, "up");
+                              }}
+                              title="Move up"
+                            >
+                              <ArrowUp className="w-4 h-4" />
+                            </MotionButton>
+                          )}
+                          {canMoveDown && (
+                            <MotionButton
+                              variant="ghost"
+                              size="icon"
+                              className="w-8 h-8 rounded-full hover:bg-primary/10 hover:text-primary transition-colors"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                moveJob(job.id, "down");
+                              }}
+                              title="Move down"
+                            >
+                              <ArrowDown className="w-4 h-4" />
+                            </MotionButton>
+                          )}
                         </>
                       )}
                       <MotionButton
@@ -767,7 +781,7 @@ export function DownloadItem({
                             e.stopPropagation();
                             onRemove(job.id);
                           }}
-                          title={job.status === "Queued" || job.status === "Paused" || job.status === "Stopped" ? "Remove from queue" : "Remove"}
+                          title={isQueueManagedJob ? "Remove from queue" : "Remove"}
                         >
                           <X className="w-4 h-4" />
                         </MotionButton>
@@ -780,16 +794,20 @@ export function DownloadItem({
         </ContextMenuTrigger>
 
         <ContextMenuContent className="w-48">
-          {(job.status === "Queued" || job.status === "Paused" || job.status === "Stopped") && (
+          {isQueueManagedJob && canMoveInQueue && (
             <>
-              <ContextMenuItem onClick={() => moveJob(job.id, "up")}>
-                <ArrowUp className="mr-2 h-3.5 w-3.5" />
-                Move Up
-              </ContextMenuItem>
-              <ContextMenuItem onClick={() => moveJob(job.id, "down")}>
-                <ArrowDown className="mr-2 h-3.5 w-3.5" />
-                Move Down
-              </ContextMenuItem>
+              {canMoveUp && (
+                <ContextMenuItem onClick={() => moveJob(job.id, "up")}>
+                  <ArrowUp className="mr-2 h-3.5 w-3.5" />
+                  Move Up
+                </ContextMenuItem>
+              )}
+              {canMoveDown && (
+                <ContextMenuItem onClick={() => moveJob(job.id, "down")}>
+                  <ArrowDown className="mr-2 h-3.5 w-3.5" />
+                  Move Down
+                </ContextMenuItem>
+              )}
               <ContextMenuSeparator />
             </>
           )}
@@ -864,7 +882,7 @@ export function DownloadItem({
           )}
           <ContextMenuItem onClick={() => onRemove(job.id)}>
             <X className="mr-2 h-3.5 w-3.5" />
-            {job.status === "Queued" || job.status === "Paused" || job.status === "Stopped" ? "Remove from Queue" : "Remove from List"}
+            {isQueueManagedJob ? "Remove from Queue" : "Remove from List"}
           </ContextMenuItem>
         </ContextMenuContent>
       </ContextMenu>

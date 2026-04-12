@@ -15,10 +15,16 @@ import type { DownloadProgress } from "../constants";
 import type { ToolBatchResult } from "@/lib/tools/tool-batch";
 
 export interface ModalApi {
-  beginTransferModal: (title: string, toolIds: string[], initialLogs?: string[]) => boolean;
+  beginTransferModal: (
+    title: string,
+    toolIds: string[],
+    initialLogs?: string[],
+    targetVersions?: Record<string, string>
+  ) => boolean;
   pushModalLog: (message: string) => void;
   setModalProgress: Dispatch<SetStateAction<number>>;
   setModalToolProgress: Dispatch<SetStateAction<Record<string, number>>>;
+  setModalToolVersions: Dispatch<SetStateAction<Record<string, string>>>;
   setModalDone: Dispatch<SetStateAction<boolean>>;
   setModalCurrentStatus: Dispatch<SetStateAction<string>>;
   setModalError: Dispatch<SetStateAction<string | null>>;
@@ -39,6 +45,7 @@ export function useDownloadProgressModal(tools: Tool[]) {
   const [isTransferRunning, setIsTransferRunning] = useState(false);
   const [modalTargetToolIds, setModalTargetToolIds] = useState<string[]>([]);
   const [modalToolProgress, setModalToolProgress] = useState<Record<string, number>>({});
+  const [modalToolVersions, setModalToolVersions] = useState<Record<string, string>>({});
   const [modalCurrentToolId, setModalCurrentToolId] = useState<string | null>(null);
   const [modalCurrentStatus, setModalCurrentStatus] = useState("Preparing...");
 
@@ -88,6 +95,7 @@ export function useDownloadProgressModal(tools: Tool[]) {
     setModalDone(false);
     setModalTargetToolIds([]);
     setModalToolProgress({});
+    setModalToolVersions({});
     setModalCurrentToolId(null);
     setModalCurrentStatus("Preparing...");
     modalLastLogRef.current = {};
@@ -103,7 +111,12 @@ export function useDownloadProgressModal(tools: Tool[]) {
   }, []);
 
   const beginTransferModal = useCallback(
-    (title: string, toolIds: string[], initialLogs: string[] = []): boolean => {
+    (
+      title: string,
+      toolIds: string[],
+      initialLogs: string[] = [],
+      targetVersions: Record<string, string> = {}
+    ): boolean => {
       if (transferLockRef.current) return false;
       transferLockRef.current = true;
       resetModal();
@@ -112,6 +125,7 @@ export function useDownloadProgressModal(tools: Tool[]) {
       setModalToolProgress(
         Object.fromEntries(toolIds.map((id) => [id, 0])) as Record<string, number>
       );
+      setModalToolVersions(targetVersions);
       setModalCurrentToolId(toolIds[0] ?? null);
       setModalCurrentStatus("Preparing...");
       setModalLogs(initialLogs);
@@ -186,6 +200,9 @@ export function useDownloadProgressModal(tools: Tool[]) {
   const modalCurrentToolName = modalCurrentToolId
     ? toolNameById[modalCurrentToolId] ?? modalCurrentToolId
     : null;
+  const modalCurrentToolVersion = modalCurrentToolId
+    ? modalToolVersions[modalCurrentToolId] ?? null
+    : null;
   const orderedModalToolIds =
     modalTargetToolIds.length > 0
       ? modalTargetToolIds
@@ -197,6 +214,7 @@ export function useDownloadProgressModal(tools: Tool[]) {
       pushModalLog,
       setModalProgress,
       setModalToolProgress,
+      setModalToolVersions,
       setModalDone,
       setModalCurrentStatus,
       setModalError,
@@ -218,11 +236,13 @@ export function useDownloadProgressModal(tools: Tool[]) {
     modalDone,
     modalTitle,
     modalToolProgress,
+    modalToolVersions,
     modalCurrentStatus,
     modalTargetToolIds,
     isTransferActive,
     isDownloading,
     modalCurrentToolName,
+    modalCurrentToolVersion,
     orderedModalToolIds,
     toolNameById,
     handleDismiss,

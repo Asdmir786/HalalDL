@@ -37,7 +37,13 @@ interface DownloadListProps {
   onStopJob: (id: string) => void | Promise<void>;
   onResumePausedJob: (id: string) => void;
   onChangePausedPreset: (id: string, presetId: string) => void;
-  queueMetaById: Map<string, { position: number; statusLabel: string; detail: string }>;
+  queueMetaById: Map<string, {
+    position: number;
+    canMoveUp: boolean;
+    canMoveDown: boolean;
+    statusLabel: string;
+    detail: string;
+  }>;
   itemVariants: Variants;
   formatRelativeTime: (ts: number) => string;
 }

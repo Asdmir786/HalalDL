@@ -144,11 +144,10 @@ export function QuickDownloadPanel() {
         origin: "tray",
       });
 
-      await fetchMetadata(id);
-
       if (settings.quickDownloadStartMode === "start") {
-        startQueuedJobs([id]);
+        startQueuedJobs([id], { ignoreQueuePaused: true });
       }
+      void fetchMetadata(id);
 
       toast.success("Quick download added");
       closeQuickMode();

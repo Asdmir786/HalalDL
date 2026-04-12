@@ -22,9 +22,11 @@ export interface ToolsProgressModalProps {
   modalError: string | null;
   modalBatchResult: ToolBatchResult | null;
   modalCurrentToolName: string | null;
+  modalCurrentToolVersion: string | null;
   modalCurrentStatus: string;
   modalProgress: number;
   modalToolProgress: Record<string, number>;
+  modalToolVersions: Record<string, string>;
   orderedModalToolIds: string[];
   toolNameById: Record<string, string>;
   modalLogs: string[];
@@ -40,9 +42,11 @@ export function ToolsProgressModal({
   modalError,
   modalBatchResult,
   modalCurrentToolName,
+  modalCurrentToolVersion,
   modalCurrentStatus,
   modalProgress,
   modalToolProgress,
+  modalToolVersions,
   orderedModalToolIds,
   toolNameById,
   modalLogs,
@@ -97,7 +101,7 @@ export function ToolsProgressModal({
                         : modalError
                           ? "Something went wrong"
                           : modalCurrentToolName
-                            ? `${modalCurrentToolName}: ${modalCurrentStatus}`
+                            ? `${modalCurrentToolName}${modalCurrentToolVersion ? ` v${modalCurrentToolVersion}` : ""}: ${modalCurrentStatus}`
                             : "Preparing transfer..."}
                     </p>
                   </div>
@@ -131,10 +135,12 @@ export function ToolsProgressModal({
                     <ToolTransferStatus
                       progress={modalProgress}
                       currentToolName={modalCurrentToolName}
+                      currentToolVersion={modalCurrentToolVersion}
                       currentStatus={modalCurrentStatus}
                       orderedToolIds={orderedModalToolIds}
                       toolProgress={modalToolProgress}
                       toolNameById={toolNameById}
+                      toolVersionById={modalToolVersions}
                       logs={modalLogs}
                       emptyLabel="Initializing transfer..."
                     />

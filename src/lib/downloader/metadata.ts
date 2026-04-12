@@ -22,8 +22,26 @@ export interface MediaMetadataProbe {
   availableSubtitleLanguages: string[];
 }
 
-function decodeShellOutput(output: string | Uint8Array): string {
-  return typeof output === "string" ? output : new TextDecoder().decode(output);
+function shellPayloadToBytes(output: unknown): Uint8Array | null {
+  if (output instanceof Uint8Array) return output;
+  if (output instanceof ArrayBuffer) return new Uint8Array(output);
+  if (ArrayBuffer.isView(output)) {
+    return new Uint8Array(output.buffer, output.byteOffset, output.byteLength);
+  }
+  if (Array.isArray(output)) return new Uint8Array(output);
+
+  if (output && typeof output === "object") {
+    const data = (output as { data?: unknown }).data;
+    if (Array.isArray(data)) return new Uint8Array(data);
+  }
+
+  return null;
+}
+
+function decodeShellOutput(output: unknown): string {
+  if (typeof output === "string") return output;
+  const bytes = shellPayloadToBytes(output);
+  return bytes ? new TextDecoder().decode(bytes) : String(output ?? "");
 }
 
 function isTauriLocalAssetUrl(value: string): boolean {

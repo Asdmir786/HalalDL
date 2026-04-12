@@ -37,8 +37,26 @@ const activeYtDlpChildren = new Map<string, Child>();
 const activeFfmpegChildren = new Map<string, Child>();
 const holdRequestedJobs = new Map<string, "pause" | "stop">();
 
-function decodeShellChunk(decoder: TextDecoder, chunk: string | Uint8Array, stream = true): string {
-  return typeof chunk === "string" ? chunk : decoder.decode(chunk, { stream });
+function shellPayloadToBytes(output: unknown): Uint8Array | null {
+  if (output instanceof Uint8Array) return output;
+  if (output instanceof ArrayBuffer) return new Uint8Array(output);
+  if (ArrayBuffer.isView(output)) {
+    return new Uint8Array(output.buffer, output.byteOffset, output.byteLength);
+  }
+  if (Array.isArray(output)) return new Uint8Array(output);
+
+  if (output && typeof output === "object") {
+    const data = (output as { data?: unknown }).data;
+    if (Array.isArray(data)) return new Uint8Array(data);
+  }
+
+  return null;
+}
+
+function decodeShellChunk(decoder: TextDecoder, chunk: unknown, stream = true): string {
+  if (typeof chunk === "string") return chunk;
+  const bytes = shellPayloadToBytes(chunk);
+  return bytes ? decoder.decode(bytes, { stream }) : String(chunk ?? "");
 }
 
 function consumeHoldRequest(jobId: string) {
@@ -108,11 +126,15 @@ function launchJob(jobId: string) {
   return true;
 }
 
-export function startQueuedJobs(jobIds?: string[]) {
+interface StartQueuedJobsOptions {
+  ignoreQueuePaused?: boolean;
+}
+
+export function startQueuedJobs(jobIds?: string[], options: StartQueuedJobsOptions = {}) {
   const { jobs } = useDownloadsStore.getState();
   const { settings } = useSettingsStore.getState();
   const { queuePaused } = useRuntimeStore.getState();
-  if (queuePaused) return 0;
+  if (queuePaused && !options.ignoreQueuePaused) return 0;
   const allowedIds = jobIds ? new Set(jobIds) : undefined;
   const reservedIds = getReservedJobIds(jobs);
   const maxConcurrency = settings.maxConcurrency || 1;

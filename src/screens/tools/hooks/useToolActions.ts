@@ -44,6 +44,7 @@ export function useToolActions(modalApi: ModalApi) {
     pushModalLog,
     setModalProgress,
     setModalToolProgress,
+    setModalToolVersions,
     setModalDone,
     setModalCurrentStatus,
     setModalError,
@@ -71,6 +72,39 @@ export function useToolActions(modalApi: ModalApi) {
   useEffect(() => {
     void refreshBackups();
   }, [refreshBackups]);
+
+  const fetchTargetVersion = useCallback(async (tool: Tool): Promise<string | null> => {
+    if (tool.latestVersion) return tool.latestVersion;
+
+    switch (tool.id) {
+      case "yt-dlp":
+        return fetchLatestYtDlpVersion(tool.channel);
+      case "ffmpeg":
+        return fetchLatestFfmpegVersion(tool.channel);
+      case "aria2":
+        return fetchLatestAria2Version();
+      case "deno":
+        return fetchLatestDenoVersion();
+      default:
+        return null;
+    }
+  }, []);
+
+  const resolveTargetVersions = useCallback(async (selectedTools: Tool[]) => {
+    const versions: Record<string, string> = {};
+
+    await Promise.all(selectedTools.map(async (selectedTool) => {
+      const version = await fetchTargetVersion(selectedTool).catch(() => null);
+      if (version) versions[selectedTool.id] = version;
+    }));
+
+    return versions;
+  }, [fetchTargetVersion]);
+
+  const formatToolTarget = useCallback((tool: Tool, targetVersions: Record<string, string>) => {
+    const version = targetVersions[tool.id];
+    return version ? `${tool.name} v${version}` : `${tool.name} latest`;
+  }, []);
 
   /* ── Per-tool: detect installed + check latest ── */
   const refreshTool = useCallback(async (id: string) => {
@@ -195,22 +229,40 @@ export function useToolActions(modalApi: ModalApi) {
       return;
     }
 
+    const actionLabel = tool.status === "Missing" ? "Installing" : "Updating";
+    const knownTargetVersions = tool.latestVersion ? { [tool.id]: tool.latestVersion } : {};
+
     if (!beginTransferModal(
-      tool.status === "Missing"
-        ? `Installing ${tool.name}`
-        : `Updating ${tool.name}`,
+      `${actionLabel} ${tool.name}${tool.latestVersion ? ` v${tool.latestVersion}` : ""}`,
       [tool.id],
-      [`Queued ${tool.name} (${tool.channel})`]
+      [
+        tool.latestVersion
+          ? `Queued ${tool.name} v${tool.latestVersion} (${tool.channel})`
+          : `Queued ${tool.name} (${tool.channel})`,
+      ],
+      knownTargetVersions
     )) {
       toast.info("Wait for the current download to finish.");
       return;
     }
+    setModalCurrentStatus(
+      tool.latestVersion ? `Preparing v${tool.latestVersion}...` : "Checking target version..."
+    );
     pushModalLog(
       `[${tool.name}] Starting ${tool.status === "Missing" ? "install" : "update"} on ${tool.channel} track`
     );
     setBusyTools((prev) => ({ ...prev, [tool.id]: true }));
 
     try {
+      const targetVersions = await resolveTargetVersions([tool]);
+      setModalToolVersions(targetVersions);
+      pushModalLog(`[${tool.name}] Target: ${formatToolTarget(tool, targetVersions)}`);
+      setModalCurrentStatus(
+        targetVersions[tool.id]
+          ? `${actionLabel} v${targetVersions[tool.id]}...`
+          : `${actionLabel} latest version...`
+      );
+
       const ch = tool.channel !== "stable" ? { [tool.id]: tool.channel } : undefined;
       const result = await downloadTools([tool.id], ch);
       setModalBatchResult(result);
@@ -218,7 +270,7 @@ export function useToolActions(modalApi: ModalApi) {
       if (result.allSucceeded) {
         setModalProgress(100);
         setModalToolProgress({ [tool.id]: 100 });
-        pushModalLog(`[${tool.name}] Completed successfully`);
+        pushModalLog(`[${tool.name}] Installed ${formatToolTarget(tool, targetVersions)}`);
         addLog({ level: "info", message: `${tool.id} installed/updated (${tool.channel})` });
         await refreshToolIds([tool.id]);
         await autoRestartAfterUpdate(`${tool.name} was updated successfully. HalalDL will restart now.`);
@@ -253,24 +305,44 @@ export function useToolActions(modalApi: ModalApi) {
       return;
     }
 
-    if (!beginTransferModal("Upgrading yt-dlp via pip", [tool.id], [
-      "Preparing pip upgrade...",
-      "Running pip install --upgrade yt-dlp...",
-    ])) {
+    const knownTargetVersions = tool.latestVersion ? { [tool.id]: tool.latestVersion } : {};
+
+    if (!beginTransferModal(
+      `Upgrading yt-dlp via pip${tool.latestVersion ? ` to v${tool.latestVersion}` : ""}`,
+      [tool.id],
+      [
+        tool.latestVersion
+          ? `Preparing pip upgrade to yt-dlp v${tool.latestVersion}...`
+          : "Preparing pip upgrade...",
+        "Running pip install --upgrade yt-dlp...",
+      ],
+      knownTargetVersions
+    )) {
       toast.info("Wait for the current download to finish.");
       return;
     }
     setBusyTools((prev) => ({ ...prev, [tool.id]: true }));
-    setModalCurrentStatus("Running pip command");
+    setModalCurrentStatus(
+      tool.latestVersion ? `Running pip command for v${tool.latestVersion}` : "Checking target version..."
+    );
     setModalProgress(15);
     setModalToolProgress({ [tool.id]: 15 });
 
     try {
+      const targetVersions = await resolveTargetVersions([tool]);
+      setModalToolVersions(targetVersions);
+      pushModalLog(`[yt-dlp] Target: ${formatToolTarget(tool, targetVersions)}`);
+      setModalCurrentStatus(
+        targetVersions[tool.id]
+          ? `Running pip command for v${targetVersions[tool.id]}`
+          : "Running pip command for latest version"
+      );
+
       const ok = await upgradeYtDlpViaPip();
       if (ok) {
         setModalProgress(100);
         setModalToolProgress({ [tool.id]: 100 });
-        pushModalLog("[yt-dlp] pip upgrade completed");
+        pushModalLog(`[yt-dlp] pip upgrade completed for ${formatToolTarget(tool, targetVersions)}`);
         await autoRestartAfterUpdate("yt-dlp was updated successfully. HalalDL will restart now.");
       } else {
         setModalError("pip upgrade failed — check logs for details");
@@ -294,23 +366,41 @@ export function useToolActions(modalApi: ModalApi) {
 
     if (!tool.systemPath) return;
     const destDir = tool.systemPath.replace(/[/\\][^/\\]+$/, "");
+    const knownTargetVersions = tool.latestVersion ? { [tool.id]: tool.latestVersion } : {};
 
     if (!beginTransferModal(
-      `Updating ${tool.name} at original location`,
+      `Updating ${tool.name}${tool.latestVersion ? ` v${tool.latestVersion}` : ""} at original location`,
       [tool.id],
-      [`Queued in-place update for ${tool.name}`]
+      [
+        tool.latestVersion
+          ? `Queued in-place update for ${tool.name} v${tool.latestVersion}`
+          : `Queued in-place update for ${tool.name}`,
+      ],
+      knownTargetVersions
     )) {
       toast.info("Wait for the current download to finish.");
       return;
     }
     pushModalLog(`[${tool.name}] Updating original location: ${destDir}`);
+    setModalCurrentStatus(
+      tool.latestVersion ? `Preparing v${tool.latestVersion}...` : "Checking target version..."
+    );
     setBusyTools((prev) => ({ ...prev, [tool.id]: true }));
 
     try {
+      const targetVersions = await resolveTargetVersions([tool]);
+      setModalToolVersions(targetVersions);
+      pushModalLog(`[${tool.name}] Target: ${formatToolTarget(tool, targetVersions)}`);
+      setModalCurrentStatus(
+        targetVersions[tool.id]
+          ? `Updating v${targetVersions[tool.id]}...`
+          : "Updating latest version..."
+      );
+
       await updateToolAtPath(tool.id, destDir, tool.variant, tool.channel);
       setModalProgress(100);
       setModalToolProgress({ [tool.id]: 100 });
-      pushModalLog(`[${tool.name}] In-place update completed`);
+      pushModalLog(`[${tool.name}] In-place update completed for ${formatToolTarget(tool, targetVersions)}`);
       addLog({ level: "info", message: `${tool.id} updated at ${destDir}` });
       await refreshToolIds([tool.id]);
       await autoRestartAfterUpdate(`${tool.name} was updated successfully. HalalDL will restart now.`);
@@ -353,10 +443,21 @@ export function useToolActions(modalApi: ModalApi) {
     if (toUpdate.length === 0) return;
 
     const ids = toUpdate.map((t) => t.id);
+    const knownTargetVersions = Object.fromEntries(
+      toUpdate
+        .filter((t) => Boolean(t.latestVersion))
+        .map((t) => [t.id, t.latestVersion!])
+    ) as Record<string, string>;
+
     if (!beginTransferModal(
       `Updating ${toUpdate.length} tool${toUpdate.length > 1 ? "s" : ""}`,
       ids,
-      [`Queued: ${toUpdate.map((t) => t.name).join(", ")}`]
+      [
+        `Queued: ${toUpdate
+          .map((t) => (t.latestVersion ? `${t.name} v${t.latestVersion}` : t.name))
+          .join(", ")}`,
+      ],
+      knownTargetVersions
     )) {
       toast.info("Wait for the current download to finish.");
       return;
@@ -371,6 +472,14 @@ export function useToolActions(modalApi: ModalApi) {
     });
 
     try {
+      setModalCurrentStatus("Checking target versions...");
+      const targetVersions = await resolveTargetVersions(toUpdate);
+      setModalToolVersions(targetVersions);
+      for (const t of toUpdate) {
+        pushModalLog(`[${t.name}] Target: ${formatToolTarget(t, targetVersions)}`);
+      }
+      setModalCurrentStatus("Downloading selected versions...");
+
       const ch: Record<string, string> = {};
       for (const t of toUpdate) {
         if (t.channel !== "stable") ch[t.id] = t.channel;

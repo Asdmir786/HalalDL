@@ -263,10 +263,10 @@ export default function App() {
       const id = addJob(supportedUrl, presetId, {
         origin: "tray",
       });
-      await fetchMetadata(id);
       if (latestSettings.quickDownloadStartMode === "start") {
-        startQueuedJobs([id]);
+        startQueuedJobs([id], { ignoreQueuePaused: true });
       }
+      void fetchMetadata(id);
     },
     []
   );
@@ -340,10 +340,10 @@ export default function App() {
         }
 
         const id = addJob(targetUrl, presetId, { origin: "deeplink" });
-        await fetchMetadata(id);
         if (startImmediately) {
-          startQueuedJobs([id]);
+          startQueuedJobs([id], { ignoreQueuePaused: true });
         }
+        void fetchMetadata(id);
       }
     },
     []

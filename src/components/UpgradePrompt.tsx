@@ -24,7 +24,13 @@ import {
   getSuccessfulToolResults,
   type ToolBatchResult,
 } from "@/lib/tools/tool-batch";
-import { downloadTools } from "@/lib/commands";
+import {
+  downloadTools,
+  fetchLatestAria2Version,
+  fetchLatestDenoVersion,
+  fetchLatestFfmpegVersion,
+  fetchLatestYtDlpVersion,
+} from "@/lib/commands";
 
 interface DownloadProgress {
   tool: string;
@@ -50,6 +56,7 @@ export function UpgradePrompt() {
   const [batchResult, setBatchResult] = useState<ToolBatchResult | null>(null);
   const [operationToolIds, setOperationToolIds] = useState<string[]>([]);
   const [toolProgress, setToolProgress] = useState<Record<string, number>>({});
+  const [toolVersions, setToolVersions] = useState<Record<string, string>>({});
   const [currentToolId, setCurrentToolId] = useState<string | null>(null);
   const [currentStatus, setCurrentStatus] = useState("Preparing...");
   const [startupMissingToolIds, setStartupMissingToolIds] = useState<string[] | null>(
@@ -131,13 +138,50 @@ export function UpgradePrompt() {
     Boolean(error) ||
     (startupReady && promptToolIds.length > 0 && dismissedMissingKey !== missingKey);
   const modalCurrentToolName = currentToolId ? toolNameById[currentToolId] ?? currentToolId : null;
+  const modalCurrentToolVersion = currentToolId ? toolVersions[currentToolId] ?? null : null;
   const totalSize = modalToolIds.reduce((acc, toolId) => acc + (TOOL_SIZES[toolId] || 0), 0);
   const showFooterActions = !isDownloading;
+
+  const fetchSetupTargetVersion = useCallback(
+    async (toolId: string): Promise<string | null> => {
+      const tool = tools.find((item) => item.id === toolId);
+      if (tool?.latestVersion) return tool.latestVersion;
+
+      switch (toolId) {
+        case "yt-dlp":
+          return fetchLatestYtDlpVersion(tool?.channel ?? "stable");
+        case "ffmpeg":
+          return fetchLatestFfmpegVersion(tool?.channel ?? "stable");
+        case "aria2":
+          return fetchLatestAria2Version();
+        case "deno":
+          return fetchLatestDenoVersion();
+        default:
+          return null;
+      }
+    },
+    [tools]
+  );
+
+  const resolveSetupTargetVersions = useCallback(
+    async (toolIds: string[]) => {
+      const versions: Record<string, string> = {};
+
+      await Promise.all(toolIds.map(async (toolId) => {
+        const version = await fetchSetupTargetVersion(toolId).catch(() => null);
+        if (version) versions[toolId] = version;
+      }));
+
+      return versions;
+    },
+    [fetchSetupTargetVersion]
+  );
 
   const resetProgressState = useCallback(() => {
     setProgress(0);
     setLogs([]);
     setToolProgress({});
+    setToolVersions({});
     setCurrentToolId(null);
     setCurrentStatus("Preparing...");
     setBatchResult(null);
@@ -155,12 +199,13 @@ export function UpgradePrompt() {
   }, []);
 
   const beginProgressRun = useCallback(
-    (toolIds: string[]) => {
+    (toolIds: string[], targetVersions: Record<string, string> = {}) => {
       resetProgressState();
       setOperationToolIds(toolIds);
       setToolProgress(
         Object.fromEntries(toolIds.map((toolId) => [toolId, 0])) as Record<string, number>
       );
+      setToolVersions(targetVersions);
       setCurrentToolId(toolIds[0] ?? null);
       setCurrentStatus("Preparing...");
       appendLog(`Queued ${toolIds.length} tool${toolIds.length === 1 ? "" : "s"} for setup`);
@@ -180,12 +225,25 @@ export function UpgradePrompt() {
       setError(null);
       setIsDownloading(true);
       beginProgressRun(toolsToInstall);
+      setCurrentStatus("Checking target versions...");
       addLog({
         level: "info",
         message: `Starting startup tool sync: ${toolsToInstall.join(", ")}`,
       });
 
       try {
+        const targetVersions = await resolveSetupTargetVersions(toolsToInstall);
+        setToolVersions(targetVersions);
+        for (const toolId of toolsToInstall) {
+          const name = toolNameById[toolId] ?? toolId;
+          appendLog(
+            targetVersions[toolId]
+              ? `[${name}] Target: ${name} v${targetVersions[toolId]}`
+              : `[${name}] Target: latest version`
+          );
+        }
+        setCurrentStatus("Downloading selected versions...");
+
         const result = await downloadTools(toolsToInstall);
         setBatchResult(result);
 
@@ -246,8 +304,29 @@ export function UpgradePrompt() {
         });
       }
     },
-    [actionToolIds, addLog, appendLog, beginProgressRun, missingKey, toolNameById]
+    [
+      actionToolIds,
+      addLog,
+      appendLog,
+      beginProgressRun,
+      missingKey,
+      resolveSetupTargetVersions,
+      toolNameById,
+    ]
   );
+
+  useEffect(() => {
+    if (!startupReady || promptToolIds.length === 0 || isDownloading) return;
+
+    let cancelled = false;
+    void resolveSetupTargetVersions(promptToolIds).then((versions) => {
+      if (!cancelled) setToolVersions(versions);
+    });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [isDownloading, promptToolIds, resolveSetupTargetVersions, startupReady]);
 
   useEffect(() => {
     if (!startupReady || !isFullMode || missingIds.length === 0 || autoInstallStartedRef.current) {
@@ -376,10 +455,12 @@ export function UpgradePrompt() {
                   <ToolTransferStatus
                     progress={progress}
                     currentToolName={modalCurrentToolName}
+                    currentToolVersion={modalCurrentToolVersion}
                     currentStatus={currentStatus}
                     orderedToolIds={modalToolIds}
                     toolProgress={toolProgress}
                     toolNameById={toolNameById}
+                    toolVersionById={toolVersions}
                     logs={logs}
                     emptyLabel="Waiting for tool download events..."
                   />
@@ -433,6 +514,7 @@ export function UpgradePrompt() {
                   <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
                     {tools.map((tool) => {
                       const isSelected = promptToolIds.includes(tool.id);
+                      const targetVersion = toolVersions[tool.id];
                       return (
                         <div
                           key={tool.id}
@@ -449,7 +531,12 @@ export function UpgradePrompt() {
                                 {!isSelected && <CheckCircle2 className="h-3.5 w-3.5 text-green-500" />}
                               </div>
                               <div className="mt-1 text-[11px] text-muted-foreground">
-                                {TOOL_SIZES[tool.id]}MB · {isSelected ? "Queued for app-managed install" : tool.version || "Already available"}
+                                {TOOL_SIZES[tool.id]}MB ·{" "}
+                                {isSelected
+                                  ? targetVersion
+                                    ? `Will install v${targetVersion}`
+                                    : "Latest version will be installed"
+                                  : tool.version || "Already available"}
                               </div>
                             </div>
                             <div

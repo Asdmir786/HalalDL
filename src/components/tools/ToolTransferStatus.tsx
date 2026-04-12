@@ -4,24 +4,36 @@ import { Terminal, ChevronRight } from "lucide-react";
 export interface ToolTransferStatusProps {
   progress: number;
   currentToolName: string | null;
+  currentToolVersion?: string | null;
   currentStatus: string;
   orderedToolIds: string[];
   toolProgress: Record<string, number>;
   toolNameById: Record<string, string>;
+  toolVersionById?: Record<string, string>;
   logs: string[];
   emptyLabel?: string;
+}
+
+function formatToolLabel(name: string, version?: string | null) {
+  return version ? `${name} v${version}` : name;
 }
 
 export function ToolTransferStatus({
   progress,
   currentToolName,
+  currentToolVersion,
   currentStatus,
   orderedToolIds,
   toolProgress,
   toolNameById,
+  toolVersionById = {},
   logs,
   emptyLabel = "Preparing transfer...",
 }: ToolTransferStatusProps) {
+  const currentToolLabel = currentToolName
+    ? formatToolLabel(currentToolName, currentToolVersion)
+    : null;
+
   return (
     <div className="flex min-h-0 flex-col gap-5 py-1">
       <div className="rounded-2xl border border-white/10 bg-white/5 p-4">
@@ -31,7 +43,7 @@ export function ToolTransferStatus({
               Overall Progress
             </div>
             <div className="mt-1 text-sm font-medium text-foreground/90">
-              {currentToolName ? `${currentToolName} · ${currentStatus}` : currentStatus}
+              {currentToolLabel ? `${currentToolLabel} · ${currentStatus}` : currentStatus}
             </div>
           </div>
           <div className="text-3xl font-semibold tabular-nums tracking-tight">
@@ -47,7 +59,7 @@ export function ToolTransferStatus({
             Active Tool
           </div>
           <div className="mt-1 truncate font-medium text-foreground/90">
-            {currentToolName || "Waiting"}
+            {currentToolLabel || "Waiting"}
           </div>
         </div>
         <div className="rounded-xl border border-white/10 bg-muted/20 px-3 py-2.5">
@@ -68,10 +80,14 @@ export function ToolTransferStatus({
           <div className="space-y-2.5">
             {orderedToolIds.map((toolId) => {
               const pct = Math.round(toolProgress[toolId] ?? 0);
+              const toolLabel = formatToolLabel(
+                toolNameById[toolId] ?? toolId,
+                toolVersionById[toolId]
+              );
               return (
                 <div key={toolId} className="space-y-1.5">
                   <div className="flex items-center justify-between text-[11px]">
-                    <span className="text-foreground/85">{toolNameById[toolId] ?? toolId}</span>
+                    <span className="truncate text-foreground/85">{toolLabel}</span>
                     <span className="font-mono text-muted-foreground">{pct}%</span>
                   </div>
                   <Progress value={pct} className="h-1.5 bg-muted/50" />

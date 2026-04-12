@@ -428,8 +428,8 @@ export function DownloadsScreen() {
     [jobs, selectedIds]
   );
   const queueMetaById = useMemo(() => {
-    const queued = jobs
-      .filter((job) => job.status === "Queued")
+    const queueItems = jobs
+      .filter((job) => job.status === "Queued" || job.status === "Paused" || job.status === "Stopped")
       .sort((a, b) => {
         const ao = typeof a.queueOrder === "number" ? a.queueOrder : a.createdAt;
         const bo = typeof b.queueOrder === "number" ? b.queueOrder : b.createdAt;
@@ -438,13 +438,15 @@ export function DownloadsScreen() {
     const queueRunning = activeCount > 0;
 
     return new Map(
-      queued.map((job, index) => [
+      queueItems.map((job, index) => [
         job.id,
         {
           position: index + 1,
+          canMoveUp: index > 0,
+          canMoveDown: index < queueItems.length - 1,
           statusLabel: queueRunning ? "Waiting" : "Queued",
           detail: queueRunning
-            ? `Starts automatically when a slot opens${queued.length > 1 ? ` • #${index + 1} in queue` : ""}`
+            ? `Starts automatically when a slot opens${queueItems.length > 1 ? ` • #${index + 1} in queue` : ""}`
             : "Start queue to begin",
         },
       ])
@@ -551,11 +553,10 @@ export function DownloadsScreen() {
       setUrl("");
 
       if (addMode === "start") {
-        const started = startQueuedJobs([id]);
+        const started = startQueuedJobs([id], { ignoreQueuePaused: true });
         if (started === 0) {
-          const queuePaused = useRuntimeStore.getState().queuePaused;
           updateJob(id, {
-            statusDetail: queuePaused ? "Queue paused" : "Waiting for an open slot",
+            statusDetail: "Waiting for an open slot",
           });
         }
       } else {
