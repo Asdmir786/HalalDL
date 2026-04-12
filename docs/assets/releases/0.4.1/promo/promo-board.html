@@ -562,9 +562,120 @@
         font-size: 17px;
         font-weight: 700;
       }
+
+      body[data-theme="light"] .app-shell,
+      body[data-theme="light"] .quick-card,
+      body[data-theme="light"] .details-card,
+      body[data-theme="light"] .settings-panel {
+        background: rgba(255, 255, 255, 0.9);
+        color: var(--ink);
+        border-color: rgba(17, 19, 18, 0.12);
+        box-shadow: 0 26px 70px rgba(17, 19, 18, 0.12);
+      }
+
+      body[data-theme="light"] .app-header {
+        border-bottom-color: rgba(17, 19, 18, 0.1);
+        background: rgba(17, 19, 18, 0.035);
+      }
+
+      body[data-theme="light"] .mock-row,
+      body[data-theme="light"] .setting-row,
+      body[data-theme="light"] .stat,
+      body[data-theme="light"] .input-like {
+        border-color: rgba(17, 19, 18, 0.12);
+        background: rgba(17, 19, 18, 0.045);
+      }
+
+      body[data-theme="light"] .row-meta,
+      body[data-theme="light"] .summary-line,
+      body[data-theme="light"] .stat small,
+      body[data-theme="light"] .setting-row span,
+      body[data-theme="light"] .input-like {
+        color: var(--muted) !important;
+      }
+
+      body[data-theme="light"] .mini-chip {
+        border-color: rgba(17, 19, 18, 0.12);
+        background: rgba(17, 19, 18, 0.055);
+        color: var(--muted);
+      }
+
+      body[data-theme="light"] .status,
+      body[data-theme="light"] .saved,
+      body[data-theme="light"] .select-like {
+        border-color: rgba(18, 209, 142, 0.28);
+        background: rgba(18, 209, 142, 0.12);
+        color: #076141;
+      }
+
+      body[data-theme="light"] .thumb {
+        background:
+          linear-gradient(135deg, rgba(34, 199, 216, 0.42), rgba(240, 90, 122, 0.32)),
+          linear-gradient(45deg, #dfe8e5, #f7faf8);
+      }
+
+      body[data-theme="light"] .field-box,
+      body[data-theme="light"] .chip-light,
+      body[data-theme="light"] .keyboard {
+        background: white;
+        color: var(--ink);
+      }
+
+      body[data-theme="dark"] {
+        background: #070908;
+        color: #f7fbf9;
+      }
+
+      body[data-theme="dark"] .frame {
+        background:
+          linear-gradient(135deg, rgba(18, 209, 142, 0.16), transparent 31%),
+          linear-gradient(315deg, rgba(34, 199, 216, 0.14), transparent 29%),
+          #080b0a;
+        color: #f7fbf9;
+      }
+
+      body[data-theme="dark"] .texture {
+        opacity: 0.18;
+        background-image:
+          linear-gradient(rgba(255, 255, 255, 0.055) 1px, transparent 1px),
+          linear-gradient(90deg, rgba(255, 255, 255, 0.055) 1px, transparent 1px);
+      }
+
+      body[data-theme="dark"] .pill,
+      body[data-theme="dark"] .feature,
+      body[data-theme="dark"] .form-card {
+        border-color: rgba(255, 255, 255, 0.12);
+        background: rgba(255, 255, 255, 0.07);
+        color: #f7fbf9;
+      }
+
+      body[data-theme="dark"] .lead,
+      body[data-theme="dark"] .feature span,
+      body[data-theme="dark"] .label,
+      body[data-theme="dark"] .footer-note {
+        color: rgba(247, 251, 249, 0.68);
+      }
+
+      body[data-theme="dark"] .headline-tag {
+        color: #8ff0cd;
+      }
+
+      body[data-theme="dark"] .field-box,
+      body[data-theme="dark"] .chip-light {
+        border-color: rgba(255, 255, 255, 0.12);
+        background: rgba(255, 255, 255, 0.075);
+        color: #f7fbf9;
+      }
+
+      body[data-theme="dark"] .keyboard {
+        border-color: rgba(255, 255, 255, 0.18);
+        background: #171d1b;
+        color: #f7fbf9;
+        box-shadow: 0 5px 0 rgba(255, 255, 255, 0.08);
+      }
     </style>
   </head>
-  <body data-capture="hero">
+  <body data-capture="hero" data-theme="light">
     <section class="frame hero">
       <div class="texture"></div>
       <div class="topbar">
@@ -739,7 +850,9 @@
     <script>
       const params = new URLSearchParams(window.location.search);
       const capture = params.get("capture") || "hero";
+      const theme = params.get("theme") === "dark" ? "dark" : "light";
       document.body.dataset.capture = capture;
+      document.body.dataset.theme = theme;
       requestAnimationFrame(() => document.body.classList.add("ready"));
     </script>
   </body>

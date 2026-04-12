@@ -16,6 +16,9 @@
 - `HalalDL-Lite-v[VERSION]-win10+11-x64-setup.exe`
 - Optional MSI variants if still distributed
 - `SHA256SUMS.txt`
+- Separate light-mode and dark-mode promo images, named with `-light` and `-dark` suffixes
+- Reproducible release-image generator, preferably `docs/assets/releases/[VERSION]/generate-images.py` using Python/Pillow or an equally deterministic script
+- Visual inspection of every image referenced by the release notes before tagging
 
 ## Release Notes
 
@@ -27,9 +30,9 @@ Use [RELEASE_TEMPLATE.md](./RELEASE_TEMPLATE.md) and include:
 - Checksum verification note
 - Known limitations
 - Upgrade notes
-- Optional embedded images in the release body (`1-2` is usually enough)
-- Prefer `docs/assets/releases/[VERSION]/promo/hero.png` near the top
-- Prefer one supporting image later in the post such as `notification-spotlight.png` or `update-flow.png`
+- Embedded images in light and dark pairs
+- Prefer `docs/assets/releases/[VERSION]/promo/hero-light.png` and `hero-dark.png` near the top
+- Prefer supporting image pairs later in the post, for example `[feature]-light.png` and `[feature]-dark.png`
 
 ## Post-Release
 
