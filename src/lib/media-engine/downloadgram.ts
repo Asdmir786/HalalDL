@@ -49,6 +49,7 @@ const DOWNLOADGRAM_PROVIDERS: readonly DownloadGramProvider[] = [
 
 const INNER_HTML_START = "['innerHTML']='";
 const ALERT_START = "pushAlert(";
+const INVALID_LINK_TARGETS = new Set(["", "#"]);
 
 export function isInstagramUrl(url: string): boolean {
   try {
@@ -59,7 +60,9 @@ export function isInstagramUrl(url: string): boolean {
   }
 }
 
-export async function resolveInstagramWithDownloadgram(url: string): Promise<InstagramResolveResult> {
+export async function resolveInstagramWithDownloadgram(
+  url: string
+): Promise<InstagramResolveResult> {
   if (!isInstagramUrl(url)) {
     throw new Error("DownloadGram resolver only accepts Instagram URLs.");
   }
@@ -222,38 +225,82 @@ function parseDownloadGramHtml(
 ): InstagramMediaItem[] {
   const doc = new DOMParser().parseFromString(html, "text/html");
   const blocks = Array.from(doc.querySelectorAll(".download-items"));
+  const providerBaseUrl = getProviderBaseUrl(provider);
 
   return blocks
     .map((block, index) => {
       const anchor = block.querySelector<HTMLAnchorElement>("a[href]");
-      if (!anchor?.href) return null;
+      const downloadUrl = normalizeDownloadGramUrl(
+        anchor?.getAttribute("href"),
+        providerBaseUrl
+      );
+      if (!downloadUrl) return null;
 
       const image = block.querySelector<HTMLImageElement>("img[src]");
       const icon = block.querySelector<HTMLElement>(".format-icon i");
-      const tokenPayload = decodeDownloadGramToken(anchor.href);
-      const type = inferMediaType(anchor.href, icon?.className ?? "");
+      const thumbnailUrl = normalizeDownloadGramUrl(
+        image?.getAttribute("src"),
+        providerBaseUrl
+      );
+      const tokenPayload = decodeDownloadGramToken(downloadUrl);
+      const type = inferMediaType(downloadUrl, icon?.className ?? "");
 
       return {
         sourceUrl: tokenPayload?.url ?? null,
         suggestedFilename: tokenPayload?.filename ?? null,
-        id: buildItemId(anchor.href, index),
+        id: buildItemId(downloadUrl, index),
         index,
         type,
-        downloadUrl: anchor.href,
-        thumbnailUrl: image?.src?.trim() || null,
+        downloadUrl,
+        thumbnailUrl,
         provider,
       } satisfies InstagramMediaItem;
     })
     .filter((item): item is InstagramMediaItem => item !== null);
 }
 
+function getProviderBaseUrl(provider: DownloadGramProvider["id"]): string {
+  return (
+    DOWNLOADGRAM_PROVIDERS.find((candidate) => candidate.id === provider)
+      ?.origin ?? "https://downloadgram.org"
+  );
+}
+
+function normalizeDownloadGramUrl(
+  rawValue: string | null | undefined,
+  baseUrl: string
+): string | null {
+  const trimmed = rawValue?.trim() ?? "";
+  if (INVALID_LINK_TARGETS.has(trimmed) || /^javascript:/i.test(trimmed)) {
+    return null;
+  }
+
+  try {
+    const parsed = new URL(trimmed, baseUrl);
+    if (parsed.protocol !== "http:" && parsed.protocol !== "https:") {
+      return null;
+    }
+    if (
+      parsed.hostname === "tauri.localhost" ||
+      parsed.hostname === "asset.localhost"
+    ) {
+      return null;
+    }
+    return parsed.toString();
+  } catch {
+    return null;
+  }
+}
+
 function inferMediaType(downloadUrl: string, iconClassName: string): MediaType {
   const lowerIcon = iconClassName.toLowerCase();
   if (lowerIcon.includes("video")) return "video";
-  if (lowerIcon.includes("photo") || lowerIcon.includes("image")) return "image";
+  if (lowerIcon.includes("photo") || lowerIcon.includes("image"))
+    return "image";
 
   const tokenPayload = decodeDownloadGramToken(downloadUrl);
-  const fromPayload = `${tokenPayload?.filename ?? ""} ${tokenPayload?.url ?? ""}`.toLowerCase();
+  const fromPayload =
+    `${tokenPayload?.filename ?? ""} ${tokenPayload?.url ?? ""}`.toLowerCase();
   if (/\.(mp4|mov|webm)(\b|$)/.test(fromPayload)) return "video";
   if (/\.(jpe?g|png|webp|gif)(\b|$)/.test(fromPayload)) return "image";
 
@@ -262,12 +309,15 @@ function inferMediaType(downloadUrl: string, iconClassName: string): MediaType {
 
 function buildItemId(downloadUrl: string, index: number): string {
   const tokenPayload = decodeDownloadGramToken(downloadUrl);
-  const preferred = tokenPayload?.filename || tokenPayload?.url || `item-${index + 1}`;
-  return preferred
-    .replace(/^https?:\/\//i, "")
-    .replace(/[^a-zA-Z0-9]+/g, "-")
-    .replace(/^-+|-+$/g, "")
-    .toLowerCase() || `item-${index + 1}`;
+  const preferred =
+    tokenPayload?.filename || tokenPayload?.url || `item-${index + 1}`;
+  return (
+    preferred
+      .replace(/^https?:\/\//i, "")
+      .replace(/[^a-zA-Z0-9]+/g, "-")
+      .replace(/^-+|-+$/g, "")
+      .toLowerCase() || `item-${index + 1}`
+  );
 }
 
 export function extractInstagramShortcode(url: string): string {
@@ -282,7 +332,9 @@ export function extractInstagramShortcode(url: string): string {
   return "instagram";
 }
 
-export function getInstagramResourceType(url: string): "post" | "reel" | "tv" | "unknown" {
+export function getInstagramResourceType(
+  url: string
+): "post" | "reel" | "tv" | "unknown" {
   try {
     const parts = new URL(url).pathname.split("/").filter(Boolean);
     const head = parts[0]?.toLowerCase();
@@ -295,7 +347,9 @@ export function getInstagramResourceType(url: string): "post" | "reel" | "tv" | 
   return "unknown";
 }
 
-function decodeDownloadGramToken(downloadUrl: string): { filename?: string; url?: string } | null {
+function decodeDownloadGramToken(
+  downloadUrl: string
+): { filename?: string; url?: string } | null {
   try {
     const token = new URL(downloadUrl).searchParams.get("token");
     if (!token) return null;
@@ -306,7 +360,8 @@ function decodeDownloadGramToken(downloadUrl: string): { filename?: string; url?
     const payload = base64UrlDecode(parts[1]);
     const parsed = JSON.parse(payload) as { filename?: unknown; url?: unknown };
     return {
-      filename: typeof parsed.filename === "string" ? parsed.filename : undefined,
+      filename:
+        typeof parsed.filename === "string" ? parsed.filename : undefined,
       url: typeof parsed.url === "string" ? parsed.url : undefined,
     };
   } catch {

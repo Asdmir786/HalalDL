@@ -70,11 +70,21 @@ export async function downloadInstagramJob(options: {
   settings: Settings;
   subtitlePreferences: SubtitlePreferences;
   updateJob: (id: string, updates: Partial<DownloadJob>) => void;
-  addLog: (entry: { level: "info" | "warn" | "error" | "debug" | "command"; message: string; jobId?: string; command?: string }) => void;
+  addLog: (entry: {
+    level: "info" | "warn" | "error" | "debug" | "command";
+    message: string;
+    jobId?: string;
+    command?: string;
+  }) => void;
 }): Promise<InstagramDownloadResult> {
-  const { job, preset, settings, subtitlePreferences, updateJob, addLog } = options;
+  const { job, preset, settings, subtitlePreferences, updateJob, addLog } =
+    options;
 
-  const unsupportedReason = getUnsupportedReason(job, preset, subtitlePreferences);
+  const unsupportedReason = getUnsupportedReason(
+    job,
+    preset,
+    subtitlePreferences
+  );
   if (unsupportedReason) {
     addLog({ level: "warn", message: unsupportedReason, jobId: job.id });
     return { code: 1, failDetail: unsupportedReason };
@@ -83,6 +93,9 @@ export async function downloadInstagramJob(options: {
   updateJob(job.id, {
     phase: "Resolving formats",
     statusDetail: "Resolving Instagram media",
+    thumbnail: undefined,
+    thumbnailStatus: "pending",
+    thumbnailError: undefined,
     subtitleStatus: "unavailable",
     hasManualSubtitles: false,
     hasAutoSubtitles: false,
@@ -104,19 +117,28 @@ export async function downloadInstagramJob(options: {
   const rootDir = await resolveRootDirectory(job, settings);
   const filenameTemplate = getFilenameTemplate(job, preset, settings);
   const postProcessPlan = buildPostProcessPlan(job, preset);
-  const activePostProcessPlan = postProcessPlan.mode === "none" ? null : postProcessPlan;
+  const activePostProcessPlan =
+    postProcessPlan.mode === "none" ? null : postProcessPlan;
 
-  if (postProcessPlan.mode === "audio" && !resolved.items.some((item) => item.type === "video")) {
+  if (
+    postProcessPlan.mode === "audio" &&
+    !resolved.items.some((item) => item.type === "video")
+  ) {
     return {
       code: 1,
-      failDetail: "This Instagram URL does not contain any video items to extract audio from.",
+      failDetail:
+        "This Instagram URL does not contain any video items to extract audio from.",
     };
   }
 
   updateJob(job.id, {
     title,
-    ...(resolved.items[0]?.thumbnailUrl ? { thumbnail: resolved.items[0].thumbnailUrl } : {}),
-    ...(resolved.items[0]?.thumbnailUrl ? { thumbnailStatus: "ready" as const } : {}),
+    ...(resolved.items[0]?.thumbnailUrl
+      ? { thumbnail: resolved.items[0].thumbnailUrl }
+      : {}),
+    ...(resolved.items[0]?.thumbnailUrl
+      ? { thumbnailStatus: "ready" as const }
+      : {}),
   });
 
   addLog({
@@ -133,7 +155,11 @@ export async function downloadInstagramJob(options: {
 
   let outputPath: string;
   if (resolved.kind === "carousel") {
-    outputPath = await prepareCollectionDirectory(rootDir, renderedBase, settings.fileCollision);
+    outputPath = await prepareCollectionDirectory(
+      rootDir,
+      renderedBase,
+      settings.fileCollision
+    );
   } else {
     const item = resolved.items[0];
     const ext = getPlannedOutputExtension(item, postProcessPlan);
@@ -143,9 +169,16 @@ export async function downloadInstagramJob(options: {
       jobId: job.id,
       ext,
     });
-    const singlePath = await resolveFilePath(rootDir, singleName, settings.fileCollision);
+    const singlePath = await resolveFilePath(
+      rootDir,
+      singleName,
+      settings.fileCollision
+    );
     if (!singlePath) {
-      outputPath = await join(rootDir, sanitizePathSegment(singleName) || `instagram.${ext}`);
+      outputPath = await join(
+        rootDir,
+        sanitizePathSegment(singleName) || `instagram.${ext}`
+      );
     } else {
       outputPath = singlePath;
     }
@@ -177,7 +210,12 @@ export async function downloadInstagramJob(options: {
         : outputPath;
     const destination =
       resolved.kind === "carousel"
-        ? await resolveCollectionItemPath(outputPath, item, settings.fileCollision, plannedExt)
+        ? await resolveCollectionItemPath(
+            outputPath,
+            item,
+            settings.fileCollision,
+            plannedExt
+          )
         : outputPath;
 
     if (!destination) {
@@ -191,7 +229,8 @@ export async function downloadInstagramJob(options: {
     }
 
     const sourceExt = inferItemExtension(item);
-    const shouldPostProcess = item.type === "video" && activePostProcessPlan !== null;
+    const shouldPostProcess =
+      item.type === "video" && activePostProcessPlan !== null;
     const downloadPath = shouldPostProcess
       ? `${destination}.source.${sourceExt}`
       : destination;
@@ -205,7 +244,12 @@ export async function downloadInstagramJob(options: {
   }
 
   const expectedOutputPaths = resolved.items
-    .map((item) => writtenPathByIndex.get(item.index) ?? plannedItems.find((candidate) => candidate.item.index === item.index)?.destination)
+    .map(
+      (item) =>
+        writtenPathByIndex.get(item.index) ??
+        plannedItems.find((candidate) => candidate.item.index === item.index)
+          ?.destination
+    )
     .filter((value): value is string => Boolean(value));
 
   if (plannedItems.length > 0) {
@@ -221,54 +265,72 @@ export async function downloadInstagramJob(options: {
       speed: undefined,
       eta: undefined,
       outputPaths: expectedOutputPaths,
-      ...(resolved.kind === "carousel" ? { outputPath } : { outputPath: plannedItems[0]?.destination ?? outputPath }),
+      ...(resolved.kind === "carousel"
+        ? { outputPath }
+        : { outputPath: plannedItems[0]?.destination ?? outputPath }),
     });
 
     addLog({
       level: "info",
-      message:
-        hasMultiplePlannedItems
-          ? `Instagram carousel download started with ${Math.min(plannedItems.length, INSTAGRAM_CAROUSEL_DOWNLOAD_CONCURRENCY)} parallel fetches for ${plannedItems.length} item(s)`
-          : "Downloading Instagram media",
+      message: hasMultiplePlannedItems
+        ? `Instagram carousel download started with ${Math.min(plannedItems.length, INSTAGRAM_CAROUSEL_DOWNLOAD_CONCURRENCY)} parallel fetches for ${plannedItems.length} item(s)`
+        : "Downloading Instagram media",
       jobId: job.id,
     });
   }
 
   let completedDownloads = 0;
   try {
-    await runWithConcurrency(plannedItems, INSTAGRAM_CAROUSEL_DOWNLOAD_CONCURRENCY, async (planned) => {
-      addLog({
-        level: "info",
-        message: `Downloading Instagram ${planned.item.type} ${planned.item.index + 1}/${resolved.items.length} → ${planned.destination}`,
-        jobId: job.id,
-      });
+    await runWithConcurrency(
+      plannedItems,
+      INSTAGRAM_CAROUSEL_DOWNLOAD_CONCURRENCY,
+      async (planned) => {
+        addLog({
+          level: "info",
+          message: `Downloading Instagram ${planned.item.type} ${planned.item.index + 1}/${resolved.items.length} → ${planned.destination}`,
+          jobId: job.id,
+        });
 
-      await downloadUrlToFile(planned.item.downloadUrl, planned.downloadPath, job.url);
-      wroteAny = true;
-      firstWrittenPath ??= planned.destination;
-      completedDownloads += 1;
+        await downloadUrlToFile(
+          planned.item.downloadUrl,
+          planned.downloadPath,
+          job.url
+        );
+        wroteAny = true;
+        firstWrittenPath ??= planned.destination;
+        completedDownloads += 1;
 
-      if (!planned.shouldPostProcess) {
-        writtenPathByIndex.set(planned.item.index, planned.destination);
+        if (!planned.shouldPostProcess) {
+          writtenPathByIndex.set(planned.item.index, planned.destination);
+        }
+
+        const hasPostProcessItems = plannedItems.some(
+          (candidate) => candidate.shouldPostProcess
+        );
+        const downloadShare = hasPostProcessItems
+          ? INSTAGRAM_STATUS_PROGRESS_SHARE.withPostProcess
+          : INSTAGRAM_STATUS_PROGRESS_SHARE.downloadOnly;
+        updateJob(job.id, {
+          status: "Downloading",
+          phase: "Downloading streams",
+          statusDetail: getInstagramDownloadProgressLabel(
+            completedDownloads,
+            plannedItems.length,
+            hasPostProcessItems
+          ),
+          progress: Math.max(
+            1,
+            Math.round(
+              (completedDownloads / plannedItems.length) * downloadShare
+            )
+          ),
+          outputPaths: expectedOutputPaths,
+          ...(resolved.kind === "carousel"
+            ? { outputPath }
+            : { outputPath: planned.destination }),
+        });
       }
-
-      const hasPostProcessItems = plannedItems.some((candidate) => candidate.shouldPostProcess);
-      const downloadShare = hasPostProcessItems
-        ? INSTAGRAM_STATUS_PROGRESS_SHARE.withPostProcess
-        : INSTAGRAM_STATUS_PROGRESS_SHARE.downloadOnly;
-      updateJob(job.id, {
-        status: "Downloading",
-        phase: "Downloading streams",
-        statusDetail: getInstagramDownloadProgressLabel(
-          completedDownloads,
-          plannedItems.length,
-          hasPostProcessItems
-        ),
-        progress: Math.max(1, Math.round((completedDownloads / plannedItems.length) * downloadShare)),
-        outputPaths: expectedOutputPaths,
-        ...(resolved.kind === "carousel" ? { outputPath } : { outputPath: planned.destination }),
-      });
-    });
+    );
   } catch (error) {
     return {
       code: 1,
@@ -276,7 +338,9 @@ export async function downloadInstagramJob(options: {
     };
   }
 
-  const postProcessItems = plannedItems.filter((planned) => planned.shouldPostProcess);
+  const postProcessItems = plannedItems.filter(
+    (planned) => planned.shouldPostProcess
+  );
   for (let index = 0; index < postProcessItems.length; index += 1) {
     const planned = postProcessItems[index];
     const converted = await runFfmpegPostProcess({
@@ -303,14 +367,17 @@ export async function downloadInstagramJob(options: {
       phase: "Converting with FFmpeg",
       progress: 70 + Math.round(((index + 1) / postProcessItems.length) * 25),
       outputPaths: expectedOutputPaths,
-      ...(resolved.kind === "carousel" ? { outputPath } : { outputPath: planned.destination }),
+      ...(resolved.kind === "carousel"
+        ? { outputPath }
+        : { outputPath: planned.destination }),
     });
   }
 
   if (!wroteAny) {
     addLog({
       level: "info",
-      message: "Instagram download skipped because the target files already exist",
+      message:
+        "Instagram download skipped because the target files already exist",
       jobId: job.id,
     });
   }
@@ -318,7 +385,10 @@ export async function downloadInstagramJob(options: {
   const writtenPaths = resolved.items
     .map((item) => writtenPathByIndex.get(item.index))
     .filter((value): value is string => Boolean(value));
-  const lastKnownOutputPath = resolved.kind === "carousel" ? outputPath : firstWrittenPath ?? outputPath;
+  const lastKnownOutputPath =
+    resolved.kind === "carousel"
+      ? outputPath
+      : (firstWrittenPath ?? outputPath);
   updateJob(job.id, {
     outputPath: lastKnownOutputPath,
     outputPaths: writtenPaths.length ? writtenPaths : [lastKnownOutputPath],
@@ -357,7 +427,10 @@ async function runWithConcurrency<T>(
   );
 }
 
-function getInstagramDownloadStartLabel(totalItems: number, parallelCount: number) {
+function getInstagramDownloadStartLabel(
+  totalItems: number,
+  parallelCount: number
+) {
   if (totalItems <= 1) {
     return "Downloading Instagram media";
   }
@@ -394,7 +467,9 @@ export async function fetchInstagramMediaInfo(url: string) {
   };
 }
 
-export async function inspectInstagramMedia(url: string): Promise<InstagramMediaSummary> {
+export async function inspectInstagramMedia(
+  url: string
+): Promise<InstagramMediaSummary> {
   const resolved = await resolveInstagramWithDownloadgram(url);
   const hasImage = resolved.items.some((item) => item.type === "image");
   const hasVideo = resolved.items.some((item) => item.type === "video");
@@ -425,7 +500,8 @@ function getUnsupportedReason(
   }
   const args = buildEffectivePresetArgs(job, preset);
   const mergeIndex = args.indexOf("--merge-output-format");
-  const mergeFormat = mergeIndex !== -1 ? args[mergeIndex + 1]?.toLowerCase() : "";
+  const mergeFormat =
+    mergeIndex !== -1 ? args[mergeIndex + 1]?.toLowerCase() : "";
   if (mergeFormat === "avi") {
     return "Instagram DownloadGram path does not support AVI conversion.";
   }
@@ -433,13 +509,20 @@ function getUnsupportedReason(
   return null;
 }
 
-async function resolveRootDirectory(job: DownloadJob, settings: Settings): Promise<string> {
+async function resolveRootDirectory(
+  job: DownloadJob,
+  settings: Settings
+): Promise<string> {
   const configured = job.overrides?.downloadDir || settings.defaultDownloadDir;
   if (configured.trim()) return configured;
   return defaultDownloadDir();
 }
 
-function getFilenameTemplate(job: DownloadJob, preset: Preset, settings: Settings): string {
+function getFilenameTemplate(
+  job: DownloadJob,
+  preset: Preset,
+  settings: Settings
+): string {
   if (job.overrides?.filenameTemplate?.trim()) {
     return ensureFilenameTemplateExtension(job.overrides.filenameTemplate);
   }
@@ -452,7 +535,10 @@ function getFilenameTemplate(job: DownloadJob, preset: Preset, settings: Setting
     : "%(title)s.%(ext)s";
 }
 
-function buildInstagramTitle(url: string, resolved: InstagramResolveResult): string {
+function buildInstagramTitle(
+  url: string,
+  resolved: InstagramResolveResult
+): string {
   const shortcode = resolved.shortcode || extractInstagramShortcode(url);
   const resourceType = resolved.resourceType || getInstagramResourceType(url);
   switch (resourceType) {
@@ -495,7 +581,11 @@ async function resolveCollectionItemPath(
   collision: Settings["fileCollision"],
   ext: string
 ): Promise<string | null> {
-  return resolveFilePath(collectionDir, buildCollectionItemFilename(item, ext), collision);
+  return resolveFilePath(
+    collectionDir,
+    buildCollectionItemFilename(item, ext),
+    collision
+  );
 }
 
 async function getCollectionItemPath(
@@ -548,7 +638,11 @@ function renderTemplateStem(
     .replace(/%\((webpage_url_basename)\)s/gi, values.shortcode || values.jobId)
     .replace(/%\(([^)]+)\)s/gi, "");
 
-  return sanitizePathSegment(rendered.trim()) || sanitizePathSegment(values.title) || "instagram";
+  return (
+    sanitizePathSegment(rendered.trim()) ||
+    sanitizePathSegment(values.title) ||
+    "instagram"
+  );
 }
 
 function renderSingleFilename(
@@ -563,7 +657,9 @@ function renderSingleFilename(
     .replace(/%\((ext)\)s/gi, values.ext)
     .replace(/%\(([^)]+)\)s/gi, "");
 
-  const withExt = rendered.includes(`.${values.ext}`) ? rendered : `${rendered}.${values.ext}`;
+  const withExt = rendered.includes(`.${values.ext}`)
+    ? rendered
+    : `${rendered}.${values.ext}`;
   return sanitizePathSegment(withExt.trim()) || `instagram.${values.ext}`;
 }
 
@@ -577,16 +673,15 @@ function sanitizePathSegment(input: string): string {
     sanitized += isControl || isReserved ? "-" : char;
   }
 
-  return sanitized
-    .replace(/\s+/g, " ")
-    .replace(/\.+$/g, "")
-    .trim();
+  return sanitized.replace(/\s+/g, " ").replace(/\.+$/g, "").trim();
 }
 
 function inferItemExtension(item: InstagramMediaItem): string {
   const filename = (item.suggestedFilename || "").toLowerCase();
   const source = (item.sourceUrl || "").toLowerCase();
-  const match = `${filename} ${source}`.match(/\.(jpg|jpeg|png|webp|gif|mp4|mov|webm)(\b|$)/);
+  const match = `${filename} ${source}`.match(
+    /\.(jpg|jpeg|png|webp|gif|mp4|mov|webm)(\b|$)/
+  );
   if (match?.[1]) {
     return match[1] === "jpeg" ? "jpg" : match[1];
   }
@@ -600,7 +695,10 @@ function splitExtension(filename: string): { stem: string; ext: string } {
   return { stem, ext };
 }
 
-function getPlannedOutputExtension(item: InstagramMediaItem, plan: PostProcessPlan): string {
+function getPlannedOutputExtension(
+  item: InstagramMediaItem,
+  plan: PostProcessPlan
+): string {
   if (item.type !== "video" || plan.mode === "none") {
     return inferItemExtension(item);
   }
@@ -633,16 +731,30 @@ function buildEffectivePresetArgs(job: DownloadJob, preset: Preset): string[] {
       args.push("-f", "bestvideo+bestaudio/best");
       break;
     case "mp4":
-      args.push("-f", "bestvideo[ext=mp4]+bestaudio[ext=m4a]/best[ext=mp4]/best");
+      args.push(
+        "-f",
+        "bestvideo[ext=mp4]+bestaudio[ext=m4a]/best[ext=mp4]/best"
+      );
       break;
     case "webm":
-      args.push("-f", "bestvideo[ext=webm]+bestaudio[ext=webm]/best[ext=webm]/best");
+      args.push(
+        "-f",
+        "bestvideo[ext=webm]+bestaudio[ext=webm]/best[ext=webm]/best"
+      );
       break;
     case "mp3":
       removeFlag("-x");
       removeFlagWithValue("--audio-format");
       removeFlagWithValue("--audio-quality");
-      args.push("-f", "bestaudio", "-x", "--audio-format", "mp3", "--audio-quality", "0");
+      args.push(
+        "-f",
+        "bestaudio",
+        "-x",
+        "--audio-format",
+        "mp3",
+        "--audio-quality",
+        "0"
+      );
       break;
     case "m4a":
       removeFlag("-x");
@@ -679,18 +791,26 @@ function buildEffectivePresetArgs(job: DownloadJob, preset: Preset): string[] {
   return args;
 }
 
-function buildPostProcessPlan(job: DownloadJob, preset: Preset): PostProcessPlan {
+function buildPostProcessPlan(
+  job: DownloadJob,
+  preset: Preset
+): PostProcessPlan {
   const args = buildEffectivePresetArgs(job, preset);
   const formatIndex = args.indexOf("-f");
   const formatValue = formatIndex !== -1 ? (args[formatIndex + 1] ?? "") : "";
   const audioFormatIndex = args.indexOf("--audio-format");
-  const audioFormat = audioFormatIndex !== -1 ? (args[audioFormatIndex + 1] ?? "").toLowerCase() : "";
+  const audioFormat =
+    audioFormatIndex !== -1
+      ? (args[audioFormatIndex + 1] ?? "").toLowerCase()
+      : "";
   const mergeIndex = args.indexOf("--merge-output-format");
-  const mergeFormat = mergeIndex !== -1 ? (args[mergeIndex + 1] ?? "").toLowerCase() : "";
+  const mergeFormat =
+    mergeIndex !== -1 ? (args[mergeIndex + 1] ?? "").toLowerCase() : "";
   const recodeIndex = args.indexOf("--recode-video");
-  const recodeFormat = recodeIndex !== -1 ? (args[recodeIndex + 1] ?? "").toLowerCase() : "";
+  const recodeFormat =
+    recodeIndex !== -1 ? (args[recodeIndex + 1] ?? "").toLowerCase() : "";
   const ppIndex = args.indexOf("--postprocessor-args");
-  const postprocessorArgs = ppIndex !== -1 ? args[ppIndex + 1] ?? "" : "";
+  const postprocessorArgs = ppIndex !== -1 ? (args[ppIndex + 1] ?? "") : "";
 
   const audioOnly =
     args.includes("-x") ||
@@ -769,11 +889,24 @@ function buildPostProcessPlan(job: DownloadJob, preset: Preset): PostProcessPlan
     };
   }
 
-  if (mergeFormat === "mp4" || /\[ext=mp4\]/i.test(formatValue) || /\[vcodec\^=avc1\]/i.test(formatValue)) {
+  if (
+    mergeFormat === "mp4" ||
+    /\[ext=mp4\]/i.test(formatValue) ||
+    /\[vcodec\^=avc1\]/i.test(formatValue)
+  ) {
     return {
       mode: "video",
       outputExt: "mp4",
-      ffmpegArgs: ["-c:v", "libx264", "-pix_fmt", "yuv420p", "-c:a", "aac", "-movflags", "+faststart"],
+      ffmpegArgs: [
+        "-c:v",
+        "libx264",
+        "-pix_fmt",
+        "yuv420p",
+        "-c:a",
+        "aac",
+        "-movflags",
+        "+faststart",
+      ],
       label: "Converting video to MP4",
     };
   }
@@ -782,12 +915,25 @@ function buildPostProcessPlan(job: DownloadJob, preset: Preset): PostProcessPlan
     return {
       mode: "video",
       outputExt: "webm",
-      ffmpegArgs: ["-c:v", "libvpx-vp9", "-crf", "32", "-b:v", "0", "-c:a", "libopus", "-b:a", "128k"],
+      ffmpegArgs: [
+        "-c:v",
+        "libvpx-vp9",
+        "-crf",
+        "32",
+        "-b:v",
+        "0",
+        "-c:a",
+        "libopus",
+        "-b:a",
+        "128k",
+      ],
       label: "Converting video to WebM",
     };
   }
 
-  if (VIDEO_CONTAINER_OVERRIDES.has((job.overrides?.format || "").toLowerCase())) {
+  if (
+    VIDEO_CONTAINER_OVERRIDES.has((job.overrides?.format || "").toLowerCase())
+  ) {
     const format = (job.overrides?.format || "").toLowerCase();
     if (format === "mkv") {
       return {
@@ -801,7 +947,18 @@ function buildPostProcessPlan(job: DownloadJob, preset: Preset): PostProcessPlan
       return {
         mode: "video",
         outputExt: "webm",
-        ffmpegArgs: ["-c:v", "libvpx-vp9", "-crf", "32", "-b:v", "0", "-c:a", "libopus", "-b:a", "128k"],
+        ffmpegArgs: [
+          "-c:v",
+          "libvpx-vp9",
+          "-crf",
+          "32",
+          "-b:v",
+          "0",
+          "-c:a",
+          "libopus",
+          "-b:a",
+          "128k",
+        ],
         label: "Converting video to WebM",
       };
     }
@@ -822,7 +979,12 @@ async function runFfmpegPostProcess(options: {
   job: DownloadJob;
   item: InstagramMediaItem;
   updateJob: (id: string, updates: Partial<DownloadJob>) => void;
-  addLog: (entry: { level: "info" | "warn" | "error" | "debug" | "command"; message: string; jobId?: string; command?: string }) => void;
+  addLog: (entry: {
+    level: "info" | "warn" | "error" | "debug" | "command";
+    message: string;
+    jobId?: string;
+    command?: string;
+  }) => void;
   inputPath: string;
   outputPath: string;
   plan: Exclude<PostProcessPlan, { mode: "none" }>;
@@ -830,7 +992,9 @@ async function runFfmpegPostProcess(options: {
   const { job, item, updateJob, addLog, inputPath, outputPath, plan } = options;
   const ffmpeg = await resolveTool("ffmpeg");
   const ffmpegArgs = ["-y", "-i", inputPath, ...plan.ffmpegArgs, outputPath];
-  const quoted = ffmpegArgs.map((arg) => (arg.includes(" ") ? `"${arg}"` : arg)).join(" ");
+  const quoted = ffmpegArgs
+    .map((arg) => (arg.includes(" ") ? `"${arg}"` : arg))
+    .join(" ");
 
   updateJob(job.id, {
     status: "Post-processing",
@@ -853,10 +1017,18 @@ async function runFfmpegPostProcess(options: {
   const cmd = Command.create(ffmpeg.command, ffmpegArgs);
   const result = await cmd.execute();
   if (result.stdout.trim()) {
-    addLog({ level: "info", message: `[ffmpeg] ${result.stdout.trim().slice(-400)}`, jobId: job.id });
+    addLog({
+      level: "info",
+      message: `[ffmpeg] ${result.stdout.trim().slice(-400)}`,
+      jobId: job.id,
+    });
   }
   if (result.stderr.trim()) {
-    addLog({ level: result.code === 0 ? "info" : "error", message: `[ffmpeg] ${result.stderr.trim().slice(-800)}`, jobId: job.id });
+    addLog({
+      level: result.code === 0 ? "info" : "error",
+      message: `[ffmpeg] ${result.stderr.trim().slice(-800)}`,
+      jobId: job.id,
+    });
   }
 
   if (result.code !== 0) {
