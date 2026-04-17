@@ -1,10 +1,12 @@
 import { Command } from "@tauri-apps/plugin-shell";
+import { convertFileSrc } from "@tauri-apps/api/core";
 import { useDownloadsStore } from "@/store/downloads";
 import { useLogsStore } from "@/store/logs";
 import { join } from "@tauri-apps/api/path";
 import { BaseDirectory, exists } from "@tauri-apps/plugin-fs";
 import { downloadUrlToFile } from "@/lib/commands";
 import { isInstagramUrl } from "@/lib/media-engine";
+import { getExplicitOutputPaths } from "@/lib/output-paths";
 import { resolveTool, ytDlpEnv, isYouTubeUrl } from "./tool-env";
 import { fetchInstagramMediaInfo } from "./instagram";
 import {
@@ -12,6 +14,9 @@ import {
   thumbnailAssetUrl,
   generateThumbnailFromMediaUrl,
 } from "./thumbnails";
+
+const IMAGE_FILE_EXTENSIONS = new Set(["jpg", "jpeg", "png", "webp", "gif", "bmp", "avif"]);
+const VIDEO_FILE_EXTENSIONS = new Set(["mp4", "mov", "webm", "mkv", "avi", "m4v"]);
 
 export interface MediaMetadataProbe {
   title: string;
@@ -59,6 +64,19 @@ function extractLanguageKeys(value: unknown): string[] {
     .map((key) => key.trim())
     .filter(Boolean)
     .sort((a, b) => a.localeCompare(b));
+}
+
+function getExtension(path: string): string {
+  const cleanPath = path.split("?")[0]?.split("#")[0] ?? "";
+  const match = cleanPath.match(/\.([a-z0-9]+)$/i);
+  return match?.[1]?.toLowerCase() ?? "";
+}
+
+function findLocalOutputByExtension(
+  value: { outputPath?: string; outputPaths?: string[] },
+  extensions: Set<string>
+): string | undefined {
+  return getExplicitOutputPaths(value).find((path) => extensions.has(getExtension(path)));
 }
 
 export async function fetchMediaInfo(url: string): Promise<MediaMetadataProbe> {
@@ -175,6 +193,31 @@ export async function fetchMetadata(jobId: string) {
       return;
     }
 
+    const localImagePath = findLocalOutputByExtension(job, IMAGE_FILE_EXTENSIONS);
+    if (localImagePath) {
+      addLog({ level: "info", message: `[meta] Using downloaded image as thumbnail`, jobId });
+      updateJob(jobId, {
+        thumbnail: thumbnailAssetUrlFromAbsolutePath(localImagePath),
+        thumbnailStatus: "ready",
+      });
+      return;
+    }
+
+    const localVideoPath = findLocalOutputByExtension(job, VIDEO_FILE_EXTENSIONS);
+    if (localVideoPath) {
+      if (ffmpeg.isLocal) {
+        addLog({ level: "info", message: `[meta] Generating thumbnail from downloaded file`, jobId });
+        await generateThumbnailFromMediaUrl(jobId, localVideoPath);
+        return;
+      }
+
+      updateJob(jobId, {
+        thumbnailStatus: "failed",
+        thumbnailError: "FFmpeg is unavailable for thumbnail generation",
+      });
+      return;
+    }
+
     addLog({ level: "warn", message: `[meta] No usable thumbnail URL from metadata probe`, jobId });
 
     if (isYouTubeUrl(job.url)) {
@@ -244,4 +287,8 @@ export async function fetchMetadata(jobId: string) {
       thumbnailError: message,
     });
   }
+}
+
+function thumbnailAssetUrlFromAbsolutePath(path: string): string {
+  return convertFileSrc(path);
 }

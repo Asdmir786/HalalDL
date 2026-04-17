@@ -17,6 +17,21 @@ pub struct DownloadProgress {
 }
 
 const MAX_DOWNLOAD_RETRIES: u8 = 3;
+const BROWSER_USER_AGENT: &str =
+    "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/136.0.0.0 Safari/537.36 HalalDL/1.0";
+const DEFAULT_ACCEPT_LANGUAGE: &str = "en-US,en;q=0.9";
+
+fn sanitize_header_value(value: Option<String>, fallback: &'static str) -> String {
+    value
+        .map(|raw| {
+            raw.chars()
+                .filter(|ch| ch.is_ascii() && !matches!(ch, '\r' | '\n'))
+                .collect::<String>()
+        })
+        .map(|clean| clean.trim().to_string())
+        .filter(|clean| !clean.is_empty())
+        .unwrap_or_else(|| fallback.to_string())
+}
 
 pub fn emit_progress(app_handle: &tauri::AppHandle, tool: &str, percentage: f64, status: &str) {
     let _ = app_handle.emit(
@@ -35,17 +50,28 @@ pub async fn download_url_to_file(
     url: String,
     dest: String,
     referer: Option<String>,
+    user_agent: Option<String>,
+    accept_language: Option<String>,
 ) -> Result<String, String> {
     use tokio::io::AsyncWriteExt;
 
+    let user_agent = sanitize_header_value(user_agent, BROWSER_USER_AGENT);
+    let accept_language = sanitize_header_value(accept_language, DEFAULT_ACCEPT_LANGUAGE);
     let client = reqwest::Client::builder()
         .danger_accept_invalid_certs(true)
         .build()
         .map_err(|e| format!("HTTP client error: {}", e))?;
 
-    let mut req = client.get(&url);
+    let mut req = client
+        .get(&url)
+        .header(
+            reqwest::header::ACCEPT,
+            "image/avif,image/webp,image/apng,image/svg+xml,image/*,video/*,audio/*,*/*;q=0.8",
+        )
+        .header(reqwest::header::ACCEPT_LANGUAGE, accept_language)
+        .header(reqwest::header::USER_AGENT, user_agent);
     if let Some(ref r) = referer {
-        req = req.header("Referer", r);
+        req = req.header(reqwest::header::REFERER, r);
     }
 
     let resp = req
@@ -54,6 +80,15 @@ pub async fn download_url_to_file(
         .map_err(|e| format!("Download failed: {}", e))?;
     if !resp.status().is_success() {
         return Err(format!("HTTP {}: {}", resp.status(), url));
+    }
+    if let Some(content_type) = resp.headers().get(reqwest::header::CONTENT_TYPE) {
+        let content_type = content_type.to_str().unwrap_or("").to_ascii_lowercase();
+        if content_type.starts_with("text/html") || content_type.starts_with("application/json") {
+            return Err(format!(
+                "Unexpected response type while downloading media: {}",
+                content_type
+            ));
+        }
     }
 
     let dest_path = Path::new(&dest);
@@ -98,7 +133,11 @@ pub async fn post_form_for_text(
     body: String,
     referer: Option<String>,
     origin: Option<String>,
+    user_agent: Option<String>,
+    accept_language: Option<String>,
 ) -> Result<String, String> {
+    let user_agent = sanitize_header_value(user_agent, BROWSER_USER_AGENT);
+    let accept_language = sanitize_header_value(accept_language, DEFAULT_ACCEPT_LANGUAGE);
     let client = reqwest::Client::builder()
         .danger_accept_invalid_certs(true)
         .build()
@@ -110,14 +149,9 @@ pub async fn post_form_for_text(
             reqwest::header::CONTENT_TYPE,
             "application/x-www-form-urlencoded; charset=UTF-8",
         )
-        .header(
-            reqwest::header::ACCEPT,
-            "text/html, text/plain, */*",
-        )
-        .header(
-            reqwest::header::USER_AGENT,
-            "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/136.0.0.0 Safari/537.36 HalalDL/1.0",
-        )
+        .header(reqwest::header::ACCEPT, "text/html, text/plain, */*")
+        .header(reqwest::header::ACCEPT_LANGUAGE, accept_language)
+        .header(reqwest::header::USER_AGENT, user_agent)
         .body(body);
 
     if let Some(ref r) = referer {

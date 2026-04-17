@@ -89,8 +89,40 @@ export async function cleanupAllBackups(): Promise<string> {
   return invoke<string>("cleanup_all_backups", { extraPaths: getExtraBackupPaths() });
 }
 
+function getBrowserRequestHeaders(): { userAgent: string | null; acceptLanguage: string | null } {
+  const userAgent = typeof navigator !== "undefined" ? navigator.userAgent.trim() : "";
+  const languages =
+    typeof navigator !== "undefined" && Array.isArray(navigator.languages)
+      ? navigator.languages
+      : [];
+  const languageParts = languages
+    .map((language) => language.trim())
+    .filter(Boolean)
+    .slice(0, 6);
+
+  if (languageParts.length === 0 && typeof navigator !== "undefined" && navigator.language) {
+    languageParts.push(navigator.language.trim());
+  }
+
+  const acceptLanguage = languageParts
+    .map((language, index) => index === 0 ? language : `${language};q=${Math.max(0.1, 1 - index * 0.1).toFixed(1)}`)
+    .join(",");
+
+  return {
+    userAgent: userAgent || null,
+    acceptLanguage: acceptLanguage || null,
+  };
+}
+
 export async function downloadUrlToFile(url: string, dest: string, referer?: string): Promise<string> {
-  return invoke<string>("download_url_to_file", { url, dest, referer: referer ?? null });
+  const { userAgent, acceptLanguage } = getBrowserRequestHeaders();
+  return invoke<string>("download_url_to_file", {
+    url,
+    dest,
+    referer: referer ?? null,
+    userAgent,
+    acceptLanguage,
+  });
 }
 
 export async function postFormForText(
@@ -99,10 +131,13 @@ export async function postFormForText(
   referer?: string,
   origin?: string
 ): Promise<string> {
+  const { userAgent, acceptLanguage } = getBrowserRequestHeaders();
   return invoke<string>("post_form_for_text", {
     url,
     body,
     referer: referer ?? null,
     origin: origin ?? null,
+    userAgent,
+    acceptLanguage,
   });
 }

@@ -8,6 +8,7 @@ interface DownloadGramProvider {
   endpoint: string;
   referer: string;
   origin: string;
+  formFields?: Record<string, string>;
 }
 
 export interface InstagramMediaItem {
@@ -36,7 +37,7 @@ const DOWNLOADGRAM_PROVIDERS: readonly DownloadGramProvider[] = [
   {
     id: "downloadgram-app",
     endpoint: "https://api.downloadgram.app/media",
-    referer: "https://www.downloadgram.app/instagram-downloader/",
+    referer: "https://www.downloadgram.app/",
     origin: "https://www.downloadgram.app",
   },
   {
@@ -44,6 +45,9 @@ const DOWNLOADGRAM_PROVIDERS: readonly DownloadGramProvider[] = [
     endpoint: "https://api.downloadgram.org/media",
     referer: "https://downloadgram.org/",
     origin: "https://downloadgram.org",
+    formFields: {
+      v: "3",
+    },
   },
 ] as const;
 
@@ -73,6 +77,7 @@ export async function resolveInstagramWithDownloadgram(
     try {
       const body = new URLSearchParams({
         url,
+        ...provider.formFields,
         lang: "en",
       }).toString();
       const responseText = await postFormForText(

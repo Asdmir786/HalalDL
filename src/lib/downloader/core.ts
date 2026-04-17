@@ -471,7 +471,7 @@ export async function startDownload(jobId: string) {
       progress: 100,
       ffmpegProgressKnown: undefined,
     });
-    fetchMetadata(jobId);
+    await fetchMetadata(jobId);
 
     setTimeout(() => {
       const { settings } = useSettingsStore.getState();
