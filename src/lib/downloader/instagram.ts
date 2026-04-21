@@ -5,7 +5,7 @@ import type { DownloadJob } from "@/store/downloads";
 import type { Preset } from "@/store/presets";
 import type { Settings } from "@/store/settings";
 import type { SubtitlePreferences } from "@/lib/subtitles";
-import { deleteFile, downloadUrlToFile } from "@/lib/commands";
+import { deleteFile, downloadUrlToFile, writeTextFile } from "@/lib/commands";
 import { ensureFilenameTemplateExtension } from "@/lib/output-paths";
 import {
   extractInstagramShortcode,
@@ -389,9 +389,22 @@ export async function downloadInstagramJob(options: {
     resolved.kind === "carousel"
       ? outputPath
       : (firstWrittenPath ?? outputPath);
+  const resolvedOutputPaths = writtenPaths.length ? writtenPaths : [lastKnownOutputPath];
+
+  if (settings.saveMetadataFiles) {
+    await writeInstagramMetadataBackup({
+      job,
+      title,
+      resolved,
+      outputPath: lastKnownOutputPath,
+      outputPaths: resolvedOutputPaths,
+      addLog,
+    });
+  }
+
   updateJob(job.id, {
     outputPath: lastKnownOutputPath,
-    outputPaths: writtenPaths.length ? writtenPaths : [lastKnownOutputPath],
+    outputPaths: resolvedOutputPaths,
     title,
     progress: 100,
     phase: "Generating thumbnail",
@@ -401,9 +414,55 @@ export async function downloadInstagramJob(options: {
   return {
     code: 0,
     lastKnownOutputPath,
-    outputPaths: writtenPaths.length ? writtenPaths : [lastKnownOutputPath],
+    outputPaths: resolvedOutputPaths,
     resolved,
   };
+}
+
+async function writeInstagramMetadataBackup(options: {
+  job: DownloadJob;
+  title: string;
+  resolved: InstagramResolveResult;
+  outputPath: string;
+  outputPaths: string[];
+  addLog: (entry: {
+    level: "info" | "warn" | "error" | "debug" | "command";
+    message: string;
+    jobId?: string;
+    command?: string;
+  }) => void;
+}) {
+  const { job, title, resolved, outputPath, outputPaths, addLog } = options;
+  const sidecarBase =
+    resolved.kind === "carousel"
+      ? await join(outputPath, "instagram")
+      : outputPath.replace(/\.[^./\\]+$/, "");
+  const sidecarPath = `${sidecarBase}.info.json`;
+
+  const payload = {
+    extractor: "downloadgram",
+    webpage_url: job.url,
+    title,
+    kind: resolved.kind,
+    shortcode: resolved.shortcode,
+    provider: resolved.providerInstance,
+    output_paths: outputPaths,
+    items: resolved.items.map((item) => ({
+      index: item.index,
+      type: item.type,
+      id: item.id,
+      source_url: item.sourceUrl,
+      thumbnail_url: item.thumbnailUrl,
+      suggested_filename: item.suggestedFilename,
+    })),
+  };
+
+  try {
+    await writeTextFile(sidecarPath, JSON.stringify(payload, null, 2));
+    addLog({ level: "info", message: `Instagram metadata backup saved: ${sidecarPath}`, jobId: job.id });
+  } catch (error) {
+    addLog({ level: "warn", message: `Instagram metadata backup failed: ${String(error)}`, jobId: job.id });
+  }
 }
 
 async function runWithConcurrency<T>(

@@ -5,6 +5,7 @@ export interface HistoryEntry {
   url: string;
   title: string;
   thumbnail?: string;
+  thumbnailSheet?: string;
   format?: string;
   fileSize?: number;
   outputPath?: string;

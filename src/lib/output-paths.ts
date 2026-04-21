@@ -7,6 +7,7 @@ type OutputPathLike = {
 
 type ThumbnailSourceLike = OutputPathLike & {
   thumbnail?: string;
+  thumbnailSheet?: string;
 };
 
 const IMAGE_FILE_EXTENSIONS = new Set([

@@ -2,6 +2,7 @@ import { Command } from "@tauri-apps/plugin-shell";
 import { convertFileSrc } from "@tauri-apps/api/core";
 import { useDownloadsStore } from "@/store/downloads";
 import { useLogsStore } from "@/store/logs";
+import { useSettingsStore } from "@/store/settings";
 import { join } from "@tauri-apps/api/path";
 import { BaseDirectory, exists } from "@tauri-apps/plugin-fs";
 import { downloadUrlToFile } from "@/lib/commands";
@@ -12,6 +13,7 @@ import { fetchInstagramMediaInfo } from "./instagram";
 import {
   ensureThumbnailDir,
   thumbnailAssetUrl,
+  generateThumbnailContactSheet,
   generateThumbnailFromMediaUrl,
 } from "./thumbnails";
 
@@ -129,8 +131,20 @@ export async function fetchMetadata(jobId: string) {
 
     const ffmpeg = await resolveTool("ffmpeg");
     const thumbsDir = await ensureThumbnailDir();
+    const shouldGenerateContactSheet = useSettingsStore.getState().settings.generateThumbnailContactSheets;
     let title = "";
     let thumbnailUrl = "";
+
+    const maybeGenerateContactSheet = async () => {
+      if (!shouldGenerateContactSheet) return;
+      const localVideoPath = findLocalOutputByExtension(
+        useDownloadsStore.getState().jobs.find((j) => j.id === jobId) ?? job,
+        VIDEO_FILE_EXTENSIONS
+      );
+      if (!localVideoPath) return;
+      addLog({ level: "info", message: "[meta] Generating thumbnail contact sheet", jobId });
+      await generateThumbnailContactSheet(jobId, localVideoPath);
+    };
 
     addLog({ level: "info", message: `[meta] Starting metadata fetch for ${job.url}`, jobId });
 
@@ -183,6 +197,7 @@ export async function fetchMetadata(jobId: string) {
         if (await exists(thumbRelPath, { baseDir: BaseDirectory.AppData })) {
           const assetUrl = await thumbnailAssetUrl(thumbRelPath);
           updateJob(jobId, { thumbnail: assetUrl, thumbnailStatus: "ready" });
+          await maybeGenerateContactSheet();
           return;
         }
       } catch (e) {
@@ -190,6 +205,7 @@ export async function fetchMetadata(jobId: string) {
       }
 
       updateJob(jobId, { thumbnail: thumbnailUrl, thumbnailStatus: "ready" });
+      await maybeGenerateContactSheet();
       return;
     }
 

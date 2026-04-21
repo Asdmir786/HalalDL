@@ -62,6 +62,7 @@ export interface DownloadJob {
   };
   thumbnailStatus?: ThumbnailStatus;
   thumbnailError?: string;
+  thumbnailSheet?: string;
   fallbackUsed?: boolean;
   fallbackFormat?: string;
   ffmpegProgressKnown?: boolean;

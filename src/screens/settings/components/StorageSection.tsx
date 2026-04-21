@@ -1,5 +1,6 @@
-import { HardDrive, FolderOpen, FolderCog, Search } from "lucide-react";
+import { Archive, FileJson, HardDrive, FolderOpen, FolderCog, Images, Search } from "lucide-react";
 import { Input } from "@/components/ui/input";
+import { Switch } from "@/components/ui/switch";
 import { MotionButton } from "@/components/motion/MotionButton";
 import { open } from "@tauri-apps/plugin-dialog";
 import { SettingsSection } from "./SettingsSection";
@@ -10,9 +11,26 @@ interface StorageSectionProps {
   onDirectoryChange: (dir: string) => void;
   tempDir: string;
   onTempDirChange: (dir: string) => void;
+  skipDownloadedBefore: boolean;
+  onSkipDownloadedBeforeChange: (value: boolean) => void;
+  saveMetadataFiles: boolean;
+  onSaveMetadataFilesChange: (value: boolean) => void;
+  generateThumbnailContactSheets: boolean;
+  onGenerateThumbnailContactSheetsChange: (value: boolean) => void;
 }
 
-export function StorageSection({ defaultDownloadDir, onDirectoryChange, tempDir, onTempDirChange }: StorageSectionProps) {
+export function StorageSection({
+  defaultDownloadDir,
+  onDirectoryChange,
+  tempDir,
+  onTempDirChange,
+  skipDownloadedBefore,
+  onSkipDownloadedBeforeChange,
+  saveMetadataFiles,
+  onSaveMetadataFilesChange,
+  generateThumbnailContactSheets,
+  onGenerateThumbnailContactSheetsChange,
+}: StorageSectionProps) {
   return (
     <SettingsSection id="storage" icon={HardDrive} title="Storage" description="Where your downloads and temporary files are saved.">
       <SettingRow icon={FolderOpen} label="Download Directory" description="Where completed downloads are saved by default." vertical>
@@ -59,6 +77,30 @@ export function StorageSection({ defaultDownloadDir, onDirectoryChange, tempDir,
             Browse
           </MotionButton>
         </div>
+      </SettingRow>
+
+      <SettingRow
+        icon={Archive}
+        label="Download Archive"
+        description="Remember completed URLs and yt-dlp media IDs so repeats are skipped cleanly."
+      >
+        <Switch checked={skipDownloadedBefore} onCheckedChange={onSkipDownloadedBeforeChange} />
+      </SettingRow>
+
+      <SettingRow
+        icon={FileJson}
+        label="Metadata Backup"
+        description="Save info JSON, description, thumbnails, and embedded metadata when yt-dlp supports it."
+      >
+        <Switch checked={saveMetadataFiles} onCheckedChange={onSaveMetadataFilesChange} />
+      </SettingRow>
+
+      <SettingRow
+        icon={Images}
+        label="Thumbnail Contact Sheets"
+        description="Generate a 3x3 preview sheet for downloaded videos when FFmpeg is available."
+      >
+        <Switch checked={generateThumbnailContactSheets} onCheckedChange={onGenerateThumbnailContactSheetsChange} />
       </SettingRow>
     </SettingsSection>
   );

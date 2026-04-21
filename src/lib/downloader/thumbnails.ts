@@ -6,6 +6,7 @@ import { BaseDirectory, exists, mkdir } from "@tauri-apps/plugin-fs";
 import { convertFileSrc } from "@tauri-apps/api/core";
 import { deleteFile } from "@/lib/commands";
 import { resolveTool } from "./tool-env";
+import { useSettingsStore } from "@/store/settings";
 
 export async function ensureThumbnailDir(): Promise<string> {
   if (!(await exists("thumbnails", { baseDir: BaseDirectory.AppData }))) {
@@ -29,6 +30,7 @@ export async function thumbnailAssetUrl(relPath: string): Promise<string> {
 export async function generateThumbnailFromMediaUrl(jobId: string, mediaUrl: string) {
   const { updateJob } = useDownloadsStore.getState();
   const { addLog } = useLogsStore.getState();
+  const shouldGenerateContactSheet = useSettingsStore.getState().settings.generateThumbnailContactSheets;
 
   try {
     updateJob(jobId, {
@@ -68,6 +70,9 @@ export async function generateThumbnailFromMediaUrl(jobId: string, mediaUrl: str
       addLog({ level: "info", message: `[thumb] Primary extraction succeeded`, jobId });
       const assetUrl = await thumbnailAssetUrl(outputRelativePath);
       updateJob(jobId, { thumbnail: assetUrl, thumbnailStatus: "ready" });
+      if (shouldGenerateContactSheet) {
+        await generateThumbnailContactSheet(jobId, mediaUrl);
+      }
       return;
     }
 
@@ -95,6 +100,9 @@ export async function generateThumbnailFromMediaUrl(jobId: string, mediaUrl: str
       addLog({ level: "info", message: `[thumb] Fallback extraction succeeded`, jobId });
       const assetUrl = await thumbnailAssetUrl(outputRelativePath);
       updateJob(jobId, { thumbnail: assetUrl, thumbnailStatus: "ready" });
+      if (shouldGenerateContactSheet) {
+        await generateThumbnailContactSheet(jobId, mediaUrl);
+      }
       return;
     }
 
@@ -112,6 +120,49 @@ export async function generateThumbnailFromMediaUrl(jobId: string, mediaUrl: str
   }
 }
 
+export async function generateThumbnailContactSheet(jobId: string, mediaUrl: string) {
+  const { updateJob } = useDownloadsStore.getState();
+  const { addLog } = useLogsStore.getState();
+
+  try {
+    const ffmpeg = await resolveTool("ffmpeg");
+    const thumbsDir = await ensureThumbnailDir();
+    const outputPath = await join(thumbsDir, `${jobId}-sheet.jpg`);
+    const outputRelativePath = `thumbnails/${jobId}-sheet.jpg`;
+    const filter = "fps=1/10,scale=180:-1:force_original_aspect_ratio=decrease,tile=3x3:padding=6:margin=6";
+
+    addLog({ level: "info", message: `[thumb] ffmpeg contact sheet: ${outputPath}`, jobId });
+
+    const command = Command.create(ffmpeg.command, [
+      "-y",
+      "-i",
+      mediaUrl,
+      "-frames:v",
+      "1",
+      "-vf",
+      filter,
+      outputPath,
+    ]);
+
+    const result = await command.execute();
+    addLog({ level: "info", message: `[thumb] ffmpeg contact sheet exit code: ${result.code}`, jobId });
+    if (result.stderr.trim()) {
+      addLog({ level: "info", message: `[thumb] contact sheet stderr (tail): ${result.stderr.trim().slice(-300)}`, jobId });
+    }
+
+    if (result.code === 0 && (await exists(outputRelativePath, { baseDir: BaseDirectory.AppData }))) {
+      const assetUrl = await thumbnailAssetUrl(outputRelativePath);
+      updateJob(jobId, { thumbnailSheet: assetUrl });
+      addLog({ level: "info", message: "[thumb] Contact sheet ready", jobId });
+      return;
+    }
+
+    addLog({ level: "warn", message: "[thumb] Contact sheet generation failed", jobId });
+  } catch (e) {
+    addLog({ level: "warn", message: `[thumb] Contact sheet exception: ${String(e)}`, jobId });
+  }
+}
+
 export async function cleanupThumbnailByJobId(jobId: string) {
   const { addLog } = useLogsStore.getState();
   try {
@@ -122,6 +173,11 @@ export async function cleanupThumbnailByJobId(jobId: string) {
         const absPath = await join(dataDir, relPath);
         await deleteFile(absPath);
       }
+    }
+    const sheetRelPath = `thumbnails/${jobId}-sheet.jpg`;
+    if (await exists(sheetRelPath, { baseDir: BaseDirectory.AppData })) {
+      const absPath = await join(dataDir, sheetRelPath);
+      await deleteFile(absPath);
     }
   } catch (e) {
     addLog({ level: "warn", message: `Thumbnail cleanup failed: ${String(e)}`, jobId });

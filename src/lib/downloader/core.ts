@@ -20,6 +20,7 @@ import { createId } from "@/lib/id";
 import type { DownloadJob } from "@/store/downloads";
 import { ensureFilenameTemplateExtension, getExplicitOutputPaths } from "@/lib/output-paths";
 import { buildClipSection } from "@/lib/clip";
+import { addUrlToAppArchive, getYtDlpArchivePath, isUrlInAppArchive } from "./archive";
 import {
   normalizeSubtitlePreferences,
   resolveSubtitleLanguages,
@@ -472,6 +473,11 @@ export async function startDownload(jobId: string) {
       ffmpegProgressKnown: undefined,
     });
     await fetchMetadata(jobId);
+    if (settings.skipDownloadedBefore) {
+      await addUrlToAppArchive(job.url).catch((error) => {
+        addLog({ level: "warn", message: `Failed to update app download archive: ${String(error)}`, jobId });
+      });
+    }
 
     setTimeout(() => {
       const { settings } = useSettingsStore.getState();
@@ -547,6 +553,7 @@ export async function startDownload(jobId: string) {
         url: doneJob.url,
         title: doneJob.title || doneJob.url,
         thumbnail: doneJob.thumbnail,
+        thumbnailSheet: doneJob.thumbnailSheet,
         format: doneJob.overrides?.format || doneJob.fallbackFormat,
         fileSize,
         outputPath: finalPath,
@@ -562,6 +569,28 @@ export async function startDownload(jobId: string) {
       };
       useHistoryStore.getState().addEntry(entry);
     }
+  };
+
+  const finalizeSkippedDownload = async (detail = "Already downloaded before") => {
+    updateJob(jobId, {
+      status: "Done",
+      phase: "Resolving formats",
+      statusDetail: detail,
+      progress: 100,
+      speed: undefined,
+      eta: undefined,
+      thumbnailStatus: "ready",
+      ffmpegProgressKnown: undefined,
+    });
+    useAttentionStore.getState().setTarget({
+      screen: "downloads",
+      targetType: "job",
+      targetId: jobId,
+      section: "recent",
+      reason: "download-finished",
+      actionLabel: "Show download",
+    });
+    addLog({ level: "info", message: `Skipped by download archive: ${job.url}`, jobId });
   };
 
   const finalizeFailedDownload = async (failDetail: string) => {
@@ -595,6 +624,17 @@ export async function startDownload(jobId: string) {
       useHistoryStore.getState().addEntry(entry);
     }
   };
+
+  if (settings.skipDownloadedBefore) {
+    try {
+      if (await isUrlInAppArchive(job.url)) {
+        await finalizeSkippedDownload();
+        return;
+      }
+    } catch (error) {
+      addLog({ level: "warn", message: `Could not read app download archive: ${String(error)}`, jobId });
+    }
+  }
 
   if (isInstagramUrl(job.url)) {
     const instagramResult = await downloadInstagramJob({
@@ -835,7 +875,26 @@ export async function startDownload(jobId: string) {
 
   args.push("--ignore-config", "--newline", "--no-colors", "--no-playlist");
   args.push("--print", "after_move:__HALALDL_OUTPUT__:%(filepath)s");
+  args.push(
+    "--progress-template",
+    "download:__HALALDL_PROGRESS__:%(progress._percent_str)s|%(progress._speed_str)s|%(progress._eta_str)s"
+  );
 
+  if (settings.skipDownloadedBefore) {
+    args.push("--download-archive", await getYtDlpArchivePath());
+    addLog({ level: "info", message: "Download archive enabled", jobId });
+  }
+
+  if (settings.saveMetadataFiles) {
+    args.push(
+      "--write-info-json",
+      "--write-description",
+      "--write-thumbnail",
+      "--embed-metadata",
+      "--embed-thumbnail"
+    );
+    addLog({ level: "info", message: "Metadata backup enabled", jobId });
+  }
   if (settings.maxSpeed && settings.maxSpeed > 0) {
     args.push("--limit-rate", `${settings.maxSpeed}K`);
   }
@@ -947,6 +1006,7 @@ export async function startDownload(jobId: string) {
     let lastKnownOutputPath: string | undefined;
     let formatUnavailable = false;
     let aria2Error = false;
+    let archiveSkipped = false;
 
     const outputParser = new OutputParser();
     let lastUpdate = 0;
@@ -986,6 +1046,9 @@ export async function startDownload(jobId: string) {
 
       if (update.outputPath) {
         lastKnownOutputPath = update.outputPath;
+      }
+      if (update.archiveSkipped) {
+        archiveSkipped = true;
       }
 
       if (update.progress || update.speed || update.eta) {
@@ -1028,6 +1091,9 @@ export async function startDownload(jobId: string) {
       if (update.outputPath) {
         lastKnownOutputPath = update.outputPath;
       }
+      if (update.archiveSkipped) {
+        archiveSkipped = true;
+      }
 
       if (update.progress || update.speed || update.eta) {
         if (shouldUpdate) {
@@ -1058,6 +1124,7 @@ export async function startDownload(jobId: string) {
       lastKnownOutputPath?: string;
       formatUnavailable: boolean;
       aria2Error: boolean;
+      archiveSkipped: boolean;
     }>((resolve) => {
       let settled = false;
       let childRef: Child | null = null;
@@ -1067,7 +1134,7 @@ export async function startDownload(jobId: string) {
         if (childRef && activeYtDlpChildren.get(jobId)?.pid === childRef.pid) {
           activeYtDlpChildren.delete(jobId);
         }
-        resolve({ code, lastKnownOutputPath, formatUnavailable, aria2Error });
+        resolve({ code, lastKnownOutputPath, formatUnavailable, aria2Error, archiveSkipped });
       };
 
       cmd.on("close", (data) => {
@@ -1355,7 +1422,9 @@ export async function startDownload(jobId: string) {
     }
   }
 
-  if (result.code === 0) {
+  if (result.code === 0 && result.archiveSkipped) {
+    await finalizeSkippedDownload();
+  } else if (result.code === 0) {
     await finalizeSuccessfulDownload(result.lastKnownOutputPath);
   } else {
     if (await finalizeHoldRequest()) {

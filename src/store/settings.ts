@@ -30,6 +30,9 @@ export interface Settings {
   maxRetries: number;
   maxSpeed: number; // in KB/s, 0 = unlimited
   fileCollision: FileCollisionAction;
+  skipDownloadedBefore: boolean;
+  saveMetadataFiles: boolean;
+  generateThumbnailContactSheets: boolean;
   
   // Paths
   defaultDownloadDir: string;
@@ -75,6 +78,9 @@ export const DEFAULT_SETTINGS: Settings = {
   maxRetries: 3,
   maxSpeed: 0,
   fileCollision: "rename",
+  skipDownloadedBefore: false,
+  saveMetadataFiles: false,
+  generateThumbnailContactSheets: false,
   defaultDownloadDir: "", 
   tempDir: "",
   autoClearFinished: false,

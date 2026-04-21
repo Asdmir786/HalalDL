@@ -6,14 +6,18 @@ export interface DownloadUpdate {
   title?: string;
   outputPath?: string;
   status?: "Post-processing" | "Downloading";
+  statusDetail?: string;
+  archiveSkipped?: boolean;
 }
 
 export class OutputParser {
   private static PROGRESS_REGEX = /\[download\]\s+(\d+\.\d+)%/;
   private static SPEED_REGEX = /at\s+([\d.]+\w+\/s)/;
   private static ETA_REGEX = /ETA\s+(\d+:\d+)/;
+  private static STRUCTURED_PROGRESS_MARKER = "__HALALDL_PROGRESS__:";
   private static DESTINATION_REGEX = /\[download\]\s+(?:Destination:|.*has already been downloaded(?: and merged into)?)\s+(.*)$/;
   private static ALREADY_DOWNLOADED_REGEX = /\[download\]\s+(.*?)\s+has already been downloaded$/;
+  private static ARCHIVE_SKIPPED_REGEX = /has already been recorded in (?:the )?archive/i;
   private static MERGER_REGEX = /^\[Merger\] Merging formats into "(.*)"\s*$/;
   private static GENERIC_DESTINATION_REGEX = /^\[[^\]]+\]\s+Destination:\s+(.*)$/;
   private static HALALDL_OUTPUT_MARKER = "__HALALDL_OUTPUT__:";
@@ -21,6 +25,25 @@ export class OutputParser {
   parse(line: string): DownloadUpdate | null {
     const update: DownloadUpdate = {};
     let hasUpdate = false;
+
+    const structuredIndex = line.indexOf(OutputParser.STRUCTURED_PROGRESS_MARKER);
+    if (structuredIndex !== -1) {
+      const payload = line.slice(structuredIndex + OutputParser.STRUCTURED_PROGRESS_MARKER.length);
+      const [percentRaw, speedRaw, etaRaw] = payload.split("|").map((part) => part?.trim() ?? "");
+      const percent = Number.parseFloat(percentRaw.replace("%", ""));
+      if (Number.isFinite(percent)) {
+        update.progress = Math.max(0, Math.min(100, percent));
+        hasUpdate = true;
+      }
+      if (speedRaw && speedRaw !== "NA" && speedRaw !== "Unknown B/s") {
+        update.speed = speedRaw;
+        hasUpdate = true;
+      }
+      if (etaRaw && etaRaw !== "NA" && etaRaw !== "Unknown") {
+        update.eta = etaRaw;
+        hasUpdate = true;
+      }
+    }
 
     const markerIndex = line.indexOf(OutputParser.HALALDL_OUTPUT_MARKER);
     if (markerIndex !== -1) {
@@ -87,6 +110,12 @@ export class OutputParser {
       const path = this.cleanPath(alreadyMatch[1]);
       update.outputPath = path;
       update.title = this.extractTitle(path);
+      hasUpdate = true;
+    }
+
+    if (OutputParser.ARCHIVE_SKIPPED_REGEX.test(line)) {
+      update.archiveSkipped = true;
+      update.statusDetail = "Already downloaded before";
       hasUpdate = true;
     }
 

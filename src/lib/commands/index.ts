@@ -46,6 +46,8 @@ export {
   readTextFromClipboard,
   deleteFile,
   renameFile,
+  writeTextFile,
+  readTextFile,
 } from "./file-commands";
 export {
   syncRuntimeSettings,

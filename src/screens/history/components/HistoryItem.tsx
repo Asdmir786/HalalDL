@@ -1,7 +1,7 @@
 import {
   RotateCcw, FolderOpen, Copy, Link, Trash2,
   FileText, CheckCircle2, XCircle, Clock, Globe, Play,
-  Star, Pencil, FileMinus
+  Star, Pencil, FileMinus, Images
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { type HistoryEntry, useHistoryStore } from "@/store/history";
@@ -14,6 +14,7 @@ import { useDownloadsStore } from "@/store/downloads";
 import { useNavigationStore } from "@/store/navigation";
 import { toast } from "sonner";
 import { Checkbox } from "@/components/ui/checkbox";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { HistoryDetails } from "./HistoryDetails";
 import { useState } from "react";
 import { getExplicitOutputPaths, getPreferredThumbnailSource } from "@/lib/output-paths";
@@ -44,6 +45,7 @@ export function HistoryItem({
   onToggleSelection
 }: HistoryItemProps) {
   const [detailsOpen, setDetailsOpen] = useState(false);
+  const [sheetOpen, setSheetOpen] = useState(false);
   const addJob = useDownloadsStore((s) => s.addJob);
   const setScreen = useNavigationStore((s) => s.setScreen);
   const toggleFavorite = useHistoryStore((s) => s.toggleFavorite);
@@ -105,6 +107,7 @@ export function HistoryItem({
   const relative = formatRelativeTime(entry.downloadedAt);
   const sizeStr = formatBytes(entry.fileSize);
   const displayThumbnail = getPreferredThumbnailSource(entry);
+  const hasThumbnailSheet = Boolean(entry.thumbnailSheet);
 
   return (
     <>
@@ -274,6 +277,11 @@ export function HistoryItem({
           </ContextMenuItem>
         )}
         <ContextMenuSeparator />
+        {hasThumbnailSheet && (
+          <ContextMenuItem onClick={() => setSheetOpen(true)}>
+            <Images className="w-3.5 h-3.5 mr-2" /> View Contact Sheet
+          </ContextMenuItem>
+        )}
         <ContextMenuItem onClick={() => setDetailsOpen(true)}>
           <Pencil className="w-3.5 h-3.5 mr-2" /> Details & Notes
         </ContextMenuItem>
@@ -300,6 +308,20 @@ export function HistoryItem({
         fileExists={fileExists}
       />
     )}
+    <Dialog open={sheetOpen} onOpenChange={setSheetOpen}>
+      <DialogContent className="max-w-3xl">
+        <DialogHeader>
+          <DialogTitle>Contact Sheet</DialogTitle>
+        </DialogHeader>
+        {entry.thumbnailSheet && (
+          <img
+            src={entry.thumbnailSheet}
+            alt="Thumbnail contact sheet"
+            className="w-full rounded-lg border border-border/60 bg-muted/30"
+          />
+        )}
+      </DialogContent>
+    </Dialog>
     </>
   );
 }

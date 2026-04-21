@@ -244,3 +244,11 @@ export async function deleteFile(path: string) {
 export async function renameFile(from: string, to: string) {
   await invoke("rename_file", { from, to });
 }
+
+export async function writeTextFile(path: string, contents: string) {
+  await invoke("write_text_file", { path, contents });
+}
+
+export async function readTextFile(path: string): Promise<string> {
+  return invoke<string>("read_text_file", { path });
+}

@@ -265,7 +265,13 @@ export function SettingsScreen() {
         group === "appearance"
           ? { theme: defaults.theme, accentColor: defaults.accentColor }
           : group === "storage"
-          ? { defaultDownloadDir: defaults.defaultDownloadDir, tempDir: defaults.tempDir }
+          ? {
+              defaultDownloadDir: defaults.defaultDownloadDir,
+              tempDir: defaults.tempDir,
+              skipDownloadedBefore: defaults.skipDownloadedBefore,
+              saveMetadataFiles: defaults.saveMetadataFiles,
+              generateThumbnailContactSheets: defaults.generateThumbnailContactSheets,
+            }
           : group === "behavior"
           ? {
               notifications: defaults.notifications,
@@ -353,6 +359,12 @@ export function SettingsScreen() {
               onDirectoryChange={(v) => setDraftValue("defaultDownloadDir", v)}
               tempDir={draftSettings.tempDir || ""}
               onTempDirChange={(v) => setDraftValue("tempDir", v)}
+              skipDownloadedBefore={draftSettings.skipDownloadedBefore}
+              onSkipDownloadedBeforeChange={(v) => setDraftValue("skipDownloadedBefore", v)}
+              saveMetadataFiles={draftSettings.saveMetadataFiles}
+              onSaveMetadataFilesChange={(v) => setDraftValue("saveMetadataFiles", v)}
+              generateThumbnailContactSheets={draftSettings.generateThumbnailContactSheets}
+              onGenerateThumbnailContactSheetsChange={(v) => setDraftValue("generateThumbnailContactSheets", v)}
             />
 
             <BehaviorSection

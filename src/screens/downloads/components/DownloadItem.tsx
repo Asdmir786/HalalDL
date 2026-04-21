@@ -4,7 +4,7 @@ import {
   X, FolderOpen, Terminal,
   Copy, RotateCcw, Play,
   Link, Clock, Pause, Square,
-  ArrowUp, ArrowDown, Check, HardDrive, Timer,
+  ArrowUp, ArrowDown, Check, HardDrive, Images, Timer,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { DownloadJob } from "@/store/downloads";
@@ -15,6 +15,7 @@ import { MotionButton } from "@/components/motion/MotionButton";
 import { revealInExplorer, deleteFile, openFile, copyFilesToClipboard } from "@/lib/commands";
 import { getExplicitOutputPaths, getPreferredThumbnailSource } from "@/lib/output-paths";
 import { ContextMenu, ContextMenuContent, ContextMenuItem, ContextMenuTrigger, ContextMenuSeparator } from "@/components/ui/context-menu";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Select, SelectContent, SelectGroup, SelectItem, SelectLabel, SelectSeparator, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { toast } from "sonner";
 import { PRESET_GROUP_LABELS, getPresetGroup, groupPresetsForSelect, resolvePresetById } from "@/lib/preset-display";
@@ -73,6 +74,7 @@ export function DownloadItem({
   const moveJob = useDownloadsStore((s) => s.moveJob);
   const { presets } = usePresetsStore();
   const [thumbErrorSource, setThumbErrorSource] = useState<string | null>(null);
+  const [sheetOpen, setSheetOpen] = useState(false);
   const ts = getJobTs(job);
   const relative = formatRelativeTime(ts);
   const absolute = new Date(ts).toLocaleString();
@@ -133,6 +135,7 @@ export function DownloadItem({
       : "File size";
   const mediaDurationLabel = formatMediaDuration(job.mediaDurationSeconds);
   const showStaticLatestMarker = isLatestDone && !spotlighted && job.status === "Done";
+  const hasThumbnailSheet = Boolean(job.thumbnailSheet);
 
   const handleCopyLink = (url: string) => {
     navigator.clipboard.writeText(url);
@@ -857,6 +860,12 @@ export function DownloadItem({
             </ContextMenuItem>
           )}
           <ContextMenuSeparator />
+          {hasThumbnailSheet && (
+            <ContextMenuItem onClick={() => setSheetOpen(true)}>
+              <Images className="mr-2 h-3.5 w-3.5" />
+              View Contact Sheet
+            </ContextMenuItem>
+          )}
           <ContextMenuItem onClick={() => onViewLogs(job.id)}>
             <Terminal className="mr-2 h-3.5 w-3.5" />
             View Logs
@@ -886,6 +895,20 @@ export function DownloadItem({
           </ContextMenuItem>
         </ContextMenuContent>
       </ContextMenu>
+      <Dialog open={sheetOpen} onOpenChange={setSheetOpen}>
+        <DialogContent className="max-w-3xl">
+          <DialogHeader>
+            <DialogTitle>Contact Sheet</DialogTitle>
+          </DialogHeader>
+          {job.thumbnailSheet && (
+            <img
+              src={job.thumbnailSheet}
+              alt="Thumbnail contact sheet"
+              className="w-full rounded-lg border border-border/60 bg-muted/30"
+            />
+          )}
+        </DialogContent>
+      </Dialog>
     </motion.div>
   );
 }
