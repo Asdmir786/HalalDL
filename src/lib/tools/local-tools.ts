@@ -1,35 +1,19 @@
-import { exists } from "@tauri-apps/plugin-fs";
+import { invoke } from "@tauri-apps/api/core";
 import { APP_MANAGED_TOOL_IDS } from "./app-mode";
-import { getAppPaths } from "@/lib/app-paths";
-
-const TOOL_BIN_NAMES: Record<string, string> = {
-  "yt-dlp": "yt-dlp.exe",
-  ffmpeg: "ffmpeg.exe",
-  aria2: "aria2c.exe",
-  deno: "deno.exe",
-};
 
 export async function isAppManagedToolInstalled(toolId: string): Promise<boolean> {
-  const fileName = TOOL_BIN_NAMES[toolId];
-  if (!fileName) return false;
-
-  const { binDir } = await getAppPaths();
-  const separator = binDir.includes("\\") ? "\\" : "/";
-  const toolPath = `${binDir}${separator}${fileName}`;
-  return exists(toolPath);
+  const missing = await invoke<string[]>("get_missing_app_managed_tools", {
+    toolIds: [toolId],
+  });
+  return !missing.includes(toolId);
 }
 
 export async function getMissingAppManagedToolIds(
   toolIds: readonly string[] = APP_MANAGED_TOOL_IDS
 ): Promise<string[]> {
-  const results = await Promise.all(
-    toolIds.map(async (toolId) => ({
-      toolId,
-      installed: await isAppManagedToolInstalled(toolId),
-    }))
-  );
-
-  return results.filter((entry) => !entry.installed).map((entry) => entry.toolId);
+  return invoke<string[]>("get_missing_app_managed_tools", {
+    toolIds: [...toolIds],
+  });
 }
 
 export function isAppManagedToolPath(path: string | undefined): boolean {

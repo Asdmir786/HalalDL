@@ -10,6 +10,17 @@ pub const BIN_DIR: &str = "bin";
 pub const THUMBNAILS_DIR: &str = "thumbnails";
 pub const ARCHIVE_DIR: &str = "download-archive";
 pub const UPDATES_DIR: &str = "updates";
+pub const MANAGED_TOOL_IDS: &[&str] = &["yt-dlp", "ffmpeg", "aria2", "deno"];
+
+fn managed_tool_file_name(tool_id: &str) -> Option<&'static str> {
+    match tool_id {
+        "yt-dlp" => Some("yt-dlp.exe"),
+        "ffmpeg" => Some("ffmpeg.exe"),
+        "aria2" => Some("aria2c.exe"),
+        "deno" => Some("deno.exe"),
+        _ => None,
+    }
+}
 
 #[derive(Debug, Clone, serde::Serialize)]
 #[serde(rename_all = "camelCase")]
@@ -86,6 +97,35 @@ pub fn ensure_app_dirs(app_handle: &tauri::AppHandle) -> Result<AppPaths, String
         fs::create_dir_all(dir).map_err(|e| format!("Failed to create {}: {}", dir, e))?;
     }
     Ok(paths)
+}
+
+#[tauri::command]
+pub fn get_missing_app_managed_tools(
+    app_handle: tauri::AppHandle,
+    tool_ids: Option<Vec<String>>,
+) -> Result<Vec<String>, String> {
+    let paths = ensure_app_dirs(&app_handle)?;
+    let bin_dir = PathBuf::from(&paths.bin_dir);
+    let requested = tool_ids.unwrap_or_else(|| {
+        MANAGED_TOOL_IDS
+            .iter()
+            .map(|tool_id| (*tool_id).to_string())
+            .collect()
+    });
+
+    let mut missing = Vec::new();
+
+    for tool_id in requested {
+        let Some(file_name) = managed_tool_file_name(&tool_id) else {
+            return Err(format!("Unsupported managed tool id: {}", tool_id));
+        };
+
+        if !bin_dir.join(file_name).exists() {
+            missing.push(tool_id);
+        }
+    }
+
+    Ok(missing)
 }
 
 #[tauri::command]

@@ -77,6 +77,7 @@ pub fn run() {
             runtime::take_pending_launch_urls,
             notifications::send_native_windows_toast,
             app_paths::resolve_app_paths,
+            app_paths::get_missing_app_managed_tools,
             app_update::get_install_context,
             app_update::download_and_verify_app_update,
             app_update::launch_portable_update,

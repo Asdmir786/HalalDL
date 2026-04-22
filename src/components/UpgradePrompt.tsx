@@ -93,12 +93,20 @@ export function UpgradePrompt() {
     void getMissingAppManagedToolIds(getStartupToolIds(appMode)).then(
       (ids) => {
         if (!cancelled) {
+          addLog({
+            level: "debug",
+            message: `Startup managed-tool probe missing: ${ids.length > 0 ? ids.join(", ") : "none"}`,
+          });
           setStartupMissingToolIds(ids);
         }
       },
-      () => {
+      (error) => {
         if (!cancelled) {
-          setStartupMissingToolIds(getStartupToolIds(appMode));
+          addLog({
+            level: "warn",
+            message: `Startup managed-tool probe failed: ${String(error)}`,
+          });
+          setStartupMissingToolIds([]);
         }
       }
     );
@@ -106,7 +114,7 @@ export function UpgradePrompt() {
     return () => {
       cancelled = true;
     };
-  }, [appMode, isManagedMode]);
+  }, [addLog, appMode, isManagedMode]);
 
   const checkedMissingIds = useMemo(() => {
     if (!allToolsChecked) return [];
@@ -122,12 +130,16 @@ export function UpgradePrompt() {
       .map((tool) => tool.id);
   }, [allToolsChecked, appMode, isManagedMode, tools]);
 
-  const missingIds = useMemo(
-    () => Array.from(new Set([...(startupMissingToolIds ?? []), ...checkedMissingIds])),
-    [checkedMissingIds, startupMissingToolIds]
-  );
+  const missingIds = useMemo(() => {
+    if (allToolsChecked) {
+      return checkedMissingIds;
+    }
+    return startupMissingToolIds ?? [];
+  }, [allToolsChecked, checkedMissingIds, startupMissingToolIds]);
   const missingKey = missingIds.slice().sort().join("|");
-  const startupReady = isManagedMode ? startupMissingToolIds !== null : allToolsChecked;
+  const startupReady = isManagedMode
+    ? startupMissingToolIds !== null && allToolsChecked
+    : allToolsChecked;
   const promptToolIds = missingIds;
   const actionToolIds = error
     ? (operationToolIds.length > 0 ? operationToolIds : promptToolIds)
