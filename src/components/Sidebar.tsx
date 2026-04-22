@@ -22,6 +22,7 @@ import { useDownloadsStore } from "@/store/downloads";
 import { useAppUpdateStore } from "@/store/app-update";
 import { Progress } from "@/components/ui/progress";
 import { isDemoModeEnabled } from "@/lib/demo-mode";
+import { getAppMode } from "@/lib/tools/app-mode";
 
 const NAV_ITEMS: { id: Screen; label: string; icon: LucideIcon }[] = [
   { id: "downloads", label: "Downloads", icon: HardDriveDownload },
@@ -38,8 +39,9 @@ export function Sidebar() {
   const { currentScreen, setScreen, sidebarCollapsed, toggleSidebar } = useNavigationStore();
   const jobs = useDownloadsStore((s) => s.jobs);
   const [version, setVersion] = useState(() => (isDemoModeEnabled() ? "0.4.0" : "..."));
-  const appMode = String(import.meta.env.VITE_APP_MODE ?? "").trim().toUpperCase();
-  const appModeLabel = appMode === "FULL" ? "Full" : "Lite";
+  const appMode = getAppMode();
+  const appModeLabel =
+    appMode === "FULL" ? "Full" : appMode === "PORTABLE" ? "Portable" : "Lite";
 
   useEffect(() => {
     if (isDemoModeEnabled()) {

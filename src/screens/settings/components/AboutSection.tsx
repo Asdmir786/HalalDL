@@ -16,6 +16,7 @@ import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
 import {
   downloadAndVerifyAppUpdate,
+  launchPortableUpdate,
   openFile,
   revealInExplorer,
   type InstallerType,
@@ -27,6 +28,7 @@ import { useDownloadsStore } from "@/store/downloads";
 import { checkAndStoreAppUpdate } from "@/lib/app-updates/service";
 import { notifyUser } from "@/lib/notifications";
 import { isDemoModeEnabled } from "@/lib/demo-mode";
+import { getAppMode } from "@/lib/tools/app-mode";
 import {
   Dialog,
   DialogContent,
@@ -69,12 +71,18 @@ export function AboutSection() {
   const [isDownloadingUpdate, setIsDownloadingUpdate] = useState(false);
   const [isLaunchingInstaller, setIsLaunchingInstaller] = useState(false);
   const [installDialogOpen, setInstallDialogOpen] = useState(false);
-  const appMode = String(import.meta.env.VITE_APP_MODE ?? "")
-    .trim()
-    .toUpperCase();
-  const appModeLabel = appMode === "FULL" ? "Full" : "Lite";
+  const appMode = getAppMode();
+  const appModeLabel =
+    appMode === "FULL" ? "Full" : appMode === "PORTABLE" ? "Portable" : "Lite";
 
   const storeUpdate = useAppUpdateStore();
+  const installerType = storeUpdate.installContext?.installerType ?? "unknown";
+  const isPortableInstall =
+    appMode === "PORTABLE" || installerType === "portable";
+  const packageLabel = formatPackageLabel(installerType);
+  const installActionLabel = isPortableInstall
+    ? "Install and Restart"
+    : "Install and Close";
   const jobs = useDownloadsStore((s) => s.jobs);
   const activeJobCount = jobs.filter(
     (job) => job.status === "Downloading" || job.status === "Post-processing"
@@ -154,7 +162,9 @@ export function AboutSection() {
       });
       await notifyUser(
         "HalalDL update ready",
-        "The verified installer has been downloaded and is ready to run.",
+        isPortableInstall
+          ? "The verified portable package has been downloaded and is ready to install."
+          : "The verified installer has been downloaded and is ready to run.",
         "success",
         {
           screen: "settings",
@@ -171,7 +181,7 @@ export function AboutSection() {
     } finally {
       setIsDownloadingUpdate(false);
     }
-  }, [assetName, checksumUrl, downloadUrl, releaseUrl]);
+  }, [assetName, checksumUrl, downloadUrl, isPortableInstall, releaseUrl]);
 
   const handleInstallUpdate = useCallback(async () => {
     if (!verifiedInstallerPath) return;
@@ -183,16 +193,24 @@ export function AboutSection() {
 
     setIsLaunchingInstaller(true);
     try {
-      await openFile(verifiedInstallerPath);
+      if (isPortableInstall) {
+        await launchPortableUpdate(verifiedInstallerPath);
+      } else {
+        await openFile(verifiedInstallerPath);
+      }
       await exit(0);
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
-      toast.error(`Failed to start installer: ${message}`);
+      toast.error(
+        isPortableInstall
+          ? `Failed to start portable updater: ${message}`
+          : `Failed to start installer: ${message}`
+      );
     } finally {
       setIsLaunchingInstaller(false);
       setInstallDialogOpen(false);
     }
-  }, [activeJobCount, verifiedInstallerPath]);
+  }, [activeJobCount, isPortableInstall, verifiedInstallerPath]);
 
   return (
     <SettingsSection
@@ -214,7 +232,7 @@ export function AboutSection() {
                 variant="outline"
                 className={cn(
                   "h-5 border-border/60 px-2 text-[10px] font-semibold tracking-wide dark:border-white/10",
-                  appModeLabel === "Full"
+                  appModeLabel === "Full" || appModeLabel === "Portable"
                     ? "text-primary"
                     : "text-muted-foreground"
                 )}
@@ -225,9 +243,7 @@ export function AboutSection() {
                 variant="outline"
                 className="h-5 max-w-full border-border/60 px-2 text-[10px] font-semibold tracking-wide dark:border-white/10"
               >
-                {formatInstallerLabel(
-                  storeUpdate.installContext?.installerType ?? "unknown"
-                )}
+                {packageLabel}
               </Badge>
             </div>
             <p className="max-w-2xl text-xs text-muted-foreground">
@@ -361,8 +377,9 @@ export function AboutSection() {
                 Update ready to install
               </p>
               <p className="text-xs text-muted-foreground">
-                Saved to Downloads. HalalDL will close before the installer
-                runs.
+                {isPortableInstall
+                  ? "Saved inside the portable updates folder. HalalDL will restart through the portable updater."
+                  : "Saved to Downloads. HalalDL will close before the installer runs."}
               </p>
             </div>
           </div>
@@ -425,13 +442,9 @@ export function AboutSection() {
           <DialogHeader>
             <DialogTitle>Install update now?</DialogTitle>
             <DialogDescription>
-              HalalDL will close before launching the verified{" "}
-              {storeUpdate.installContext?.installerType === "msi"
-                ? "MSI"
-                : storeUpdate.installContext?.installerType === "nsis"
-                  ? "NSIS"
-                  : "installer"}{" "}
-              package.
+              {isPortableInstall
+                ? "HalalDL will close, hand off to the portable updater, then relaunch after the verified package is applied."
+                : `HalalDL will close before launching the verified ${packageLabel} package.`}
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-3 text-sm text-muted-foreground">
@@ -469,7 +482,7 @@ export function AboutSection() {
               {isLaunchingInstaller ? (
                 <Loader2 className="w-4 h-4 mr-2 animate-spin" />
               ) : null}
-              Install and Close
+              {installActionLabel}
             </MotionButton>
           </DialogFooter>
         </DialogContent>
@@ -478,10 +491,11 @@ export function AboutSection() {
   );
 }
 
-function formatInstallerLabel(installerType: InstallerType): string {
+function formatPackageLabel(installerType: InstallerType): string {
   if (installerType === "msi") return "MSI";
   if (installerType === "nsis") return "NSIS";
-  return "Installer Unknown";
+  if (installerType === "portable") return "Portable ZIP";
+  return "Package Unknown";
 }
 
 function LinkCard({

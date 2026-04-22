@@ -11,9 +11,6 @@ import type { AttentionTargetInput } from "@/store/attention";
 
 type NotificationKind = "info" | "success" | "error";
 
-const APP_UPDATE_NOTIFY_KEY = "halaldl:lastNotifiedAppUpdateVersion";
-const TOOL_UPDATE_NOTIFY_KEY = "halaldl:lastNotifiedToolUpdateVersions";
-
 async function sendDesktopNotification(
   title: string,
   body: string,
@@ -92,39 +89,4 @@ export async function notifyUser(
     return;
   }
   toast.info(title, toastOptions);
-}
-
-export function readLastNotifiedAppUpdateVersion() {
-  try {
-    return localStorage.getItem(APP_UPDATE_NOTIFY_KEY);
-  } catch {
-    return null;
-  }
-}
-
-export function writeLastNotifiedAppUpdateVersion(version: string) {
-  try {
-    localStorage.setItem(APP_UPDATE_NOTIFY_KEY, version);
-  } catch {
-    void 0;
-  }
-}
-
-export function readLastNotifiedToolUpdateVersions() {
-  try {
-    const raw = localStorage.getItem(TOOL_UPDATE_NOTIFY_KEY);
-    if (!raw) return {} as Record<string, string>;
-    const parsed = JSON.parse(raw) as Record<string, string>;
-    return parsed && typeof parsed === "object" ? parsed : {};
-  } catch {
-    return {} as Record<string, string>;
-  }
-}
-
-export function writeLastNotifiedToolUpdateVersions(versions: Record<string, string>) {
-  try {
-    localStorage.setItem(TOOL_UPDATE_NOTIFY_KEY, JSON.stringify(versions));
-  } catch {
-    void 0;
-  }
 }

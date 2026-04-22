@@ -15,11 +15,13 @@ import { ToolRow } from "./components/ToolRow";
 import { ToolsProgressModal } from "./components/ToolsProgressModal";
 import { useDownloadProgressModal } from "./hooks/useDownloadProgressModal";
 import { useToolActions } from "./hooks/useToolActions";
+import { getAppMode } from "@/lib/tools/app-mode";
 
 export function ToolsScreen() {
   const { tools } = useToolsStore();
-  const appMode = String(import.meta.env.VITE_APP_MODE ?? "").trim().toUpperCase();
-  const isLite = appMode !== "FULL";
+  const appMode = getAppMode();
+  const isLite = appMode === "LITE";
+  const isPortable = appMode === "PORTABLE";
 
   const scrollRef = useRef<HTMLDivElement>(null);
   const scrollTopRef = useRef(0);
@@ -175,13 +177,18 @@ export function ToolsScreen() {
                 ))}
               </div>
 
-              {isLite && (
+              {(isLite || isPortable) && (
                 <div className="rounded-xl border border-muted/40 bg-muted/10 p-4 flex items-center gap-3 text-xs text-muted-foreground">
                   <Info className="w-4 h-4 shrink-0 text-primary" />
                   <span>
-                    <strong className="text-foreground">Lite Mode</strong>{" "}
-                    &mdash; Tools are downloaded to your AppData bin folder. Use the
-                    overflow menu to set custom paths or visit tool websites.
+                    <strong className="text-foreground">
+                      {isPortable ? "Portable Mode" : "Lite Mode"}
+                    </strong>{" "}
+                    &mdash;{" "}
+                    {isPortable
+                      ? "Tools are stored in the portable-data bin folder beside the app."
+                      : "Tools are downloaded to your AppData bin folder."}{" "}
+                    Use the overflow menu to set custom paths or visit tool websites.
                   </span>
                 </div>
               )}

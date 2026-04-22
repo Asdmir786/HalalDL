@@ -31,6 +31,13 @@ import { toast } from "sonner";
 import { getAppMode } from "@/lib/tools/app-mode";
 import { startQueuedJobs } from "@/lib/downloader";
 import { isDemoModeEnabled, seedMarketingDemoState } from "@/lib/demo-mode";
+import {
+  getAddModeDefaultMigrated,
+  getLastAppMode,
+  setAddModeDefaultMigrated,
+  setFullSwitchAutoInstall,
+  setLastAppMode,
+} from "@/lib/runtime-flags";
 
 export function usePersistenceInit(): MutableRefObject<boolean> {
   const { setSettings } = useSettingsStore();
@@ -85,20 +92,18 @@ export function usePersistenceInit(): MutableRefObject<boolean> {
         }
 
         const currentMode = getAppMode();
-        const lastModeKey = "halaldl:lastAppMode";
-        const fullSwitchKey = "halaldl:fullSwitchAutoInstall";
         try {
-          const lastMode = localStorage.getItem(lastModeKey);
+          const lastMode = await getLastAppMode();
           if (lastMode && lastMode !== currentMode) {
             if (currentMode === "LITE") {
               await invoke("cleanup_bin_tools", {
                 tools: ["yt-dlp", "ffmpeg", "aria2", "deno"],
               });
             } else {
-              localStorage.setItem(fullSwitchKey, "1");
+              await setFullSwitchAutoInstall(true);
             }
           }
-          localStorage.setItem(lastModeKey, currentMode);
+          await setLastAppMode(currentMode);
         } catch {
           void 0;
         }
@@ -113,13 +118,12 @@ export function usePersistenceInit(): MutableRefObject<boolean> {
           mergedSettings.downloadsSelectedPreset = canonicalizePresetId(mergedSettings.downloadsSelectedPreset);
           mergedSettings.quickDefaultPreset = canonicalizePresetId(mergedSettings.quickDefaultPreset);
           try {
-            const addModeMigrationKey = "halaldl:addModeDefaultMigrated";
             if (
-              localStorage.getItem(addModeMigrationKey) !== "1" &&
+              !(await getAddModeDefaultMigrated()) &&
               mergedSettings.downloadsAddMode === "queue"
             ) {
               mergedSettings.downloadsAddMode = "start";
-              localStorage.setItem(addModeMigrationKey, "1");
+              await setAddModeDefaultMigrated(true);
             }
           } catch {
             void 0;

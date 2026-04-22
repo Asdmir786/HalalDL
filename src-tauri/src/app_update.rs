@@ -29,15 +29,14 @@ impl Default for InstallContext {
 
 fn fallback_install_context() -> InstallContext {
     let mut context = InstallContext::default();
-    if let Ok(current_exe) = std::env::current_exe() {
-        if let Some(parent) = current_exe.parent() {
-            let install_dir = parent.to_string_lossy().to_string();
-            let uninstall_exe = parent.join("uninstall.exe");
-            context.install_dir = Some(install_dir);
-            context.detected_from = Some("filesystem".to_string());
-            if uninstall_exe.exists() {
-                context.installer_type = "nsis".to_string();
-            }
+    if let Ok(app_dir) = crate::app_paths::current_exe_dir() {
+        let uninstall_exe = app_dir.join("uninstall.exe");
+        context.install_dir = Some(app_dir.to_string_lossy().to_string());
+        context.detected_from = Some("filesystem".to_string());
+        if crate::app_paths::is_portable_layout(&app_dir) {
+            context.installer_type = "portable".to_string();
+        } else if uninstall_exe.exists() {
+            context.installer_type = "nsis".to_string();
         }
     }
     context
@@ -133,6 +132,19 @@ fn move_verified_file(temp_path: &Path, dest_path: &Path) -> Result<(), String> 
 
 #[tauri::command]
 pub fn get_install_context(app_handle: tauri::AppHandle) -> Result<InstallContext, String> {
+    if let Ok(app_dir) = crate::app_paths::current_exe_dir() {
+        if crate::app_paths::is_portable_layout(&app_dir) {
+            return Ok(InstallContext {
+                installer_type: "portable".to_string(),
+                install_scope: "portable".to_string(),
+                install_dir: Some(app_dir.to_string_lossy().to_string()),
+                uninstall_command: None,
+                detected_from: Some("portable-marker".to_string()),
+                registry_key: None,
+            });
+        }
+    }
+
     #[cfg(target_os = "windows")]
     {
         use std::os::windows::process::CommandExt;
@@ -302,6 +314,72 @@ $best |
         let _ = app_handle;
         Ok(fallback_install_context())
     }
+}
+
+#[tauri::command]
+pub fn launch_portable_update(
+    app_handle: tauri::AppHandle,
+    zip_path: String,
+    relaunch_exe: Option<String>,
+) -> Result<(), String> {
+    use std::process::Command;
+
+    #[cfg(target_os = "windows")]
+    use std::os::windows::process::CommandExt;
+
+    let paths = crate::app_paths::ensure_app_dirs(&app_handle)?;
+    if !paths.is_portable {
+        return Err("Portable updater is only available in portable mode".to_string());
+    }
+
+    let app_dir = PathBuf::from(&paths.app_dir);
+    let updater_path = app_dir.join("HalalDL.PortableUpdater.exe");
+    if !updater_path.exists() {
+        return Err(format!(
+            "Portable updater was not found at {}",
+            updater_path.display()
+        ));
+    }
+    let updates_dir = PathBuf::from(&paths.updates_dir);
+    fs::create_dir_all(&updates_dir).map_err(|e| e.to_string())?;
+    let staged_updater = updates_dir.join(format!(
+        "portable-updater-{}.exe",
+        std::process::id()
+    ));
+    fs::copy(&updater_path, &staged_updater)
+        .map_err(|e| format!("Failed to stage portable updater: {}", e))?;
+
+    let current_exe = std::env::current_exe().map_err(|e| e.to_string())?;
+    let current_pid = std::process::id().to_string();
+    let relaunch_target = relaunch_exe
+        .filter(|value| !value.trim().is_empty())
+        .unwrap_or_else(|| {
+            current_exe
+                .file_name()
+                .and_then(|name| name.to_str())
+                .unwrap_or("HalalDL.exe")
+                .to_string()
+        });
+
+    let mut command = Command::new(&staged_updater);
+    command.args([
+        "--app-dir",
+        &paths.app_dir,
+        "--zip",
+        &zip_path,
+        "--pid",
+        &current_pid,
+        "--relaunch-exe",
+        &relaunch_target,
+    ]);
+
+    #[cfg(target_os = "windows")]
+    {
+        command.creation_flags(0x08000000);
+    }
+
+    command.spawn().map_err(|e| e.to_string())?;
+    Ok(())
 }
 
 #[tauri::command]

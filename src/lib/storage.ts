@@ -1,26 +1,23 @@
-import { load, Store } from "@tauri-apps/plugin-store";
+import { getStateFilePath } from "@/lib/app-paths";
+import { readTextFile, writeTextFile } from "@/lib/commands";
+
+const FILE_NAMES = {
+  settings: "settings.json",
+  presets: "presets.json",
+  logs: "logs.json",
+  downloads: "downloads.json",
+  tools: "tools.json",
+  history: "history.json",
+  runtimeFlags: "runtime-flags.json",
+} as const;
 
 class StorageManager {
-  private settingsStore: Store | null = null;
-  private presetsStore: Store | null = null;
-  private logsStore: Store | null = null;
-  private downloadsStore: Store | null = null;
-  private toolsStore: Store | null = null;
-  private historyStore: Store | null = null;
   private initPromise: Promise<void> | null = null;
   private initError: string | null = null;
+  private filePaths: Record<keyof typeof FILE_NAMES, string> | null = null;
 
   async init() {
-    if (
-      this.settingsStore &&
-      this.presetsStore &&
-      this.logsStore &&
-      this.downloadsStore &&
-      this.toolsStore &&
-      this.historyStore
-    ) {
-      return;
-    }
+    if (this.filePaths) return;
     if (this.initPromise) {
       await this.initPromise;
       return;
@@ -28,17 +25,19 @@ class StorageManager {
 
     this.initPromise = (async () => {
       try {
-        this.settingsStore = await load("settings.json", { autoSave: false, defaults: {} });
-        this.presetsStore = await load("presets.json", { autoSave: false, defaults: {} });
-        this.logsStore = await load("logs.json", { autoSave: false, defaults: {} });
-        this.downloadsStore = await load("downloads.json", { autoSave: false, defaults: {} });
-        this.toolsStore = await load("tools.json", { autoSave: false, defaults: {} });
-        this.historyStore = await load("history.json", { autoSave: false, defaults: {} });
+        this.filePaths = {
+          settings: await getStateFilePath(FILE_NAMES.settings),
+          presets: await getStateFilePath(FILE_NAMES.presets),
+          logs: await getStateFilePath(FILE_NAMES.logs),
+          downloads: await getStateFilePath(FILE_NAMES.downloads),
+          tools: await getStateFilePath(FILE_NAMES.tools),
+          history: await getStateFilePath(FILE_NAMES.history),
+          runtimeFlags: await getStateFilePath(FILE_NAMES.runtimeFlags),
+        };
         this.initError = null;
       } catch (error) {
         const message = error instanceof Error ? error.message : String(error);
         this.initError = message;
-        console.error("Failed to initialize storage:", error);
         throw error;
       } finally {
         this.initPromise = null;
@@ -52,83 +51,88 @@ class StorageManager {
     if (this.initError) {
       throw new Error(`Storage initialization failed: ${this.initError}`);
     }
+    if (!this.filePaths) {
+      throw new Error("Storage paths are unavailable");
+    }
+  }
+
+  private async readJson<T>(key: keyof typeof FILE_NAMES): Promise<T | null> {
+    if (!this.filePaths) await this.init();
+    this.ensureReady();
+
+    try {
+      const raw = await readTextFile(this.filePaths![key]);
+      if (!raw.trim()) return null;
+      return JSON.parse(raw) as T;
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      if (message.toLowerCase().includes("failed to read file")) {
+        return null;
+      }
+      throw error;
+    }
+  }
+
+  private async writeJson<T>(key: keyof typeof FILE_NAMES, data: T) {
+    if (!this.filePaths) await this.init();
+    this.ensureReady();
+    await writeTextFile(this.filePaths![key], JSON.stringify(data, null, 2));
   }
 
   async getSettings<T>(): Promise<T | null> {
-    if (!this.settingsStore) await this.init();
-    this.ensureReady();
-    return (await this.settingsStore?.get<T>("data")) || null;
+    return this.readJson<T>("settings");
   }
 
   async saveSettings<T>(data: T) {
-    if (!this.settingsStore) await this.init();
-    this.ensureReady();
-    await this.settingsStore?.set("data", data);
-    await this.settingsStore?.save();
+    await this.writeJson("settings", data);
   }
 
   async getPresets<T>(): Promise<T | null> {
-    if (!this.presetsStore) await this.init();
-    this.ensureReady();
-    return (await this.presetsStore?.get<T>("data")) || null;
+    return this.readJson<T>("presets");
   }
 
   async savePresets<T>(data: T) {
-    if (!this.presetsStore) await this.init();
-    this.ensureReady();
-    await this.presetsStore?.set("data", data);
-    await this.presetsStore?.save();
+    await this.writeJson("presets", data);
   }
 
   async getLogs<T>(): Promise<T | null> {
-    if (!this.logsStore) await this.init();
-    this.ensureReady();
-    return (await this.logsStore?.get<T>("data")) || null;
+    return this.readJson<T>("logs");
   }
 
   async saveLogs<T>(data: T) {
-    if (!this.logsStore) await this.init();
-    this.ensureReady();
-    await this.logsStore?.set("data", data);
-    await this.logsStore?.save();
+    await this.writeJson("logs", data);
   }
 
   async getDownloads<T>(): Promise<T | null> {
-    if (!this.downloadsStore) await this.init();
-    this.ensureReady();
-    return (await this.downloadsStore?.get<T>("data")) || null;
+    return this.readJson<T>("downloads");
   }
 
   async saveDownloads<T>(data: T) {
-    if (!this.downloadsStore) await this.init();
-    this.ensureReady();
-    await this.downloadsStore?.set("data", data);
-    await this.downloadsStore?.save();
+    await this.writeJson("downloads", data);
   }
 
   async getTools<T>(): Promise<T | null> {
-    if (!this.toolsStore) await this.init();
-    this.ensureReady();
-    return (await this.toolsStore?.get<T>("data")) || null;
+    return this.readJson<T>("tools");
   }
 
   async saveTools<T>(data: T) {
-    if (!this.toolsStore) await this.init();
-    this.ensureReady();
-    await this.toolsStore?.set("data", data);
-    await this.toolsStore?.save();
+    await this.writeJson("tools", data);
   }
+
   async getHistory<T>(): Promise<T | null> {
-    if (!this.historyStore) await this.init();
-    this.ensureReady();
-    return (await this.historyStore?.get<T>("data")) || null;
+    return this.readJson<T>("history");
   }
 
   async saveHistory<T>(data: T) {
-    if (!this.historyStore) await this.init();
-    this.ensureReady();
-    await this.historyStore?.set("data", data);
-    await this.historyStore?.save();
+    await this.writeJson("history", data);
+  }
+
+  async getRuntimeFlags<T>(): Promise<T | null> {
+    return this.readJson<T>("runtimeFlags");
+  }
+
+  async saveRuntimeFlags<T>(data: T) {
+    await this.writeJson("runtimeFlags", data);
   }
 }
 

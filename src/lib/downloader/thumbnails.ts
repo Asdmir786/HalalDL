@@ -1,20 +1,19 @@
 import { Command } from "@tauri-apps/plugin-shell";
 import { useDownloadsStore } from "@/store/downloads";
 import { useLogsStore } from "@/store/logs";
-import { appDataDir, join } from "@tauri-apps/api/path";
-import { BaseDirectory, exists, mkdir } from "@tauri-apps/plugin-fs";
+import { exists, mkdir } from "@tauri-apps/plugin-fs";
 import { convertFileSrc } from "@tauri-apps/api/core";
 import { deleteFile } from "@/lib/commands";
 import { resolveTool } from "./tool-env";
 import { useSettingsStore } from "@/store/settings";
+import { getAppPaths } from "@/lib/app-paths";
 
 export async function ensureThumbnailDir(): Promise<string> {
-  if (!(await exists("thumbnails", { baseDir: BaseDirectory.AppData }))) {
-    await mkdir("thumbnails", { baseDir: BaseDirectory.AppData, recursive: true });
+  const { thumbnailsDir } = await getAppPaths();
+  if (!(await exists(thumbnailsDir))) {
+    await mkdir(thumbnailsDir, { recursive: true });
   }
-  const dataDir = await appDataDir();
-  const thumbsDir = await join(dataDir, "thumbnails");
-  return thumbsDir;
+  return thumbnailsDir;
 }
 
 export function thumbnailRelativePathForJob(jobId: string): string {
@@ -22,8 +21,9 @@ export function thumbnailRelativePathForJob(jobId: string): string {
 }
 
 export async function thumbnailAssetUrl(relPath: string): Promise<string> {
-  const dataDir = await appDataDir();
-  const absPath = await join(dataDir, relPath);
+  const { dataDir } = await getAppPaths();
+  const separator = dataDir.includes("\\") ? "\\" : "/";
+  const absPath = `${dataDir}${separator}${relPath.replace(/\//g, separator)}`;
   return convertFileSrc(absPath);
 }
 
@@ -41,7 +41,8 @@ export async function generateThumbnailFromMediaUrl(jobId: string, mediaUrl: str
     });
     const ffmpeg = await resolveTool("ffmpeg");
     const thumbsDir = await ensureThumbnailDir();
-    const outputPath = await join(thumbsDir, `${jobId}.jpg`);
+    const separator = thumbsDir.includes("\\") ? "\\" : "/";
+    const outputPath = `${thumbsDir}${separator}${jobId}.jpg`;
     const outputRelativePath = thumbnailRelativePathForJob(jobId);
     const filter = "blackframe=amount=98:threshold=32,select='lt(lavfi.blackframe.pblack,98)',scale=320:-1";
 
@@ -66,7 +67,7 @@ export async function generateThumbnailFromMediaUrl(jobId: string, mediaUrl: str
       addLog({ level: "info", message: `[thumb] ffmpeg primary stderr (tail): ${stderrTail}`, jobId });
     }
 
-    if (primaryOutput.code === 0 && (await exists(outputRelativePath, { baseDir: BaseDirectory.AppData }))) {
+    if (primaryOutput.code === 0 && (await exists(outputPath))) {
       addLog({ level: "info", message: `[thumb] Primary extraction succeeded`, jobId });
       const assetUrl = await thumbnailAssetUrl(outputRelativePath);
       updateJob(jobId, { thumbnail: assetUrl, thumbnailStatus: "ready" });
@@ -96,7 +97,7 @@ export async function generateThumbnailFromMediaUrl(jobId: string, mediaUrl: str
       addLog({ level: "info", message: `[thumb] ffmpeg fallback stderr (tail): ${stderrTail}`, jobId });
     }
 
-    if (fallbackOutput.code === 0 && (await exists(outputRelativePath, { baseDir: BaseDirectory.AppData }))) {
+    if (fallbackOutput.code === 0 && (await exists(outputPath))) {
       addLog({ level: "info", message: `[thumb] Fallback extraction succeeded`, jobId });
       const assetUrl = await thumbnailAssetUrl(outputRelativePath);
       updateJob(jobId, { thumbnail: assetUrl, thumbnailStatus: "ready" });
@@ -127,7 +128,8 @@ export async function generateThumbnailContactSheet(jobId: string, mediaUrl: str
   try {
     const ffmpeg = await resolveTool("ffmpeg");
     const thumbsDir = await ensureThumbnailDir();
-    const outputPath = await join(thumbsDir, `${jobId}-sheet.jpg`);
+    const separator = thumbsDir.includes("\\") ? "\\" : "/";
+    const outputPath = `${thumbsDir}${separator}${jobId}-sheet.jpg`;
     const outputRelativePath = `thumbnails/${jobId}-sheet.jpg`;
     const filter = "fps=1/10,scale=180:-1:force_original_aspect_ratio=decrease,tile=3x3:padding=6:margin=6";
 
@@ -150,7 +152,7 @@ export async function generateThumbnailContactSheet(jobId: string, mediaUrl: str
       addLog({ level: "info", message: `[thumb] contact sheet stderr (tail): ${result.stderr.trim().slice(-300)}`, jobId });
     }
 
-    if (result.code === 0 && (await exists(outputRelativePath, { baseDir: BaseDirectory.AppData }))) {
+    if (result.code === 0 && (await exists(outputPath))) {
       const assetUrl = await thumbnailAssetUrl(outputRelativePath);
       updateJob(jobId, { thumbnailSheet: assetUrl });
       addLog({ level: "info", message: "[thumb] Contact sheet ready", jobId });
@@ -166,17 +168,16 @@ export async function generateThumbnailContactSheet(jobId: string, mediaUrl: str
 export async function cleanupThumbnailByJobId(jobId: string) {
   const { addLog } = useLogsStore.getState();
   try {
-    const dataDir = await appDataDir();
+    const { thumbnailsDir } = await getAppPaths();
     for (const ext of ["jpg", "webp", "png", "jpeg"]) {
-      const relPath = `thumbnails/${jobId}.${ext}`;
-      if (await exists(relPath, { baseDir: BaseDirectory.AppData })) {
-        const absPath = await join(dataDir, relPath);
+      const absPath = `${thumbnailsDir}${thumbnailsDir.includes("\\") ? "\\" : "/"}${jobId}.${ext}`;
+      if (await exists(absPath)) {
         await deleteFile(absPath);
       }
     }
-    const sheetRelPath = `thumbnails/${jobId}-sheet.jpg`;
-    if (await exists(sheetRelPath, { baseDir: BaseDirectory.AppData })) {
-      const absPath = await join(dataDir, sheetRelPath);
+    const sheetAbsPath = `${thumbnailsDir}${thumbnailsDir.includes("\\") ? "\\" : "/"}${jobId}-sheet.jpg`;
+    if (await exists(sheetAbsPath)) {
+      const absPath = sheetAbsPath;
       await deleteFile(absPath);
     }
   } catch (e) {

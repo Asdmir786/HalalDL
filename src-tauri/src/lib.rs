@@ -1,3 +1,4 @@
+mod app_paths;
 mod app_update;
 mod clipboard;
 mod diagnostics;
@@ -75,8 +76,10 @@ pub fn run() {
             runtime::set_autostart_enabled,
             runtime::take_pending_launch_urls,
             notifications::send_native_windows_toast,
+            app_paths::resolve_app_paths,
             app_update::get_install_context,
             app_update::download_and_verify_app_update,
+            app_update::launch_portable_update,
             tools::resolve_system_tool_path,
             tools::update_tool_at_path,
             tools::list_tool_backups,

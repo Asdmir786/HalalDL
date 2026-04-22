@@ -37,12 +37,14 @@ import {
 import { checkAndStoreAppUpdate } from "@/lib/app-updates/service";
 import {
   notifyUser,
+} from "@/lib/notifications";
+import { resolveExistingPresetId } from "@/lib/preset-display";
+import {
   readLastNotifiedAppUpdateVersion,
   readLastNotifiedToolUpdateVersions,
   writeLastNotifiedAppUpdateVersion,
   writeLastNotifiedToolUpdateVersions,
-} from "@/lib/notifications";
-import { resolveExistingPresetId } from "@/lib/preset-display";
+} from "@/lib/runtime-flags";
 
 // Lazy load non-critical screens
 const PresetsScreen = lazy(() => import("@/screens/PresetsScreen").then(module => ({ default: module.PresetsScreen })));
@@ -147,8 +149,9 @@ export default function App() {
   } = useRuntimeStore();
   const [isBooting, setIsBooting] = useState(true);
   const [launchedFromAutostart, setLaunchedFromAutostart] = useState(false);
-  const lastNotifiedAppVersionRef = useRef<string | null>(readLastNotifiedAppUpdateVersion());
-  const lastNotifiedToolVersionsRef = useRef<Record<string, string>>(readLastNotifiedToolUpdateVersions());
+  const [notificationFlagsReady, setNotificationFlagsReady] = useState(false);
+  const lastNotifiedAppVersionRef = useRef<string | null>(null);
+  const lastNotifiedToolVersionsRef = useRef<Record<string, string>>({});
   const activeDownloads = useMemo(
     () =>
       jobs.filter(
@@ -181,6 +184,26 @@ export default function App() {
       .catch(() => {
         void 0;
       });
+  }, []);
+
+  useEffect(() => {
+    let cancelled = false;
+    void Promise.all([
+      readLastNotifiedAppUpdateVersion(),
+      readLastNotifiedToolUpdateVersions(),
+    ]).then(([appVersion, toolVersions]) => {
+      if (cancelled) return;
+      lastNotifiedAppVersionRef.current = appVersion;
+      lastNotifiedToolVersionsRef.current = toolVersions;
+      setNotificationFlagsReady(true);
+    }).catch(() => {
+      if (cancelled) return;
+      setNotificationFlagsReady(true);
+    });
+
+    return () => {
+      cancelled = true;
+    };
   }, []);
 
   useEffect(() => {
@@ -465,6 +488,7 @@ export default function App() {
   useEffect(() => {
     if (!settings.enableBackgroundUpdateChecks) return;
     if (!toolsReady) return;
+    if (!notificationFlagsReady) return;
 
     const runChecks = async () => {
       const latestSettings = useSettingsStore.getState().settings;
@@ -499,7 +523,7 @@ export default function App() {
             }
           );
           lastNotifiedAppVersionRef.current = appUpdate.resolved.latestVersion;
-          writeLastNotifiedAppUpdateVersion(appUpdate.resolved.latestVersion);
+          void writeLastNotifiedAppUpdateVersion(appUpdate.resolved.latestVersion);
         }
       }
 
@@ -612,7 +636,7 @@ export default function App() {
             ),
           };
           lastNotifiedToolVersionsRef.current = nextNotified;
-          writeLastNotifiedToolUpdateVersions(nextNotified);
+          void writeLastNotifiedToolUpdateVersions(nextNotified);
         }
       }
     };
@@ -629,6 +653,7 @@ export default function App() {
     settings.checkAppUpdatesInBackground,
     settings.checkToolUpdatesInBackground,
     settings.enableBackgroundUpdateChecks,
+    notificationFlagsReady,
     setTools,
     toolsReady,
   ]);

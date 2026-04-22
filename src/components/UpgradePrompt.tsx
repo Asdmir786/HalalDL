@@ -31,6 +31,10 @@ import {
   fetchLatestFfmpegVersion,
   fetchLatestYtDlpVersion,
 } from "@/lib/commands";
+import {
+  getFullSwitchAutoInstall,
+  setFullSwitchAutoInstall,
+} from "@/lib/runtime-flags";
 
 interface DownloadProgress {
   tool: string;
@@ -47,7 +51,7 @@ const TOOL_SIZES: Record<string, number> = {
 
 export function UpgradePrompt() {
   const appMode = getAppMode();
-  const isFullMode = appMode === "FULL";
+  const isManagedMode = appMode !== "LITE";
 
   const [isDownloading, setIsDownloading] = useState(false);
   const [progress, setProgress] = useState(0);
@@ -60,7 +64,7 @@ export function UpgradePrompt() {
   const [currentToolId, setCurrentToolId] = useState<string | null>(null);
   const [currentStatus, setCurrentStatus] = useState("Preparing...");
   const [startupMissingToolIds, setStartupMissingToolIds] = useState<string[] | null>(
-    isFullMode ? null : []
+    isManagedMode ? null : []
   );
   const [dismissedMissingKey, setDismissedMissingKey] = useState<string | null>(null);
 
@@ -70,7 +74,6 @@ export function UpgradePrompt() {
 
   const { tools } = useToolsStore();
   const { addLog } = useLogsStore();
-  const fullSwitchKey = "halaldl:fullSwitchAutoInstall";
 
   const toolNameById = useMemo(
     () => Object.fromEntries(tools.map((tool) => [tool.id, tool.name])) as Record<string, string>,
@@ -85,7 +88,7 @@ export function UpgradePrompt() {
   useEffect(() => {
     let cancelled = false;
 
-    if (!isFullMode) return;
+    if (!isManagedMode) return;
 
     void getMissingAppManagedToolIds(getStartupToolIds(appMode)).then(
       (ids) => {
@@ -103,12 +106,12 @@ export function UpgradePrompt() {
     return () => {
       cancelled = true;
     };
-  }, [appMode, isFullMode]);
+  }, [appMode, isManagedMode]);
 
   const checkedMissingIds = useMemo(() => {
     if (!allToolsChecked) return [];
 
-    if (isFullMode) {
+    if (isManagedMode) {
       return getStartupToolIds(appMode).filter(
         (toolId) => tools.find((tool) => tool.id === toolId)?.status === "Missing"
       );
@@ -117,14 +120,14 @@ export function UpgradePrompt() {
     return tools
       .filter((tool) => tool.status === "Missing" && isStartupRequiredTool(tool.id, appMode))
       .map((tool) => tool.id);
-  }, [allToolsChecked, appMode, isFullMode, tools]);
+  }, [allToolsChecked, appMode, isManagedMode, tools]);
 
   const missingIds = useMemo(
     () => Array.from(new Set([...(startupMissingToolIds ?? []), ...checkedMissingIds])),
     [checkedMissingIds, startupMissingToolIds]
   );
   const missingKey = missingIds.slice().sort().join("|");
-  const startupReady = isFullMode ? startupMissingToolIds !== null : allToolsChecked;
+  const startupReady = isManagedMode ? startupMissingToolIds !== null : allToolsChecked;
   const promptToolIds = missingIds;
   const actionToolIds = error
     ? (operationToolIds.length > 0 ? operationToolIds : promptToolIds)
@@ -329,26 +332,28 @@ export function UpgradePrompt() {
   }, [isDownloading, promptToolIds, resolveSetupTargetVersions, startupReady]);
 
   useEffect(() => {
-    if (!startupReady || !isFullMode || missingIds.length === 0 || autoInstallStartedRef.current) {
+    if (!startupReady || !isManagedMode || missingIds.length === 0 || autoInstallStartedRef.current) {
       return;
     }
 
+    let cancelled = false;
     let timer: number | undefined;
-    try {
-      if (localStorage.getItem(fullSwitchKey) !== "1") return;
+    void getFullSwitchAutoInstall().then((shouldAutoInstall) => {
+      if (cancelled || !shouldAutoInstall) return;
       autoInstallStartedRef.current = true;
-      localStorage.removeItem(fullSwitchKey);
+      void setFullSwitchAutoInstall(false);
       timer = window.setTimeout(() => {
         void handleUpgrade(missingIds);
       }, 0);
-    } catch {
+    }).catch(() => {
       void 0;
-    }
+    });
 
     return () => {
+      cancelled = true;
       if (timer !== undefined) window.clearTimeout(timer);
     };
-  }, [fullSwitchKey, handleUpgrade, isFullMode, missingIds, startupReady]);
+  }, [handleUpgrade, isManagedMode, missingIds, startupReady]);
 
   useEffect(() => {
     let disposed = false;
@@ -395,8 +400,10 @@ export function UpgradePrompt() {
     };
   }, [appendLog, isDownloading, toolNameById]);
 
-  const selectionSubtitle = isFullMode
-    ? "Full mode manages its own local toolset. Missing app-managed binaries will be installed now."
+  const selectionSubtitle = isManagedMode
+    ? appMode === "PORTABLE"
+      ? "Portable mode manages its own local toolset beside the app. Missing bundled binaries will be installed now."
+      : "Full mode manages its own local toolset. Missing app-managed binaries will be installed now."
     : "Lite mode only requires yt-dlp to be available before downloads can start.";
 
   const handleClose = (nextOpen: boolean) => {
@@ -435,7 +442,7 @@ export function UpgradePrompt() {
                 </div>
                 <div className="min-w-0">
                   <DialogTitle className="text-lg font-bold tracking-tight">
-                    {isDownloading ? "Setting Up Tools" : isFullMode ? "Full Mode Setup" : "Setup Required"}
+                    {isDownloading ? "Setting Up Tools" : isManagedMode ? (appMode === "PORTABLE" ? "Portable Setup" : "Full Mode Setup") : "Setup Required"}
                   </DialogTitle>
                   <p className="mt-0.5 text-xs font-medium text-muted-foreground">
                     {isDownloading ? "Installing your local tool bundle..." : selectionSubtitle}

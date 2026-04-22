@@ -5,10 +5,11 @@ import "./index.css";
 
 type ErrorBoundaryState = {
   error: Error | null;
+  payload: string | null;
 };
 
 class AppErrorBoundary extends React.Component<React.PropsWithChildren, ErrorBoundaryState> {
-  state: ErrorBoundaryState = { error: null };
+  state: ErrorBoundaryState = { error: null, payload: null };
 
   static getDerivedStateFromError(error: Error) {
     return { error };
@@ -16,12 +17,12 @@ class AppErrorBoundary extends React.Component<React.PropsWithChildren, ErrorBou
 
   componentDidCatch(error: Error) {
     try {
-      const payload = {
+      const payload = JSON.stringify({
         message: error.message,
         stack: error.stack,
         time: new Date().toISOString(),
-      };
-      localStorage.setItem("halaldl:lastError", JSON.stringify(payload));
+      });
+      this.setState({ payload });
     } catch {
       void 0;
     }
@@ -46,12 +47,8 @@ class AppErrorBoundary extends React.Component<React.PropsWithChildren, ErrorBou
               <button
                 className="h-9 rounded-md border border-input bg-background px-3 text-sm font-medium"
                 onClick={() => {
-                  try {
-                    const payload = localStorage.getItem("halaldl:lastError");
-                    if (payload) navigator.clipboard.writeText(payload);
-                  } catch {
-                    void 0;
-                  }
+                  const payload = this.state.payload;
+                  if (payload) void navigator.clipboard.writeText(payload);
                 }}
               >
                 Copy Error

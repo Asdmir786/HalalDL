@@ -1,6 +1,6 @@
-import { appDataDir, join } from "@tauri-apps/api/path";
 import { exists } from "@tauri-apps/plugin-fs";
 import { APP_MANAGED_TOOL_IDS } from "./app-mode";
+import { getAppPaths } from "@/lib/app-paths";
 
 const TOOL_BIN_NAMES: Record<string, string> = {
   "yt-dlp": "yt-dlp.exe",
@@ -13,8 +13,9 @@ export async function isAppManagedToolInstalled(toolId: string): Promise<boolean
   const fileName = TOOL_BIN_NAMES[toolId];
   if (!fileName) return false;
 
-  const dataDir = await appDataDir();
-  const toolPath = await join(dataDir, "bin", fileName);
+  const { binDir } = await getAppPaths();
+  const separator = binDir.includes("\\") ? "\\" : "/";
+  const toolPath = `${binDir}${separator}${fileName}`;
   return exists(toolPath);
 }
 
@@ -35,5 +36,8 @@ export function isAppManagedToolPath(path: string | undefined): boolean {
   if (!path) return false;
 
   const normalized = path.replace(/\//g, "\\").toLowerCase();
-  return normalized.includes("\\appdata\\") && normalized.includes("\\bin\\");
+  return (
+    (normalized.includes("\\appdata\\") && normalized.includes("\\bin\\")) ||
+    normalized.includes("\\portable-data\\bin\\")
+  );
 }

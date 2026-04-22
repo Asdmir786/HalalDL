@@ -2,14 +2,15 @@ import { downloadDir, join } from "@tauri-apps/api/path";
 import { invoke } from "@tauri-apps/api/core";
 import { getAppMode, type AppMode } from "@/lib/tools/app-mode";
 import { fetchJson, isUpdateAvailable } from "./version-utils";
+import { getAppPaths } from "@/lib/app-paths";
 
 const REPO_URL = "https://github.com/Asdmir786/HalalDL";
 const RELEASES_URL = `${REPO_URL}/releases`;
 const LATEST_API =
   "https://api.github.com/repos/Asdmir786/HalalDL/releases/latest";
 
-export type InstallerType = "msi" | "nsis" | "unknown";
-export type InstallScope = "user" | "machine" | "unknown";
+export type InstallerType = "msi" | "nsis" | "portable" | "unknown";
+export type InstallScope = "user" | "machine" | "portable" | "unknown";
 
 export interface InstallContext {
   installerType: InstallerType;
@@ -64,6 +65,9 @@ export function buildPreferredAssetName(
   mode: AppMode,
   installerType: InstallerType
 ): string | null {
+  if (mode === "PORTABLE" || installerType === "portable") {
+    return `HalalDL-Portable-v${version}-win10+11-x64.zip`;
+  }
   if (installerType === "unknown") return null;
 
   const flavor = mode === "FULL" ? "Full" : "Lite";
@@ -136,13 +140,26 @@ export async function downloadAndVerifyAppUpdate(
     );
   }
 
-  const downloadsDir = await downloadDir();
-  const dest = await join(downloadsDir, update.assetName);
+  const appMode = getAppMode();
+  const dest =
+    appMode === "PORTABLE"
+      ? await join((await getAppPaths()).updatesDir, update.assetName)
+      : await join(await downloadDir(), update.assetName);
 
   return invoke<string>("download_and_verify_app_update", {
     url: update.downloadUrl,
     dest,
     checksumUrl: update.checksumUrl,
     assetName: update.assetName,
+  });
+}
+
+export async function launchPortableUpdate(
+  zipPath: string,
+  relaunchExe?: string
+) {
+  return invoke("launch_portable_update", {
+    zipPath,
+    relaunchExe: relaunchExe ?? null,
   });
 }

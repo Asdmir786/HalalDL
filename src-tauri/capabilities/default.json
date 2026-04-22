@@ -26,6 +26,11 @@
     "fs:allow-download-meta-recursive",
     "fs:allow-desktop-read-recursive",
     "fs:allow-desktop-meta-recursive",
+    {
+      "identifier": "fs:scope",
+      "allow": ["$EXE/portable-data/**"],
+      "deny": []
+    },
     "os:default",
     "notification:default",
     "process:default",

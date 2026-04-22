@@ -1,8 +1,9 @@
-import { appDataDir, join } from "@tauri-apps/api/path";
 import { exists } from "@tauri-apps/plugin-fs";
 import { useLogsStore } from "@/store/logs";
 import { notifyUser } from "@/lib/notifications";
 import type { AttentionTargetInput } from "@/store/attention";
+import { getAppPaths } from "@/lib/app-paths";
+import { getAppMode } from "@/lib/tools/app-mode";
 
 export type ToolResolution = {
   command: string;
@@ -10,17 +11,22 @@ export type ToolResolution = {
   isLocal: boolean;
 };
 
-export function toLocalCommandName(baseName: string): string {
-  return `local-${baseName}`;
+export function toLocalCommandName(baseName: string, portable = false): string {
+  return `${portable ? "portable" : "local"}-${baseName}`;
 }
 
 export async function resolveTool(baseName: string): Promise<ToolResolution> {
   try {
-    const dataDir = await appDataDir();
+    const { binDir, isPortable } = await getAppPaths();
     const exeSuffix = navigator.userAgent.toLowerCase().includes("windows") ? ".exe" : "";
-    const localPath = await join(dataDir, "bin", `${baseName}${exeSuffix}`);
+    const separator = binDir.includes("\\") ? "\\" : "/";
+    const localPath = `${binDir}${separator}${baseName}${exeSuffix}`;
     if (await exists(localPath)) {
-      return { command: toLocalCommandName(baseName), path: localPath, isLocal: true };
+      return {
+        command: toLocalCommandName(baseName, isPortable || getAppMode() === "PORTABLE"),
+        path: localPath,
+        isLocal: true,
+      };
     }
   } catch {
     void 0;

@@ -58,6 +58,31 @@
           "args": true
         },
         {
+          "name": "portable-yt-dlp",
+          "cmd": "$EXE/portable-data/bin/yt-dlp.exe",
+          "args": true
+        },
+        {
+          "name": "portable-ffmpeg",
+          "cmd": "$EXE/portable-data/bin/ffmpeg.exe",
+          "args": true
+        },
+        {
+          "name": "portable-ffprobe",
+          "cmd": "$EXE/portable-data/bin/ffprobe.exe",
+          "args": true
+        },
+        {
+          "name": "portable-aria2c",
+          "cmd": "$EXE/portable-data/bin/aria2c.exe",
+          "args": true
+        },
+        {
+          "name": "portable-deno",
+          "cmd": "$EXE/portable-data/bin/deno.exe",
+          "args": true
+        },
+        {
           "name": "pip",
           "cmd": "pip",
           "args": true
@@ -121,6 +146,31 @@
         {
           "name": "local-deno",
           "cmd": "$APPDATA/bin/deno.exe",
+          "args": true
+        },
+        {
+          "name": "portable-yt-dlp",
+          "cmd": "$EXE/portable-data/bin/yt-dlp.exe",
+          "args": true
+        },
+        {
+          "name": "portable-ffmpeg",
+          "cmd": "$EXE/portable-data/bin/ffmpeg.exe",
+          "args": true
+        },
+        {
+          "name": "portable-ffprobe",
+          "cmd": "$EXE/portable-data/bin/ffprobe.exe",
+          "args": true
+        },
+        {
+          "name": "portable-aria2c",
+          "cmd": "$EXE/portable-data/bin/aria2c.exe",
+          "args": true
+        },
+        {
+          "name": "portable-deno",
+          "cmd": "$EXE/portable-data/bin/deno.exe",
           "args": true
         }
       ]

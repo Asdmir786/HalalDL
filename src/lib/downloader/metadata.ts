@@ -4,7 +4,7 @@ import { useDownloadsStore } from "@/store/downloads";
 import { useLogsStore } from "@/store/logs";
 import { useSettingsStore } from "@/store/settings";
 import { join } from "@tauri-apps/api/path";
-import { BaseDirectory, exists } from "@tauri-apps/plugin-fs";
+import { exists } from "@tauri-apps/plugin-fs";
 import { downloadUrlToFile } from "@/lib/commands";
 import { isInstagramUrl } from "@/lib/media-engine";
 import { getExplicitOutputPaths } from "@/lib/output-paths";
@@ -194,7 +194,7 @@ export async function fetchMetadata(jobId: string) {
 
       try {
         await downloadUrlToFile(thumbnailUrl, thumbDest, job.url);
-        if (await exists(thumbRelPath, { baseDir: BaseDirectory.AppData })) {
+        if (await exists(thumbDest)) {
           const assetUrl = await thumbnailAssetUrl(thumbRelPath);
           updateJob(jobId, { thumbnail: assetUrl, thumbnailStatus: "ready" });
           await maybeGenerateContactSheet();

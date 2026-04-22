@@ -1,8 +1,6 @@
 use std::collections::HashSet;
 use std::fs;
 use std::path::{Path, PathBuf};
-use tauri::Manager;
-
 use crate::download::{
     download_to_temp, emit_progress, resolve_latest_aria2_zip_url,
     resolve_latest_ffmpeg_essentials_zip_url,
@@ -296,11 +294,8 @@ pub async fn download_tools(
     }
 
     let ch = channels.unwrap_or_default();
-    let bin_dir = app_handle
-        .path()
-        .app_data_dir()
-        .map_err(|e: tauri::Error| e.to_string())?
-        .join("bin");
+    let paths = crate::app_paths::ensure_app_dirs(&app_handle)?;
+    let bin_dir = PathBuf::from(&paths.bin_dir);
 
     if !bin_dir.exists() {
         fs::create_dir_all(&bin_dir).map_err(|e| e.to_string())?;
@@ -355,11 +350,8 @@ pub fn stage_manual_tool(
     tool: String,
     source: String,
 ) -> Result<String, String> {
-    let bin_dir = app_handle
-        .path()
-        .app_data_dir()
-        .map_err(|e: tauri::Error| e.to_string())?
-        .join("bin");
+    let paths = crate::app_paths::ensure_app_dirs(&app_handle)?;
+    let bin_dir = PathBuf::from(&paths.bin_dir);
 
     if !bin_dir.exists() {
         fs::create_dir_all(&bin_dir).map_err(|e| e.to_string())?;
@@ -453,7 +445,8 @@ fn collect_backup_dirs(
 ) -> Vec<PathBuf> {
     let mut dirs: Vec<PathBuf> = Vec::new();
 
-    if let Ok(bin_dir) = app_handle.path().app_data_dir().map(|d| d.join("bin")) {
+    if let Ok(paths) = crate::app_paths::resolve_paths(app_handle) {
+        let bin_dir = PathBuf::from(paths.bin_dir);
         if bin_dir.exists() {
             dirs.push(bin_dir);
         }
@@ -617,11 +610,8 @@ pub fn cleanup_bin_tools(
     app_handle: tauri::AppHandle,
     tools: Vec<String>,
 ) -> Result<String, String> {
-    let bin_dir = app_handle
-        .path()
-        .app_data_dir()
-        .map_err(|e: tauri::Error| e.to_string())?
-        .join("bin");
+    let paths = crate::app_paths::ensure_app_dirs(&app_handle)?;
+    let bin_dir = PathBuf::from(&paths.bin_dir);
 
     if !bin_dir.exists() {
         return Ok("No bin directory to clean".to_string());

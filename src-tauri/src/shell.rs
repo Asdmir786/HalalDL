@@ -95,9 +95,12 @@ pub fn add_to_user_path(app_handle: tauri::AppHandle) -> Result<String, String> 
     {
         use std::process::Command;
         use std::os::windows::process::CommandExt;
-        use tauri::Manager;
+        let paths = crate::app_paths::ensure_app_dirs(&app_handle)?;
+        if paths.is_portable {
+            return Ok("Portable mode does not modify User PATH".to_string());
+        }
 
-        let bin_dir = app_handle.path().app_data_dir().map_err(|e| e.to_string())?.join("bin");
+        let bin_dir = std::path::PathBuf::from(&paths.bin_dir);
         let bin_path = bin_dir.to_string_lossy().to_string();
 
         let current_path = Command::new("powershell")

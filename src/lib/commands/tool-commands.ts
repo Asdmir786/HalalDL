@@ -1,4 +1,3 @@
-import { appDataDir, join } from "@tauri-apps/api/path";
 import { exists } from "@tauri-apps/plugin-fs";
 import { invoke } from "@tauri-apps/api/core";
 import { open as openDialog } from "@tauri-apps/plugin-dialog";
@@ -6,6 +5,7 @@ import { useLogsStore } from "@/store/logs";
 import { useToolsStore } from "@/store/tools";
 import { revealInExplorer } from "./file-commands";
 import type { ToolBatchResult } from "@/lib/tools/tool-batch";
+import { getAppPaths } from "@/lib/app-paths";
 
 export async function updateToolAtPath(tool: string, destDir: string, variant?: string, channel?: string): Promise<string> {
   const { addLog } = useLogsStore.getState();
@@ -56,9 +56,9 @@ export async function revealToolInExplorer(toolId: string, currentPath?: string)
   const isWindows = navigator.userAgent.toLowerCase().includes("windows");
   const fileName = isWindows ? entry.windows : entry.unix;
 
-  const dataDir = await appDataDir();
-  const binDir = await join(dataDir, "bin");
-  const toolPath = await join(binDir, fileName);
+  const { binDir } = await getAppPaths();
+  const separator = binDir.includes("\\") ? "\\" : "/";
+  const toolPath = `${binDir}${separator}${fileName}`;
 
   if (await exists(toolPath)) {
     await revealInExplorer(toolPath);

@@ -4,6 +4,7 @@ import { useLogsStore, type LogEntry } from "@/store/logs";
 import { usePresetsStore, type Preset } from "@/store/presets";
 import { useSettingsStore, type Settings } from "@/store/settings";
 import { useToolsStore, type Tool } from "@/store/tools";
+import { getAppMode } from "@/lib/tools/app-mode";
 
 type DiagnosticsRedaction = {
   redactUrls: boolean;
@@ -86,7 +87,7 @@ export function buildDiagnosticsPayload(redaction: DiagnosticsRedaction) {
     })
     .join("\n");
 
-  const appMode = String(import.meta.env.VITE_APP_MODE ?? "").trim().toUpperCase();
+  const appMode = getAppMode();
 
   const toolsStatus = {
     tools: toolsState.tools.map((t: Tool) => sanitizeTool(t, redaction)),
@@ -112,7 +113,7 @@ export function buildDiagnosticsPayload(redaction: DiagnosticsRedaction) {
     createdAt,
     redaction,
     buildInfo: {
-      appMode: appMode === "FULL" ? "FULL" : "LITE",
+      appMode,
       userAgent: navigator.userAgent,
     },
     toolsStatus,
