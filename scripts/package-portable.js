@@ -18,14 +18,12 @@ const workDir = path.join(repoRoot, ".portable-build");
 const stagingDir = path.join(workDir, "staging");
 const downloadsDir = path.join(workDir, "downloads");
 const appExe = path.join(repoRoot, "src-tauri", "target", "release", `${productName}.exe`);
-const updaterExe = path.join(repoRoot, "src-tauri", "target", "release", "portable_updater.exe");
 const assetName = `${productName}-Portable-v${version}-win10+11-x64.zip`;
 
 const USER_AGENT = `HalalDL-PortablePackager/${version}`;
 
 async function main() {
   ensureFile(appExe, "Portable app executable was not built");
-  ensureFile(updaterExe, "Portable updater executable was not built");
 
   fs.rmSync(workDir, { recursive: true, force: true });
   fs.mkdirSync(stagingDir, { recursive: true });
@@ -35,7 +33,6 @@ async function main() {
   removeExistingPortableAssets(outDir);
 
   copyFile(appExe, path.join(stagingDir, `${productName}.exe`));
-  copyFile(updaterExe, path.join(stagingDir, `${productName}.PortableUpdater.exe`));
   writePortableMarker(path.join(stagingDir, `${productName}.portable.json`));
 
   const portableBinDir = path.join(stagingDir, "portable-data", "bin");

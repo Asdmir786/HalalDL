@@ -3,7 +3,6 @@ export {
   getInstallContext,
   resolveLatestAppUpdate,
   downloadAndVerifyAppUpdate,
-  launchPortableUpdate,
   buildPreferredAssetName,
   selectPreferredReleaseAsset,
   type InstallerType,

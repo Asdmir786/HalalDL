@@ -16,7 +16,6 @@ import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
 import {
   downloadAndVerifyAppUpdate,
-  launchPortableUpdate,
   openFile,
   revealInExplorer,
   type InstallerType,
@@ -80,9 +79,7 @@ export function AboutSection() {
   const isPortableInstall =
     appMode === "PORTABLE" || installerType === "portable";
   const packageLabel = formatPackageLabel(installerType);
-  const installActionLabel = isPortableInstall
-    ? "Install and Restart"
-    : "Install and Close";
+  const installActionLabel = "Install and Close";
   const jobs = useDownloadsStore((s) => s.jobs);
   const activeJobCount = jobs.filter(
     (job) => job.status === "Downloading" || job.status === "Post-processing"
@@ -148,6 +145,11 @@ export function AboutSection() {
   }, [version]);
 
   const handleDownloadUpdate = useCallback(async () => {
+    if (isPortableInstall) {
+      await openUrl(releaseUrl);
+      return;
+    }
+
     if (!downloadUrl || !assetName || !checksumUrl) {
       await openUrl(releaseUrl);
       return;
@@ -162,9 +164,7 @@ export function AboutSection() {
       });
       await notifyUser(
         "HalalDL update ready",
-        isPortableInstall
-          ? "The verified portable package has been downloaded and is ready to install."
-          : "The verified installer has been downloaded and is ready to run.",
+        "The verified installer has been downloaded and is ready to run.",
         "success",
         {
           screen: "settings",
@@ -193,24 +193,16 @@ export function AboutSection() {
 
     setIsLaunchingInstaller(true);
     try {
-      if (isPortableInstall) {
-        await launchPortableUpdate(verifiedInstallerPath);
-      } else {
-        await openFile(verifiedInstallerPath);
-      }
+      await openFile(verifiedInstallerPath);
       await exit(0);
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
-      toast.error(
-        isPortableInstall
-          ? `Failed to start portable updater: ${message}`
-          : `Failed to start installer: ${message}`
-      );
+      toast.error(`Failed to start installer: ${message}`);
     } finally {
       setIsLaunchingInstaller(false);
       setInstallDialogOpen(false);
     }
-  }, [activeJobCount, isPortableInstall, verifiedInstallerPath]);
+  }, [activeJobCount, verifiedInstallerPath]);
 
   return (
     <SettingsSection
@@ -309,7 +301,12 @@ export function AboutSection() {
                     Update ready. SHA-256 checksum verified.
                   </p>
                 )}
-                {!verifiedInstallerPath && checksumUrl && (
+                {isPortableInstall && (
+                  <p className="text-xs text-muted-foreground">
+                    Portable builds update manually from GitHub Releases.
+                  </p>
+                )}
+                {!isPortableInstall && !verifiedInstallerPath && checksumUrl && (
                   <p className="text-xs text-muted-foreground">
                     Package checksum will be verified before install.
                   </p>
@@ -317,7 +314,18 @@ export function AboutSection() {
               </div>
               </div>
               <div className="grid shrink-0 grid-cols-1 gap-2 sm:grid-cols-2 lg:w-[230px] lg:grid-cols-1">
-                {verifiedInstallerPath ? (
+                {isPortableInstall ? (
+                  <MotionButton
+                    size="sm"
+                    onClick={() => void openUrl(releaseUrl)}
+                    whileHover={{ scale: 1.05 }}
+                    whileTap={{ scale: 0.95 }}
+                    className="w-full sm:col-span-2 lg:col-span-1"
+                  >
+                    <ExternalLink className="w-3.5 h-3.5 mr-1.5" />
+                    Open Release Page
+                  </MotionButton>
+                ) : verifiedInstallerPath ? (
                   <>
                     <MotionButton
                       size="sm"
@@ -369,7 +377,7 @@ export function AboutSection() {
           </div>
         )}
 
-        {verifiedInstallerPath && activeJobCount === 0 && (
+        {!isPortableInstall && verifiedInstallerPath && activeJobCount === 0 && (
           <div className="flex items-start gap-2.5 rounded-lg border border-green-500/20 bg-green-500/5 px-4 py-3">
             <CheckCircle2 className="w-5 h-5 text-green-500 shrink-0" />
             <div className="min-w-0">
@@ -377,15 +385,13 @@ export function AboutSection() {
                 Update ready to install
               </p>
               <p className="text-xs text-muted-foreground">
-                {isPortableInstall
-                  ? "Saved inside the portable updates folder. HalalDL will restart through the portable updater."
-                  : "Saved to Downloads. HalalDL will close before the installer runs."}
+                Saved to Downloads. HalalDL will close before the installer runs.
               </p>
             </div>
           </div>
         )}
 
-        {verifiedInstallerPath && activeJobCount > 0 && (
+        {!isPortableInstall && verifiedInstallerPath && activeJobCount > 0 && (
           <div className="flex items-start gap-2.5 rounded-lg border border-amber-500/20 bg-amber-500/5 px-4 py-3">
             <Info className="w-5 h-5 text-amber-400 shrink-0" />
             <div className="min-w-0">
@@ -442,9 +448,7 @@ export function AboutSection() {
           <DialogHeader>
             <DialogTitle>Install update now?</DialogTitle>
             <DialogDescription>
-              {isPortableInstall
-                ? "HalalDL will close, hand off to the portable updater, then relaunch after the verified package is applied."
-                : `HalalDL will close before launching the verified ${packageLabel} package.`}
+              {`HalalDL will close before launching the verified ${packageLabel} package.`}
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-3 text-sm text-muted-foreground">

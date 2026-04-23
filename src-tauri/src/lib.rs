@@ -80,7 +80,6 @@ pub fn run() {
             app_paths::get_missing_app_managed_tools,
             app_update::get_install_context,
             app_update::download_and_verify_app_update,
-            app_update::launch_portable_update,
             tools::resolve_system_tool_path,
             tools::update_tool_at_path,
             tools::list_tool_backups,
