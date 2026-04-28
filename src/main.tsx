@@ -2,6 +2,8 @@ import React from "react";
 import ReactDOM from "react-dom/client";
 import App from "./App";
 import "./index.css";
+import { ReleasePromoBoard } from "./release-assets/ReleasePromoBoard";
+import { isReleasePromoMode } from "./release-assets/releasePromoMode";
 
 type ErrorBoundaryState = {
   error: Error | null;
@@ -64,6 +66,6 @@ class AppErrorBoundary extends React.Component<React.PropsWithChildren, ErrorBou
 
 ReactDOM.createRoot(document.getElementById("root") as HTMLElement).render(
   <AppErrorBoundary>
-    <App />
+    {isReleasePromoMode() ? <ReleasePromoBoard /> : <App />}
   </AppErrorBoundary>
 );
