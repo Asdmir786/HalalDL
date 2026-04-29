@@ -1,6 +1,7 @@
 import { Command } from "@tauri-apps/plugin-shell";
 import { convertFileSrc } from "@tauri-apps/api/core";
 import { useDownloadsStore } from "@/store/downloads";
+import type { DownloadJob } from "@/store/downloads";
 import { useLogsStore } from "@/store/logs";
 import { useSettingsStore } from "@/store/settings";
 import { join } from "@tauri-apps/api/path";
