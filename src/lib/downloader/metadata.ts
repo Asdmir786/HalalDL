@@ -24,6 +24,7 @@ export interface MediaMetadataProbe {
   title: string;
   thumbnailUrl: string;
   mediaDurationSeconds?: number;
+  mediaCollectionSummary?: DownloadJob["mediaCollectionSummary"];
   hasManualSubtitles: boolean;
   hasAutoSubtitles: boolean;
   availableSubtitleLanguages: string[];
@@ -156,6 +157,9 @@ export async function fetchMetadata(jobId: string) {
       updateJob(jobId, {
         ...(title ? { title } : {}),
         ...(info.mediaDurationSeconds ? { mediaDurationSeconds: info.mediaDurationSeconds } : {}),
+        ...(info.mediaCollectionSummary
+          ? { mediaCollectionSummary: info.mediaCollectionSummary }
+          : {}),
         subtitleStatus:
           info.hasManualSubtitles || info.hasAutoSubtitles ? "available" : "unavailable",
         hasManualSubtitles: info.hasManualSubtitles,

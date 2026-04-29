@@ -43,6 +43,12 @@ export interface DownloadJob {
   outputPaths?: string[];
   fileSize?: number;
   mediaDurationSeconds?: number;
+  mediaCollectionSummary?: {
+    totalItems: number;
+    imageCount: number;
+    videoCount: number;
+    kind?: "single" | "carousel";
+  };
   createdAt: number;
   statusChangedAt?: number;
   queueOrder?: number;

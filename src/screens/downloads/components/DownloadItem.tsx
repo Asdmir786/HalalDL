@@ -50,6 +50,62 @@ interface DownloadItemProps {
   formatRelativeTime: (ts: number) => string;
 }
 
+const IMAGE_EXTENSIONS = new Set(["jpg", "jpeg", "png", "webp", "gif", "bmp", "avif"]);
+const VIDEO_EXTENSIONS = new Set(["mp4", "mov", "webm", "mkv", "avi", "m4v"]);
+
+function getPathExtension(path: string): string {
+  const cleanPath = path.split("?")[0]?.split("#")[0] ?? "";
+  const match = cleanPath.match(/\.([a-z0-9]+)$/i);
+  return match?.[1]?.toLowerCase() ?? "";
+}
+
+function inferMediaCollectionSummary(job: DownloadJob, explicitOutputPaths: string[]) {
+  if (job.mediaCollectionSummary) {
+    return job.mediaCollectionSummary;
+  }
+
+  let imageCount = 0;
+  let videoCount = 0;
+
+  for (const path of explicitOutputPaths) {
+    const ext = getPathExtension(path);
+    if (IMAGE_EXTENSIONS.has(ext)) {
+      imageCount += 1;
+      continue;
+    }
+    if (VIDEO_EXTENSIONS.has(ext)) {
+      videoCount += 1;
+    }
+  }
+
+  const totalItems = imageCount + videoCount;
+  if (totalItems === 0) {
+    return undefined;
+  }
+
+  return {
+    totalItems,
+    imageCount,
+    videoCount,
+    kind: totalItems > 1 ? ("carousel" as const) : ("single" as const),
+  };
+}
+
+function formatMediaCollectionLabel(
+  summary: NonNullable<DownloadJob["mediaCollectionSummary"]>
+): string {
+  const parts: string[] = [];
+
+  if (summary.videoCount > 0) {
+    parts.push(`${summary.videoCount} video${summary.videoCount === 1 ? "" : "s"}`);
+  }
+  if (summary.imageCount > 0) {
+    parts.push(`${summary.imageCount} image${summary.imageCount === 1 ? "" : "s"}`);
+  }
+
+  return parts.join(", ");
+}
+
 export function DownloadItem({
   job,
   section = "live",
@@ -128,12 +184,16 @@ export function DownloadItem({
     ? PRESET_GROUP_LABELS[getPresetGroup(selectedPresetConfig)]
     : "Preset";
   const explicitOutputPaths = getExplicitOutputPaths(job);
+  const mediaCollectionSummary = inferMediaCollectionSummary(job, explicitOutputPaths);
   const fileSizeLabel = job.status === "Done" ? formatBytes(job.fileSize) : "";
   const fileSizeTitle =
     explicitOutputPaths.length > 1
       ? `Total output size across ${explicitOutputPaths.length} files`
       : "File size";
   const mediaDurationLabel = formatMediaDuration(job.mediaDurationSeconds);
+  const mediaCollectionLabel = mediaCollectionSummary
+    ? formatMediaCollectionLabel(mediaCollectionSummary)
+    : "";
   const showStaticLatestMarker = isLatestDone && !spotlighted && job.status === "Done";
   const hasThumbnailSheet = Boolean(job.thumbnailSheet);
 
@@ -365,6 +425,22 @@ export function DownloadItem({
                               <span className="flex shrink-0 items-center gap-1 whitespace-nowrap opacity-80" title="Media duration">
                                 <Timer className="h-3 w-3 opacity-70" />
                                 {mediaDurationLabel}
+                              </span>
+                            </>
+                        )}
+                        {mediaCollectionLabel && (
+                            <>
+                              <span className="w-0.5 h-0.5 rounded-full bg-muted-foreground/50" />
+                              <span
+                                className="flex shrink-0 items-center gap-1 whitespace-nowrap opacity-80"
+                                title="Media items in this download"
+                              >
+                                {mediaCollectionSummary?.videoCount ? (
+                                  <Play className="h-3 w-3 opacity-70" />
+                                ) : (
+                                  <Images className="h-3 w-3 opacity-70" />
+                                )}
+                                {mediaCollectionLabel}
                               </span>
                             </>
                         )}

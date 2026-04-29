@@ -31,6 +31,8 @@ type InstagramDownloadResult =
 export interface InstagramMediaSummary {
   kind: InstagramResolveResult["kind"];
   itemCount: number;
+  imageCount: number;
+  videoCount: number;
   hasImage: boolean;
   hasVideo: boolean;
   isImageOnly: boolean;
@@ -133,10 +135,11 @@ export async function downloadInstagramJob(options: {
 
   updateJob(job.id, {
     title,
-    ...(resolved.items[0]?.thumbnailUrl
-      ? { thumbnail: resolved.items[0].thumbnailUrl }
+    mediaCollectionSummary: summarizeInstagramItems(resolved),
+    ...(getPreferredInstagramThumbnail(resolved.items)
+      ? { thumbnail: getPreferredInstagramThumbnail(resolved.items) }
       : {}),
-    ...(resolved.items[0]?.thumbnailUrl
+    ...(getPreferredInstagramThumbnail(resolved.items)
       ? { thumbnailStatus: "ready" as const }
       : {}),
   });
@@ -519,7 +522,8 @@ export async function fetchInstagramMediaInfo(url: string) {
   const resolved = await resolveInstagramWithDownloadgram(url);
   return {
     title: buildInstagramTitle(url, resolved),
-    thumbnailUrl: resolved.items[0]?.thumbnailUrl ?? "",
+    thumbnailUrl: getPreferredInstagramThumbnail(resolved.items) ?? "",
+    mediaCollectionSummary: summarizeInstagramItems(resolved),
     hasManualSubtitles: false,
     hasAutoSubtitles: false,
     availableSubtitleLanguages: [] as string[],
@@ -530,18 +534,54 @@ export async function inspectInstagramMedia(
   url: string
 ): Promise<InstagramMediaSummary> {
   const resolved = await resolveInstagramWithDownloadgram(url);
+  const imageCount = resolved.items.filter((item) => item.type === "image").length;
+  const videoCount = resolved.items.filter((item) => item.type === "video").length;
   const hasImage = resolved.items.some((item) => item.type === "image");
   const hasVideo = resolved.items.some((item) => item.type === "video");
 
   return {
     kind: resolved.kind,
     itemCount: resolved.items.length,
+    imageCount,
+    videoCount,
     hasImage,
     hasVideo,
     isImageOnly: hasImage && !hasVideo,
     isVideoOnly: hasVideo && !hasImage,
     isMixedCarousel: resolved.kind === "carousel" && hasImage && hasVideo,
   };
+}
+
+function summarizeInstagramItems(
+  resolved: InstagramResolveResult
+): DownloadJob["mediaCollectionSummary"] {
+  const imageCount = resolved.items.filter((item) => item.type === "image").length;
+  const videoCount = resolved.items.filter((item) => item.type === "video").length;
+
+  return {
+    totalItems: resolved.items.length,
+    imageCount,
+    videoCount,
+    kind: resolved.kind,
+  };
+}
+
+function getPreferredInstagramThumbnail(
+  items: InstagramMediaItem[]
+): string | undefined {
+  for (const item of items) {
+    const candidate = item.thumbnailUrl?.trim();
+    if (candidate) return candidate;
+  }
+
+  for (const item of items) {
+    if (item.type === "image") {
+      const candidate = item.downloadUrl?.trim();
+      if (candidate) return candidate;
+    }
+  }
+
+  return undefined;
 }
 
 function getUnsupportedReason(
