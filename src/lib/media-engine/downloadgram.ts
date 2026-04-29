@@ -4,7 +4,7 @@ type MediaType = "image" | "video";
 type ResolveKind = "single" | "carousel";
 
 interface DownloadGramProvider {
-  id: "downloadgram-app" | "downloadgram-org";
+  id: "downloadgram-app" | "downloadgram-website";
   endpoint: string;
   referer: string;
   origin: string;
@@ -41,12 +41,12 @@ const DOWNLOADGRAM_PROVIDERS: readonly DownloadGramProvider[] = [
     origin: "https://www.downloadgram.app",
   },
   {
-    id: "downloadgram-org",
-    endpoint: "https://api.downloadgram.org/media",
-    referer: "https://downloadgram.org/",
-    origin: "https://downloadgram.org",
+    id: "downloadgram-website",
+    endpoint: "https://downloadgram.website/core/ajax.php",
+    referer: "https://downloadgram.website/",
+    origin: "https://downloadgram.website",
     formFields: {
-      v: "3",
+      host: "instagram",
     },
   },
 ] as const;
@@ -112,6 +112,29 @@ export async function resolveInstagramWithDownloadgram(
 }
 
 function extractHtmlFragment(responseText: string): string {
+  const trimmed = responseText.trim();
+  if (trimmed.startsWith("{") && trimmed.endsWith("}")) {
+    try {
+      const parsed = JSON.parse(trimmed) as {
+        error?: unknown;
+        message?: unknown;
+      };
+      const detail =
+        typeof parsed.message === "string"
+          ? parsed.message
+          : typeof parsed.error === "string"
+            ? parsed.error
+            : "";
+      if (detail) {
+        throw new Error(`DownloadGram API error: ${detail}`);
+      }
+    } catch (error) {
+      if (error instanceof Error) {
+        throw error;
+      }
+    }
+  }
+
   const alertIndex = responseText.indexOf(ALERT_START);
   if (alertIndex !== -1) {
     const startQuote = responseText.indexOf("'", alertIndex);
@@ -128,6 +151,9 @@ function extractHtmlFragment(responseText: string): string {
 
   const start = responseText.indexOf(INNER_HTML_START);
   if (start === -1) {
+    if (trimmed.startsWith("<")) {
+      return trimmed;
+    }
     throw new Error("Could not find DownloadGram HTML payload.");
   }
 
@@ -229,17 +255,23 @@ function parseDownloadGramHtml(
   provider: DownloadGramProvider["id"]
 ): InstagramMediaItem[] {
   const doc = new DOMParser().parseFromString(html, "text/html");
-  const blocks = Array.from(doc.querySelectorAll(".download-items"));
+  const blocks = Array.from(
+    doc.querySelectorAll(
+      provider === "downloadgram-website"
+        ? ".story-container"
+        : ".download-items"
+    )
+  );
   const providerBaseUrl = getProviderBaseUrl(provider);
 
   return blocks
     .map((block, index) => {
       const anchor = block.querySelector<HTMLAnchorElement>("a[href]");
-      const downloadUrl = normalizeDownloadGramUrl(
+      const normalizedDownloadUrl = normalizeDownloadGramUrl(
         anchor?.getAttribute("href"),
         providerBaseUrl
       );
-      if (!downloadUrl) return null;
+      if (!normalizedDownloadUrl) return null;
 
       const image = block.querySelector<HTMLImageElement>("img[src]");
       const icon = block.querySelector<HTMLElement>(".format-icon i");
@@ -247,16 +279,22 @@ function parseDownloadGramHtml(
         image?.getAttribute("src"),
         providerBaseUrl
       );
-      const tokenPayload = decodeDownloadGramToken(downloadUrl);
-      const type = inferMediaType(downloadUrl, icon?.className ?? "");
+      const resolvedDownload = resolveProviderDownloadUrl(
+        normalizedDownloadUrl,
+        provider
+      );
+      const type = inferMediaType(
+        resolvedDownload.downloadUrl,
+        icon?.className ?? ""
+      );
 
       return {
-        sourceUrl: tokenPayload?.url ?? null,
-        suggestedFilename: tokenPayload?.filename ?? null,
-        id: buildItemId(downloadUrl, index),
+        sourceUrl: resolvedDownload.sourceUrl,
+        suggestedFilename: resolvedDownload.suggestedFilename,
+        id: buildItemId(resolvedDownload.downloadUrl, index),
         index,
         type,
-        downloadUrl,
+        downloadUrl: resolvedDownload.downloadUrl,
         thumbnailUrl,
         provider,
       } satisfies InstagramMediaItem;
@@ -267,7 +305,7 @@ function parseDownloadGramHtml(
 function getProviderBaseUrl(provider: DownloadGramProvider["id"]): string {
   return (
     DOWNLOADGRAM_PROVIDERS.find((candidate) => candidate.id === provider)
-      ?.origin ?? "https://downloadgram.org"
+      ?.origin ?? "https://www.downloadgram.app"
   );
 }
 
@@ -312,6 +350,34 @@ function inferMediaType(downloadUrl: string, iconClassName: string): MediaType {
   return "image";
 }
 
+function resolveProviderDownloadUrl(
+  downloadUrl: string,
+  provider: DownloadGramProvider["id"]
+): {
+  downloadUrl: string;
+  sourceUrl: string | null;
+  suggestedFilename: string | null;
+} {
+  if (provider === "downloadgram-website") {
+    const decodedUrl = decodeDownloadgramWebsiteUrl(downloadUrl);
+    if (decodedUrl) {
+      return {
+        downloadUrl: decodedUrl,
+        sourceUrl: decodedUrl,
+        suggestedFilename: extractFilenameFromUrl(decodedUrl),
+      };
+    }
+  }
+
+  const tokenPayload = decodeDownloadGramToken(downloadUrl);
+  return {
+    downloadUrl,
+    sourceUrl: tokenPayload?.url ?? null,
+    suggestedFilename:
+      tokenPayload?.filename ?? extractFilenameFromUrl(tokenPayload?.url),
+  };
+}
+
 function buildItemId(downloadUrl: string, index: number): string {
   const tokenPayload = decodeDownloadGramToken(downloadUrl);
   const preferred =
@@ -323,6 +389,18 @@ function buildItemId(downloadUrl: string, index: number): string {
       .replace(/^-+|-+$/g, "")
       .toLowerCase() || `item-${index + 1}`
   );
+}
+
+function decodeDownloadgramWebsiteUrl(downloadUrl: string): string | null {
+  try {
+    const parsed = new URL(downloadUrl);
+    const token = parsed.searchParams.get("url");
+    if (!token) return null;
+
+    return atob(token);
+  } catch {
+    return null;
+  }
 }
 
 export function extractInstagramShortcode(url: string): string {
@@ -369,6 +447,19 @@ function decodeDownloadGramToken(
         typeof parsed.filename === "string" ? parsed.filename : undefined,
       url: typeof parsed.url === "string" ? parsed.url : undefined,
     };
+  } catch {
+    return null;
+  }
+}
+
+function extractFilenameFromUrl(url: string | null | undefined): string | null {
+  if (!url) return null;
+
+  try {
+    const pathname = new URL(url).pathname;
+    const parts = pathname.split("/").filter(Boolean);
+    const segment = parts.length > 0 ? parts[parts.length - 1] : null;
+    return segment ? decodeURIComponent(segment) : null;
   } catch {
     return null;
   }
