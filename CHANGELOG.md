@@ -1,5 +1,16 @@
 # Changelog
 
+## 0.5.0 - 2026-05-05
+- **Portable Mode (#8)**: Added a dedicated Portable ZIP for Windows, with app state, thumbnails, archive data, and managed tools stored beside the executable under `portable-data`.
+- **Portable Tools**: Bundled `yt-dlp`, `ffmpeg`, `ffprobe`, `aria2c`, and `deno` for Portable builds so locked-down setups can run without a separate tool install flow.
+- **Portable Updates**: Removed the stale portable self-updater path. Portable builds now open GitHub Releases for manual ZIP replacement instead of staging an in-place updater executable.
+- **DownloadGram Providers**: Moved DownloadGram provider routing into an editable JSON config, keeping only the current `.app` and `.org` providers and their live API endpoints.
+- **DownloadGram Health Checks**: Added a route probe script so provider endpoint drift can be checked without changing downloader code.
+- **Instagram Reliability**: Hardened DownloadGram parsing, fallback media fetches, thumbnail selection, and image/carousel handling for tougher Instagram cases.
+- **Archive / Results**: Added richer download archive context, stronger finished-result metadata, better thumbnail carry-through, and contact-sheet support for image-heavy jobs.
+- **Managed Tools / Updates**: Tightened tool target visibility, startup setup prompts, backup cleanup, path handling, and installer-type messaging across Full, Lite, and Portable modes.
+- **Release Assets**: Refreshed the v0.5.0 release notes and GitHub-ready light/dark promo image set.
+
 ## 0.4.1 - 2026-04-12
 - **Presets / Filenames (#5)**: Added preset-level filename templates so custom presets can define their own saved-file naming pattern without forcing every download to override it manually.
 - **Quick Download Panel (#6)**: Tightened the quick panel layout by reducing repeated metadata, shortening the URL/preset controls, and keeping the download action easier to reach on smaller screens and keyboard-first setups.

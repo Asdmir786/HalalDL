@@ -15,6 +15,7 @@ import {
   Sparkles,
   WandSparkles,
 } from "lucide-react";
+import { useEffect, type ComponentType, type PropsWithChildren } from "react";
 import { cn } from "@/lib/utils";
 
 type ThemeName = "light" | "dark";
@@ -33,10 +34,10 @@ const sceneCopy: Record<SceneName, SceneCopy> = {
     eyebrow: "v0.5.0 · Portable Workflow Update",
     title: "Three ways to run HalalDL.\nOne cleaner daily flow.",
     body:
-      "Portable joins Full and Lite, Instagram fallback got more reliable, and finished downloads now carry richer metadata, previews, and archive context.",
+      "Portable joins Full and Lite, DownloadGram providers are easier to keep current, and finished downloads now carry richer metadata, previews, and archive context.",
     bullets: [
       "New Portable ZIP with bundled tools beside the app",
-      "Stronger Instagram and DownloadGram fallback handling",
+      "Editable DownloadGram provider routes for .app and .org",
       "Archive, thumbnails, metadata, and contact-sheet improvements",
     ],
     accentLabel: "Portable release ready",
@@ -49,7 +50,7 @@ const sceneCopy: Record<SceneName, SceneCopy> = {
     bullets: [
       "portable-data stores state, tools, thumbnails, and archive beside the EXE",
       "Bundled yt-dlp, ffmpeg, ffprobe, aria2c, and deno",
-      "Manual GitHub Releases update path instead of an in-place self-updater",
+      "Manual GitHub Releases update path with the stale updater removed",
     ],
     accentLabel: "Portable bundle detected",
   },
@@ -57,11 +58,11 @@ const sceneCopy: Record<SceneName, SceneCopy> = {
     eyebrow: "Instagram reliability",
     title: "Fallback paths that\nhold up better\nwhen links get weird.",
     body:
-      "Image-heavy Instagram cases, DownloadGram parsing, and local preview paths were tightened so the app can recover more gracefully when metadata is messy.",
+      "Image-heavy Instagram cases, DownloadGram provider routing, and local preview paths were tightened so the app can recover more gracefully when metadata is messy.",
     bullets: [
-      "Hardened DownloadGram URL parsing",
+      "DownloadGram .app and .org endpoints live in editable JSON",
+      "Route health checks flag provider drift before a release",
       "Better fallback media fetches and thumbnail selection",
-      "Richer finished-result metadata and more dependable image previews",
     ],
     accentLabel: "Fallback path improved",
   },
@@ -100,6 +101,16 @@ function SceneShell({
 }) {
   const copy = sceneCopy[scene];
   const isDark = theme === "dark";
+
+  useEffect(() => {
+    const root = document.documentElement;
+    root.classList.toggle("dark", isDark);
+    root.classList.toggle("light", !isDark);
+
+    return () => {
+      root.classList.remove("dark", "light");
+    };
+  }, [isDark]);
 
   const shellClass = isDark ? "dark" : "";
   return (
@@ -178,9 +189,6 @@ function ReleaseBackdrop({ scene }: { scene: SceneName }) {
   return (
     <>
       <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_left,rgba(16,185,129,0.09),transparent_32%),radial-gradient(circle_at_bottom_right,rgba(14,165,233,0.08),transparent_30%)]" />
-      <div className="absolute left-[-120px] top-[-160px] h-[460px] w-[460px] rounded-full bg-emerald-400/18 blur-[110px]" />
-      <div className="absolute right-[-140px] top-[120px] h-[420px] w-[420px] rounded-full bg-cyan-400/14 blur-[120px]" />
-      <div className="absolute bottom-[-220px] left-[30%] h-[420px] w-[560px] rounded-full bg-amber-300/10 blur-[135px]" />
       <div className={cn("absolute inset-0 bg-gradient-to-br", accentMap[scene])} />
       <div
         className="absolute inset-0 opacity-[0.08]"
@@ -211,7 +219,7 @@ function SceneVisual({ scene }: { scene: SceneName }) {
 function Surface({
   className,
   children,
-}: React.PropsWithChildren<{ className?: string }>) {
+}: PropsWithChildren<{ className?: string }>) {
   return (
     <div
       className={cn(
@@ -229,7 +237,7 @@ function MiniChip({
   text,
   tone = "default",
 }: {
-  icon: React.ComponentType<{ className?: string }>;
+  icon: ComponentType<{ className?: string }>;
   text: string;
   tone?: "default" | "good";
 }) {
@@ -332,7 +340,7 @@ function HeroScene() {
           </div>
           <div className="mt-5 space-y-3">
             <FeatureRow icon={PackageCheck} title="Portable build" body="Bundled binaries, portable-data layout, manual release-page updates." />
-            <FeatureRow icon={Camera} title="Stronger fallbacks" body="Instagram and DownloadGram recovery paths are less brittle." />
+            <FeatureRow icon={Camera} title="Editable fallbacks" body="DownloadGram .app and .org routes can be adjusted without rewriting the downloader." />
             <FeatureRow icon={FolderArchive} title="Richer finished jobs" body="Archive, thumbnails, metadata, and contact-sheet support land together." />
           </div>
         </Surface>
@@ -370,7 +378,7 @@ function PortableScene() {
               <InfoPill label="Installer type" value="Portable ZIP" />
               <InfoPill label="Install scope" value="portable-data" />
               <InfoPill label="Managed tools" value="yt-dlp · ffmpeg · aria2 · deno" />
-              <InfoPill label="Update action" value="Open Releases page" />
+              <InfoPill label="Update action" value="Open Releases page only" />
             </div>
             <div className="mt-6 flex gap-3">
               <ActionButton primary icon={ArrowUpRight} label="Open GitHub Releases" />
@@ -382,7 +390,7 @@ function PortableScene() {
       <div className="grid grid-cols-3 gap-4">
         <StatPanel icon={PackageCheck} title="Fixed startup probe" body="Portable mode now checks bundled files directly in portable-data/bin." />
         <StatPanel icon={HardDriveDownload} title="No AppData dependency" body="Portable state and managed binaries stay beside the executable." />
-        <StatPanel icon={ShieldCheck} title="Safer updates" body="Release-page updates replace the older staged updater path." />
+        <StatPanel icon={ShieldCheck} title="Safer updates" body="Release-page updates replace the older staged updater path, and that updater code is gone." />
       </div>
     </div>
   );
@@ -420,9 +428,9 @@ function InstagramScene() {
               </div>
             </div>
             <div className="space-y-4">
-              <FeatureRow icon={Download} title="Stricter link parsing" body="Odd share URLs and fallback links are normalized more carefully before request time." />
+              <FeatureRow icon={Download} title="Editable provider routes" body="DownloadGram .app and .org endpoints now live in JSON with provider-specific fields." />
               <FeatureRow icon={ImageIcon} title="Better thumbnail paths" body="Image-heavy jobs can reuse downloaded local media as a cleaner preview source." />
-              <FeatureRow icon={Layers3} title="Richer finished metadata" body="Completed results keep more context for cards, previews, and later browsing." />
+              <FeatureRow icon={Layers3} title="Route health check" body="A release-time probe catches simple endpoint drift before users feel it." />
             </div>
           </div>
         </div>
@@ -432,10 +440,10 @@ function InstagramScene() {
           Reliability pass
         </div>
         <div className="mt-4 space-y-4">
-          <ProbeRow title="DownloadGram URL normalization" detail="Cleaner path extraction and fewer bad share-link assumptions." />
+          <ProbeRow title="downloadgram.app provider" detail="Posts to the current api.downloadgram.app media route." />
+          <ProbeRow title="downloadgram.org provider" detail="Posts to the current api.downloadgram.org media route with v=3." />
           <ProbeRow title="Fallback media fetch selection" detail="More resilient handling for image-only and carousel cases." />
           <ProbeRow title="Thumbnail and preview handoff" detail="Finished cards can lean on local outputs when they exist." />
-          <ProbeRow title="Result card context" detail="Output parsing and metadata capture widened for post-download clarity." />
         </div>
       </Surface>
     </div>
@@ -547,7 +555,7 @@ function ModeRow({
   note,
   highlight = false,
 }: {
-  icon: React.ComponentType<{ className?: string }>;
+  icon: ComponentType<{ className?: string }>;
   name: string;
   note: string;
   highlight?: boolean;
@@ -582,7 +590,7 @@ function FeatureRow({
   title,
   body,
 }: {
-  icon: React.ComponentType<{ className?: string }>;
+  icon: ComponentType<{ className?: string }>;
   title: string;
   body: string;
 }) {
@@ -650,7 +658,7 @@ function ActionButton({
   label,
   primary = false,
 }: {
-  icon: React.ComponentType<{ className?: string }>;
+  icon: ComponentType<{ className?: string }>;
   label: string;
   primary?: boolean;
 }) {
@@ -674,7 +682,7 @@ function StatPanel({
   title,
   body,
 }: {
-  icon: React.ComponentType<{ className?: string }>;
+  icon: ComponentType<{ className?: string }>;
   title: string;
   body: string;
 }) {
@@ -729,7 +737,7 @@ function SnapshotTile({
   icon: Icon,
 }: {
   label: string;
-  icon: React.ComponentType<{ className?: string }>;
+  icon: ComponentType<{ className?: string }>;
 }) {
   return (
     <div className="rounded-[26px] border border-border/70 bg-background/55 p-4">
