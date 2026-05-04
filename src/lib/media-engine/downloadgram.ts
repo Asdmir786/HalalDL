@@ -1,14 +1,26 @@
 import { postFormForText } from "@/lib/commands";
+import configuredProviders from "./downloadgram-providers.json";
 
 type MediaType = "image" | "video";
 type ResolveKind = "single" | "carousel";
+type TokenMode = "jwt-query" | "direct";
 
 interface DownloadGramProvider {
-  id: "downloadgram-app" | "downloadgram-website";
+  id: string;
+  label: string;
+  enabled?: boolean;
   endpoint: string;
   referer: string;
   origin: string;
   formFields?: Record<string, string>;
+  parser: string;
+  tokenMode: TokenMode;
+  resultBlockSelectors: string[];
+  downloadLinkSelector?: string;
+  thumbnailSelector?: string;
+  mediaIconSelector?: string;
+  lastChecked?: string;
+  notes?: string;
 }
 
 export interface InstagramMediaItem {
@@ -19,12 +31,12 @@ export interface InstagramMediaItem {
   thumbnailUrl: string | null;
   sourceUrl: string | null;
   suggestedFilename: string | null;
-  provider: DownloadGramProvider["id"];
+  provider: string;
 }
 
 export interface InstagramResolveResult {
   provider: "downloadgram";
-  providerInstance: DownloadGramProvider["id"];
+  providerInstance: string;
   sourceUrl: string;
   shortcode: string;
   resourceType: "post" | "reel" | "tv" | "unknown";
@@ -33,26 +45,22 @@ export interface InstagramResolveResult {
   resolvedAt: string;
 }
 
-const DOWNLOADGRAM_PROVIDERS: readonly DownloadGramProvider[] = [
-  {
-    id: "downloadgram-app",
-    endpoint: "https://api.downloadgram.app/media",
-    referer: "https://www.downloadgram.app/",
-    origin: "https://www.downloadgram.app",
-  },
-  {
-    id: "downloadgram-website",
-    endpoint: "https://downloadgram.website/core/ajax.php",
-    referer: "https://downloadgram.website/",
-    origin: "https://downloadgram.website",
-    formFields: {
-      host: "instagram",
-    },
-  },
-] as const;
+const DOWNLOADGRAM_PROVIDERS = (
+  configuredProviders as unknown as DownloadGramProvider[]
+).filter((provider) =>
+  Boolean(
+    provider.enabled !== false &&
+      provider.id &&
+      provider.endpoint &&
+      provider.referer &&
+      provider.origin &&
+      provider.tokenMode &&
+      provider.resultBlockSelectors?.length
+  )
+);
 
-const INNER_HTML_START = "['innerHTML']='";
 const ALERT_START = "pushAlert(";
+const HTML_ASSIGNMENT_MARKERS = ["['innerHTML']=", ".innerHTML=", ".html("];
 const INVALID_LINK_TARGETS = new Set(["", "#"]);
 
 export function isInstagramUrl(url: string): boolean {
@@ -87,10 +95,12 @@ export async function resolveInstagramWithDownloadgram(
         provider.origin
       );
       const html = extractHtmlFragment(responseText);
-      const items = parseDownloadGramHtml(html, provider.id);
+      const items = parseDownloadGramHtml(html, provider);
 
       if (items.length === 0) {
-        throw new Error("DownloadGram returned no downloadable media items.");
+        throw new Error(
+          `${provider.label} returned no downloadable media items.`
+        );
       }
 
       return {
@@ -149,33 +159,65 @@ function extractHtmlFragment(responseText: string): string {
     }
   }
 
-  const start = responseText.indexOf(INNER_HTML_START);
-  if (start === -1) {
-    if (trimmed.startsWith("<")) {
-      return trimmed;
-    }
-    throw new Error("Could not find DownloadGram HTML payload.");
+  if (trimmed.startsWith("<")) {
+    return trimmed;
   }
 
-  const raw = readQuotedJsString(responseText, start + INNER_HTML_START.length);
-  const html = decodeJsSingleQuotedString(raw).trim();
+  const html = extractAssignedHtml(responseText)?.trim();
   if (!html) {
-    throw new Error("DownloadGram returned an empty HTML payload.");
+    throw new Error("Could not find DownloadGram HTML payload.");
   }
 
   return html;
 }
 
-function readQuotedJsString(source: string, startIndex: number): string {
+function extractAssignedHtml(source: string): string | null {
+  for (const marker of HTML_ASSIGNMENT_MARKERS) {
+    let searchIndex = 0;
+    while (searchIndex < source.length) {
+      const markerIndex = source.indexOf(marker, searchIndex);
+      if (markerIndex === -1) break;
+
+      let valueIndex = markerIndex + marker.length;
+      while (/\s/.test(source[valueIndex] ?? "")) valueIndex += 1;
+      if (source[valueIndex] === "=") {
+        valueIndex += 1;
+        while (/\s/.test(source[valueIndex] ?? "")) valueIndex += 1;
+      }
+
+      const quote = source[valueIndex];
+      if (quote === "'" || quote === '"') {
+        const raw = readQuotedJsString(source, valueIndex + 1, quote);
+        return quote === "'"
+          ? decodeJsSingleQuotedString(raw)
+          : decodeJsDoubleQuotedString(raw);
+      }
+
+      searchIndex = markerIndex + marker.length;
+    }
+  }
+
+  return null;
+}
+
+function readQuotedJsString(
+  source: string,
+  startIndex: number,
+  quote: "'" | '"'
+): string {
   let out = "";
   for (let i = startIndex; i < source.length; i += 1) {
     const ch = source[i];
-    if (ch === "'" && source[i - 1] !== "\\") {
+    if (ch === quote && source[i - 1] !== "\\") {
       return out;
     }
     out += ch;
   }
   throw new Error("DownloadGram payload string was not terminated.");
+}
+
+function decodeJsDoubleQuotedString(raw: string): string {
+  return decodeJsSingleQuotedString(raw.replace(/\\"/g, '"'));
 }
 
 function decodeJsSingleQuotedString(raw: string): string {
@@ -252,32 +294,30 @@ function decodeJsSingleQuotedString(raw: string): string {
 
 function parseDownloadGramHtml(
   html: string,
-  provider: DownloadGramProvider["id"]
+  provider: DownloadGramProvider
 ): InstagramMediaItem[] {
   const doc = new DOMParser().parseFromString(html, "text/html");
   const blocks = Array.from(
-    doc.querySelectorAll(
-      provider === "downloadgram-website"
-        ? ".story-container"
-        : ".download-items"
-    )
+    doc.querySelectorAll(provider.resultBlockSelectors.join(","))
   );
-  const providerBaseUrl = getProviderBaseUrl(provider);
+  const downloadLinkSelector = provider.downloadLinkSelector ?? "a[href]";
+  const thumbnailSelector = provider.thumbnailSelector ?? "img[src]";
+  const mediaIconSelector = provider.mediaIconSelector ?? ".format-icon i";
 
   return blocks
     .map((block, index) => {
-      const anchor = block.querySelector<HTMLAnchorElement>("a[href]");
+      const anchor = block.querySelector<HTMLAnchorElement>(downloadLinkSelector);
       const normalizedDownloadUrl = normalizeDownloadGramUrl(
         anchor?.getAttribute("href"),
-        providerBaseUrl
+        provider.origin
       );
       if (!normalizedDownloadUrl) return null;
 
-      const image = block.querySelector<HTMLImageElement>("img[src]");
-      const icon = block.querySelector<HTMLElement>(".format-icon i");
+      const image = block.querySelector<HTMLImageElement>(thumbnailSelector);
+      const icon = block.querySelector<HTMLElement>(mediaIconSelector);
       const thumbnailUrl = normalizeDownloadGramUrl(
         image?.getAttribute("src"),
-        providerBaseUrl
+        provider.origin
       );
       const resolvedDownload = resolveProviderDownloadUrl(
         normalizedDownloadUrl,
@@ -296,17 +336,10 @@ function parseDownloadGramHtml(
         type,
         downloadUrl: resolvedDownload.downloadUrl,
         thumbnailUrl,
-        provider,
+        provider: provider.id,
       } satisfies InstagramMediaItem;
     })
     .filter((item): item is InstagramMediaItem => item !== null);
-}
-
-function getProviderBaseUrl(provider: DownloadGramProvider["id"]): string {
-  return (
-    DOWNLOADGRAM_PROVIDERS.find((candidate) => candidate.id === provider)
-      ?.origin ?? "https://www.downloadgram.app"
-  );
 }
 
 function normalizeDownloadGramUrl(
@@ -352,24 +385,14 @@ function inferMediaType(downloadUrl: string, iconClassName: string): MediaType {
 
 function resolveProviderDownloadUrl(
   downloadUrl: string,
-  provider: DownloadGramProvider["id"]
+  provider: DownloadGramProvider
 ): {
   downloadUrl: string;
   sourceUrl: string | null;
   suggestedFilename: string | null;
 } {
-  if (provider === "downloadgram-website") {
-    const decodedUrl = decodeDownloadgramWebsiteUrl(downloadUrl);
-    if (decodedUrl) {
-      return {
-        downloadUrl: decodedUrl,
-        sourceUrl: decodedUrl,
-        suggestedFilename: extractFilenameFromUrl(decodedUrl),
-      };
-    }
-  }
-
-  const tokenPayload = decodeDownloadGramToken(downloadUrl);
+  const tokenPayload =
+    provider.tokenMode === "jwt-query" ? decodeDownloadGramToken(downloadUrl) : null;
   return {
     downloadUrl,
     sourceUrl: tokenPayload?.url ?? null,
@@ -389,18 +412,6 @@ function buildItemId(downloadUrl: string, index: number): string {
       .replace(/^-+|-+$/g, "")
       .toLowerCase() || `item-${index + 1}`
   );
-}
-
-function decodeDownloadgramWebsiteUrl(downloadUrl: string): string | null {
-  try {
-    const parsed = new URL(downloadUrl);
-    const token = parsed.searchParams.get("url");
-    if (!token) return null;
-
-    return atob(token);
-  } catch {
-    return null;
-  }
 }
 
 export function extractInstagramShortcode(url: string): string {

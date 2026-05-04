@@ -15,10 +15,6 @@ default-run = "halaldl"
 name = "halal_dl_lib"
 crate-type = ["staticlib", "cdylib", "rlib"]
 
-[[bin]]
-name = "portable_updater"
-path = "src/bin/portable_updater.rs"
-
 [build-dependencies]
 tauri-build = { version = "2.5.6", features = [] }
 

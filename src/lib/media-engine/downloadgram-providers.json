@@ -1,0 +1,38 @@
+[
+  {
+    "id": "downloadgram-app",
+    "label": "DownloadGram App",
+    "enabled": true,
+    "endpoint": "https://api.downloadgram.app/media",
+    "referer": "https://www.downloadgram.app/",
+    "origin": "https://www.downloadgram.app",
+    "formFields": {},
+    "parser": "downloadgram-app",
+    "tokenMode": "jwt-query",
+    "resultBlockSelectors": [".download-items"],
+    "downloadLinkSelector": "a[href]",
+    "thumbnailSelector": "img[src]",
+    "mediaIconSelector": ".format-icon i",
+    "lastChecked": "2026-05-05",
+    "notes": "Current live form on www.downloadgram.app posts url and lang to this endpoint."
+  },
+  {
+    "id": "downloadgram-org",
+    "label": "DownloadGram Org",
+    "enabled": true,
+    "endpoint": "https://api.downloadgram.org/media",
+    "referer": "https://downloadgram.org/",
+    "origin": "https://downloadgram.org",
+    "formFields": {
+      "v": "3"
+    },
+    "parser": "downloadgram-org",
+    "tokenMode": "jwt-query",
+    "resultBlockSelectors": [".download-items", ".dlsection", "#downloadhere"],
+    "downloadLinkSelector": "a[href]",
+    "thumbnailSelector": "img[src]",
+    "mediaIconSelector": ".format-icon i",
+    "lastChecked": "2026-05-05",
+    "notes": "Current live form on downloadgram.org posts url, v=3, and lang to this endpoint."
+  }
+]
