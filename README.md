@@ -80,7 +80,7 @@ HalalDL releases are currently **not code-signed**, so Windows SmartScreen may w
 - Verify the installer against the `SHA256SUMS.txt` file attached to each release
 - If SmartScreen appears, use `More info` and confirm the publisher/source only if the checksum matches the release page
 
-The repo is public so you can inspect the source, workflows, and release process before installing.
+The repo is public so you can inspect the source, workflows, and release process before installing. See the [Code signing policy](./CODE_SIGNING_POLICY.md) for the current signing plan and verification guidance.
 
 ## Features
 
