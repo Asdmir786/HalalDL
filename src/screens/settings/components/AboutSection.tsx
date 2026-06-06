@@ -8,6 +8,8 @@ import {
   ArrowUpCircle,
   Loader2,
   MessageSquare,
+  Copy,
+  ShieldCheck,
   Star,
   X,
 } from "lucide-react";
@@ -21,7 +23,6 @@ import {
   downloadAndVerifyAppUpdate,
   openFile,
   revealInExplorer,
-  type InstallerType,
 } from "@/lib/commands";
 import { useAppUpdateStore } from "@/store/app-update";
 import { SettingsSection } from "./SettingsSection";
@@ -38,6 +39,8 @@ import {
   markSupportPromptStarred,
   readSupportPromptState,
 } from "@/lib/runtime-flags";
+import { buildCopyDiagnosticsSummary } from "@/lib/diagnostics";
+import { formatDiagnosticsPackageLabel } from "@/lib/diagnostics-summary";
 import {
   Dialog,
   DialogContent,
@@ -49,7 +52,9 @@ import {
 
 const REPO_URL = "https://github.com/Asdmir786/HalalDL";
 const RELEASES_URL = `${REPO_URL}/releases`;
+const LATEST_RELEASE_URL = `${REPO_URL}/releases/latest`;
 const ISSUES_URL = `${REPO_URL}/issues/new/choose`;
+const CODE_SIGNING_POLICY_URL = `${REPO_URL}/blob/main/CODE_SIGNING_POLICY.md`;
 const SUPPORT_PROMPT_COMPLETED_DOWNLOADS = 3;
 
 type UpdateStatus =
@@ -89,7 +94,7 @@ export function AboutSection() {
   const installerType = storeUpdate.installContext?.installerType ?? "unknown";
   const isPortableInstall =
     appMode === "PORTABLE" || installerType === "portable";
-  const packageLabel = formatPackageLabel(installerType);
+  const packageLabel = formatDiagnosticsPackageLabel(installerType);
   const installActionLabel = "Install and Close";
   const jobs = useDownloadsStore((s) => s.jobs);
   const activeJobCount = jobs.filter(
@@ -267,6 +272,19 @@ export function AboutSection() {
     }
     await openUrl(ISSUES_URL);
   }, []);
+
+  const handleCopyDiagnostics = useCallback(async () => {
+    try {
+      const summary = buildCopyDiagnosticsSummary({
+        version: version === "..." ? "unknown" : version,
+        packageLabel,
+      });
+      await navigator.clipboard.writeText(summary);
+      toast.success("Diagnostics copied to clipboard");
+    } catch {
+      toast.error("Failed to copy diagnostics");
+    }
+  }, [packageLabel, version]);
 
   return (
     <SettingsSection
@@ -499,7 +517,7 @@ export function AboutSection() {
                 more Windows users find the project.
               </p>
             </div>
-            <div className="grid shrink-0 grid-cols-1 gap-2 sm:grid-cols-3 lg:w-[360px]">
+            <div className="grid shrink-0 grid-cols-1 gap-2 sm:grid-cols-2 lg:w-[360px]">
               <MotionButton
                 size="sm"
                 onClick={() => void handleStarProject()}
@@ -522,6 +540,17 @@ export function AboutSection() {
                 Feedback
               </MotionButton>
               <MotionButton
+                variant="outline"
+                size="sm"
+                onClick={() => void handleCopyDiagnostics()}
+                whileHover={{ scale: 1.03 }}
+                whileTap={{ scale: 0.97 }}
+                className="w-full"
+              >
+                <Copy className="h-3.5 w-3.5 mr-1.5" />
+                Copy Diagnostics
+              </MotionButton>
+              <MotionButton
                 variant="ghost"
                 size="sm"
                 onClick={() => void handleDismissSupportPrompt()}
@@ -536,6 +565,57 @@ export function AboutSection() {
           </div>
         </div>
       )}
+
+      <div className="rounded-xl border border-border/30 bg-muted/15 p-4 sm:p-5">
+        <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
+          <div className="min-w-0 space-y-2">
+            <div className="flex items-center gap-2">
+              <ShieldCheck className="h-4 w-4 text-primary" />
+              <p className="text-sm font-semibold">Install Trust</p>
+            </div>
+            <p className="max-w-2xl text-xs leading-relaxed text-muted-foreground">
+              Official HalalDL downloads come from GitHub Releases. Releases
+              are currently unsigned, so Windows SmartScreen may appear. Verify
+              downloaded files with SHA256SUMS.txt when needed.
+            </p>
+          </div>
+          <div className="grid shrink-0 grid-cols-1 gap-2 sm:grid-cols-3 lg:w-[420px]">
+            <MotionButton
+              variant="outline"
+              size="sm"
+              onClick={() => void openUrl(LATEST_RELEASE_URL)}
+              whileHover={{ scale: 1.03 }}
+              whileTap={{ scale: 0.97 }}
+              className="w-full"
+            >
+              <ExternalLink className="h-3.5 w-3.5 mr-1.5" />
+              Latest Release
+            </MotionButton>
+            <MotionButton
+              variant="outline"
+              size="sm"
+              onClick={() => void openUrl(CODE_SIGNING_POLICY_URL)}
+              whileHover={{ scale: 1.03 }}
+              whileTap={{ scale: 0.97 }}
+              className="w-full"
+            >
+              <ShieldCheck className="h-3.5 w-3.5 mr-1.5" />
+              Signing Policy
+            </MotionButton>
+            <MotionButton
+              variant="outline"
+              size="sm"
+              onClick={() => void handleCopyDiagnostics()}
+              whileHover={{ scale: 1.03 }}
+              whileTap={{ scale: 0.97 }}
+              className="w-full"
+            >
+              <Copy className="h-3.5 w-3.5 mr-1.5" />
+              Copy Diagnostics
+            </MotionButton>
+          </div>
+        </div>
+      </div>
 
       {/* Links */}
       <div className="grid grid-cols-1 gap-2.5 sm:grid-cols-2 xl:grid-cols-3">
@@ -562,6 +642,12 @@ export function AboutSection() {
           title="Feedback"
           description="Bugs & feature requests"
           onClick={() => openUrl(ISSUES_URL)}
+        />
+        <LinkCard
+          icon={Copy}
+          title="Copy Diagnostics"
+          description="Paste into support requests"
+          onClick={() => void handleCopyDiagnostics()}
         />
       </div>
 
@@ -615,13 +701,6 @@ export function AboutSection() {
       </Dialog>
     </SettingsSection>
   );
-}
-
-function formatPackageLabel(installerType: InstallerType): string {
-  if (installerType === "msi") return "MSI";
-  if (installerType === "nsis") return "NSIS";
-  if (installerType === "portable") return "Portable ZIP";
-  return "Package Unknown";
 }
 
 function LinkCard({

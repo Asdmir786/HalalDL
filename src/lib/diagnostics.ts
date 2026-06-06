@@ -5,6 +5,7 @@ import { usePresetsStore, type Preset } from "@/store/presets";
 import { useSettingsStore, type Settings } from "@/store/settings";
 import { useToolsStore, type Tool } from "@/store/tools";
 import { getAppMode } from "@/lib/tools/app-mode";
+import { formatDiagnosticsSummary } from "@/lib/diagnostics-summary";
 
 type DiagnosticsRedaction = {
   redactUrls: boolean;
@@ -123,4 +124,54 @@ export function buildDiagnosticsPayload(redaction: DiagnosticsRedaction) {
     historySummary,
     logsText,
   };
+}
+
+export function buildCopyDiagnosticsSummary({
+  version,
+  packageLabel,
+  osLabel = navigator.userAgent || "Unknown OS",
+}: {
+  version: string;
+  packageLabel: string;
+  osLabel?: string;
+}) {
+  const logsState = useLogsStore.getState();
+  const downloadsState = useDownloadsStore.getState();
+  const historyState = useHistoryStore.getState();
+  const toolsState = useToolsStore.getState();
+
+  const activeDownloadCount = downloadsState.jobs.filter(
+    (job) => job.status === "Downloading" || job.status === "Post-processing"
+  ).length;
+  const completedHistoryCount = historyState.entries.filter(
+    (entry) => entry.status === "completed"
+  ).length;
+  const failedHistoryCount = historyState.entries.filter(
+    (entry) => entry.status === "failed"
+  ).length;
+  const recentErrors = logsState.logs
+    .filter((log) => log.level === "error")
+    .slice(-5)
+    .map((log) =>
+      redactLogLine(log.message, { redactPaths: true, redactUrls: true })
+    );
+
+  return formatDiagnosticsSummary({
+    version,
+    mode: getAppMode(),
+    packageLabel,
+    osLabel,
+    activeDownloadCount,
+    history: {
+      total: historyState.entries.length,
+      completed: completedHistoryCount,
+      failed: failedHistoryCount,
+    },
+    tools: toolsState.tools.map((tool) => ({
+      name: tool.name,
+      status: tool.status,
+      version: tool.version,
+    })),
+    recentErrors,
+  });
 }

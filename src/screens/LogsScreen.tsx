@@ -15,10 +15,12 @@ import {
 import { toast } from "sonner";
 import { useLogsStore, LogLevel } from "@/store/logs";
 import { useDownloadsStore } from "@/store/downloads";
+import { useAppUpdateStore } from "@/store/app-update";
 import { MotionButton } from "@/components/motion/MotionButton";
 import { FadeInStagger, FadeInItem } from "@/components/motion/StaggerContainer";
 import { save } from "@tauri-apps/plugin-dialog";
 import { invoke } from "@tauri-apps/api/core";
+import { getVersion } from "@tauri-apps/api/app";
 import { Input } from "@/components/ui/input";
 import {
   Select,
@@ -29,7 +31,11 @@ import {
 } from "@/components/ui/select";
 import { cn } from "@/lib/utils";
 import { Separator } from "@/components/ui/separator";
-import { buildDiagnosticsPayload } from "@/lib/diagnostics";
+import {
+  buildCopyDiagnosticsSummary,
+  buildDiagnosticsPayload,
+} from "@/lib/diagnostics";
+import { formatDiagnosticsPackageLabel } from "@/lib/diagnostics-summary";
 
 const LEVEL_STYLES: Record<LogLevel, string> = {
   info: "text-blue-400",
@@ -58,6 +64,7 @@ export function LogsScreen() {
   const loadStatus = useLogsStore((state) => state.loadStatus);
   const loadLogs = useLogsStore((state) => state.loadLogs);
   const jobs = useDownloadsStore((state) => state.jobs);
+  const installContext = useAppUpdateStore((state) => state.installContext);
 
   const [filter, setFilter] = React.useState<LogLevel | "all">("all");
   const [search, setSearch] = React.useState("");
@@ -66,6 +73,9 @@ export function LogsScreen() {
   const [availableJobs, setAvailableJobs] = React.useState<string[]>([]);
   const parentRef = React.useRef<HTMLDivElement>(null);
   const didAutoSelectJob = React.useRef(false);
+  const packageLabel = formatDiagnosticsPackageLabel(
+    installContext?.installerType ?? "unknown"
+  );
 
   const activeJobIds = React.useMemo(() => {
     return new Set(
@@ -76,6 +86,30 @@ export function LogsScreen() {
   }, [jobs]);
 
   const activeJobsCount = activeJobIds.size;
+  const errorCount = React.useMemo(
+    () => logs.filter((log) => log.level === "error").length,
+    [logs]
+  );
+  const warningCount = React.useMemo(
+    () => logs.filter((log) => log.level === "warn").length,
+    [logs]
+  );
+  const commandCount = React.useMemo(
+    () => logs.filter((log) => log.level === "command").length,
+    [logs]
+  );
+  const lastFailedJob = React.useMemo(() => {
+    let latest = undefined as (typeof jobs)[number] | undefined;
+    for (const job of jobs) {
+      if (job.status !== "Failed") continue;
+      const ts = job.statusChangedAt ?? job.createdAt;
+      const latestTs = latest
+        ? latest.statusChangedAt ?? latest.createdAt
+        : Number.NEGATIVE_INFINITY;
+      if (ts > latestTs) latest = job;
+    }
+    return latest;
+  }, [jobs]);
   const selectedJob = React.useMemo(() => {
     if (jobFilter === "all" || jobFilter === "active") return undefined;
     return jobs.find((job) => job.id === jobFilter);
@@ -184,6 +218,7 @@ export function LogsScreen() {
 
   const [isExporting, setIsExporting] = React.useState(false);
   const [isExportingDiagnostics, setIsExportingDiagnostics] = React.useState(false);
+  const [isCopyingDiagnostics, setIsCopyingDiagnostics] = React.useState(false);
 
   const handleExport = React.useCallback(async () => {
     if (!filteredLogs.length) {
@@ -242,6 +277,28 @@ export function LogsScreen() {
       setIsExportingDiagnostics(false);
     }
   }, []);
+
+  const handleCopyDiagnostics = React.useCallback(async () => {
+    setIsCopyingDiagnostics(true);
+    try {
+      const version = await getVersion().catch(() => "unknown");
+      const summary = buildCopyDiagnosticsSummary({
+        version,
+        packageLabel,
+      });
+      await navigator.clipboard.writeText(summary);
+      toast.success("Diagnostics copied to clipboard");
+    } catch (error: unknown) {
+      const message = error instanceof Error ? error.message : String(error);
+      useLogsStore.getState().addLog({
+        level: "error",
+        message: `Copy diagnostics failed: ${message}`,
+      });
+      toast.error(`Copy diagnostics failed: ${message}`);
+    } finally {
+      setIsCopyingDiagnostics(false);
+    }
+  }, [packageLabel]);
 
   const copyToClipboard = React.useCallback((text: string, label: string) => {
     navigator.clipboard.writeText(text);
@@ -313,14 +370,29 @@ export function LogsScreen() {
               <div className="space-y-1">
                 <h2 className="text-2xl font-bold tracking-tight flex items-center gap-2">
                   <Terminal className="w-6 h-6 text-primary" />
-                  Console Output
+                  Logs & Diagnostics
                 </h2>
                 <p className="text-muted-foreground text-sm">
-                  System logs and yt-dlp process output
+                  Review app output, copy support details, and export a redacted diagnostics ZIP.
                 </p>
               </div>
               
               <div className="flex items-center gap-2">
+                <MotionButton
+                  variant="outline"
+                  size="sm"
+                  onClick={() => void handleCopyDiagnostics()}
+                  disabled={isCopyingDiagnostics}
+                  whileHover={{ scale: 1.02 }}
+                  whileTap={{ scale: 0.98 }}
+                >
+                  {isCopyingDiagnostics ? (
+                    <LoaderCircle className="w-3.5 h-3.5 mr-2 animate-spin" />
+                  ) : (
+                    <Copy className="w-3.5 h-3.5 mr-2" />
+                  )}
+                  Copy Diagnostics
+                </MotionButton>
                  <MotionButton
                   variant="outline"
                   size="sm"
@@ -334,7 +406,7 @@ export function LogsScreen() {
                   ) : (
                     <Download className="w-3.5 h-3.5 mr-2" />
                   )}
-                  Diagnostics
+                  Export Diagnostics
                 </MotionButton>
                  <MotionButton
                   variant="outline"
@@ -360,7 +432,7 @@ export function LogsScreen() {
                   whileTap={{ scale: 0.98 }}
                 >
                   <Copy className="w-3.5 h-3.5 mr-2" />
-                  Copy
+                  Copy Logs
                 </MotionButton>
                 <MotionButton
                   variant="outline"
@@ -371,7 +443,7 @@ export function LogsScreen() {
                   whileTap={{ scale: 0.98 }}
                 >
                   <AlertCircle className="w-3.5 h-3.5 mr-2" />
-                  Copy Errors
+                  Copy Error Lines
                 </MotionButton>
                 <MotionButton
                   variant="ghost"
@@ -386,6 +458,39 @@ export function LogsScreen() {
                   Clear
                 </MotionButton>
               </div>
+            </div>
+
+            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-4">
+              <LogSummaryCard
+                label="Active jobs"
+                value={String(activeJobsCount)}
+                detail={
+                  activeJobsCount === 0
+                    ? "No downloads running"
+                    : "Currently producing output"
+                }
+              />
+              <LogSummaryCard
+                label="Errors"
+                value={String(errorCount)}
+                detail="Current log buffer"
+                tone={errorCount > 0 ? "danger" : "default"}
+              />
+              <LogSummaryCard
+                label="Warnings"
+                value={String(warningCount)}
+                detail={`${commandCount} command line${commandCount === 1 ? "" : "s"} captured`}
+                tone={warningCount > 0 ? "warning" : "default"}
+              />
+              <LogSummaryCard
+                label="Last failed job"
+                value={lastFailedJob?.title || "None"}
+                detail={
+                  lastFailedJob
+                    ? lastFailedJob.statusDetail || "Select the job to copy error lines"
+                    : "No failed jobs in the queue"
+                }
+              />
             </div>
 
             {/* Toolbar */}
@@ -466,7 +571,7 @@ export function LogsScreen() {
             <div className="absolute top-0 left-0 right-0 h-8 bg-white/5 border-b border-white/5 flex items-center px-3 justify-between z-10 backdrop-blur-md select-none">
               <div className="flex items-center gap-2 text-[10px] font-mono text-white/40">
                 <Terminal className="w-3 h-3" />
-                <span>BASH</span>
+                <span>FILTERED OUTPUT</span>
               </div>
               <div className="flex items-center gap-3">
                  <div className={cn(
@@ -576,6 +681,39 @@ export function LogsScreen() {
           </div>
         </FadeInItem>
       </FadeInStagger>
+    </div>
+  );
+}
+
+function LogSummaryCard({
+  label,
+  value,
+  detail,
+  tone = "default",
+}: {
+  label: string;
+  value: string;
+  detail: string;
+  tone?: "default" | "danger" | "warning";
+}) {
+  return (
+    <div
+      className={cn(
+        "min-w-0 rounded-xl border px-4 py-3",
+        tone === "danger"
+          ? "border-red-500/20 bg-red-500/5"
+          : tone === "warning"
+            ? "border-amber-500/20 bg-amber-500/5"
+            : "border-border/40 bg-muted/20"
+      )}
+    >
+      <p className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
+        {label}
+      </p>
+      <p className="mt-1 truncate text-lg font-semibold tracking-tight text-foreground">
+        {value}
+      </p>
+      <p className="mt-1 truncate text-xs text-muted-foreground">{detail}</p>
     </div>
   );
 }
