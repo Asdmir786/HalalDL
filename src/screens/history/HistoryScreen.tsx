@@ -11,10 +11,29 @@ import { DiskAwareness } from "./components/DiskAwareness";
 import { SmartSuggestions } from "./components/SmartSuggestions";
 import { HistoryExport } from "./components/HistoryExport";
 import { exists, readDir } from "@tauri-apps/plugin-fs";
+import { open } from "@tauri-apps/plugin-shell";
 import { toast } from "sonner";
-import { History as HistoryIcon } from "lucide-react";
+import { History as HistoryIcon, MessageSquare, Star, X } from "lucide-react";
 import { copyFilesToClipboard } from "@/lib/commands";
 import { getExplicitOutputPaths } from "@/lib/output-paths";
+import {
+  dismissSupportPrompt,
+  markSupportPromptFeedback,
+  markSupportPromptStarred,
+  readSupportPromptState,
+} from "@/lib/runtime-flags";
+
+const REPO_URL = "https://github.com/Asdmir786/HalalDL";
+const ISSUES_URL = `${REPO_URL}/issues/new/choose`;
+const SUPPORT_PROMPT_COMPLETED_DOWNLOADS = 3;
+
+async function openUrl(url: string) {
+  try {
+    await open(url);
+  } catch {
+    return;
+  }
+}
 
 type PathParts = {
   dir: string;
@@ -188,6 +207,7 @@ export function HistoryScreen() {
   const [hideMissing, setHideMissing] = useState(false);
   const [groupByDomain, setGroupByDomain] = useState(false);
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
+  const [supportPromptDismissed, setSupportPromptDismissed] = useState(false);
 
   const scrollRef = useRef<HTMLDivElement>(null);
   const scrollTopRef = useRef(0);
@@ -197,6 +217,27 @@ export function HistoryScreen() {
 
   // Track file existence for visible entries
   const [fileExistsMap, setFileExistsMap] = useState<Record<string, boolean>>({});
+  const completedDownloadCount = entries.filter((entry) => entry.status === "completed").length;
+  const shouldShowSupportFooter =
+    completedDownloadCount >= SUPPORT_PROMPT_COMPLETED_DOWNLOADS &&
+    !supportPromptDismissed;
+
+  useEffect(() => {
+    let cancelled = false;
+    readSupportPromptState()
+      .then((state) => {
+        if (cancelled) return;
+        setSupportPromptDismissed(
+          Boolean(state.dismissedAt || state.starredAt || state.feedbackAt)
+        );
+      })
+      .catch(() => {
+        if (!cancelled) setSupportPromptDismissed(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   useEffect(() => {
     let cancelled = false;
@@ -457,6 +498,35 @@ export function HistoryScreen() {
     }
   }, [selectedCopyablePaths]);
 
+  const handleDismissSupportPrompt = useCallback(async () => {
+    setSupportPromptDismissed(true);
+    try {
+      await dismissSupportPrompt();
+    } catch {
+      void 0;
+    }
+  }, []);
+
+  const handleStarProject = useCallback(async () => {
+    setSupportPromptDismissed(true);
+    try {
+      await markSupportPromptStarred();
+    } catch {
+      void 0;
+    }
+    await openUrl(REPO_URL);
+  }, []);
+
+  const handleGiveFeedback = useCallback(async () => {
+    setSupportPromptDismissed(true);
+    try {
+      await markSupportPromptFeedback();
+    } catch {
+      void 0;
+    }
+    await openUrl(ISSUES_URL);
+  }, []);
+
   useLayoutEffect(() => {
     const el = scrollRef.current;
     if (!el) return;
@@ -610,34 +680,99 @@ export function HistoryScreen() {
               ))}
             </div>
           ) : (
-            <div className={viewMode === "list" ? "flex flex-col gap-2" : "grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-4"}>
-              {filtered.map((entry) => (
-                viewMode === "list" ? (
-                  <HistoryItem
-                    key={entry.id}
-                    entry={entry}
-                    onRemove={handleRemove}
-                    fileExists={fileExistsMap[entry.id] ?? null}
-                    formatRelativeTime={formatRelativeTime}
-                    isSelected={selectedIdsSet.has(entry.id)}
-                    onToggleSelection={handleToggleSelection}
-                  />
-                ) : (
-                  <HistoryGrid
-                    key={entry.id}
-                    entry={entry}
-                    onRemove={handleRemove}
-                    fileExists={fileExistsMap[entry.id] ?? null}
-                    formatRelativeTime={formatRelativeTime}
-                    isSelected={selectedIdsSet.has(entry.id)}
-                    onToggleSelection={handleToggleSelection}
-                  />
-                )
-              ))}
-            </div>
+            <>
+              <div className={viewMode === "list" ? "flex flex-col gap-2" : "grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-4"}>
+                {filtered.map((entry) => (
+                  viewMode === "list" ? (
+                    <HistoryItem
+                      key={entry.id}
+                      entry={entry}
+                      onRemove={handleRemove}
+                      fileExists={fileExistsMap[entry.id] ?? null}
+                      formatRelativeTime={formatRelativeTime}
+                      isSelected={selectedIdsSet.has(entry.id)}
+                      onToggleSelection={handleToggleSelection}
+                    />
+                  ) : (
+                    <HistoryGrid
+                      key={entry.id}
+                      entry={entry}
+                      onRemove={handleRemove}
+                      fileExists={fileExistsMap[entry.id] ?? null}
+                      formatRelativeTime={formatRelativeTime}
+                      isSelected={selectedIdsSet.has(entry.id)}
+                      onToggleSelection={handleToggleSelection}
+                    />
+                  )
+                ))}
+              </div>
+            </>
+          )}
+          {filtered.length > 0 && shouldShowSupportFooter && (
+            <SupportFooter
+              completedCount={completedDownloadCount}
+              onStar={() => void handleStarProject()}
+              onFeedback={() => void handleGiveFeedback()}
+              onDismiss={() => void handleDismissSupportPrompt()}
+            />
           )}
         </div>
       </FadeInStagger>
+    </div>
+  );
+}
+
+function SupportFooter({
+  completedCount,
+  onStar,
+  onFeedback,
+  onDismiss,
+}: {
+  completedCount: number;
+  onStar: () => void;
+  onFeedback: () => void;
+  onDismiss: () => void;
+}) {
+  return (
+    <div className="mt-6 rounded-xl border border-border/30 bg-muted/15 px-4 py-3">
+      <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+        <div className="min-w-0">
+          <div className="flex items-center gap-2 text-sm font-medium">
+            <Star className="h-4 w-4 text-primary" />
+            HalalDL has helped with {completedCount} downloads
+          </div>
+          <p className="mt-1 text-xs text-muted-foreground">
+            A GitHub star or quick feedback note helps more Windows users find
+            the project.
+          </p>
+        </div>
+        <div className="flex flex-wrap items-center gap-2">
+          <button
+            type="button"
+            onClick={onStar}
+            className="inline-flex items-center gap-1.5 rounded-full bg-primary px-3 py-1.5 text-xs font-semibold text-primary-foreground transition-colors hover:bg-primary/90"
+          >
+            <Star className="h-3.5 w-3.5" />
+            Star
+          </button>
+          <button
+            type="button"
+            onClick={onFeedback}
+            className="inline-flex items-center gap-1.5 rounded-full border border-border/50 bg-background/50 px-3 py-1.5 text-xs font-semibold text-foreground transition-colors hover:bg-muted"
+          >
+            <MessageSquare className="h-3.5 w-3.5" />
+            Feedback
+          </button>
+          <button
+            type="button"
+            onClick={onDismiss}
+            className="inline-flex items-center gap-1.5 rounded-full px-3 py-1.5 text-xs font-medium text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+          >
+            <X className="h-3.5 w-3.5" />
+            Not now
+          </button>
+        </div>
+      </div>
     </div>
   );
 }

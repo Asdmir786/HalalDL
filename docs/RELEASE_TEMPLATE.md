@@ -54,10 +54,12 @@ Released: YYYY-MM-DD
 
 *   **Full (Recommended)**: Best for most users. Includes all dependencies (FFmpeg, yt-dlp, etc.) pre-configured.
 *   **Lite**: Best for power users who manage their own tools.
+*   **Portable**: Best for no-install or locked-down Windows setups. Keeps app data and managed tools beside the executable.
 
 ## ⚠️ Known Notes
 
 *   **[Platform or release note]**: [Any platform-specific note, limitation, or small caveat worth calling out.]
+*   **Install trust**: If releases are still unsigned, mention that Windows SmartScreen may appear and point users to `SHA256SUMS.txt`.
 *   **Release images**: [Confirm that light-mode and dark-mode release images are included separately.]
 
 ## ⬆️ Upgrade Notes

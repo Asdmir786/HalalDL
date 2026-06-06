@@ -10,6 +10,7 @@ HalalDL is a privacy-focused Windows desktop app for downloading video or audio 
 
 - **Best for most users:** download the latest release and choose `HalalDL-Full-...-setup.exe`
 - **Best for power users:** choose `HalalDL-Lite-...-setup.exe` if you want to manage `yt-dlp`, `ffmpeg`, and optional tools yourself
+- **Best for no-install use:** choose `HalalDL-Portable-...zip` if you want the app, settings, archive, thumbnails, and managed tools kept together in one folder
 - **WinGet:** `winget install --id Asdmir786.HalalDL`
 - **Platform today:** Windows 10 and Windows 11, x64
 - **Use it responsibly:** only download content you are allowed to access and save; respect platform rules, copyright, and local law
@@ -22,7 +23,7 @@ WinGet catalog updates can lag behind GitHub Releases, so the latest GitHub rele
 - **Beginner-friendly:** paste a URL, pick a preset, and go
 - **Fast clipboard flow:** quick tray downloads and auto-paste keep repeat downloads moving
 - **Transparent:** raw logs stay visible instead of being hidden behind vague progress messages
-- **Flexible:** Full and Lite builds let you choose between convenience and control
+- **Flexible:** Full, Lite, and Portable builds let you choose between convenience, control, and no-install use
 
 ## Why This Exists
 
@@ -65,12 +66,17 @@ The project tries to keep the strong parts of the CLI ecosystem while making the
 4. Watch live progress and raw logs.
 5. Find completed files and past activity in History.
 
-## Full vs Lite
+## Which Build Should I Download?
+
+For most people, start with **Full setup EXE**.
 
 | Build | Best for | Includes tools | Notes |
 | --- | --- | --- | --- |
-| **Full** | Most users | Yes | Recommended if you want the easiest install path |
-| **Lite** | Power users | No | Use your own `yt-dlp`, `ffmpeg`, `aria2`, and optional Deno runtime |
+| **Full setup EXE** | Most users | Yes, app-managed | Recommended first install path |
+| **Full MSI** | Package/manual deployment | Yes, app-managed | Useful when you specifically prefer MSI |
+| **Lite setup EXE** | Power users | No | Use your own `yt-dlp`, `ffmpeg`, `aria2`, and optional Deno runtime |
+| **Lite MSI** | Power-user deployment | No | Same Lite behavior, MSI package |
+| **Portable ZIP** | Locked-down or no-install Windows setups | Yes, inside `portable-data/bin` | Keep the app and its data together in one folder |
 
 ## Install Trust And SmartScreen
 
@@ -79,6 +85,16 @@ HalalDL releases are currently **not code-signed**, so Windows SmartScreen may w
 - Download from the official [GitHub Releases](https://github.com/Asdmir786/HalalDL/releases/latest) page only
 - Verify the installer against the `SHA256SUMS.txt` file attached to each release
 - If SmartScreen appears, use `More info` and confirm the publisher/source only if the checksum matches the release page
+
+### Verify SHA256 on Windows
+
+Open PowerShell in the folder where you downloaded the installer and run:
+
+```powershell
+Get-FileHash .\HalalDL-Full-v0.5.0-win10+11-x64-setup.exe -Algorithm SHA256
+```
+
+Compare the `Hash` value with the matching line in `SHA256SUMS.txt` from the same GitHub Release. If the filename differs, replace the filename in the command with the file you downloaded.
 
 The repo is public so you can inspect the source, workflows, and release process before installing. See the [Code signing policy](./CODE_SIGNING_POLICY.md) for the current signing plan and verification guidance.
 
@@ -102,7 +118,7 @@ No. HalalDL is a local desktop app.
 
 ### Which build should I choose?
 
-Choose **Full** if you want the easiest setup. Choose **Lite** if you prefer managing your own tools.
+Choose **Full setup EXE** if you want the easiest setup. Choose **Lite** if you prefer managing your own tools. Choose **Portable ZIP** if you want a no-install folder that carries its app data and managed tools with it.
 
 ### Does HalalDL support macOS or Linux?
 

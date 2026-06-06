@@ -6,6 +6,9 @@ type RuntimeFlags = {
   addModeDefaultMigrated?: boolean;
   lastNotifiedAppUpdateVersion?: string | null;
   lastNotifiedToolUpdateVersions?: Record<string, string>;
+  supportPromptDismissedAt?: number;
+  supportPromptStarredAt?: number;
+  supportPromptFeedbackAt?: number;
 };
 
 async function readFlags(): Promise<RuntimeFlags> {
@@ -63,5 +66,37 @@ export async function writeLastNotifiedToolUpdateVersions(
   await writeFlags((current) => ({
     ...current,
     lastNotifiedToolUpdateVersions: versions,
+  }));
+}
+
+export async function readSupportPromptState() {
+  const flags = await readFlags();
+  return {
+    dismissedAt: flags.supportPromptDismissedAt ?? null,
+    starredAt: flags.supportPromptStarredAt ?? null,
+    feedbackAt: flags.supportPromptFeedbackAt ?? null,
+  };
+}
+
+export async function dismissSupportPrompt() {
+  await writeFlags((current) => ({
+    ...current,
+    supportPromptDismissedAt: Date.now(),
+  }));
+}
+
+export async function markSupportPromptStarred() {
+  await writeFlags((current) => ({
+    ...current,
+    supportPromptDismissedAt: Date.now(),
+    supportPromptStarredAt: Date.now(),
+  }));
+}
+
+export async function markSupportPromptFeedback() {
+  await writeFlags((current) => ({
+    ...current,
+    supportPromptDismissedAt: Date.now(),
+    supportPromptFeedbackAt: Date.now(),
   }));
 }

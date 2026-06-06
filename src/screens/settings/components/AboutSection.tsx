@@ -7,6 +7,9 @@ import {
   CheckCircle2,
   ArrowUpCircle,
   Loader2,
+  MessageSquare,
+  Star,
+  X,
 } from "lucide-react";
 import { getVersion } from "@tauri-apps/api/app";
 import { exit } from "@tauri-apps/plugin-process";
@@ -28,6 +31,13 @@ import { checkAndStoreAppUpdate } from "@/lib/app-updates/service";
 import { notifyUser } from "@/lib/notifications";
 import { isDemoModeEnabled } from "@/lib/demo-mode";
 import { getAppMode } from "@/lib/tools/app-mode";
+import { useHistoryStore } from "@/store/history";
+import {
+  dismissSupportPrompt,
+  markSupportPromptFeedback,
+  markSupportPromptStarred,
+  readSupportPromptState,
+} from "@/lib/runtime-flags";
 import {
   Dialog,
   DialogContent,
@@ -39,7 +49,8 @@ import {
 
 const REPO_URL = "https://github.com/Asdmir786/HalalDL";
 const RELEASES_URL = `${REPO_URL}/releases`;
-const ISSUES_URL = `${REPO_URL}/issues`;
+const ISSUES_URL = `${REPO_URL}/issues/new/choose`;
+const SUPPORT_PROMPT_COMPLETED_DOWNLOADS = 3;
 
 type UpdateStatus =
   | "idle"
@@ -84,6 +95,13 @@ export function AboutSection() {
   const activeJobCount = jobs.filter(
     (job) => job.status === "Downloading" || job.status === "Post-processing"
   ).length;
+  const completedDownloadCount = useHistoryStore(
+    (s) => s.entries.filter((entry) => entry.status === "completed").length
+  );
+  const [supportPromptDismissed, setSupportPromptDismissed] = useState(false);
+  const shouldShowSupportPrompt =
+    completedDownloadCount >= SUPPORT_PROMPT_COMPLETED_DOWNLOADS &&
+    !supportPromptDismissed;
   const canInstallUpdate =
     activeJobCount === 0 && Boolean(verifiedInstallerPath);
 
@@ -94,6 +112,23 @@ export function AboutSection() {
     getVersion()
       .then(setVersion)
       .catch(() => setVersion("unknown"));
+  }, []);
+
+  useEffect(() => {
+    let cancelled = false;
+    readSupportPromptState()
+      .then((state) => {
+        if (cancelled) return;
+        setSupportPromptDismissed(
+          Boolean(state.dismissedAt || state.starredAt || state.feedbackAt)
+        );
+      })
+      .catch(() => {
+        if (!cancelled) setSupportPromptDismissed(false);
+      });
+    return () => {
+      cancelled = true;
+    };
   }, []);
 
   useEffect(() => {
@@ -203,6 +238,35 @@ export function AboutSection() {
       setInstallDialogOpen(false);
     }
   }, [activeJobCount, verifiedInstallerPath]);
+
+  const handleDismissSupportPrompt = useCallback(async () => {
+    setSupportPromptDismissed(true);
+    try {
+      await dismissSupportPrompt();
+    } catch {
+      void 0;
+    }
+  }, []);
+
+  const handleStarProject = useCallback(async () => {
+    setSupportPromptDismissed(true);
+    try {
+      await markSupportPromptStarred();
+    } catch {
+      void 0;
+    }
+    await openUrl(REPO_URL);
+  }, []);
+
+  const handleGiveFeedback = useCallback(async () => {
+    setSupportPromptDismissed(true);
+    try {
+      await markSupportPromptFeedback();
+    } catch {
+      void 0;
+    }
+    await openUrl(ISSUES_URL);
+  }, []);
 
   return (
     <SettingsSection
@@ -421,6 +485,58 @@ export function AboutSection() {
         )}
       </div>
 
+      {shouldShowSupportPrompt && (
+        <div className="rounded-xl border border-primary/20 bg-primary/5 p-4 sm:p-5">
+          <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
+            <div className="min-w-0 space-y-2">
+              <div className="flex items-center gap-2">
+                <Star className="h-4 w-4 text-primary" />
+                <p className="text-sm font-semibold">Enjoying HalalDL?</p>
+              </div>
+              <p className="max-w-2xl text-xs leading-relaxed text-muted-foreground">
+                You have completed {completedDownloadCount} downloads. If
+                HalalDL helped you, a GitHub star or a quick feedback note helps
+                more Windows users find the project.
+              </p>
+            </div>
+            <div className="grid shrink-0 grid-cols-1 gap-2 sm:grid-cols-3 lg:w-[360px]">
+              <MotionButton
+                size="sm"
+                onClick={() => void handleStarProject()}
+                whileHover={{ scale: 1.04 }}
+                whileTap={{ scale: 0.96 }}
+                className="w-full"
+              >
+                <Star className="h-3.5 w-3.5 mr-1.5" />
+                Star
+              </MotionButton>
+              <MotionButton
+                variant="outline"
+                size="sm"
+                onClick={() => void handleGiveFeedback()}
+                whileHover={{ scale: 1.03 }}
+                whileTap={{ scale: 0.97 }}
+                className="w-full"
+              >
+                <MessageSquare className="h-3.5 w-3.5 mr-1.5" />
+                Feedback
+              </MotionButton>
+              <MotionButton
+                variant="ghost"
+                size="sm"
+                onClick={() => void handleDismissSupportPrompt()}
+                whileHover={{ scale: 1.03 }}
+                whileTap={{ scale: 0.97 }}
+                className="w-full text-muted-foreground"
+              >
+                <X className="h-3.5 w-3.5 mr-1.5" />
+                Not now
+              </MotionButton>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Links */}
       <div className="grid grid-cols-1 gap-2.5 sm:grid-cols-2 xl:grid-cols-3">
         <LinkCard
@@ -436,8 +552,14 @@ export function AboutSection() {
           onClick={() => openUrl(RELEASES_URL)}
         />
         <LinkCard
-          icon={Info}
-          title="Report Issue"
+          icon={Star}
+          title="Star HalalDL"
+          description="Support the project"
+          onClick={() => openUrl(REPO_URL)}
+        />
+        <LinkCard
+          icon={MessageSquare}
+          title="Feedback"
           description="Bugs & feature requests"
           onClick={() => openUrl(ISSUES_URL)}
         />

@@ -7,14 +7,16 @@
 - `pnpm build`
 - `pnpm cargo:check`
 - Verify core screens still work
-- Verify Lite vs Full packaging still behaves as expected
+- Verify Full, Lite, and Portable packaging still behave as expected
 - Confirm installer names match the README and release template
 
 ## Release Assets
 
 - `HalalDL-Full-v[VERSION]-win10+11-x64-setup.exe`
+- `HalalDL-Full-v[VERSION]-win10+11-x64.msi`
 - `HalalDL-Lite-v[VERSION]-win10+11-x64-setup.exe`
-- Optional MSI variants if still distributed
+- `HalalDL-Lite-v[VERSION]-win10+11-x64.msi`
+- `HalalDL-Portable-v[VERSION]-win10+11-x64.zip`
 - `SHA256SUMS.txt`
 - Separate light-mode and dark-mode promo images, named with `-light` and `-dark` suffixes
 - Reproducible release-image generator, preferably `docs/assets/releases/[VERSION]/generate-images.py` using Python/Pillow or an equally deterministic script
@@ -26,8 +28,9 @@ Use [RELEASE_TEMPLATE.md](./RELEASE_TEMPLATE.md) and include:
 
 - What changed
 - Who the release is for
-- Full vs Lite guidance
+- Full vs Lite vs Portable guidance
 - Checksum verification note
+- SmartScreen/code-signing note if releases are still unsigned
 - Known limitations
 - Upgrade notes
 - Embedded images in light and dark pairs
@@ -38,5 +41,7 @@ Use [RELEASE_TEMPLATE.md](./RELEASE_TEMPLATE.md) and include:
 
 - Verify the latest release page opens and downloads correctly
 - Verify `SHA256SUMS.txt` is attached
+- Verify the Full setup EXE is presented as the recommended path for most users
+- Verify Portable ZIP manual update notes are present if Portable is included
 - Check GitHub Insights baseline numbers
 - Post the release announcement and social update from [github-launch-kit.md](./github-launch-kit.md)
