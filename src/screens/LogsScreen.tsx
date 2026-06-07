@@ -34,6 +34,7 @@ import { Separator } from "@/components/ui/separator";
 import {
   buildCopyDiagnosticsSummary,
   buildDiagnosticsPayload,
+  getSupportOsLabel,
 } from "@/lib/diagnostics";
 import { formatDiagnosticsPackageLabel } from "@/lib/diagnostics-summary";
 
@@ -98,18 +99,6 @@ export function LogsScreen() {
     () => logs.filter((log) => log.level === "command").length,
     [logs]
   );
-  const lastFailedJob = React.useMemo(() => {
-    let latest = undefined as (typeof jobs)[number] | undefined;
-    for (const job of jobs) {
-      if (job.status !== "Failed") continue;
-      const ts = job.statusChangedAt ?? job.createdAt;
-      const latestTs = latest
-        ? latest.statusChangedAt ?? latest.createdAt
-        : Number.NEGATIVE_INFINITY;
-      if (ts > latestTs) latest = job;
-    }
-    return latest;
-  }, [jobs]);
   const selectedJob = React.useMemo(() => {
     if (jobFilter === "all" || jobFilter === "active") return undefined;
     return jobs.find((job) => job.id === jobFilter);
@@ -244,7 +233,7 @@ export function LogsScreen() {
       });
       if (path) {
         await invoke("write_text_file", { path, contents: content });
-        toast.success("Logs exported successfully");
+        toast.success("Logs exported");
       }
     } catch (error: unknown) {
       const message = error instanceof Error ? error.message : String(error);
@@ -268,33 +257,36 @@ export function LogsScreen() {
       if (!path) return;
       const payload = buildDiagnosticsPayload({ redactUrls: true, redactPaths: true });
       await invoke("export_diagnostics_zip", { output_path: path, payload });
-      toast.success("Diagnostics exported successfully");
+      toast.success("Report exported");
     } catch (error: unknown) {
       const message = error instanceof Error ? error.message : String(error);
-      useLogsStore.getState().addLog({ level: "error", message: `Diagnostics export failed: ${message}` });
-      toast.error(`Diagnostics export failed: ${message}`);
+      useLogsStore.getState().addLog({ level: "error", message: `Report export failed: ${message}` });
+      toast.error(`Report export failed: ${message}`);
     } finally {
       setIsExportingDiagnostics(false);
     }
   }, []);
 
-  const handleCopyDiagnostics = React.useCallback(async () => {
+  const handleCopySupportInfo = React.useCallback(async () => {
     setIsCopyingDiagnostics(true);
     try {
       const version = await getVersion().catch(() => "unknown");
       const summary = buildCopyDiagnosticsSummary({
         version,
         packageLabel,
+        osLabel: getSupportOsLabel(),
       });
       await navigator.clipboard.writeText(summary);
-      toast.success("Diagnostics copied to clipboard");
+      toast.success("Support info copied", {
+        description: "Paste it into a GitHub issue if you need help.",
+      });
     } catch (error: unknown) {
       const message = error instanceof Error ? error.message : String(error);
       useLogsStore.getState().addLog({
         level: "error",
-        message: `Copy diagnostics failed: ${message}`,
+        message: `Copy support info failed: ${message}`,
       });
-      toast.error(`Copy diagnostics failed: ${message}`);
+      toast.error("Could not copy support info");
     } finally {
       setIsCopyingDiagnostics(false);
     }
@@ -302,7 +294,7 @@ export function LogsScreen() {
 
   const copyToClipboard = React.useCallback((text: string, label: string) => {
     navigator.clipboard.writeText(text);
-    toast.success(`${label} copied to clipboard`);
+    toast.success(`${label} copied`);
   }, []);
 
   const handleCopyVisible = React.useCallback(() => {
@@ -366,22 +358,22 @@ export function LogsScreen() {
         {/* Modern Header */}
         <FadeInItem>
           <div className="flex flex-col gap-6">
-            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+            <div className="flex flex-col gap-4 xl:flex-row xl:items-start xl:justify-between">
               <div className="space-y-1">
                 <h2 className="text-2xl font-bold tracking-tight flex items-center gap-2">
                   <Terminal className="w-6 h-6 text-primary" />
-                  Logs & Diagnostics
+                  Logs
                 </h2>
                 <p className="text-muted-foreground text-sm">
-                  Review app output, copy support details, and export a redacted diagnostics ZIP.
+                  Download output and error details.
                 </p>
               </div>
               
-              <div className="flex items-center gap-2">
+              <div className="flex flex-wrap items-center gap-2 xl:justify-end">
                 <MotionButton
                   variant="outline"
                   size="sm"
-                  onClick={() => void handleCopyDiagnostics()}
+                  onClick={() => void handleCopySupportInfo()}
                   disabled={isCopyingDiagnostics}
                   whileHover={{ scale: 1.02 }}
                   whileTap={{ scale: 0.98 }}
@@ -391,7 +383,7 @@ export function LogsScreen() {
                   ) : (
                     <Copy className="w-3.5 h-3.5 mr-2" />
                   )}
-                  Copy Diagnostics
+                  Copy Support Info
                 </MotionButton>
                  <MotionButton
                   variant="outline"
@@ -406,7 +398,7 @@ export function LogsScreen() {
                   ) : (
                     <Download className="w-3.5 h-3.5 mr-2" />
                   )}
-                  Export Diagnostics
+                  Export Report
                 </MotionButton>
                  <MotionButton
                   variant="outline"
@@ -421,7 +413,7 @@ export function LogsScreen() {
                   ) : (
                     <Download className="w-3.5 h-3.5 mr-2" />
                   )}
-                  Export
+                  Export Logs
                 </MotionButton>
                 <MotionButton
                   variant="outline"
@@ -443,7 +435,7 @@ export function LogsScreen() {
                   whileTap={{ scale: 0.98 }}
                 >
                   <AlertCircle className="w-3.5 h-3.5 mr-2" />
-                  Copy Error Lines
+                  Copy Errors
                 </MotionButton>
                 <MotionButton
                   variant="ghost"
@@ -460,37 +452,12 @@ export function LogsScreen() {
               </div>
             </div>
 
-            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-4">
-              <LogSummaryCard
-                label="Active jobs"
-                value={String(activeJobsCount)}
-                detail={
-                  activeJobsCount === 0
-                    ? "No downloads running"
-                    : "Currently producing output"
-                }
-              />
-              <LogSummaryCard
-                label="Errors"
-                value={String(errorCount)}
-                detail="Current log buffer"
-                tone={errorCount > 0 ? "danger" : "default"}
-              />
-              <LogSummaryCard
-                label="Warnings"
-                value={String(warningCount)}
-                detail={`${commandCount} command line${commandCount === 1 ? "" : "s"} captured`}
-                tone={warningCount > 0 ? "warning" : "default"}
-              />
-              <LogSummaryCard
-                label="Last failed job"
-                value={lastFailedJob?.title || "None"}
-                detail={
-                  lastFailedJob
-                    ? lastFailedJob.statusDetail || "Select the job to copy error lines"
-                    : "No failed jobs in the queue"
-                }
-              />
+            <div className="flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
+              <LogStat label="running" value={activeJobsCount} />
+              <LogStat label="errors" value={errorCount} tone={errorCount > 0 ? "danger" : "default"} />
+              <LogStat label="warnings" value={warningCount} tone={warningCount > 0 ? "warning" : "default"} />
+              <LogStat label="commands" value={commandCount} />
+              <LogStat label="lines" value={logs.length} />
             </div>
 
             {/* Toolbar */}
@@ -571,7 +538,7 @@ export function LogsScreen() {
             <div className="absolute top-0 left-0 right-0 h-8 bg-white/5 border-b border-white/5 flex items-center px-3 justify-between z-10 backdrop-blur-md select-none">
               <div className="flex items-center gap-2 text-[10px] font-mono text-white/40">
                 <Terminal className="w-3 h-3" />
-                <span>FILTERED OUTPUT</span>
+                <span>OUTPUT</span>
               </div>
               <div className="flex items-center gap-3">
                  <div className={cn(
@@ -685,35 +652,28 @@ export function LogsScreen() {
   );
 }
 
-function LogSummaryCard({
+function LogStat({
   label,
   value,
-  detail,
   tone = "default",
 }: {
   label: string;
-  value: string;
-  detail: string;
+  value: number;
   tone?: "default" | "danger" | "warning";
 }) {
   return (
-    <div
+    <span
       className={cn(
-        "min-w-0 rounded-xl border px-4 py-3",
+        "inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1",
         tone === "danger"
-          ? "border-red-500/20 bg-red-500/5"
+          ? "border-red-500/20 bg-red-500/5 text-red-300"
           : tone === "warning"
-            ? "border-amber-500/20 bg-amber-500/5"
+            ? "border-amber-500/20 bg-amber-500/5 text-amber-300"
             : "border-border/40 bg-muted/20"
       )}
     >
-      <p className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
-        {label}
-      </p>
-      <p className="mt-1 truncate text-lg font-semibold tracking-tight text-foreground">
-        {value}
-      </p>
-      <p className="mt-1 truncate text-xs text-muted-foreground">{detail}</p>
-    </div>
+      <span className="font-semibold text-foreground">{value}</span>
+      <span>{label}</span>
+    </span>
   );
 }

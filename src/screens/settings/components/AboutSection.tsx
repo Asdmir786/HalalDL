@@ -39,7 +39,10 @@ import {
   markSupportPromptStarred,
   readSupportPromptState,
 } from "@/lib/runtime-flags";
-import { buildCopyDiagnosticsSummary } from "@/lib/diagnostics";
+import {
+  buildCopyDiagnosticsSummary,
+  getSupportOsLabel,
+} from "@/lib/diagnostics";
 import { formatDiagnosticsPackageLabel } from "@/lib/diagnostics-summary";
 import {
   Dialog,
@@ -273,16 +276,19 @@ export function AboutSection() {
     await openUrl(ISSUES_URL);
   }, []);
 
-  const handleCopyDiagnostics = useCallback(async () => {
+  const handleCopySupportInfo = useCallback(async () => {
     try {
       const summary = buildCopyDiagnosticsSummary({
         version: version === "..." ? "unknown" : version,
         packageLabel,
+        osLabel: getSupportOsLabel(),
       });
       await navigator.clipboard.writeText(summary);
-      toast.success("Diagnostics copied to clipboard");
+      toast.success("Support info copied", {
+        description: "Paste it into a GitHub issue if you need help.",
+      });
     } catch {
-      toast.error("Failed to copy diagnostics");
+      toast.error("Could not copy support info");
     }
   }, [packageLabel, version]);
 
@@ -509,12 +515,10 @@ export function AboutSection() {
             <div className="min-w-0 space-y-2">
               <div className="flex items-center gap-2">
                 <Star className="h-4 w-4 text-primary" />
-                <p className="text-sm font-semibold">Enjoying HalalDL?</p>
+                <p className="text-sm font-semibold">Help improve HalalDL</p>
               </div>
               <p className="max-w-2xl text-xs leading-relaxed text-muted-foreground">
-                You have completed {completedDownloadCount} downloads. If
-                HalalDL helped you, a GitHub star or a quick feedback note helps
-                more Windows users find the project.
+                A star, feedback note, or support info helps the project improve.
               </p>
             </div>
             <div className="grid shrink-0 grid-cols-1 gap-2 sm:grid-cols-2 lg:w-[360px]">
@@ -542,13 +546,13 @@ export function AboutSection() {
               <MotionButton
                 variant="outline"
                 size="sm"
-                onClick={() => void handleCopyDiagnostics()}
+                onClick={() => void handleCopySupportInfo()}
                 whileHover={{ scale: 1.03 }}
                 whileTap={{ scale: 0.97 }}
                 className="w-full"
               >
                 <Copy className="h-3.5 w-3.5 mr-1.5" />
-                Copy Diagnostics
+                Copy Support Info
               </MotionButton>
               <MotionButton
                 variant="ghost"
@@ -579,7 +583,7 @@ export function AboutSection() {
               downloaded files with SHA256SUMS.txt when needed.
             </p>
           </div>
-          <div className="grid shrink-0 grid-cols-1 gap-2 sm:grid-cols-3 lg:w-[420px]">
+          <div className="grid shrink-0 grid-cols-1 gap-2 sm:grid-cols-2 lg:w-[300px]">
             <MotionButton
               variant="outline"
               size="sm"
@@ -601,17 +605,6 @@ export function AboutSection() {
             >
               <ShieldCheck className="h-3.5 w-3.5 mr-1.5" />
               Signing Policy
-            </MotionButton>
-            <MotionButton
-              variant="outline"
-              size="sm"
-              onClick={() => void handleCopyDiagnostics()}
-              whileHover={{ scale: 1.03 }}
-              whileTap={{ scale: 0.97 }}
-              className="w-full"
-            >
-              <Copy className="h-3.5 w-3.5 mr-1.5" />
-              Copy Diagnostics
             </MotionButton>
           </div>
         </div>
@@ -645,9 +638,9 @@ export function AboutSection() {
         />
         <LinkCard
           icon={Copy}
-          title="Copy Diagnostics"
+          title="Copy Support Info"
           description="Paste into support requests"
-          onClick={() => void handleCopyDiagnostics()}
+          onClick={() => void handleCopySupportInfo()}
         />
       </div>
 

@@ -13,6 +13,7 @@ export type DiagnosticsSummaryInput = {
   mode: DiagnosticsSummaryMode;
   packageLabel: string;
   osLabel: string;
+  userAgent: string;
   activeDownloadCount: number;
   history: {
     total: number;
@@ -20,7 +21,6 @@ export type DiagnosticsSummaryInput = {
     failed: number;
   };
   tools: DiagnosticsSummaryTool[];
-  recentErrors: string[];
 };
 
 function formatMode(mode: DiagnosticsSummaryMode): string {
@@ -40,14 +40,8 @@ export function formatDiagnosticsPackageLabel(
 
 function formatTool(tool: DiagnosticsSummaryTool): string {
   const version = tool.version?.trim();
-  return version
-    ? `- ${tool.name}: ${tool.status}, ${version}`
-    : `- ${tool.name}: ${tool.status}`;
-}
-
-function formatRecentErrors(errors: string[]): string {
-  if (errors.length === 0) return "- No recent errors";
-  return errors.map((error) => `- ${error}`).join("\n");
+  if (tool.status === "Missing") return `- ${tool.name}: Missing`;
+  return version ? `- ${tool.name}: ${version}` : `- ${tool.name}: ${tool.status}`;
 }
 
 export function formatDiagnosticsSummary(input: DiagnosticsSummaryInput): string {
@@ -57,18 +51,16 @@ export function formatDiagnosticsSummary(input: DiagnosticsSummaryInput): string
       : "- No tools loaded";
 
   return [
-    "HalalDL diagnostics",
+    "HalalDL support info",
     `Version: ${input.version}`,
     `Mode: ${formatMode(input.mode)}`,
     `Package: ${input.packageLabel}`,
     `OS: ${input.osLabel}`,
-    `Active downloads: ${input.activeDownloadCount}`,
+    `User agent: ${input.userAgent}`,
+    `Downloads running: ${input.activeDownloadCount}`,
     `History: ${input.history.total} total, ${input.history.completed} completed, ${input.history.failed} failed`,
     "",
     "Tools:",
     tools,
-    "",
-    "Recent errors:",
-    formatRecentErrors(input.recentErrors),
   ].join("\n");
 }

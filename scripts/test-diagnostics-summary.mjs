@@ -9,6 +9,7 @@ const summary = formatDiagnosticsSummary({
   mode: "FULL",
   packageLabel: "NSIS",
   osLabel: "Windows 11 x64",
+  userAgent: "Mozilla/5.0 TestAgent",
   activeDownloadCount: 1,
   history: {
     total: 4,
@@ -19,25 +20,27 @@ const summary = formatDiagnosticsSummary({
     { name: "yt-dlp", status: "Detected", version: "2026.06.01" },
     { name: "FFmpeg", status: "Missing" },
   ],
-  recentErrors: ["yt-dlp exited with code 1"],
 });
 
-assert.match(summary, /^HalalDL diagnostics/m);
+assert.match(summary, /^HalalDL support info/m);
 assert.match(summary, /Version: 0\.5\.1/);
 assert.match(summary, /Mode: Full/);
 assert.match(summary, /Package: NSIS/);
 assert.match(summary, /OS: Windows 11 x64/);
-assert.match(summary, /Active downloads: 1/);
+assert.match(summary, /User agent: Mozilla\/5\.0 TestAgent/);
+assert.match(summary, /Downloads running: 1/);
 assert.match(summary, /History: 4 total, 3 completed, 1 failed/);
-assert.match(summary, /- yt-dlp: Detected, 2026\.06\.01/);
+assert.match(summary, /- yt-dlp: 2026\.06\.01/);
 assert.match(summary, /- FFmpeg: Missing/);
-assert.match(summary, /Recent errors:\n- yt-dlp exited with code 1/);
+assert.doesNotMatch(summary, /Recent errors/);
+assert.doesNotMatch(summary, /Detected,/);
 
 const noErrors = formatDiagnosticsSummary({
   version: "unknown",
   mode: "LITE",
   packageLabel: "Package Unknown",
   osLabel: "Unknown OS",
+  userAgent: "Unknown user agent",
   activeDownloadCount: 0,
   history: {
     total: 0,
@@ -50,4 +53,4 @@ const noErrors = formatDiagnosticsSummary({
 
 assert.match(noErrors, /Mode: Lite/);
 assert.match(noErrors, /Tools:\n- No tools loaded/);
-assert.match(noErrors, /Recent errors:\n- No recent errors/);
+assert.doesNotMatch(noErrors, /Recent errors/);

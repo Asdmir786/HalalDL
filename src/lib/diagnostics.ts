@@ -6,6 +6,7 @@ import { useSettingsStore, type Settings } from "@/store/settings";
 import { useToolsStore, type Tool } from "@/store/tools";
 import { getAppMode } from "@/lib/tools/app-mode";
 import { formatDiagnosticsSummary } from "@/lib/diagnostics-summary";
+import { arch, platform, version as osVersion } from "@tauri-apps/plugin-os";
 
 type DiagnosticsRedaction = {
   redactUrls: boolean;
@@ -129,13 +130,14 @@ export function buildDiagnosticsPayload(redaction: DiagnosticsRedaction) {
 export function buildCopyDiagnosticsSummary({
   version,
   packageLabel,
-  osLabel = navigator.userAgent || "Unknown OS",
+  osLabel,
+  userAgent = navigator.userAgent || "Unknown user agent",
 }: {
   version: string;
   packageLabel: string;
-  osLabel?: string;
+  osLabel: string;
+  userAgent?: string;
 }) {
-  const logsState = useLogsStore.getState();
   const downloadsState = useDownloadsStore.getState();
   const historyState = useHistoryStore.getState();
   const toolsState = useToolsStore.getState();
@@ -149,18 +151,13 @@ export function buildCopyDiagnosticsSummary({
   const failedHistoryCount = historyState.entries.filter(
     (entry) => entry.status === "failed"
   ).length;
-  const recentErrors = logsState.logs
-    .filter((log) => log.level === "error")
-    .slice(-5)
-    .map((log) =>
-      redactLogLine(log.message, { redactPaths: true, redactUrls: true })
-    );
 
   return formatDiagnosticsSummary({
     version,
     mode: getAppMode(),
     packageLabel,
     osLabel,
+    userAgent,
     activeDownloadCount,
     history: {
       total: historyState.entries.length,
@@ -172,6 +169,32 @@ export function buildCopyDiagnosticsSummary({
       status: tool.status,
       version: tool.version,
     })),
-    recentErrors,
   });
+}
+
+function formatPlatformLabel(value: string): string {
+  if (value === "windows") return "Windows";
+  if (value === "macos") return "macOS";
+  if (value === "linux") return "Linux";
+  return value || "Unknown OS";
+}
+
+function formatArchLabel(value: string): string {
+  if (value === "x86_64") return "x64";
+  if (value === "aarch64") return "ARM64";
+  return value || "unknown arch";
+}
+
+export function getSupportOsLabel(): string {
+  try {
+    const platformLabel = formatPlatformLabel(platform());
+    const versionLabel = osVersion();
+    const archLabel = formatArchLabel(arch());
+    return [platformLabel, versionLabel, archLabel]
+      .filter(Boolean)
+      .join(" ");
+  } catch {
+    const platformLabel = navigator.platform || "Unknown OS";
+    return platformLabel;
+  }
 }

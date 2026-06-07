@@ -60,6 +60,6 @@ body:
   - type: textarea
     id: logs
     attributes:
-      label: Relevant logs or screenshots
-      description: Remove private information before posting.
+      label: Support info, logs, or screenshots
+      description: Use Copy Support Info in HalalDL when possible. Remove private information before posting.
       render: shell
