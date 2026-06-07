@@ -140,6 +140,7 @@ export function AboutSection() {
   }, []);
 
   useEffect(() => {
+    const timer = window.setTimeout(() => {
     if (storeUpdate.updateAvailable && storeUpdate.latestVersion) {
       setLatestVersion(storeUpdate.latestVersion);
       setReleaseUrl(storeUpdate.releaseUrl ?? RELEASES_URL);
@@ -148,6 +149,8 @@ export function AboutSection() {
       setChecksumUrl(storeUpdate.checksumUrl);
       setUpdateStatus("update-available");
     }
+    }, 0);
+    return () => window.clearTimeout(timer);
   }, [
     storeUpdate.updateAvailable,
     storeUpdate.latestVersion,
@@ -158,8 +161,11 @@ export function AboutSection() {
   ]);
 
   useEffect(() => {
-    setVerifiedInstallerPath(null);
-    setInstallDialogOpen(false);
+    const timer = window.setTimeout(() => {
+      setVerifiedInstallerPath(null);
+      setInstallDialogOpen(false);
+    }, 0);
+    return () => window.clearTimeout(timer);
   }, [assetName, latestVersion]);
 
   const checkForUpdates = useCallback(async () => {
@@ -284,11 +290,11 @@ export function AboutSection() {
         osLabel: getSupportOsLabel(),
       });
       await navigator.clipboard.writeText(summary);
-      toast.success("Support info copied", {
+      toast.success("App info copied", {
         description: "Paste it into a GitHub issue if you need help.",
       });
     } catch {
-      toast.error("Could not copy support info");
+      toast.error("Could not copy app info");
     }
   }, [packageLabel, version]);
 
@@ -552,7 +558,7 @@ export function AboutSection() {
                 className="w-full"
               >
                 <Copy className="h-3.5 w-3.5 mr-1.5" />
-                Copy Support Info
+                Copy app info
               </MotionButton>
               <MotionButton
                 variant="ghost"
@@ -638,7 +644,7 @@ export function AboutSection() {
         />
         <LinkCard
           icon={Copy}
-          title="Copy Support Info"
+          title="Copy app info"
           description="Paste into support requests"
           onClick={() => void handleCopySupportInfo()}
         />

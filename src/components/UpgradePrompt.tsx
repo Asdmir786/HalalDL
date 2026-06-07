@@ -35,6 +35,7 @@ import {
   getFullSwitchAutoInstall,
   setFullSwitchAutoInstall,
 } from "@/lib/runtime-flags";
+import { isTauriRuntime } from "@/lib/tauri-runtime";
 
 interface DownloadProgress {
   tool: string;
@@ -368,6 +369,7 @@ export function UpgradePrompt() {
   }, [handleUpgrade, isManagedMode, missingIds, startupReady]);
 
   useEffect(() => {
+    if (!isTauriRuntime()) return;
     let disposed = false;
     let cleanup: (() => void) | null = null;
 

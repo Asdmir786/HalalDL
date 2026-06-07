@@ -38,6 +38,7 @@ import {
   setFullSwitchAutoInstall,
   setLastAppMode,
 } from "@/lib/runtime-flags";
+import { markStartup } from "@/lib/startup-metrics";
 
 export function usePersistenceInit(): MutableRefObject<boolean> {
   const { setSettings } = useSettingsStore();
@@ -48,7 +49,22 @@ export function usePersistenceInit(): MutableRefObject<boolean> {
   const initialized = useRef(false);
 
   useEffect(() => {
+    const scheduleDeferred = (work: () => void) => {
+      const run = () => window.setTimeout(work, 0);
+      const requestIdleCallback = (
+        window as Window & {
+          requestIdleCallback?: (callback: () => void, options?: { timeout: number }) => number;
+        }
+      ).requestIdleCallback;
+      if (typeof requestIdleCallback === "function") {
+        requestIdleCallback(run, { timeout: 1000 });
+      } else {
+        window.setTimeout(run, 0);
+      }
+    };
+
     const checkTools = async () => {
+      markStartup("tools-check-start");
       addLog({ level: "debug", message: "Checking tools..." });
 
       const checkAndNotify = async (
@@ -77,92 +93,33 @@ export function usePersistenceInit(): MutableRefObject<boolean> {
         checkAndNotify("aria2", checkAria2Version),
         checkAndNotify("deno", checkDenoVersion),
       ]);
+      markStartup("tools-check-ready");
     };
 
     const init = async () => {
       if (initialized.current) return;
 
       try {
+        markStartup("persistence-start");
         if (isDemoModeEnabled()) {
           seedMarketingDemoState();
           useRuntimeStore.getState().setPersistenceReady(true);
           initialized.current = true;
+          markStartup("persistence-demo-ready");
           addLog({ level: "info", message: "Marketing demo mode seeded" });
           return;
         }
 
-        const currentMode = getAppMode();
-        try {
-          const lastMode = await getLastAppMode();
-          if (lastMode && lastMode !== currentMode) {
-            if (currentMode === "LITE") {
-              await invoke("cleanup_bin_tools", {
-                tools: ["yt-dlp", "ffmpeg", "aria2", "deno"],
-              });
-            } else {
-              await setFullSwitchAutoInstall(true);
-            }
-          }
-          await setLastAppMode(currentMode);
-        } catch {
-          void 0;
-        }
-
         await storage.init();
         addLog({ level: "debug", message: "Storage initialized" });
-        await useLogsStore.getState().loadLogs();
 
         const savedSettings = await storage.getSettings<Settings>();
         if (savedSettings) {
           const mergedSettings = { ...DEFAULT_SETTINGS, ...savedSettings };
           mergedSettings.downloadsSelectedPreset = canonicalizePresetId(mergedSettings.downloadsSelectedPreset);
           mergedSettings.quickDefaultPreset = canonicalizePresetId(mergedSettings.quickDefaultPreset);
-          try {
-            if (
-              !(await getAddModeDefaultMigrated()) &&
-              mergedSettings.downloadsAddMode === "queue"
-            ) {
-              mergedSettings.downloadsAddMode = "start";
-              await setAddModeDefaultMigrated(true);
-            }
-          } catch {
-            void 0;
-          }
-          if (!mergedSettings.defaultDownloadDir) {
-            try {
-              mergedSettings.defaultDownloadDir = await downloadDir();
-            } catch (e) {
-              addLog({
-                level: "warn",
-                message: `Could not resolve download dir: ${String(e)}`,
-              });
-            }
-          }
-          try {
-            mergedSettings.launchAtLogin = await isAutostartEnabled();
-          } catch {
-            void 0;
-          }
           setSettings(mergedSettings);
           addLog({ level: "info", message: "Settings loaded" });
-        } else {
-          try {
-            const defaultDir = await downloadDir();
-            const currentSettings = useSettingsStore.getState().settings;
-            setSettings({ ...currentSettings, defaultDownloadDir: defaultDir });
-          } catch (e) {
-            addLog({
-              level: "warn",
-              message: `Could not resolve download dir: ${String(e)}`,
-            });
-          }
-          try {
-            const launchAtLogin = await isAutostartEnabled();
-            const currentSettings = useSettingsStore.getState().settings;
-            setSettings({ ...currentSettings, launchAtLogin });
-          } catch {
-            void 0;
-          }
         }
 
         const savedUserPresets = await storage.getPresets<Preset[]>();
@@ -216,11 +173,6 @@ export function usePersistenceInit(): MutableRefObject<boolean> {
               level: "info",
               message: `Downloads loaded (${normalizedDownloads.length})`,
             });
-            if (normalizedDownloads.some((job) => job.status === "Queued")) {
-              window.setTimeout(() => {
-                startQueuedJobs();
-              }, 0);
-            }
           } else {
             const idMap = new Map<string, string>();
             const migratedDownloads: DownloadJob[] = normalizedDownloads.map(
@@ -242,11 +194,6 @@ export function usePersistenceInit(): MutableRefObject<boolean> {
               level: "info",
               message: `Downloads loaded (${migratedDownloads.length})`,
             });
-            if (migratedDownloads.some((job) => job.status === "Queued")) {
-              window.setTimeout(() => {
-                startQueuedJobs();
-              }, 0);
-            }
 
             const logsState = useLogsStore.getState();
             const migratedLogs = logsState.logs.map((l) => {
@@ -275,55 +222,126 @@ export function usePersistenceInit(): MutableRefObject<boolean> {
           }
         }
 
-        const savedHistory = await storage.getHistory<HistoryEntry[]>();
-        if (savedHistory && Array.isArray(savedHistory)) {
-          useHistoryStore.setState({ entries: savedHistory });
-          addLog({
-            level: "info",
-            message: `History loaded (${savedHistory.length})`,
-          });
-        }
-
-        const savedTools = await storage.getTools<Tool[]>();
-        if (savedTools && Array.isArray(savedTools)) {
-          const currentTools = useToolsStore.getState().tools;
-          const mergedTools = currentTools.map((baseTool) => {
-            const saved = savedTools.find((t) => t.id === baseTool.id);
-            if (!saved) return baseTool;
-            return {
-              ...baseTool,
-              mode: saved.mode ?? baseTool.mode,
-              path: saved.path,
-            };
-          });
-          setTools(mergedTools);
-          addLog({
-            level: "info",
-            message: `Tools loaded (${mergedTools.length})`,
-          });
-        }
-
-        await checkTools();
-
-        try {
-          const backupIds = await listToolBackups();
-          const currentTools = useToolsStore.getState().tools;
-          for (const t of currentTools) {
-            updateTool(t.id, { hasBackup: backupIds.includes(t.id) });
-          }
-          addLog({
-            level: "debug",
-            message: `Backups found: ${backupIds.length > 0 ? backupIds.join(", ") : "none"}`,
-          });
-        } catch (e) {
-          addLog({
-            level: "warn",
-            message: `Failed to list backups: ${String(e)}`,
-          });
-        }
-
         useRuntimeStore.getState().setPersistenceReady(true);
-        initialized.current = true;
+        markStartup("persistence-critical-ready");
+
+        scheduleDeferred(() => {
+          void (async () => {
+            try {
+              const currentMode = getAppMode();
+              try {
+                const lastMode = await getLastAppMode();
+                if (lastMode && lastMode !== currentMode) {
+                  if (currentMode === "LITE") {
+                    await invoke("cleanup_bin_tools", {
+                      tools: ["yt-dlp", "ffmpeg", "aria2", "deno"],
+                    });
+                  } else {
+                    await setFullSwitchAutoInstall(true);
+                  }
+                }
+                await setLastAppMode(currentMode);
+              } catch {
+                void 0;
+              }
+
+              try {
+                const latestSettings = useSettingsStore.getState().settings;
+                const nextSettings = { ...latestSettings };
+                let changed = false;
+
+                if (
+                  !(await getAddModeDefaultMigrated()) &&
+                  nextSettings.downloadsAddMode === "queue"
+                ) {
+                  nextSettings.downloadsAddMode = "start";
+                  await setAddModeDefaultMigrated(true);
+                  changed = true;
+                }
+
+                if (!nextSettings.defaultDownloadDir) {
+                  nextSettings.defaultDownloadDir = await downloadDir();
+                  changed = true;
+                }
+
+                const launchAtLogin = await isAutostartEnabled();
+                if (nextSettings.launchAtLogin !== launchAtLogin) {
+                  nextSettings.launchAtLogin = launchAtLogin;
+                  changed = true;
+                }
+
+                if (changed) setSettings(nextSettings);
+              } catch (e) {
+                addLog({
+                  level: "warn",
+                  message: `Deferred settings sync failed: ${String(e)}`,
+                });
+              }
+
+              await useLogsStore.getState().loadLogs();
+
+              const savedHistory = await storage.getHistory<HistoryEntry[]>();
+              if (savedHistory && Array.isArray(savedHistory)) {
+                useHistoryStore.setState({ entries: savedHistory });
+                addLog({
+                  level: "info",
+                  message: `History loaded (${savedHistory.length})`,
+                });
+              }
+
+              const savedTools = await storage.getTools<Tool[]>();
+              if (savedTools && Array.isArray(savedTools)) {
+                const currentTools = useToolsStore.getState().tools;
+                const mergedTools = currentTools.map((baseTool) => {
+                  const saved = savedTools.find((t) => t.id === baseTool.id);
+                  if (!saved) return baseTool;
+                  return {
+                    ...baseTool,
+                    mode: saved.mode ?? baseTool.mode,
+                    path: saved.path,
+                  };
+                });
+                setTools(mergedTools);
+                addLog({
+                  level: "info",
+                  message: `Tools loaded (${mergedTools.length})`,
+                });
+              }
+
+              await checkTools();
+
+              try {
+                const backupIds = await listToolBackups();
+                const currentTools = useToolsStore.getState().tools;
+                for (const t of currentTools) {
+                  updateTool(t.id, { hasBackup: backupIds.includes(t.id) });
+                }
+                addLog({
+                  level: "debug",
+                  message: `Backups found: ${backupIds.length > 0 ? backupIds.join(", ") : "none"}`,
+                });
+              } catch (e) {
+                addLog({
+                  level: "warn",
+                  message: `Failed to list backups: ${String(e)}`,
+                });
+              }
+
+              if (useDownloadsStore.getState().jobs.some((job) => job.status === "Queued")) {
+                startQueuedJobs();
+              }
+
+              initialized.current = true;
+              markStartup("persistence-deferred-ready");
+            } catch (e) {
+              addLog({
+                level: "error",
+                message: `Deferred persistence load failed: ${String(e)}`,
+              });
+              initialized.current = true;
+            }
+          })();
+        });
       } catch (e) {
         addLog({
           level: "error",

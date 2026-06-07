@@ -4,6 +4,7 @@ import App from "./App";
 import "./index.css";
 import { ReleasePromoBoard } from "./release-assets/ReleasePromoBoard";
 import { isReleasePromoMode } from "./release-assets/releasePromoMode";
+import { markStartup } from "@/lib/startup-metrics";
 
 type ErrorBoundaryState = {
   error: Error | null;
@@ -63,6 +64,8 @@ class AppErrorBoundary extends React.Component<React.PropsWithChildren, ErrorBou
     return this.props.children;
   }
 }
+
+markStartup("bundle-ready");
 
 ReactDOM.createRoot(document.getElementById("root") as HTMLElement).render(
   <AppErrorBoundary>

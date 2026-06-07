@@ -239,8 +239,13 @@ export function DownloadsScreen() {
     let cancelled = false;
 
     if (!trimmed || !isInstagramUrl(trimmed)) {
-      setInstagramMediaSummary(null);
-      return;
+      const timer = window.setTimeout(() => {
+        if (!cancelled) setInstagramMediaSummary(null);
+      }, 0);
+      return () => {
+        cancelled = true;
+        window.clearTimeout(timer);
+      };
     }
 
     inspectInstagramMedia(trimmed)

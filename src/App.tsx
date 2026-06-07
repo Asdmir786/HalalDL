@@ -39,6 +39,8 @@ import {
   notifyUser,
 } from "@/lib/notifications";
 import { resolveExistingPresetId } from "@/lib/preset-display";
+import { isTauriRuntime } from "@/lib/tauri-runtime";
+import { markStartup, reportStartupSummary } from "@/lib/startup-metrics";
 import {
   readLastNotifiedAppUpdateVersion,
   readLastNotifiedToolUpdateVersions,
@@ -145,9 +147,10 @@ export default function App() {
   const {
     windowMode,
     queuePaused,
+    persistenceReady,
     setTrayStatus,
   } = useRuntimeStore();
-  const [isBooting, setIsBooting] = useState(true);
+  const [deferredUiReady, setDeferredUiReady] = useState(false);
   const [launchedFromAutostart, setLaunchedFromAutostart] = useState(false);
   const [notificationFlagsReady, setNotificationFlagsReady] = useState(false);
   const lastNotifiedAppVersionRef = useRef<string | null>(null);
@@ -170,12 +173,16 @@ export default function App() {
     (state) => state.tools.every((tool) => tool.status !== "Checking")
   );
 
-  // Initial boot sequence to show off the loader
   useEffect(() => {
-    const timer = setTimeout(() => {
-      setIsBooting(false);
-    }, 350);
-    return () => clearTimeout(timer);
+    markStartup("app-first-render");
+    const frame = window.requestAnimationFrame(() => {
+      window.setTimeout(() => {
+        markStartup("first-usable-frame");
+        setDeferredUiReady(true);
+        void reportStartupSummary();
+      }, 0);
+    });
+    return () => window.cancelAnimationFrame(frame);
   }, []);
 
   useEffect(() => {
@@ -373,6 +380,7 @@ export default function App() {
   );
 
   useEffect(() => {
+    if (!isTauriRuntime()) return;
     let disposeTray: (() => void) | undefined;
     let disposeDeepLinks: (() => void) | undefined;
     const handleAction = async (action: TrayActionPayload["action"]) => {
@@ -486,6 +494,7 @@ export default function App() {
   }, [addClipboardDownload, processLaunchUrls]);
 
   useEffect(() => {
+    if (!isTauriRuntime()) return;
     if (!settings.enableBackgroundUpdateChecks) return;
     if (!toolsReady) return;
     if (!notificationFlagsReady) return;
@@ -677,16 +686,7 @@ export default function App() {
       {windowMode === "full" && <Sidebar />}
       <main className="flex-1 overflow-hidden relative bg-gradient-to-br from-background via-background to-secondary/20">
         <AnimatePresence mode="wait">
-          {isBooting ? (
-             <motion.div
-               key="boot-loader"
-               className="h-full w-full flex items-center justify-center"
-               exit={{ opacity: 0, scale: 0.9, filter: "blur(10px)" }}
-               transition={{ duration: 0.5 }}
-             >
-               <LoadingFallback />
-             </motion.div>
-          ) : windowMode === "quick" ? (
+          {windowMode === "quick" ? (
             <motion.div
               key="quick-download"
               className="h-full w-full"
@@ -713,7 +713,7 @@ export default function App() {
           )}
         </AnimatePresence>
       </main>
-      {windowMode === "full" && <UpgradePrompt />}
+      {windowMode === "full" && deferredUiReady && persistenceReady && <UpgradePrompt />}
     </div>
   );
 }

@@ -37,6 +37,7 @@ import {
   getSupportOsLabel,
 } from "@/lib/diagnostics";
 import { formatDiagnosticsPackageLabel } from "@/lib/diagnostics-summary";
+import { formatLineCount, formatLogLines } from "./logs/log-actions";
 
 const LEVEL_STYLES: Record<LogLevel, string> = {
   info: "text-blue-400",
@@ -69,6 +70,7 @@ export function LogsScreen() {
 
   const [filter, setFilter] = React.useState<LogLevel | "all">("all");
   const [search, setSearch] = React.useState("");
+  const deferredSearch = React.useDeferredValue(search);
   const [autoScroll, setAutoScroll] = React.useState(true);
   const [jobFilter, setJobFilter] = React.useState<string | "all" | "active">("active");
   const [availableJobs, setAvailableJobs] = React.useState<string[]>([]);
@@ -160,7 +162,7 @@ export function LogsScreen() {
   }, [activeJobsCount, jobFilter]);
 
   const filteredLogs = React.useMemo(() => {
-    const searchLower = search.toLowerCase();
+    const searchLower = deferredSearch.toLowerCase();
     return logs.filter((log) => {
       const matchesLevel = filter === "all" || log.level === filter;
       const matchesJob =
@@ -169,12 +171,17 @@ export function LogsScreen() {
           ? !!log.jobId && activeJobIds.has(log.jobId)
           : log.jobId === jobFilter);
       const matchesSearch =
-        !search ||
+        !deferredSearch ||
         log.message.toLowerCase().includes(searchLower) ||
         log.command?.toLowerCase().includes(searchLower);
       return matchesLevel && matchesJob && matchesSearch;
     });
-  }, [logs, filter, jobFilter, search, activeJobIds]);
+  }, [logs, filter, jobFilter, deferredSearch, activeJobIds]);
+
+  const visibleScopeLabel = React.useMemo(() => {
+    if (logs.length === filteredLogs.length) return "Showing all logs";
+    return `Showing ${formatLineCount(filteredLogs.length)} of ${formatLineCount(logs.length)}`;
+  }, [filteredLogs.length, logs.length]);
 
   const rowVirtualizer = useVirtualizer({
     count: filteredLogs.length,
@@ -184,7 +191,7 @@ export function LogsScreen() {
       [filteredLogs]
     ),
     estimateSize: React.useCallback(() => 35, []),
-    overscan: 20, // Increased overscan for smoother scrolling
+    overscan: 10,
     measureElement: React.useCallback(
       (element: HTMLElement) => element.getBoundingClientRect().height,
       []
@@ -219,21 +226,16 @@ export function LogsScreen() {
       const now = new Date();
       const pad2 = (n: number) => String(n).padStart(2, "0");
       const stamp = `${now.getFullYear()}-${pad2(now.getMonth() + 1)}-${pad2(now.getDate())}_${pad2(now.getHours())}-${pad2(now.getMinutes())}-${pad2(now.getSeconds())}`;
-      const content = filteredLogs
-        .map(
-          (l) =>
-            `[${l.timestamp}] [${l.level.toUpperCase()}] ${l.message}${
-              l.command ? ` | ${l.command}` : ""
-            }`
-        )
-        .join("\n");
+      const content = formatLogLines(filteredLogs);
       const path = await save({
         filters: [{ name: "Text", extensions: ["txt"] }],
         defaultPath: `HalalDL-logs-${stamp}.txt`,
       });
       if (path) {
         await invoke("write_text_file", { path, contents: content });
-        toast.success("Logs exported");
+        toast.success("Saved shown logs", {
+          description: formatLineCount(filteredLogs.length),
+        });
       }
     } catch (error: unknown) {
       const message = error instanceof Error ? error.message : String(error);
@@ -257,7 +259,9 @@ export function LogsScreen() {
       if (!path) return;
       const payload = buildDiagnosticsPayload({ redactUrls: true, redactPaths: true });
       await invoke("export_diagnostics_zip", { output_path: path, payload });
-      toast.success("Report exported");
+      toast.success("Saved support ZIP", {
+        description: "Redacted logs and app details are ready.",
+      });
     } catch (error: unknown) {
       const message = error instanceof Error ? error.message : String(error);
       useLogsStore.getState().addLog({ level: "error", message: `Report export failed: ${message}` });
@@ -277,7 +281,7 @@ export function LogsScreen() {
         osLabel: getSupportOsLabel(),
       });
       await navigator.clipboard.writeText(summary);
-      toast.success("Support info copied", {
+      toast.success("App info copied", {
         description: "Paste it into a GitHub issue if you need help.",
       });
     } catch (error: unknown) {
@@ -292,28 +296,34 @@ export function LogsScreen() {
     }
   }, [packageLabel]);
 
-  const copyToClipboard = React.useCallback((text: string, label: string) => {
-    navigator.clipboard.writeText(text);
-    toast.success(`${label} copied`);
+  const copyToClipboard = React.useCallback(async (
+    text: string,
+    label: string,
+    description?: string
+  ) => {
+    try {
+      await navigator.clipboard.writeText(text);
+      toast.success(`${label} copied`, description ? { description } : undefined);
+    } catch (error: unknown) {
+      const message = error instanceof Error ? error.message : String(error);
+      useLogsStore.getState().addLog({ level: "error", message: `${label} copy failed: ${message}` });
+      toast.error(`Could not copy ${label.toLowerCase()}`);
+    }
   }, []);
 
-  const handleCopyVisible = React.useCallback(() => {
+  const handleCopyVisible = React.useCallback(async () => {
     if (!filteredLogs.length) {
       toast.info("No logs to copy");
       return;
     }
-    const content = filteredLogs
-      .map(
-        (l) =>
-          `[${l.timestamp}] [${l.level.toUpperCase()}] ${l.message}${
-            l.command ? ` | ${l.command}` : ""
-          }`
-      )
-      .join("\n");
-    copyToClipboard(content, "Logs");
+    await copyToClipboard(
+      formatLogLines(filteredLogs),
+      "Shown logs",
+      `${formatLineCount(filteredLogs.length)} from the current filters.`
+    );
   }, [filteredLogs, copyToClipboard]);
 
-  const handleCopyErrors = React.useCallback(() => {
+  const handleCopyErrors = React.useCallback(async () => {
     if (!canCopyErrors || jobFilter === "all" || jobFilter === "active") {
       toast.info("Select a failed job to copy error lines");
       return;
@@ -323,15 +333,11 @@ export function LogsScreen() {
       toast.info("No error lines found for this job");
       return;
     }
-    const content = errorLogs
-      .map(
-        (l) =>
-          `[${l.timestamp}] [${l.level.toUpperCase()}] ${l.message}${
-            l.command ? ` | ${l.command}` : ""
-          }`
-      )
-      .join("\n");
-    copyToClipboard(content, "Error lines");
+    await copyToClipboard(
+      formatLogLines(errorLogs),
+      "Job errors",
+      `${formatLineCount(errorLogs.length)} from the selected failed job.`
+    );
   }, [canCopyErrors, jobFilter, logs, copyToClipboard]);
 
   const handleClear = React.useCallback(() => {
@@ -383,7 +389,7 @@ export function LogsScreen() {
                   ) : (
                     <Copy className="w-3.5 h-3.5 mr-2" />
                   )}
-                  Copy Support Info
+                  Copy app info
                 </MotionButton>
                  <MotionButton
                   variant="outline"
@@ -398,13 +404,14 @@ export function LogsScreen() {
                   ) : (
                     <Download className="w-3.5 h-3.5 mr-2" />
                   )}
-                  Export Report
+                  Save support ZIP
                 </MotionButton>
                  <MotionButton
                   variant="outline"
                   size="sm"
                   onClick={handleExport}
-                  disabled={loadStatus !== "ready" || isExporting}
+                  disabled={loadStatus !== "ready" || isExporting || filteredLogs.length === 0}
+                  title="Saves only the logs currently shown after search, level, and job filters."
                   whileHover={{ scale: 1.02 }}
                   whileTap={{ scale: 0.98 }}
                 >
@@ -413,29 +420,31 @@ export function LogsScreen() {
                   ) : (
                     <Download className="w-3.5 h-3.5 mr-2" />
                   )}
-                  Export Logs
+                  Save shown logs
                 </MotionButton>
                 <MotionButton
                   variant="outline"
                   size="sm"
-                  onClick={handleCopyVisible}
-                  disabled={loadStatus !== "ready"}
+                  onClick={() => void handleCopyVisible()}
+                  disabled={loadStatus !== "ready" || filteredLogs.length === 0}
+                  title="Copies only the logs currently shown after search, level, and job filters."
                   whileHover={{ scale: 1.02 }}
                   whileTap={{ scale: 0.98 }}
                 >
                   <Copy className="w-3.5 h-3.5 mr-2" />
-                  Copy Logs
+                  Copy shown logs {filteredLogs.length > 0 ? `(${filteredLogs.length})` : ""}
                 </MotionButton>
                 <MotionButton
                   variant="outline"
                   size="sm"
-                  onClick={handleCopyErrors}
+                  onClick={() => void handleCopyErrors()}
                   disabled={loadStatus !== "ready" || !canCopyErrors}
+                  title="Copies error lines for the selected failed job only."
                   whileHover={{ scale: 1.02 }}
                   whileTap={{ scale: 0.98 }}
                 >
                   <AlertCircle className="w-3.5 h-3.5 mr-2" />
-                  Copy Errors
+                  Copy job errors
                 </MotionButton>
                 <MotionButton
                   variant="ghost"
@@ -458,6 +467,9 @@ export function LogsScreen() {
               <LogStat label="warnings" value={warningCount} tone={warningCount > 0 ? "warning" : "default"} />
               <LogStat label="commands" value={commandCount} />
               <LogStat label="lines" value={logs.length} />
+              <span className="inline-flex items-center rounded-full border border-border/40 bg-muted/20 px-2.5 py-1">
+                {visibleScopeLabel}
+              </span>
             </div>
 
             {/* Toolbar */}
@@ -551,7 +563,7 @@ export function LogsScreen() {
                     {autoScroll ? "Auto-scroll On" : "Auto-scroll Off"}
                  </div>
                 <span className="text-[10px] font-mono text-white/30 border-l border-white/10 pl-3">
-                  {filteredLogs.length} lines
+                  {formatLineCount(filteredLogs.length)}
                 </span>
               </div>
             </div>

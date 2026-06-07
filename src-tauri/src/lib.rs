@@ -66,6 +66,7 @@ pub fn run() {
             download::download_url_to_file,
             download::post_form_for_text,
             runtime::sync_runtime_settings,
+            runtime::startup_timings,
             runtime::update_tray_state,
             runtime::restore_main_window,
             runtime::show_quick_download_window,
@@ -122,6 +123,7 @@ pub fn run() {
             if !startup_urls.is_empty() {
                 runtime::append_launch_urls(&app.handle(), startup_urls.clone());
             }
+            runtime::mark_setup_complete(&app.handle());
             Ok(())
         })
         .run(tauri::generate_context!())

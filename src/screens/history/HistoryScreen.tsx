@@ -1,4 +1,5 @@
-import { useCallback, useLayoutEffect, useMemo, useRef, useState, useEffect, type UIEvent } from "react";
+import { useCallback, useDeferredValue, useLayoutEffect, useMemo, useRef, useState, useEffect, type UIEvent } from "react";
+import { useVirtualizer } from "@tanstack/react-virtual";
 import { useHistoryStore, type HistoryEntry } from "@/store/history";
 import { useDownloadsStore } from "@/store/downloads";
 import { useNavigationStore } from "@/store/navigation";
@@ -15,7 +16,7 @@ import { open } from "@tauri-apps/plugin-shell";
 import { toast } from "sonner";
 import { History as HistoryIcon, MessageSquare, Star, X } from "lucide-react";
 import { copyFilesToClipboard } from "@/lib/commands";
-import { getExplicitOutputPaths } from "@/lib/output-paths";
+import { buildHistoryCopyState } from "./copy-actions.ts";
 import {
   dismissSupportPrompt,
   markSupportPromptFeedback,
@@ -190,6 +191,10 @@ function formatRelativeTime(ts: number): string {
   return `${Math.floor(days / 365)}y ago`;
 }
 
+function formatCount(count: number, singular: string, plural = `${singular}s`) {
+  return `${count} ${count === 1 ? singular : plural}`;
+}
+
 export function HistoryScreen() {
   const entries = useHistoryStore((s) => s.entries);
   const setEntries = useHistoryStore((s) => s.setEntries);
@@ -199,6 +204,7 @@ export function HistoryScreen() {
   const setScreen = useNavigationStore((s) => s.setScreen);
 
   const [search, setSearch] = useState("");
+  const deferredSearch = useDeferredValue(search);
   const [statusFilter, setStatusFilter] = useState<StatusFilter>("all");
   const [dateFilter, setDateFilter] = useState<DateFilter>("all");
   const [sortOrder, setSortOrder] = useState<SortOrder>("newest");
@@ -210,6 +216,7 @@ export function HistoryScreen() {
   const [supportPromptDismissed, setSupportPromptDismissed] = useState(false);
 
   const scrollRef = useRef<HTMLDivElement>(null);
+  const resultsRef = useRef<HTMLDivElement>(null);
   const scrollTopRef = useRef(0);
   const fileCheckRetryRef = useRef<Record<string, number>>({});
   const retryTimeoutRef = useRef<number | null>(null);
@@ -217,6 +224,7 @@ export function HistoryScreen() {
 
   // Track file existence for visible entries
   const [fileExistsMap, setFileExistsMap] = useState<Record<string, boolean>>({});
+  const [gridColumns, setGridColumns] = useState(4);
   const completedDownloadCount = entries.filter((entry) => entry.status === "completed").length;
   const shouldShowSupportFooter =
     completedDownloadCount >= SUPPORT_PROMPT_COMPLETED_DOWNLOADS &&
@@ -267,7 +275,9 @@ export function HistoryScreen() {
         resetIds.push(entry.id);
       }
     }
-    const candidates = entries.filter((e) => e.outputPath && e.status === "completed");
+    const candidates = entries
+      .filter((e) => e.outputPath && e.status === "completed")
+      .slice(0, 120);
     const MAX_RETRIES = 3;
     const toCheck = candidates.filter(
       (e) =>
@@ -368,8 +378,8 @@ export function HistoryScreen() {
   const filtered = useMemo(() => {
     let result = entries;
 
-    if (search) {
-      const q = search.toLowerCase();
+    if (deferredSearch) {
+      const q = deferredSearch.toLowerCase();
       result = result.filter(
         (e) => e.title.toLowerCase().includes(q) || e.url.toLowerCase().includes(q)
       );
@@ -393,10 +403,13 @@ export function HistoryScreen() {
     // "newest" is default order (entries are prepended)
 
     return result;
-  }, [entries, search, statusFilter, dateFilter, sortOrder, hideMissing, fileExistsMap]);
+  }, [entries, deferredSearch, statusFilter, dateFilter, sortOrder, hideMissing, fileExistsMap]);
 
   const selectedIdsFiltered = useMemo(
-    () => selectedIds.filter((id) => entries.some((e) => e.id === id)),
+    () => {
+      const entryIds = new Set(entries.map((entry) => entry.id));
+      return selectedIds.filter((id) => entryIds.has(id));
+    },
     [selectedIds, entries]
   );
 
@@ -413,6 +426,30 @@ export function HistoryScreen() {
     }
     return [...map.entries()].sort((a, b) => a[0].localeCompare(b[0]));
   }, [filtered, groupByDomain]);
+
+  useLayoutEffect(() => {
+    const el = resultsRef.current;
+    if (!el) return;
+    const updateColumns = () => {
+      const width = el.clientWidth;
+      setGridColumns(width >= 1024 ? 4 : width >= 640 ? 3 : 2);
+    };
+    updateColumns();
+    const observer = new ResizeObserver(updateColumns);
+    observer.observe(el);
+    return () => observer.disconnect();
+  }, []);
+
+  const virtualRowCount = viewMode === "grid"
+    ? Math.ceil(filtered.length / gridColumns)
+    : filtered.length;
+
+  const rowVirtualizer = useVirtualizer({
+    count: groupByDomain ? 0 : virtualRowCount,
+    getScrollElement: () => resultsRef.current,
+    estimateSize: () => (viewMode === "grid" ? 300 : 128),
+    overscan: 8,
+  });
 
   const handleClearAll = useCallback(() => {
     if (entries.length === 0) return;
@@ -439,9 +476,30 @@ export function HistoryScreen() {
     setSelectedIds(filtered.map((e) => e.id));
   }, [filtered]);
 
+  const handleSearchChange = useCallback((value: string) => {
+    setSearch(value);
+    setSelectedIds([]);
+  }, []);
+
+  const handleStatusFilterChange = useCallback((value: StatusFilter) => {
+    setStatusFilter(value);
+    setSelectedIds([]);
+  }, []);
+
+  const handleDateFilterChange = useCallback((value: DateFilter) => {
+    setDateFilter(value);
+    setSelectedIds([]);
+  }, []);
+
+  const handleHideMissingChange = useCallback((value: boolean) => {
+    setHideMissing(value);
+    setSelectedIds([]);
+  }, []);
+
   const handleBulkRedownload = useCallback(() => {
     if (selectedIdsFiltered.length === 0) return;
-    const selectedEntries = entries.filter((e) => selectedIdsFiltered.includes(e.id));
+    const selectedSet = new Set(selectedIdsFiltered);
+    const selectedEntries = entries.filter((e) => selectedSet.has(e.id));
     selectedEntries.forEach((entry) => {
       addJob(entry.url, entry.presetId, entry.overrides);
     });
@@ -449,54 +507,47 @@ export function HistoryScreen() {
     toast.success(`Queued ${selectedEntries.length} download${selectedEntries.length === 1 ? "" : "s"}`);
   }, [addJob, entries, selectedIdsFiltered, setScreen]);
 
-  const filteredCopyablePaths = useMemo(
+  const {
+    filteredCopyablePaths,
+    filteredCopyableEntryCount,
+    selectedCopyablePaths,
+    selectedCopyableEntryCount,
+  } = useMemo(
     () =>
-      filtered
-        .filter(
-          (entry) =>
-            entry.status === "completed" &&
-            getExplicitOutputPaths(entry).length > 0 &&
-            fileExistsMap[entry.id] === true
-        )
-        .flatMap((entry) => getExplicitOutputPaths(entry)),
-    [filtered, fileExistsMap]
-  );
-
-  const selectedCopyablePaths = useMemo(
-    () =>
-      entries
-        .filter(
-          (entry) =>
-            selectedIdsFiltered.includes(entry.id) &&
-            entry.status === "completed" &&
-            getExplicitOutputPaths(entry).length > 0 &&
-            fileExistsMap[entry.id] === true
-        )
-        .flatMap((entry) => getExplicitOutputPaths(entry)),
-    [entries, fileExistsMap, selectedIdsFiltered]
+      buildHistoryCopyState({
+        entries,
+        filtered,
+        selectedIds: selectedIdsFiltered,
+        fileExistsMap,
+      }),
+    [entries, fileExistsMap, filtered, selectedIdsFiltered]
   );
 
   const handleCopyFilteredFiles = useCallback(async () => {
     if (filteredCopyablePaths.length === 0) return;
     try {
       await copyFilesToClipboard(filteredCopyablePaths);
-      toast.success("Copied to clipboard");
+      toast.success(`Copied ${formatCount(filteredCopyablePaths.length, "file")}`, {
+        description: `${formatCount(filteredCopyableEntryCount, "filtered item")} copied from the current view.`,
+      });
     } catch (e) {
       const message = e instanceof Error ? e.message : String(e);
       toast.error(`Failed to copy: ${message}`);
     }
-  }, [filteredCopyablePaths]);
+  }, [filteredCopyableEntryCount, filteredCopyablePaths]);
 
   const handleCopySelectedFiles = useCallback(async () => {
     if (selectedCopyablePaths.length === 0) return;
     try {
       await copyFilesToClipboard(selectedCopyablePaths);
-      toast.success("Copied to clipboard");
+      toast.success(`Copied ${formatCount(selectedCopyablePaths.length, "file")}`, {
+        description: `${formatCount(selectedCopyableEntryCount, "selected item")} copied.`,
+      });
     } catch (e) {
       const message = e instanceof Error ? e.message : String(e);
       toast.error(`Failed to copy: ${message}`);
     }
-  }, [selectedCopyablePaths]);
+  }, [selectedCopyableEntryCount, selectedCopyablePaths]);
 
   const handleDismissSupportPrompt = useCallback(async () => {
     setSupportPromptDismissed(true);
@@ -539,7 +590,7 @@ export function HistoryScreen() {
 
   return (
     <div className="flex flex-col h-full bg-background max-w-6xl mx-auto w-full" role="main">
-      <FadeInStagger className="flex flex-col h-full">
+      <FadeInStagger className="flex flex-col h-full overflow-auto">
         <div className="p-8 pb-4">
           <HistoryHeader
             totalCount={entries.length}
@@ -548,59 +599,81 @@ export function HistoryScreen() {
             failedCount={entries.filter((entry) => entry.status === "failed").length}
             selectedCount={selectedIdsFiltered.length}
             search={search}
-            onSearchChange={setSearch}
+            onSearchChange={handleSearchChange}
             statusFilter={statusFilter}
-            onStatusFilterChange={setStatusFilter}
+            onStatusFilterChange={handleStatusFilterChange}
             dateFilter={dateFilter}
-            onDateFilterChange={setDateFilter}
+            onDateFilterChange={handleDateFilterChange}
             sortOrder={sortOrder}
             onSortOrderChange={setSortOrder}
             hideMissing={hideMissing}
-            onHideMissingChange={setHideMissing}
+            onHideMissingChange={handleHideMissingChange}
             groupByDomain={groupByDomain}
             onGroupByDomainChange={setGroupByDomain}
             viewMode={viewMode}
             onViewModeChange={setViewMode}
             onClearAll={handleClearAll}
           >
-            {selectedIdsFiltered.length > 0 && (
-              <div className="flex flex-wrap items-center gap-2">
-                <button
-                  onClick={handleSelectAllFiltered}
-                  className="rounded-full border border-border/40 bg-background/45 px-3 py-1.5 text-xs font-medium text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
-                >
-                  Select Visible
-                </button>
+            {filtered.length > 0 && (
+              <div className="flex flex-wrap items-center gap-2 rounded-2xl border border-border/35 bg-background/45 px-2 py-2">
+                {selectedIdsFiltered.length === 0 ? (
+                  <>
+                    <span className="px-1 text-xs text-muted-foreground">
+                      Current view: {formatCount(filtered.length, "item")} shown
+                    </span>
+                    <button
+                      onClick={() => void handleCopyFilteredFiles()}
+                      disabled={filteredCopyablePaths.length === 0}
+                      title="Copies files from the current search and filters only."
+                      className={`rounded-full px-3 py-1.5 text-xs font-semibold transition-colors ${
+                        filteredCopyablePaths.length === 0
+                          ? "cursor-not-allowed bg-muted/40 text-muted-foreground/60"
+                          : "bg-blue-500/10 text-blue-700 hover:bg-blue-500/20 dark:text-blue-300"
+                      }`}
+                    >
+                      Copy filtered files {filteredCopyablePaths.length > 0 ? `(${filteredCopyablePaths.length})` : ""}
+                    </button>
+                    <button
+                      onClick={handleSelectAllFiltered}
+                      className="rounded-full border border-border/40 bg-background/45 px-3 py-1.5 text-xs font-medium text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+                    >
+                      Select shown
+                    </button>
+                  </>
+                ) : (
+                  <>
+                    <span className="px-1 text-xs text-muted-foreground">
+                      {formatCount(selectedIdsFiltered.length, "item")} selected
+                    </span>
+                    <button
+                      onClick={() => void handleCopySelectedFiles()}
+                      disabled={selectedCopyablePaths.length === 0}
+                      title="Copies files from checked history rows only."
+                      className={`rounded-full px-3 py-1.5 text-xs font-semibold transition-colors ${
+                        selectedCopyablePaths.length === 0
+                          ? "cursor-not-allowed border border-border/30 bg-muted/30 text-muted-foreground/50"
+                          : "border border-blue-500/20 bg-blue-500/10 text-blue-700 hover:bg-blue-500/20 dark:text-blue-300"
+                      }`}
+                    >
+                      Copy selected files {selectedCopyablePaths.length > 0 ? `(${selectedCopyablePaths.length})` : ""}
+                    </button>
+                    <button
+                      onClick={handleSelectAllFiltered}
+                      className="rounded-full border border-border/40 bg-background/45 px-3 py-1.5 text-xs font-medium text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+                    >
+                      Select all shown
+                    </button>
+                  </>
+                )}
                 <button
                   onClick={handleClearSelection}
+                  disabled={selectedIdsFiltered.length === 0}
                   className="rounded-full border border-border/40 bg-background/45 px-3 py-1.5 text-xs font-medium text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
                 >
-                  Clear Selection
-                </button>
-                <button
-                  onClick={() => void handleCopySelectedFiles()}
-                  disabled={selectedCopyablePaths.length === 0}
-                  className={`rounded-full px-3 py-1.5 text-xs font-semibold transition-colors ${
-                    selectedCopyablePaths.length === 0
-                      ? "cursor-not-allowed border border-border/30 bg-muted/30 text-muted-foreground/50"
-                      : "border border-blue-500/20 bg-blue-500/10 text-blue-700 hover:bg-blue-500/20 dark:text-blue-300"
-                  }`}
-                >
-                  Copy Selection {selectedCopyablePaths.length > 0 ? `(${selectedCopyablePaths.length})` : ""}
+                  Clear selection
                 </button>
               </div>
             )}
-            <button
-              onClick={() => void handleCopyFilteredFiles()}
-              disabled={filteredCopyablePaths.length === 0}
-              className={`rounded-full px-3 py-1.5 text-xs font-semibold transition-colors ${
-                filteredCopyablePaths.length === 0
-                  ? "text-muted-foreground/60 bg-muted/40 cursor-not-allowed"
-                  : "bg-blue-500/10 text-blue-700 hover:bg-blue-500/20 dark:text-blue-300"
-              }`}
-            >
-              Copy Shown {filteredCopyablePaths.length > 0 ? `(${filteredCopyablePaths.length})` : ""}
-            </button>
             <button
               onClick={handleBulkRedownload}
               disabled={selectedIdsFiltered.length === 0}
@@ -619,7 +692,7 @@ export function HistoryScreen() {
         <div
           ref={scrollRef}
           onScroll={handleScroll}
-          className="flex-1 overflow-auto px-8 pb-8"
+          className="px-8 pb-8"
         >
           {entries.length > 0 && (
             <div className="flex flex-col gap-3 mb-4">
@@ -680,33 +753,67 @@ export function HistoryScreen() {
               ))}
             </div>
           ) : (
-            <>
-              <div className={viewMode === "list" ? "flex flex-col gap-2" : "grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-4"}>
-                {filtered.map((entry) => (
-                  viewMode === "list" ? (
-                    <HistoryItem
-                      key={entry.id}
-                      entry={entry}
-                      onRemove={handleRemove}
-                      fileExists={fileExistsMap[entry.id] ?? null}
-                      formatRelativeTime={formatRelativeTime}
-                      isSelected={selectedIdsSet.has(entry.id)}
-                      onToggleSelection={handleToggleSelection}
-                    />
-                  ) : (
-                    <HistoryGrid
-                      key={entry.id}
-                      entry={entry}
-                      onRemove={handleRemove}
-                      fileExists={fileExistsMap[entry.id] ?? null}
-                      formatRelativeTime={formatRelativeTime}
-                      isSelected={selectedIdsSet.has(entry.id)}
-                      onToggleSelection={handleToggleSelection}
-                    />
-                  )
-                ))}
+            <div
+              ref={resultsRef}
+              className="h-[min(620px,calc(100vh-9rem))] overflow-auto pr-1"
+            >
+              <div
+                style={{
+                  height: `${rowVirtualizer.getTotalSize()}px`,
+                  position: "relative",
+                  width: "100%",
+                }}
+              >
+                {rowVirtualizer.getVirtualItems().map((virtualRow) => {
+                  if (viewMode === "list") {
+                    const entry = filtered[virtualRow.index];
+                    if (!entry) return null;
+                    return (
+                      <div
+                        key={virtualRow.key}
+                        data-index={virtualRow.index}
+                        ref={rowVirtualizer.measureElement}
+                        className="absolute left-0 top-0 w-full pb-2"
+                        style={{ transform: `translateY(${virtualRow.start}px)` }}
+                      >
+                        <HistoryItem
+                          entry={entry}
+                          onRemove={handleRemove}
+                          fileExists={fileExistsMap[entry.id] ?? null}
+                          formatRelativeTime={formatRelativeTime}
+                          isSelected={selectedIdsSet.has(entry.id)}
+                          onToggleSelection={handleToggleSelection}
+                        />
+                      </div>
+                    );
+                  }
+
+                  const start = virtualRow.index * gridColumns;
+                  const rowEntries = filtered.slice(start, start + gridColumns);
+                  return (
+                    <div
+                      key={virtualRow.key}
+                      data-index={virtualRow.index}
+                      ref={rowVirtualizer.measureElement}
+                      className="absolute left-0 top-0 grid w-full grid-cols-2 gap-4 pb-4 sm:grid-cols-3 lg:grid-cols-4"
+                      style={{ transform: `translateY(${virtualRow.start}px)` }}
+                    >
+                      {rowEntries.map((entry) => (
+                        <HistoryGrid
+                          key={entry.id}
+                          entry={entry}
+                          onRemove={handleRemove}
+                          fileExists={fileExistsMap[entry.id] ?? null}
+                          formatRelativeTime={formatRelativeTime}
+                          isSelected={selectedIdsSet.has(entry.id)}
+                          onToggleSelection={handleToggleSelection}
+                        />
+                      ))}
+                    </div>
+                  );
+                })}
               </div>
-            </>
+            </div>
           )}
           {filtered.length > 0 && shouldShowSupportFooter && (
             <SupportFooter

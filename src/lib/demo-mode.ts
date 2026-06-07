@@ -433,9 +433,9 @@ export function seedMarketingDemoState() {
     downloadsSelectedPreset: "default",
     quickDefaultPreset: "whatsapp-optimized",
     closeToTray: true,
-    enableBackgroundUpdateChecks: true,
-    checkToolUpdatesInBackground: true,
-    checkAppUpdatesInBackground: true,
+    enableBackgroundUpdateChecks: false,
+    checkToolUpdatesInBackground: false,
+    checkAppUpdatesInBackground: false,
   };
 
   useSettingsStore.getState().setSettings(settings);

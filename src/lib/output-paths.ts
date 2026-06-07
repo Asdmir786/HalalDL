@@ -45,10 +45,18 @@ function isImageFilePath(path: string): boolean {
   return IMAGE_FILE_EXTENSIONS.has(getExtension(path));
 }
 
+function toLocalAssetUrl(path: string): string | undefined {
+  try {
+    return convertFileSrc(path);
+  } catch {
+    return undefined;
+  }
+}
+
 export function getPreferredThumbnailSource(value: ThumbnailSourceLike): string | undefined {
   const localImagePath = getExplicitOutputPaths(value).find(isImageFilePath);
   if (localImagePath) {
-    return convertFileSrc(localImagePath);
+    return toLocalAssetUrl(localImagePath) ?? value.thumbnail;
   }
 
   return value.thumbnail;

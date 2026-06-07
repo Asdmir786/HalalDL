@@ -1,4 +1,4 @@
-use std::{sync::Mutex, thread, time::Duration};
+use std::{sync::Mutex, thread, time::{Duration, Instant}};
 
 use serde::{Deserialize, Serialize};
 use tauri::menu::{MenuBuilder, MenuItemBuilder};
@@ -51,8 +51,9 @@ pub(crate) struct WindowBounds {
     size: PhysicalSize<u32>,
 }
 
-#[derive(Default)]
 pub struct RuntimeState {
+    pub startup_instant: Instant,
+    pub setup_complete_ms: Mutex<Option<u128>>,
     pub settings: Mutex<RuntimeSettingsPayload>,
     pub tray_state: Mutex<TrayStatePayload>,
     pub pending_launch_urls: Mutex<Vec<String>>,
@@ -60,6 +61,46 @@ pub struct RuntimeState {
     pub tray_click_nonce: Mutex<u64>,
     pub allow_exit: Mutex<bool>,
     pub launched_from_autostart: Mutex<bool>,
+}
+
+impl Default for RuntimeState {
+    fn default() -> Self {
+        Self {
+            startup_instant: Instant::now(),
+            setup_complete_ms: Mutex::new(None),
+            settings: Mutex::new(RuntimeSettingsPayload::default()),
+            tray_state: Mutex::new(TrayStatePayload::default()),
+            pending_launch_urls: Mutex::new(Vec::new()),
+            saved_main_bounds: Mutex::new(None),
+            tray_click_nonce: Mutex::new(0),
+            allow_exit: Mutex::new(false),
+            launched_from_autostart: Mutex::new(false),
+        }
+    }
+}
+
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct StartupTimings {
+    pub setup_complete_ms: Option<u128>,
+}
+
+pub fn mark_setup_complete(app: &AppHandle) {
+    let state = app.state::<RuntimeState>();
+    if let Ok(mut setup_complete_ms) = state.setup_complete_ms.lock() {
+        *setup_complete_ms = Some(state.startup_instant.elapsed().as_millis());
+    };
+}
+
+#[tauri::command]
+pub fn startup_timings(app: AppHandle) -> Result<StartupTimings, String> {
+    let state = app.state::<RuntimeState>();
+    let setup_complete_ms = state
+        .setup_complete_ms
+        .lock()
+        .map_err(|_| "Startup timing lock poisoned".to_string())?
+        .to_owned();
+    Ok(StartupTimings { setup_complete_ms })
 }
 
 #[derive(Clone, Serialize)]

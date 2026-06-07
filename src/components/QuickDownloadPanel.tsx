@@ -57,6 +57,7 @@ export function QuickDownloadPanel() {
   }, [quickDraft]);
 
   useEffect(() => {
+    const timer = window.setTimeout(() => {
     if (quickDraft) {
       setUrl(quickDraft.url);
       setPresetId(resolveExistingPresetId(quickPresets, quickDraft.presetId || settings.quickDefaultPreset || "default"));
@@ -66,6 +67,8 @@ export function QuickDownloadPanel() {
 
     setPresetId((current) => resolveExistingPresetId(quickPresets, current || settings.quickDefaultPreset || "default"));
     void refreshClipboardUrl();
+    }, 0);
+    return () => window.clearTimeout(timer);
   }, [quickDraft, quickPresets, refreshClipboardUrl, settings.quickDefaultPreset]);
 
   const selectedPreset =
