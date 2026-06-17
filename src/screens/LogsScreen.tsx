@@ -37,7 +37,7 @@ import {
   getSupportOsLabel,
 } from "@/lib/diagnostics";
 import { formatDiagnosticsPackageLabel } from "@/lib/diagnostics-summary";
-import { formatLineCount, formatLogLines } from "./logs/log-actions";
+import { formatLineCount, formatLogLines } from "./log-actions";
 
 const LEVEL_STYLES: Record<LogLevel, string> = {
   info: "text-blue-400",

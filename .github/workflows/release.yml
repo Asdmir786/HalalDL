@@ -86,3 +86,4 @@ jobs:
             src-tauri/target/release/bundle/**
             src-tauri/target/release/build/**
           if-no-files-found: ignore
+          retention-days: 1

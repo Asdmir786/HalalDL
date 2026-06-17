@@ -128,6 +128,7 @@ export function DownloadInputSection({
   const probeRequestRef = useRef(0);
   const inputRef = useRef<HTMLInputElement | null>(null);
   const urlRef = useRef(url);
+  const [presetSelectOpen, setPresetSelectOpen] = useState(false);
   const presetGroups = useMemo(() => groupPresetsForSelect(presets), [presets]);
   const selectedPresetConfig = useMemo(
     () => (selectedPreset === "custom" ? null : resolvePresetById(presets, selectedPreset) ?? null),
@@ -416,6 +417,15 @@ export function DownloadInputSection({
   }, [handlePasteFromClipboard, isAdding, onAdd]);
 
   const isInstagramImageOnly = instagramMediaSummary?.isImageOnly ?? false;
+  const presetSelectionLocked = isDirectImageUrl || isInstagramImageOnly;
+  const presetSelectionDisabled = presetSelectionLocked && !presetSelectOpen;
+
+  useEffect(() => {
+    if (presetSelectionLocked && presetSelectOpen) {
+      setPresetSelectOpen(false);
+    }
+  }, [presetSelectionLocked, presetSelectOpen]);
+
   const instagramPresetMessage = useMemo(() => {
     if (!instagramMediaSummary) return null;
     if (instagramMediaSummary.isImageOnly) {
@@ -540,7 +550,9 @@ export function DownloadInputSection({
           <Select
             value={selectedPreset}
             onValueChange={onPresetChange}
-            disabled={isDirectImageUrl || isInstagramImageOnly}
+            open={presetSelectOpen}
+            onOpenChange={setPresetSelectOpen}
+            disabled={presetSelectionDisabled}
           >
             <SelectTrigger className="h-10 rounded-lg border-border/65 bg-background/95 px-3 shadow-sm focus:ring-1 disabled:cursor-not-allowed disabled:opacity-70 dark:border-white/10 dark:bg-background/90">
               {isDirectImageUrl ? (

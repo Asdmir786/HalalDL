@@ -265,6 +265,12 @@ export function DownloadsScreen() {
     };
   }, [url]);
 
+  useEffect(() => {
+    if (instagramMediaSummary?.isImageOnly && showOutputConfig) {
+      setShowOutputConfig(false);
+    }
+  }, [instagramMediaSummary?.isImageOnly, showOutputConfig]);
+
   const prevJobsCountRef = useRef(jobs.length);
   useEffect(() => {
     prevJobsCountRef.current = jobs.length;
