@@ -8,7 +8,7 @@ HalalDL is a real released Windows app, not just a prototype.
 
 - Current public release: `v0.5.0`
 - Current branch state when this plan was written: `main` contains post-`v0.5.0` support and trust improvements
-- Current public positioning: Windows-first, local-first desktop GUI for `yt-dlp`
+- Current public positioning: local-first Windows media downloader powered by `yt-dlp`
 - Primary platform: Windows 10 and Windows 11, x64
 - Distribution today: GitHub Releases and WinGet
 - Latest release asset signal: the Full setup EXE is the strongest download path
@@ -287,7 +287,7 @@ Use Reddit for honest feedback, not spam.
 Suggested post angle:
 
 ```text
-I built a Windows-first local yt-dlp GUI and need feedback on the install/trust flow.
+I built a local-first Windows media downloader powered by yt-dlp and need feedback on the install/trust flow.
 ```
 
 Talk about:
@@ -310,7 +310,7 @@ Do not position HalalDL as just another “free YouTube downloader.”
 Better positioning:
 
 ```text
-HalalDL is a Windows-first, local-first desktop GUI for yt-dlp with presets, raw logs, and Full/Lite/Portable builds.
+HalalDL is a local-first Windows media downloader powered by yt-dlp, with presets, visible logs, and optional tool management.
 ```
 
 Core proof points:

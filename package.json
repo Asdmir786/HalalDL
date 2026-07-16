@@ -1,5 +1,6 @@
 {
   "name": "halaldl",
+  "description": "Local-first Windows media downloader powered by yt-dlp",
   "private": true,
   "version": "0.5.0",
   "type": "module",

@@ -5,9 +5,8 @@ This file captures the repo settings and launch copy that cannot be stored direc
 ## Repo Metadata
 
 - **Homepage:** `https://halaldl.vercel.app`
-- **Description:** `Windows-first, local-first desktop GUI for yt-dlp with presets, raw logs, and optional bundled tools.`
-- **Topics to keep:** `desktop-app`, `ffmpeg`, `open-source`, `react`, `rust`, `tauri`, `video-downloader`, `windows`, `yt-dlp`, `yt-dlp-gui`
-- **Topics to consider adding:** `media-downloader`, `download-manager`, `privacy-focused`, `windows-app`
+- **Description:** `Local-first Windows media downloader powered by yt-dlp, with presets, visible logs, and optional tool management.`
+- **Topics:** `windows`, `desktop-app`, `media-downloader`, `video-downloader`, `yt-dlp`, `yt-dlp-gui`, `ffmpeg`, `tauri`, `rust`, `react`, `open-source`, `local-first`
 
 ## GitHub Settings To Apply
 
@@ -45,6 +44,11 @@ This file captures the repo settings and launch copy that cannot be stored direc
 - If you use `--submit`, WingetCreate can create the fork/branch/PR for you.
 - WinGet validation runs after the PR opens, then Microsoft reviews and merges it.
 
+### Next Release Manifest Values
+
+- **ShortDescription:** `Local-first Windows media downloader powered by yt-dlp`
+- **Tags:** `desktop-app`, `ffmpeg`, `local-first`, `media-downloader`, `open-source`, `tauri`, `video-downloader`, `windows`, `yt-dlp`, `yt-dlp-gui`
+
 ### Automation Options
 
 - **Yes, it can be automated.**
@@ -56,11 +60,11 @@ This file captures the repo settings and launch copy that cannot be stored direc
 
 ### Title
 
-`HalalDL v[VERSION] is live: Windows-first, local-first downloads with a cleaner yt-dlp workflow`
+`HalalDL v[VERSION] is live: local-first Windows media downloading with a clearer yt-dlp workflow`
 
 ### Body
 
-HalalDL is a Windows-first desktop GUI for `yt-dlp` focused on a cleaner workflow, visible raw logs, and local-first privacy.
+HalalDL is a local-first Windows media downloader powered by `yt-dlp`, with presets, visible logs, and optional tool management.
 
 This release keeps the setup simple:
 
@@ -75,7 +79,7 @@ Feedback and bug reports are welcome.
 
 ## Social Post Draft
 
-Built a Windows-first desktop GUI for `yt-dlp` called **HalalDL**.
+Built a local-first Windows media downloader powered by `yt-dlp` called **HalalDL**.
 
 The goal is simple: local-first downloads, visible raw logs, presets that make sense, and a cleaner setup for Windows users.
 

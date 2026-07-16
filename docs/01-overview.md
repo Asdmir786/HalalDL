@@ -4,7 +4,7 @@
 - Package manager: pnpm
 - Platform: Windows-first (v1), architecture cross-platform-ready
 
-HalalDL is a lightweight, modern desktop GUI for yt-dlp, focused on speed, clarity, and reliability.
+HalalDL is a local-first Windows media downloader powered by yt-dlp, with presets, visible logs, and optional tool management.
 
 ## Goals
 - Fast startup and low memory usage

@@ -1,12 +1,12 @@
 # HalalDL
 
-Windows-first, local-first desktop downloads for people who want a clean GUI on top of `yt-dlp`.
+Local-first media downloading for Windows, powered by `yt-dlp`.
 
 [Official website](https://halaldl.vercel.app) • [Download the latest release](https://github.com/Asdmir786/HalalDL/releases/latest) • [Report a bug](https://github.com/Asdmir786/HalalDL/issues/new/choose) • [Get support](./SUPPORT.md) • [Read the docs](./docs)
 
 ## Start Here
 
-HalalDL is a privacy-focused Windows desktop app for downloading video or audio with presets, raw logs, and optional bundled tools.
+HalalDL is a local-first Windows media downloader powered by `yt-dlp`, with presets, visible logs, and optional tool management.
 
 - **Best for most users:** download the latest release and choose `HalalDL-Full-...-setup.exe`
 - **Best for power users:** choose `HalalDL-Lite-...-setup.exe` if you want to manage `yt-dlp`, `ffmpeg`, and optional tools yourself
@@ -174,3 +174,7 @@ Small fixes, UX polish, packaging improvements, and bug reports are all welcome.
 ## License
 
 [MIT](./LICENSE)
+
+## About
+
+Local-first Windows media downloader powered by yt-dlp, with presets, visible logs, and optional tool management.
