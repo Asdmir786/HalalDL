@@ -113,7 +113,30 @@ async function resolveLatestAria2ZipUrl() {
   return match.browser_download_url;
 }
 
+function findEssentialsZipAsset(assets) {
+  if (!Array.isArray(assets)) return null;
+  return assets.find((asset) => {
+    const name = String(asset?.name ?? "").toLowerCase();
+    return name.endsWith(".zip") && name.includes("essentials_build");
+  });
+}
+
 async function resolveLatestFfmpegZipUrl() {
+  // Prefer GitHub releases so CI/builds survive gyan.dev outages.
+  try {
+    const latest = await fetchJson(
+      "https://api.github.com/repos/GyanD/codexffmpeg/releases/latest"
+    );
+    const match = findEssentialsZipAsset(latest.assets);
+    if (match?.browser_download_url) {
+      console.log(`Using GitHub latest FFmpeg essentials: ${match.name}`);
+      return match.browser_download_url;
+    }
+    throw new Error("No essentials_build ZIP in latest GitHub release");
+  } catch (error) {
+    console.warn(`⚠️ GitHub latest FFmpeg lookup failed: ${String(error)}`);
+  }
+
   try {
     const versionText = await fetchText("https://www.gyan.dev/ffmpeg/builds/release-version");
     const versionTag = versionText.trim().split(/\s+/)[0]?.replace(/^v/, "");
@@ -124,18 +147,18 @@ async function resolveLatestFfmpegZipUrl() {
     const release = await fetchJson(
       `https://api.github.com/repos/GyanD/codexffmpeg/releases/tags/${versionTag}`
     );
-    const assets = Array.isArray(release.assets) ? release.assets : [];
-    const match = assets.find((asset) => {
-      const name = String(asset?.name ?? "").toLowerCase();
-      return name.endsWith(".zip") && name.includes("essentials_build");
-    });
+    const match = findEssentialsZipAsset(release.assets);
     if (match?.browser_download_url) {
+      console.log(`Using GitHub tagged FFmpeg essentials: ${match.name}`);
       return match.browser_download_url;
     }
+    throw new Error(`No essentials_build ZIP for tag ${versionTag}`);
   } catch (error) {
-    console.warn(`⚠️ Falling back to default FFmpeg ZIP URL: ${String(error)}`);
+    console.warn(`⚠️ Gyan version → GitHub tag lookup failed: ${String(error)}`);
   }
 
+  // Last resort: gyan.dev direct zip (may also be down).
+  console.warn("⚠️ Falling back to gyan.dev direct FFmpeg ZIP URL");
   return "https://www.gyan.dev/ffmpeg/builds/ffmpeg-release-essentials.zip";
 }
 

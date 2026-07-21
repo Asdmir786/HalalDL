@@ -7,8 +7,9 @@ import {
 } from "@/components/ui/dialog";
 import { MotionButton } from "@/components/motion/MotionButton";
 import { AnimatePresence, motion } from "framer-motion";
-import { Sparkles, AlertCircle, Loader2 } from "lucide-react";
+import { Sparkles, AlertCircle, Loader2, Copy } from "lucide-react";
 import { toast } from "sonner";
+import { copyText } from "@/lib/copy-text";
 import { ToolTransferStatus } from "@/components/tools/ToolTransferStatus";
 import { ToolBatchSummary } from "@/components/tools/ToolBatchSummary";
 import type { ToolBatchResult } from "@/lib/tools/tool-batch";
@@ -116,9 +117,21 @@ export function ToolsProgressModal({
                     animate={{ opacity: 1 }}
                     className="space-y-4"
                   >
-                    <div className="flex items-start gap-3 rounded-xl border border-destructive/20 bg-destructive/5 p-4 text-sm text-destructive">
-                      <AlertCircle className="mt-0.5 h-5 w-5 shrink-0" />
-                      <p>{modalError}</p>
+                    <div className="space-y-3 rounded-xl border border-destructive/20 bg-destructive/5 p-4 text-sm text-destructive">
+                      <div className="flex items-start gap-3">
+                        <AlertCircle className="mt-0.5 h-5 w-5 shrink-0" />
+                        <p className="min-w-0 flex-1 whitespace-pre-wrap break-words">{modalError}</p>
+                      </div>
+                      <MotionButton
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        className="h-8 gap-1.5 rounded-lg border-destructive/25 bg-background/40 text-destructive hover:bg-destructive/10"
+                        onClick={() => void copyText(modalError, "Error copied")}
+                      >
+                        <Copy className="h-3.5 w-3.5" />
+                        Copy error
+                      </MotionButton>
                     </div>
                     {modalBatchResult && (
                       <ToolBatchSummary result={modalBatchResult} toolNameById={toolNameById} />

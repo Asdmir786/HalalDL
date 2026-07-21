@@ -9,6 +9,8 @@ export interface AppPaths {
   thumbnailsDir: string;
   archiveDir: string;
   updatesDir: string;
+  cacheDir: string;
+  ytdlpCacheDir: string;
   markerPath: string;
 }
 

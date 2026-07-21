@@ -18,6 +18,7 @@ import { ContextMenu, ContextMenuContent, ContextMenuItem, ContextMenuTrigger, C
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Select, SelectContent, SelectGroup, SelectItem, SelectLabel, SelectSeparator, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { toast } from "sonner";
+import { copyText, formatJobErrorText } from "@/lib/copy-text";
 import { PRESET_GROUP_LABELS, getPresetGroup, groupPresetsForSelect, resolvePresetById } from "@/lib/preset-display";
 import { isInstagramUrl } from "@/lib/media-engine";
 import { formatBytes, formatMediaDuration, getJobTs } from "../utils";
@@ -160,9 +161,11 @@ export function DownloadItem({
   const isRecentResult = section === "recent";
   const footerDetail = job.status === "Queued"
     ? queueMeta?.detail || job.statusDetail || ""
-    : isRecentResult
-      ? ""
-      : job.statusDetail || "";
+    : job.status === "Failed"
+      ? job.statusDetail || "Download failed"
+      : isRecentResult
+        ? ""
+        : job.statusDetail || "";
   const hasFfmpegProgress = job.phase === "Converting with FFmpeg" && job.ffmpegProgressKnown;
   const showFooterRow =
     job.status === "Queued" ||
@@ -198,8 +201,18 @@ export function DownloadItem({
   const hasThumbnailSheet = Boolean(job.thumbnailSheet);
 
   const handleCopyLink = (url: string) => {
-    navigator.clipboard.writeText(url);
-    toast.success("Link copied to clipboard");
+    void copyText(url, "Link copied to clipboard");
+  };
+
+  const handleCopyError = () => {
+    void copyText(
+      formatJobErrorText({
+        title: job.title,
+        url: job.url,
+        statusDetail: job.statusDetail,
+      }),
+      "Error copied"
+    );
   };
 
   const handleCopyFiles = async () => {
@@ -772,6 +785,58 @@ export function DownloadItem({
                         : footerDetail || "Paused with resumable partial data kept in place."}
                     </div>
                   </div>
+                ) : job.status === "Failed" ? (
+                  <div className="mt-1 space-y-2 rounded-xl border border-destructive/25 bg-destructive/8 px-3 py-2.5">
+                    <div className="flex items-start justify-between gap-3">
+                      <p
+                        className="min-w-0 flex-1 whitespace-pre-wrap break-words text-[11px] leading-relaxed text-destructive"
+                        title={footerDetail}
+                      >
+                        {footerDetail}
+                      </p>
+                      <div className="flex shrink-0 items-center gap-1">
+                        <MotionButton
+                          variant="ghost"
+                          size="icon"
+                          className="h-8 w-8 rounded-full border border-destructive/20 bg-background/40 hover:bg-destructive/15 hover:text-destructive"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleCopyError();
+                          }}
+                          title="Copy error"
+                          aria-label="Copy error"
+                        >
+                          <Copy className="h-3.5 w-3.5" />
+                        </MotionButton>
+                        <MotionButton
+                          variant="ghost"
+                          size="icon"
+                          className="h-8 w-8 rounded-full border border-primary/20 bg-primary/5 hover:bg-primary/15 hover:text-primary"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            onRetry(job.id);
+                          }}
+                          title="Retry Download"
+                          aria-label="Retry download"
+                        >
+                          <RotateCcw className="h-3.5 w-3.5" />
+                        </MotionButton>
+                        <MotionButton
+                          variant="ghost"
+                          size="icon"
+                          className="h-8 w-8 rounded-full border border-destructive/20 bg-destructive/5 hover:bg-destructive/15 hover:text-destructive"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            onRemove(job.id);
+                          }}
+                          title="Remove"
+                          aria-label="Remove failed download"
+                        >
+                          <X className="h-3.5 w-3.5" />
+                        </MotionButton>
+                      </div>
+                    </div>
+                  </div>
                 ) : showFooterRow ? (
                   <div className="flex items-center justify-between gap-2">
                     <div className="truncate text-[10px] text-muted-foreground">
@@ -834,21 +899,6 @@ export function DownloadItem({
                           title="Show in Explorer"
                         >
                           <FolderOpen className="w-4 h-4" />
-                        </MotionButton>
-                      )}
-
-                      {job.status === "Failed" && (
-                        <MotionButton
-                          variant="ghost"
-                          size="icon"
-                          className="w-8 h-8 rounded-full border border-primary/20 bg-primary/5 hover:bg-primary/15 hover:text-primary transition-colors"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            onRetry(job.id);
-                          }}
-                          title="Retry Download"
-                        >
-                          <RotateCcw className="w-4 h-4" />
                         </MotionButton>
                       )}
 
@@ -930,10 +980,16 @@ export function DownloadItem({
             </ContextMenuItem>
           )}
           {job.status === "Failed" && (
-            <ContextMenuItem onClick={() => onRetry(job.id)}>
-              <RotateCcw className="mr-2 h-3.5 w-3.5" />
-              Retry
-            </ContextMenuItem>
+            <>
+              <ContextMenuItem onClick={() => onRetry(job.id)}>
+                <RotateCcw className="mr-2 h-3.5 w-3.5" />
+                Retry
+              </ContextMenuItem>
+              <ContextMenuItem onClick={handleCopyError}>
+                <Copy className="mr-2 h-3.5 w-3.5" />
+                Copy Error
+              </ContextMenuItem>
+            </>
           )}
           <ContextMenuSeparator />
           {hasThumbnailSheet && (
@@ -948,8 +1004,7 @@ export function DownloadItem({
           </ContextMenuItem>
           <ContextMenuItem
             onClick={() => {
-              navigator.clipboard.writeText(JSON.stringify(job, null, 2));
-              toast.success("Job details copied");
+              void copyText(JSON.stringify(job, null, 2), "Job details copied");
             }}
           >
             <Copy className="mr-2 h-3.5 w-3.5" />

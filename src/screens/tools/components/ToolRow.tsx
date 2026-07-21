@@ -121,6 +121,14 @@ export function ToolRow({
                 {tool.variant}
               </Badge>
             )}
+            {tool.usingFallback && tool.status === "Detected" && (
+              <Badge
+                variant="outline"
+                className="text-[9px] h-4 px-1.5 font-medium text-amber-500 border-amber-500/20 bg-amber-500/5"
+              >
+                Fallback
+              </Badge>
+            )}
             {tool.channel === "nightly" && (
               <Badge
                 variant="outline"
@@ -142,9 +150,13 @@ export function ToolRow({
           <p className="text-[11px] text-muted-foreground truncate" title={tool.systemPath || tool.path || ""}>
             {tool.mode === "Manual" && tool.path
               ? tool.path
-              : tool.systemPath
-                ? tool.systemPath
-                : TOOL_DESCRIPTIONS[tool.id]}
+              : tool.usingFallback && tool.status === "Detected"
+                ? `Using system/PATH fallback${tool.systemPath ? `: ${tool.systemPath}` : ""}`
+                : tool.status === "Missing" && tool.id === "yt-dlp"
+                  ? "Unavailable — install yt-dlp or add it to PATH"
+                  : tool.systemPath
+                    ? tool.systemPath
+                    : TOOL_DESCRIPTIONS[tool.id]}
           </p>
         </div>
       </div>

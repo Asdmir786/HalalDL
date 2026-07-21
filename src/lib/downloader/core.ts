@@ -21,6 +21,7 @@ import type { DownloadJob } from "@/store/downloads";
 import { ensureFilenameTemplateExtension, getExplicitOutputPaths } from "@/lib/output-paths";
 import { buildClipSection } from "@/lib/clip";
 import { addUrlToAppArchive, getYtDlpArchivePath, isUrlInAppArchive } from "./archive";
+import { getAppPaths } from "@/lib/app-paths";
 import {
   normalizeSubtitlePreferences,
   resolveSubtitleLanguages,
@@ -871,6 +872,13 @@ export async function startDownload(jobId: string) {
   if (clipSection) {
     args.push("--download-sections", clipSection);
     addLog({ level: "info", message: `Clip range applied: ${clipSection.slice(1)}`, jobId });
+  }
+
+  try {
+    const { ytdlpCacheDir } = await getAppPaths();
+    args.push("--cache-dir", ytdlpCacheDir);
+  } catch {
+    // Fall back to yt-dlp default cache location.
   }
 
   args.push("--ignore-config", "--newline", "--no-colors", "--no-playlist");

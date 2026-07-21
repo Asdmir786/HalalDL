@@ -10,6 +10,7 @@ import { downloadUrlToFile } from "@/lib/commands";
 import { isInstagramUrl } from "@/lib/media-engine";
 import { getExplicitOutputPaths } from "@/lib/output-paths";
 import { resolveTool, ytDlpEnv, isYouTubeUrl } from "./tool-env";
+import { getAppPaths } from "@/lib/app-paths";
 import { fetchInstagramMediaInfo } from "./instagram";
 import {
   ensureThumbnailDir,
@@ -89,9 +90,16 @@ export async function fetchMediaInfo(url: string): Promise<MediaMetadataProbe> {
   }
 
   const ytDlp = await resolveTool("yt-dlp");
+  const args = ["--dump-single-json", "--skip-download", "--no-playlist", "--referer", url, url];
+  try {
+    const { ytdlpCacheDir } = await getAppPaths();
+    args.splice(0, 0, "--cache-dir", ytdlpCacheDir);
+  } catch {
+    // Keep default cache when app paths are unavailable.
+  }
   const command = Command.create(
     ytDlp.command,
-    ["--dump-single-json", "--skip-download", "--no-playlist", "--referer", url, url],
+    args,
     { env: ytDlpEnv(), encoding: "raw" }
   );
   const result = await command.execute();

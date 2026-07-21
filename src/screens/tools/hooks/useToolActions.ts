@@ -131,7 +131,22 @@ export function useToolActions(modalApi: ModalApi) {
         version: result?.version,
         variant: result?.variant,
         systemPath: result?.systemPath,
+        usingFallback: result?.usingFallback ?? false,
       });
+
+      if (!result) {
+        if (id === "yt-dlp") {
+          toast.error("yt-dlp is unavailable", {
+            description: "No app-managed binary and no system/PATH fallback was found.",
+          });
+        }
+      } else if (result.usingFallback && id === "yt-dlp") {
+        toast.info("Using system/PATH yt-dlp fallback", {
+          description: result.systemPath
+            ? `Fallback binary: ${result.systemPath}`
+            : "App-managed yt-dlp is missing; HalalDL is using a system install for now.",
+        });
+      }
 
       const toolChannel = useToolsStore.getState().tools.find((t) => t.id === id)?.channel ?? "stable";
       const latestTrack = getLatestTrackForTool(id, toolChannel);
@@ -141,19 +156,28 @@ export function useToolActions(modalApi: ModalApi) {
         message: `Checking latest ${id} on ${latestTrack} track via ${latestSource}`,
       });
       let latest: string | null = null;
-      switch (id) {
-        case "yt-dlp":
-          latest = await fetchLatestYtDlpVersion(toolChannel);
-          break;
-        case "ffmpeg":
-          latest = await fetchLatestFfmpegVersion(toolChannel);
-          break;
-        case "aria2":
-          latest = await fetchLatestAria2Version();
-          break;
-        case "deno":
-          latest = await fetchLatestDenoVersion();
-          break;
+      try {
+        switch (id) {
+          case "yt-dlp":
+            latest = await fetchLatestYtDlpVersion(toolChannel);
+            break;
+          case "ffmpeg":
+            latest = await fetchLatestFfmpegVersion(toolChannel);
+            break;
+          case "aria2":
+            latest = await fetchLatestAria2Version();
+            break;
+          case "deno":
+            latest = await fetchLatestDenoVersion();
+            break;
+        }
+      } catch (latestError) {
+        addLog({
+          level: "warn",
+          message: `Latest ${id} lookup failed: ${
+            latestError instanceof Error ? latestError.message : String(latestError)
+          }`,
+        });
       }
       const current = useToolsStore.getState().tools.find((t) => t.id === id);
       updateTool(id, {
@@ -173,7 +197,13 @@ export function useToolActions(modalApi: ModalApi) {
         level: "error",
         message: `Refresh failed (${id}): ${e instanceof Error ? e.message : String(e)}`,
       });
-      updateTool(id, { status: "Missing" });
+      updateTool(id, {
+        status: "Missing",
+        version: undefined,
+        variant: undefined,
+        systemPath: undefined,
+        usingFallback: false,
+      });
       toast.error(`Error refreshing ${id}`);
     } finally {
       setBusyTools((prev) => ({ ...prev, [id]: false }));

@@ -231,6 +231,20 @@ pub async fn resolve_latest_aria2_zip_url(app_handle: &tauri::AppHandle) -> Resu
     Err("No matching aria2 Windows zip asset found".to_string())
 }
 
+fn find_ffmpeg_essentials_zip_url(json: &serde_json::Value) -> Option<String> {
+    let assets = json.get("assets").and_then(|v| v.as_array())?;
+    for asset in assets {
+        let name = asset.get("name").and_then(|v| v.as_str()).unwrap_or("");
+        let lower = name.to_lowercase();
+        if lower.ends_with(".zip") && lower.contains("essentials_build") {
+            if let Some(url) = asset.get("browser_download_url").and_then(|v| v.as_str()) {
+                return Some(url.to_string());
+            }
+        }
+    }
+    None
+}
+
 pub async fn resolve_latest_ffmpeg_essentials_zip_url(
     app_handle: &tauri::AppHandle,
 ) -> Result<String, String> {
@@ -240,6 +254,21 @@ pub async fn resolve_latest_ffmpeg_essentials_zip_url(
         .read_timeout(Duration::from_secs(45))
         .build()
         .map_err(|e| e.to_string())?;
+
+    // Prefer GitHub latest so installs work when gyan.dev is down.
+    let latest_res = client
+        .get("https://api.github.com/repos/GyanD/codexffmpeg/releases/latest")
+        .header("Accept", "application/vnd.github+json")
+        .send()
+        .await
+        .map_err(|e| e.to_string())?;
+
+    if latest_res.status().is_success() {
+        let json: serde_json::Value = latest_res.json().await.map_err(|e| e.to_string())?;
+        if let Some(url) = find_ffmpeg_essentials_zip_url(&json) {
+            return Ok(url);
+        }
+    }
 
     let version_res = client
         .get("https://www.gyan.dev/ffmpeg/builds/release-version")
@@ -287,25 +316,12 @@ pub async fn resolve_latest_ffmpeg_essentials_zip_url(
     }
 
     let json: serde_json::Value = release_res.json().await.map_err(|e| e.to_string())?;
-    let assets = json
-        .get("assets")
-        .and_then(|v| v.as_array())
-        .ok_or_else(|| "Missing assets in Gyan FFmpeg GitHub release response".to_string())?;
-
-    for asset in assets {
-        let name = asset.get("name").and_then(|v| v.as_str()).unwrap_or("");
-        let lower = name.to_lowercase();
-        if lower.ends_with(".zip") && lower.contains("essentials_build") {
-            if let Some(url) = asset.get("browser_download_url").and_then(|v| v.as_str()) {
-                return Ok(url.to_string());
-            }
-        }
-    }
-
-    Err(format!(
-        "No matching FFmpeg Essentials ZIP asset found for {}",
-        version
-    ))
+    find_ffmpeg_essentials_zip_url(&json).ok_or_else(|| {
+        format!(
+            "No matching FFmpeg Essentials ZIP asset found for {}",
+            version
+        )
+    })
 }
 
 pub async fn download_to_temp(

@@ -9,6 +9,8 @@ pub async fn fetch_latest_ytdlp_version(app_handle: tauri::AppHandle, channel: O
 
     let client = reqwest::Client::builder()
         .user_agent(format!("HalalDL/{}", app_handle.package_info().version))
+        .connect_timeout(std::time::Duration::from_secs(10))
+        .timeout(std::time::Duration::from_secs(20))
         .build()
         .map_err(|e| e.to_string())?;
 
@@ -42,6 +44,8 @@ pub async fn fetch_latest_ytdlp_version(app_handle: tauri::AppHandle, channel: O
 pub async fn fetch_latest_aria2_version(app_handle: tauri::AppHandle) -> Result<String, String> {
     let client = reqwest::Client::builder()
         .user_agent(format!("HalalDL/{}", app_handle.package_info().version))
+        .connect_timeout(std::time::Duration::from_secs(10))
+        .timeout(std::time::Duration::from_secs(20))
         .build()
         .map_err(|e| e.to_string())?;
 
@@ -79,6 +83,8 @@ pub async fn fetch_latest_aria2_version(app_handle: tauri::AppHandle) -> Result<
 pub async fn fetch_latest_deno_version(app_handle: tauri::AppHandle) -> Result<String, String> {
     let client = reqwest::Client::builder()
         .user_agent(format!("HalalDL/{}", app_handle.package_info().version))
+        .connect_timeout(std::time::Duration::from_secs(10))
+        .timeout(std::time::Duration::from_secs(20))
         .build()
         .map_err(|e| e.to_string())?;
 
@@ -112,6 +118,8 @@ pub async fn fetch_latest_ffmpeg_version(app_handle: tauri::AppHandle, channel: 
 
     let client = reqwest::Client::builder()
         .user_agent(format!("HalalDL/{}", app_handle.package_info().version))
+        .connect_timeout(std::time::Duration::from_secs(10))
+        .timeout(std::time::Duration::from_secs(20))
         .build()
         .map_err(|e| e.to_string())?;
 

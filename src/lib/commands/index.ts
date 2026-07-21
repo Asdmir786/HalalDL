@@ -37,6 +37,7 @@ export {
   cleanupAllBackups,
   downloadUrlToFile,
   postFormForText,
+  clearYtDlpCache,
 } from "./tool-commands";
 export {
   revealInExplorer,

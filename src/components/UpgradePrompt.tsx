@@ -10,7 +10,8 @@ import {
   DialogFooter,
 } from "@/components/ui/dialog";
 import { MotionButton } from "@/components/motion/MotionButton";
-import { Sparkles, AlertCircle, Download, CheckCircle2 } from "lucide-react";
+import { Sparkles, AlertCircle, Download, CheckCircle2, Copy } from "lucide-react";
+import { copyText } from "@/lib/copy-text";
 import { useToolsStore } from "@/store/tools";
 import { useLogsStore } from "@/store/logs";
 import { AnimatePresence, motion } from "framer-motion";
@@ -81,6 +82,13 @@ export function UpgradePrompt() {
     [tools]
   );
   const allToolsChecked = tools.length > 0 && tools.every((tool) => tool.status !== "Checking");
+  const managedProbeKey = useMemo(
+    () =>
+      tools
+        .map((tool) => `${tool.id}:${tool.status}:${tool.usingFallback ? "1" : "0"}`)
+        .join("|"),
+    [tools]
+  );
 
   useEffect(() => {
     activeToolIdsRef.current = operationToolIds;
@@ -96,7 +104,7 @@ export function UpgradePrompt() {
         if (!cancelled) {
           addLog({
             level: "debug",
-            message: `Startup managed-tool probe missing: ${ids.length > 0 ? ids.join(", ") : "none"}`,
+            message: `Managed-tool probe missing: ${ids.length > 0 ? ids.join(", ") : "none"}`,
           });
           setStartupMissingToolIds(ids);
         }
@@ -105,7 +113,7 @@ export function UpgradePrompt() {
         if (!cancelled) {
           addLog({
             level: "warn",
-            message: `Startup managed-tool probe failed: ${String(error)}`,
+            message: `Managed-tool probe failed: ${String(error)}`,
           });
           setStartupMissingToolIds([]);
         }
@@ -115,21 +123,22 @@ export function UpgradePrompt() {
     return () => {
       cancelled = true;
     };
-  }, [addLog, appMode, isManagedMode]);
+    // Re-probe when tool availability changes so deleting yt-dlp while the app is open
+    // re-opens the mandatory Full/Portable setup modal.
+  }, [addLog, appMode, isManagedMode, managedProbeKey]);
 
   const checkedMissingIds = useMemo(() => {
     if (!allToolsChecked) return [];
 
     if (isManagedMode) {
-      return getStartupToolIds(appMode).filter(
-        (toolId) => tools.find((tool) => tool.id === toolId)?.status === "Missing"
-      );
+      // Full/Portable always require app-managed copies, even if a PATH fallback exists.
+      return startupMissingToolIds ?? [];
     }
 
     return tools
       .filter((tool) => tool.status === "Missing" && isStartupRequiredTool(tool.id, appMode))
       .map((tool) => tool.id);
-  }, [allToolsChecked, appMode, isManagedMode, tools]);
+  }, [allToolsChecked, appMode, isManagedMode, startupMissingToolIds, tools]);
 
   const missingIds = useMemo(() => {
     if (allToolsChecked) {
@@ -142,6 +151,10 @@ export function UpgradePrompt() {
     ? startupMissingToolIds !== null && allToolsChecked
     : allToolsChecked;
   const promptToolIds = missingIds;
+  const ytDlpMissing = promptToolIds.includes("yt-dlp");
+  const isMandatorySetup = isManagedMode && ytDlpMissing;
+  const ytDlpTool = tools.find((tool) => tool.id === "yt-dlp");
+  const ytDlpUsingFallback = Boolean(ytDlpTool?.usingFallback && ytDlpTool.status === "Detected");
   const actionToolIds = error
     ? (operationToolIds.length > 0 ? operationToolIds : promptToolIds)
     : promptToolIds;
@@ -152,7 +165,9 @@ export function UpgradePrompt() {
   const modalOpen =
     isDownloading ||
     Boolean(error) ||
-    (startupReady && promptToolIds.length > 0 && dismissedMissingKey !== missingKey);
+    (startupReady &&
+      promptToolIds.length > 0 &&
+      (isMandatorySetup || dismissedMissingKey !== missingKey));
   const modalCurrentToolName = currentToolId ? toolNameById[currentToolId] ?? currentToolId : null;
   const modalCurrentToolVersion = currentToolId ? toolVersions[currentToolId] ?? null : null;
   const totalSize = modalToolIds.reduce((acc, toolId) => acc + (TOOL_SIZES[toolId] || 0), 0);
@@ -414,14 +429,26 @@ export function UpgradePrompt() {
     };
   }, [appendLog, isDownloading, toolNameById]);
 
-  const selectionSubtitle = isManagedMode
-    ? appMode === "PORTABLE"
-      ? "Portable mode manages its own local toolset beside the app. Missing bundled binaries will be installed now."
-      : "Full mode manages its own local toolset. Missing app-managed binaries will be installed now."
-    : "Lite mode only requires yt-dlp to be available before downloads can start.";
+  const selectionSubtitle = (() => {
+    if (isDownloading) return "Installing your local tool bundle...";
+    if (isManagedMode) {
+      if (ytDlpMissing) {
+        return ytDlpUsingFallback
+          ? "App-managed yt-dlp is missing. A system/PATH fallback was found, but Full/Portable mode still requires a local copy. Download again to continue."
+          : "App-managed yt-dlp is missing or unavailable. Download again to restore the required local binary.";
+      }
+      return appMode === "PORTABLE"
+        ? "Portable mode manages its own local toolset beside the app. Missing bundled binaries will be installed now."
+        : "Full mode manages its own local toolset. Missing app-managed binaries will be installed now.";
+    }
+    if (ytDlpMissing) {
+      return "Lite mode needs yt-dlp. No system/PATH fallback was found. Install yt-dlp with HalalDL, or put yt-dlp on PATH and press Check again.";
+    }
+    return "Lite mode only requires yt-dlp to be available before downloads can start.";
+  })();
 
   const handleClose = (nextOpen: boolean) => {
-    if (isDownloading && !nextOpen) return;
+    if (!nextOpen && (isDownloading || isMandatorySetup)) return;
     if (!nextOpen) {
       setError(null);
       setOperationToolIds([]);
@@ -430,16 +457,22 @@ export function UpgradePrompt() {
     }
   };
 
+  const primaryActionLabel = (() => {
+    if (error) return "Retry Install";
+    if (isManagedMode && ytDlpMissing) return "Download again";
+    return `Install (${totalSize}MB)`;
+  })();
+
   return (
     <Dialog open={modalOpen} onOpenChange={handleClose}>
       <DialogContent
-        showCloseButton={!isDownloading}
+        showCloseButton={!isDownloading && !isMandatorySetup}
         className="w-[calc(100%-1rem)] max-w-[560px] border-none bg-transparent p-0 shadow-2xl overflow-hidden"
         onInteractOutside={(event) => {
-          if (isDownloading) event.preventDefault();
+          if (isDownloading || isMandatorySetup) event.preventDefault();
         }}
         onEscapeKeyDown={(event) => {
-          if (isDownloading) event.preventDefault();
+          if (isDownloading || isMandatorySetup) event.preventDefault();
         }}
       >
         <div className="relative flex max-h-[min(760px,calc(100vh-1rem))] min-h-0 flex-col overflow-hidden rounded-xl border border-white/10 bg-background/90 backdrop-blur-2xl">
@@ -456,10 +489,18 @@ export function UpgradePrompt() {
                 </div>
                 <div className="min-w-0">
                   <DialogTitle className="text-lg font-bold tracking-tight">
-                    {isDownloading ? "Setting Up Tools" : isManagedMode ? (appMode === "PORTABLE" ? "Portable Setup" : "Full Mode Setup") : "Setup Required"}
+                    {isDownloading
+                      ? "Setting Up Tools"
+                      : isManagedMode
+                        ? ytDlpMissing
+                          ? "yt-dlp Required"
+                          : appMode === "PORTABLE"
+                            ? "Portable Setup"
+                            : "Full Mode Setup"
+                        : "Setup Required"}
                   </DialogTitle>
                   <p className="mt-0.5 text-xs font-medium text-muted-foreground">
-                    {isDownloading ? "Installing your local tool bundle..." : selectionSubtitle}
+                    {selectionSubtitle}
                   </p>
                 </div>
               </div>
@@ -495,11 +536,21 @@ export function UpgradePrompt() {
                 >
                   <div className="flex items-start gap-3">
                     <AlertCircle className="mt-0.5 h-5 w-5 shrink-0" />
-                    <div className="space-y-2">
-                      <p>{error}</p>
+                    <div className="min-w-0 flex-1 space-y-2">
+                      <p className="whitespace-pre-wrap break-words">{error}</p>
                       <p className="text-xs text-destructive/80">
                         Retry when ready. The setup modal will stay single-run; it will not spawn extra success dialogs after restart.
                       </p>
+                      <MotionButton
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        className="h-8 gap-1.5 rounded-lg border-destructive/25 bg-background/40 text-destructive hover:bg-destructive/10"
+                        onClick={() => void copyText(error, "Error copied")}
+                      >
+                        <Copy className="h-3.5 w-3.5" />
+                        Copy error
+                      </MotionButton>
                     </div>
                   </div>
                   {batchResult && (
@@ -579,14 +630,16 @@ export function UpgradePrompt() {
 
           {showFooterActions && (
             <DialogFooter className="gap-2 bg-muted/5 p-4 pt-2 sm:flex-row sm:p-6 sm:pt-2">
-              <MotionButton
-                type="button"
-                variant="ghost"
-                onClick={() => handleClose(false)}
-                className="h-11 w-full flex-1 rounded-xl text-muted-foreground hover:text-foreground"
-              >
-                Close
-              </MotionButton>
+              {!isMandatorySetup && (
+                <MotionButton
+                  type="button"
+                  variant="ghost"
+                  onClick={() => handleClose(false)}
+                  className="h-11 w-full flex-1 rounded-xl text-muted-foreground hover:text-foreground"
+                >
+                  Close
+                </MotionButton>
+              )}
               <MotionButton
                 type="button"
                 onClick={() => void handleUpgrade()}
@@ -594,7 +647,7 @@ export function UpgradePrompt() {
                 className="h-11 w-full flex-1 gap-2 rounded-xl bg-primary text-primary-foreground shadow-lg shadow-primary/20 hover:bg-primary/90"
               >
                 <Download className="h-4 w-4" />
-                {error ? "Retry Install" : `Install (${totalSize}MB)`}
+                {primaryActionLabel}
               </MotionButton>
             </DialogFooter>
           )}

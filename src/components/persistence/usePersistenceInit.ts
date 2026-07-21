@@ -73,6 +73,7 @@ export function usePersistenceInit(): MutableRefObject<boolean> {
           version: string;
           variant?: string;
           systemPath?: string;
+          usingFallback?: boolean;
         } | null>
       ) => {
         const result = await checkFn();
@@ -81,10 +82,24 @@ export function usePersistenceInit(): MutableRefObject<boolean> {
           version: result?.version || undefined,
           variant: result?.variant,
           systemPath: result?.systemPath,
+          usingFallback: result?.usingFallback ?? false,
           updateAvailable: undefined,
           latestVersion: undefined,
           latestCheckedAt: undefined,
         });
+        if (id === "yt-dlp" && result?.usingFallback) {
+          addLog({
+            level: "info",
+            message: `Startup: using system/PATH fallback yt-dlp${
+              result.systemPath ? ` at ${result.systemPath}` : ""
+            }`,
+          });
+        } else if (id === "yt-dlp" && !result) {
+          addLog({
+            level: "warn",
+            message: "Startup: yt-dlp unavailable (no app-managed binary and no PATH fallback)",
+          });
+        }
       };
 
       await Promise.allSettled([

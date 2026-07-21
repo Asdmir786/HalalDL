@@ -1,4 +1,4 @@
-import { Gauge, Layers, RotateCcw, Zap } from "lucide-react";
+import { Gauge, Layers, RotateCcw, Zap, Trash2 } from "lucide-react";
 import { Slider } from "@/components/ui/slider";
 import { Input } from "@/components/ui/input";
 import {
@@ -10,6 +10,9 @@ import {
 } from "@/components/ui/select";
 import { useEffect, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
+import { toast } from "sonner";
+import { clearYtDlpCache } from "@/lib/commands";
+import { MotionButton } from "@/components/motion/MotionButton";
 import { SettingsSection } from "./SettingsSection";
 import { SettingRow } from "./SettingRow";
 
@@ -36,6 +39,7 @@ export function EngineSection({
 }: EngineSectionProps) {
   const [speedUnit, setSpeedUnit] = useState<number>(1);
   const [localSpeedValue, setLocalSpeedValue] = useState<number>(0);
+  const [isClearingCache, setIsClearingCache] = useState(false);
 
   useEffect(() => {
     const rawKb = maxSpeed || 0;
@@ -144,6 +148,38 @@ export function EngineSection({
             </SelectContent>
           </Select>
         </div>
+      </SettingRow>
+
+      <SettingRow
+        icon={Trash2}
+        label="Clear yt-dlp Cache"
+        description="Reset cached extractor/challenge data when sites keep asking to sign in or fail oddly."
+        vertical
+      >
+        <MotionButton
+          type="button"
+          variant="outline"
+          disabled={isClearingCache}
+          className="h-10 w-full justify-center gap-2 rounded-xl sm:w-auto"
+          onClick={() => {
+            void (async () => {
+              setIsClearingCache(true);
+              try {
+                const summary = await clearYtDlpCache();
+                toast.success("yt-dlp cache cleared", { description: summary });
+              } catch (error) {
+                toast.error(
+                  `Failed to clear cache: ${error instanceof Error ? error.message : String(error)}`
+                );
+              } finally {
+                setIsClearingCache(false);
+              }
+            })();
+          }}
+        >
+          <Trash2 className="h-4 w-4" />
+          {isClearingCache ? "Clearing..." : "Clear cache"}
+        </MotionButton>
       </SettingRow>
     </SettingsSection>
   );

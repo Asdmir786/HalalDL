@@ -8,50 +8,162 @@ export interface ToolCheckResult {
   version: string;
   variant: string;
   systemPath?: string;
+  isLocal?: boolean;
+  usingFallback?: boolean;
+}
+
+const TOOL_CHECK_TIMEOUT_MS = 8000;
+const PIP_CHECK_TIMEOUT_MS = 5000;
+
+async function executeWithTimeout(
+  program: string,
+  args: string[],
+  timeoutMs = TOOL_CHECK_TIMEOUT_MS
+): Promise<{ code: number | null; stdout: string; stderr: string }> {
+  const cmd = Command.create(program, args);
+  let timeoutId: ReturnType<typeof setTimeout> | undefined;
+
+  try {
+    return await Promise.race([
+      cmd.execute(),
+      new Promise<never>((_, reject) => {
+        timeoutId = setTimeout(() => {
+          reject(new Error(`Timed out after ${timeoutMs}ms`));
+        }, timeoutMs);
+      }),
+    ]);
+  } finally {
+    if (timeoutId !== undefined) clearTimeout(timeoutId);
+  }
 }
 
 export async function resolveSystemToolPath(tool: string): Promise<string | null> {
   return invoke<string | null>("resolve_system_tool_path", { tool });
 }
 
+async function detectYtDlpPipVariant(): Promise<string | null> {
+  for (const pipCmd of ["pip", "pip3"]) {
+    try {
+      const pipOut = await executeWithTimeout(pipCmd, ["show", "yt-dlp"], PIP_CHECK_TIMEOUT_MS);
+      if (pipOut.code === 0 && pipOut.stdout.toLowerCase().includes("name: yt-dlp")) {
+        return "pip";
+      }
+    } catch {
+      // pip not available / timed out
+    }
+  }
+  return null;
+}
+
 export async function checkYtDlpVersion(): Promise<ToolCheckResult | null> {
   const { addLog } = useLogsStore.getState();
   try {
     const tool = await resolveTool("yt-dlp");
-    addLog({ level: "command", message: "Checking for yt-dlp binary...", command: `${tool.path} --version` });
-    const cmd = Command.create(tool.command, ["--version"]);
-    const output = await cmd.execute();
-    if (output.code === 0) {
-      const version = output.stdout.trim();
 
-      let variant = tool.isLocal ? "Bundled" : "System";
-      if (!tool.isLocal) {
-        try {
-          const pipCmd = Command.create("pip", ["show", "yt-dlp"]);
-          const pipOut = await pipCmd.execute();
-          if (pipOut.code === 0 && pipOut.stdout.toLowerCase().includes("name: yt-dlp")) {
-            variant = "pip";
-          }
-        } catch {
-          try {
-            const pip3Cmd = Command.create("pip3", ["show", "yt-dlp"]);
-            const pip3Out = await pip3Cmd.execute();
-            if (pip3Out.code === 0 && pip3Out.stdout.toLowerCase().includes("name: yt-dlp")) {
-              variant = "pip";
-            }
-          } catch {
-            // neither pip nor pip3 available
-          }
+    if (tool.isLocal) {
+      addLog({
+        level: "command",
+        message: "Checking app-managed yt-dlp binary...",
+        command: `${tool.path} --version`,
+      });
+      try {
+        const output = await executeWithTimeout(tool.command, ["--version"]);
+        if (output.code === 0) {
+          const version = output.stdout.trim();
+          addLog({
+            level: "info",
+            message: `yt-dlp ${version || "Detected"} (Bundled) at ${tool.path}`,
+          });
+          return {
+            version,
+            variant: "Bundled",
+            systemPath: tool.path,
+            isLocal: true,
+            usingFallback: false,
+          };
         }
+        addLog({
+          level: "warn",
+          message: `App-managed yt-dlp returned code ${output.code}; checking for a system fallback...`,
+        });
+      } catch (e) {
+        addLog({
+          level: "warn",
+          message: `App-managed yt-dlp check failed (${String(e)}); checking for a system fallback...`,
+        });
+      }
+    } else {
+      addLog({
+        level: "info",
+        message: "App-managed yt-dlp is unavailable; checking system/PATH fallback...",
+      });
+    }
+
+    const systemPath = await resolveSystemToolPath("yt-dlp").catch(() => null);
+    if (!systemPath && !tool.isLocal) {
+      // Last-chance PATH spawn with a short timeout (covers non-.exe launchers).
+      addLog({
+        level: "command",
+        message: "Probing PATH for yt-dlp...",
+        command: "yt-dlp --version",
+      });
+      try {
+        const output = await executeWithTimeout("yt-dlp", ["--version"], TOOL_CHECK_TIMEOUT_MS);
+        if (output.code === 0) {
+          const version = output.stdout.trim();
+          const pipVariant = await detectYtDlpPipVariant();
+          const variant = pipVariant ?? "System";
+          addLog({
+            level: "info",
+            message: `Using system/PATH fallback yt-dlp ${version || "Detected"} (${variant})`,
+          });
+          return {
+            version,
+            variant,
+            systemPath: undefined,
+            isLocal: false,
+            usingFallback: true,
+          };
+        }
+      } catch (e) {
+        addLog({ level: "warn", message: `PATH yt-dlp probe failed: ${String(e)}` });
       }
 
-      const systemPath = !tool.isLocal
-        ? await resolveSystemToolPath("yt-dlp").catch(() => null)
-        : tool.path;
-
-      addLog({ level: "info", message: `yt-dlp ${version || "Detected"} (${variant}) at ${systemPath || tool.path}` });
-      return { version, variant, systemPath: systemPath ?? undefined };
+      addLog({
+        level: "warn",
+        message: "yt-dlp is unavailable (no app-managed binary and none on PATH)",
+      });
+      return null;
     }
+
+    const command = tool.isLocal ? "yt-dlp" : tool.command;
+    const probePath = systemPath || "yt-dlp";
+    addLog({
+      level: "command",
+      message: "Checking system/PATH yt-dlp fallback...",
+      command: `${probePath} --version`,
+    });
+    const output = await executeWithTimeout(command, ["--version"]);
+    if (output.code === 0) {
+      const version = output.stdout.trim();
+      const pipVariant = await detectYtDlpPipVariant();
+      const variant = pipVariant ?? "System";
+      const resolvedPath = systemPath ?? undefined;
+      addLog({
+        level: "info",
+        message: `Using system/PATH fallback yt-dlp ${version || "Detected"} (${variant})${
+          resolvedPath ? ` at ${resolvedPath}` : ""
+        }`,
+      });
+      return {
+        version,
+        variant,
+        systemPath: resolvedPath,
+        isLocal: false,
+        usingFallback: true,
+      };
+    }
+
     addLog({ level: "warn", message: `yt-dlp version check returned code ${output.code}` });
   } catch (e) {
     addLog({ level: "error", message: `yt-dlp check failed: ${String(e)}` });
@@ -63,11 +175,18 @@ export async function checkFfmpegVersion(): Promise<ToolCheckResult | null> {
   const { addLog } = useLogsStore.getState();
   try {
     const tool = await resolveTool("ffmpeg");
+    if (!tool.isLocal) {
+      const systemPath = await resolveSystemToolPath("ffmpeg").catch(() => null);
+      if (!systemPath) {
+        addLog({ level: "warn", message: "ffmpeg is unavailable (no app-managed binary and none on PATH)" });
+        return null;
+      }
+    }
+
     addLog({ level: "command", message: "Checking for ffmpeg binary...", command: `${tool.path} -version` });
-    const cmd = Command.create(tool.command, ["-version"]);
-    const output = await cmd.execute();
+    const output = await executeWithTimeout(tool.command, ["-version"]);
     if (output.code === 0) {
-      const firstLine = output.stdout.split('\n')[0] || "";
+      const firstLine = output.stdout.split("\n")[0] || "";
       const rawMatch = firstLine.match(/version\s+(\S+)/i);
       const rawVersion = rawMatch ? rawMatch[1] : "";
       const dateGitMatch = rawVersion.match(/^(\d{4})-(\d{2})-(\d{2})-git-([0-9a-f]+)/i);
@@ -105,7 +224,13 @@ export async function checkFfmpegVersion(): Promise<ToolCheckResult | null> {
         : tool.path;
 
       addLog({ level: "info", message: `ffmpeg ${version} (${variant}) at ${systemPath || tool.path}` });
-      return { version, variant, systemPath: systemPath ?? undefined };
+      return {
+        version,
+        variant,
+        systemPath: systemPath ?? undefined,
+        isLocal: tool.isLocal,
+        usingFallback: !tool.isLocal,
+      };
     }
     addLog({ level: "warn", message: `ffmpeg version check returned code ${output.code}` });
   } catch (e) {
@@ -118,11 +243,18 @@ export async function checkAria2Version(): Promise<ToolCheckResult | null> {
   const { addLog } = useLogsStore.getState();
   try {
     const tool = await resolveTool("aria2c");
+    if (!tool.isLocal) {
+      const systemPath = await resolveSystemToolPath("aria2").catch(() => null);
+      if (!systemPath) {
+        addLog({ level: "warn", message: "aria2c is unavailable (no app-managed binary and none on PATH)" });
+        return null;
+      }
+    }
+
     addLog({ level: "command", message: "Checking for aria2c binary...", command: `${tool.path} --version` });
-    const cmd = Command.create(tool.command, ["--version"]);
-    const output = await cmd.execute();
+    const output = await executeWithTimeout(tool.command, ["--version"]);
     if (output.code === 0) {
-      const firstLine = output.stdout.split('\n')[0] || "";
+      const firstLine = output.stdout.split("\n")[0] || "";
       const versionMatch = firstLine.match(/version\s+(\S+)/i);
       const version = versionMatch ? versionMatch[1] : (firstLine || "Detected");
       const variant = tool.isLocal ? "Bundled" : "System";
@@ -132,7 +264,13 @@ export async function checkAria2Version(): Promise<ToolCheckResult | null> {
         : tool.path;
 
       addLog({ level: "info", message: `aria2c ${version} (${variant}) at ${systemPath || tool.path}` });
-      return { version, variant, systemPath: systemPath ?? undefined };
+      return {
+        version,
+        variant,
+        systemPath: systemPath ?? undefined,
+        isLocal: tool.isLocal,
+        usingFallback: !tool.isLocal,
+      };
     }
     addLog({ level: "warn", message: `aria2c version check returned code ${output.code}` });
   } catch (e) {
@@ -145,11 +283,18 @@ export async function checkDenoVersion(): Promise<ToolCheckResult | null> {
   const { addLog } = useLogsStore.getState();
   try {
     const tool = await resolveTool("deno");
+    if (!tool.isLocal) {
+      const systemPath = await resolveSystemToolPath("deno").catch(() => null);
+      if (!systemPath) {
+        addLog({ level: "warn", message: "deno is unavailable (no app-managed binary and none on PATH)" });
+        return null;
+      }
+    }
+
     addLog({ level: "command", message: "Checking for deno binary...", command: `${tool.path} --version` });
-    const cmd = Command.create(tool.command, ["--version"]);
-    const output = await cmd.execute();
+    const output = await executeWithTimeout(tool.command, ["--version"]);
     if (output.code === 0) {
-      const firstLine = output.stdout.split('\n')[0] || "";
+      const firstLine = output.stdout.split("\n")[0] || "";
       const versionMatch = firstLine.match(/deno\s+(\S+)/i);
       const version = versionMatch ? versionMatch[1] : (firstLine || "Detected");
       const variant = tool.isLocal ? "Bundled" : "System";
@@ -159,7 +304,13 @@ export async function checkDenoVersion(): Promise<ToolCheckResult | null> {
         : tool.path;
 
       addLog({ level: "info", message: `deno ${version} (${variant}) at ${systemPath || tool.path}` });
-      return { version, variant, systemPath: systemPath ?? undefined };
+      return {
+        version,
+        variant,
+        systemPath: systemPath ?? undefined,
+        isLocal: tool.isLocal,
+        usingFallback: !tool.isLocal,
+      };
     }
     addLog({ level: "warn", message: `deno version check returned code ${output.code}` });
   } catch (e) {

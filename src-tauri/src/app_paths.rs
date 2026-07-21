@@ -10,6 +10,8 @@ pub const BIN_DIR: &str = "bin";
 pub const THUMBNAILS_DIR: &str = "thumbnails";
 pub const ARCHIVE_DIR: &str = "download-archive";
 pub const UPDATES_DIR: &str = "updates";
+pub const CACHE_DIR: &str = "cache";
+pub const YTDLP_CACHE_DIR: &str = "yt-dlp";
 pub const MANAGED_TOOL_IDS: &[&str] = &["yt-dlp", "ffmpeg", "aria2", "deno"];
 
 fn managed_tool_file_name(tool_id: &str) -> Option<&'static str> {
@@ -33,6 +35,8 @@ pub struct AppPaths {
     pub thumbnails_dir: String,
     pub archive_dir: String,
     pub updates_dir: String,
+    pub cache_dir: String,
+    pub ytdlp_cache_dir: String,
     pub marker_path: String,
 }
 
@@ -69,6 +73,8 @@ pub fn resolve_paths(app_handle: &tauri::AppHandle) -> Result<AppPaths, String> 
     let thumbnails_dir = data_dir.join(THUMBNAILS_DIR);
     let archive_dir = data_dir.join(ARCHIVE_DIR);
     let updates_dir = data_dir.join(UPDATES_DIR);
+    let cache_dir = data_dir.join(CACHE_DIR);
+    let ytdlp_cache_dir = cache_dir.join(YTDLP_CACHE_DIR);
     let marker_path = portable_marker_path_for_app_dir(&app_dir);
 
     Ok(AppPaths {
@@ -80,6 +86,8 @@ pub fn resolve_paths(app_handle: &tauri::AppHandle) -> Result<AppPaths, String> 
         thumbnails_dir: thumbnails_dir.to_string_lossy().to_string(),
         archive_dir: archive_dir.to_string_lossy().to_string(),
         updates_dir: updates_dir.to_string_lossy().to_string(),
+        cache_dir: cache_dir.to_string_lossy().to_string(),
+        ytdlp_cache_dir: ytdlp_cache_dir.to_string_lossy().to_string(),
         marker_path: marker_path.to_string_lossy().to_string(),
     })
 }
@@ -93,10 +101,62 @@ pub fn ensure_app_dirs(app_handle: &tauri::AppHandle) -> Result<AppPaths, String
         &paths.thumbnails_dir,
         &paths.archive_dir,
         &paths.updates_dir,
+        &paths.cache_dir,
+        &paths.ytdlp_cache_dir,
     ] {
         fs::create_dir_all(dir).map_err(|e| format!("Failed to create {}: {}", dir, e))?;
     }
     Ok(paths)
+}
+
+fn remove_dir_if_exists(path: &PathBuf) -> Result<bool, String> {
+    if !path.exists() {
+        return Ok(false);
+    }
+    fs::remove_dir_all(path).map_err(|e| format!("Failed to remove {}: {}", path.display(), e))?;
+    Ok(true)
+}
+
+/// Clears HalalDL-managed yt-dlp cache plus common system yt-dlp cache folders.
+/// Helps when extractors keep reusing stale challenge/login state.
+#[tauri::command]
+pub fn clear_ytdlp_cache(app_handle: tauri::AppHandle) -> Result<String, String> {
+    let paths = ensure_app_dirs(&app_handle)?;
+    let mut cleared = Vec::new();
+
+    let managed = PathBuf::from(&paths.ytdlp_cache_dir);
+    if remove_dir_if_exists(&managed)? {
+        cleared.push(format!("app cache ({})", managed.display()));
+        fs::create_dir_all(&managed)
+            .map_err(|e| format!("Failed to recreate {}: {}", managed.display(), e))?;
+    }
+
+    if let Ok(local) = std::env::var("LOCALAPPDATA") {
+        let candidate = PathBuf::from(local).join("yt-dlp");
+        if remove_dir_if_exists(&candidate)? {
+            cleared.push(format!("LocalAppData ({})", candidate.display()));
+        }
+    }
+
+    if let Ok(roaming) = std::env::var("APPDATA") {
+        let candidate = PathBuf::from(roaming).join("yt-dlp");
+        if remove_dir_if_exists(&candidate)? {
+            cleared.push(format!("AppData ({})", candidate.display()));
+        }
+    }
+
+    if let Ok(home) = std::env::var("USERPROFILE") {
+        let candidate = PathBuf::from(home).join(".cache").join("yt-dlp");
+        if remove_dir_if_exists(&candidate)? {
+            cleared.push(format!("user cache ({})", candidate.display()));
+        }
+    }
+
+    if cleared.is_empty() {
+        Ok("No yt-dlp cache folders were found".to_string())
+    } else {
+        Ok(format!("Cleared {}", cleared.join("; ")))
+    }
 }
 
 #[tauri::command]

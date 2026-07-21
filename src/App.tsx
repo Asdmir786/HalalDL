@@ -3,6 +3,7 @@ import { activateAttentionTarget, parseAttentionSearchParams } from "@/lib/atten
 import { useNavigationStore } from "@/store/navigation";
 import { PersistenceManager } from "@/components/PersistenceManager";
 import { UpgradePrompt } from "@/components/UpgradePrompt";
+import { Toaster } from "@/components/ui/sonner";
 import { AnimatePresence, motion } from "framer-motion";
 import { PageTransition } from "@/components/motion/PageTransition";
 import { DownloadsScreen } from "@/screens/DownloadsScreen"; // Keep critical path eager
@@ -714,6 +715,7 @@ export default function App() {
         </AnimatePresence>
       </main>
       {windowMode === "full" && deferredUiReady && persistenceReady && <UpgradePrompt />}
+      <Toaster />
     </div>
   );
 }

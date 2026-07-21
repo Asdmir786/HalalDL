@@ -12,8 +12,9 @@ import { type HistoryEntry, useHistoryStore } from "@/store/history";
 import { useState } from "react";
 import { renameFile } from "@/lib/commands";
 import { toast } from "sonner";
-import { X, Plus, Tag, Pencil } from "lucide-react";
+import { X, Plus, Tag, Pencil, Copy } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
+import { copyText, formatJobErrorText } from "@/lib/copy-text";
 
 interface HistoryDetailsProps {
   entry: HistoryEntry | null;
@@ -153,6 +154,36 @@ export function HistoryDetails({ entry, open, onOpenChange, fileExists }: Histor
                 {entry.outputPath || "N/A"}
               </p>
             </div>
+
+            {entry.failReason && (
+              <div className="space-y-2">
+                <Label className="text-xs text-muted-foreground uppercase tracking-wider">Failure</Label>
+                <div className="rounded-xl border border-destructive/20 bg-destructive/5 p-3">
+                  <p className="whitespace-pre-wrap break-words text-sm text-destructive">
+                    {entry.failReason}
+                  </p>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    className="mt-2 h-8 gap-1.5 rounded-lg border-destructive/25"
+                    onClick={() =>
+                      void copyText(
+                        formatJobErrorText({
+                          title: entry.title,
+                          url: entry.url,
+                          failReason: entry.failReason,
+                        }),
+                        "Error copied"
+                      )
+                    }
+                  >
+                    <Copy className="h-3.5 w-3.5" />
+                    Copy error
+                  </Button>
+                </div>
+              </div>
+            )}
           </div>
 
           {/* Notes & Tags Column */}

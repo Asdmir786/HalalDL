@@ -19,6 +19,8 @@ export interface Tool {
   channel: ToolChannel;
   required: boolean;
   hasBackup?: boolean;
+  /** True when a system/PATH binary is being used instead of an app-managed copy. */
+  usingFallback?: boolean;
 }
 
 interface ToolsState {

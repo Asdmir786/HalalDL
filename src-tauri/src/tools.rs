@@ -130,6 +130,7 @@ async fn download_ffmpeg(
     if let Some(url) = mirror_url {
         sources.push(url);
     }
+    // Keep gyan.dev last — GitHub mirrors are preferred when available.
     sources.push("https://www.gyan.dev/ffmpeg/builds/ffmpeg-release-essentials.zip".to_string());
 
     let zip_path = dest.join("ffmpeg-update.zip");
