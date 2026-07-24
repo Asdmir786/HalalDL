@@ -7,7 +7,6 @@ import {
   Database,
   Gauge,
   ListTree,
-  Wrench,
 } from "lucide-react";
 import { getVersion } from "@tauri-apps/api/app";
 import { toast } from "sonner";
@@ -97,7 +96,6 @@ export function PerformanceSection() {
 
   const firstUsableFrameMs = getMarkMs(summary, "first-usable-frame");
   const persistenceReadyMs = getMarkMs(summary, "persistence-critical-ready");
-  const toolsCheckReadyMs = getMarkMs(summary, "tools-check-ready");
   const hasTimings = Boolean(summary && summary.marks.length > 0);
 
   return (
@@ -135,14 +133,6 @@ export function PerformanceSection() {
         description="Critical settings and downloads finished loading."
       >
         <TimingValue value={formatMs(persistenceReadyMs)} />
-      </SettingRow>
-
-      <SettingRow
-        icon={Wrench}
-        label="Tools check ready"
-        description="yt-dlp, ffmpeg, aria2, and deno status checks finished."
-      >
-        <TimingValue value={formatMs(toolsCheckReadyMs)} />
       </SettingRow>
 
       <SettingRow

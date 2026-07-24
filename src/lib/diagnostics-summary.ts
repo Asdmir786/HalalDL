@@ -12,7 +12,6 @@ export type DiagnosticsPerformanceSummary = {
   firstUsableFrameMs: number | null;
   rustSetupCompleteMs: number | null;
   persistenceCriticalReadyMs: number | null;
-  toolsCheckReadyMs: number | null;
   available: boolean;
 };
 
@@ -71,7 +70,6 @@ function formatPerformanceBlock(
     `- First usable frame: ${formatMs(performance.firstUsableFrameMs)}`,
     `- Rust setup: ${formatMs(performance.rustSetupCompleteMs)}`,
     `- Persistence ready: ${formatMs(performance.persistenceCriticalReadyMs)}`,
-    `- Tools check ready: ${formatMs(performance.toolsCheckReadyMs)}`,
   ];
 }
 

@@ -25,7 +25,6 @@ const summary = formatDiagnosticsSummary({
     firstUsableFrameMs: 780,
     rustSetupCompleteMs: 120,
     persistenceCriticalReadyMs: 450,
-    toolsCheckReadyMs: 1100,
   },
 });
 
@@ -43,7 +42,7 @@ assert.match(summary, /Performance:/);
 assert.match(summary, /- First usable frame: 780ms/);
 assert.match(summary, /- Rust setup: 120ms/);
 assert.match(summary, /- Persistence ready: 450ms/);
-assert.match(summary, /- Tools check ready: 1100ms/);
+assert.doesNotMatch(summary, /Tools check ready/);
 assert.doesNotMatch(summary, /Recent errors/);
 assert.doesNotMatch(summary, /Detected,/);
 

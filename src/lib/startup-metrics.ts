@@ -82,7 +82,6 @@ export function getStartupMetricsSnapshot() {
       rustSetupCompleteMs: null,
       firstUsableFrameMs: null,
       persistenceCriticalReadyMs: null,
-      toolsCheckReadyMs: null,
       marks: [] as StartupMark[],
       capturedAt: null as string | null,
     };
@@ -93,7 +92,6 @@ export function getStartupMetricsSnapshot() {
     rustSetupCompleteMs: summary.rustSetupCompleteMs,
     firstUsableFrameMs: getMarkMs(summary, "first-usable-frame"),
     persistenceCriticalReadyMs: getMarkMs(summary, "persistence-critical-ready"),
-    toolsCheckReadyMs: getMarkMs(summary, "tools-check-ready"),
     marks: summary.marks,
     capturedAt: summary.capturedAt,
   };
@@ -116,7 +114,6 @@ export function formatStartupMetricsForSupport(
     `- First usable frame: ${formatMs(getMarkMs(summary, "first-usable-frame"))}`,
     `- Rust setup: ${formatMs(summary.rustSetupCompleteMs)}`,
     `- Persistence ready: ${formatMs(getMarkMs(summary, "persistence-critical-ready"))}`,
-    `- Tools check ready: ${formatMs(getMarkMs(summary, "tools-check-ready"))}`,
   ];
 }
 

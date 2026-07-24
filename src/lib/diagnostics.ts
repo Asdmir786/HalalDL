@@ -179,7 +179,6 @@ export function buildCopyDiagnosticsSummary({
       firstUsableFrameMs: performance.firstUsableFrameMs,
       rustSetupCompleteMs: performance.rustSetupCompleteMs,
       persistenceCriticalReadyMs: performance.persistenceCriticalReadyMs,
-      toolsCheckReadyMs: performance.toolsCheckReadyMs,
     },
   });
 }
