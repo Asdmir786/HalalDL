@@ -18,6 +18,7 @@ import { AppearanceSection } from "./settings/components/AppearanceSection";
 import { StorageSection } from "./settings/components/StorageSection";
 import { BehaviorSection } from "./settings/components/BehaviorSection";
 import { EngineSection } from "./settings/components/EngineSection";
+import { PerformanceSection } from "./settings/components/PerformanceSection";
 import { AboutSection } from "./settings/components/AboutSection";
 import { usePresetsStore } from "@/store/presets";
 import { getQuickEligiblePresets } from "@/lib/preset-display";
@@ -419,6 +420,8 @@ export function SettingsScreen() {
               maxSpeed={draftSettings.maxSpeed}
               onMaxSpeedChange={(v) => setDraftValue("maxSpeed", v)}
             />
+
+            <PerformanceSection />
 
             <AboutSection />
           </div>

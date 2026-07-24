@@ -44,6 +44,7 @@ All files stored under a folder prefix inside the zip:
 - `HalalDL-diagnostics/presets.json`
 - `HalalDL-diagnostics/download-queue.json`
 - `HalalDL-diagnostics/history-summary.json`
+- `HalalDL-diagnostics/performance.json`
 - `HalalDL-diagnostics/logs.txt`
 
 Where:
@@ -54,6 +55,7 @@ Where:
 - `settings.json`/`presets.json`: exported snapshots from store
 - `download-queue.json`: current jobs list (ids, url redacted, status/progress, outputDir, overrides)
 - `history-summary.json`: counts and selected fields; optionally include full history if user opts in
+- `performance.json`: startup timings snapshot (first usable frame, Rust setup, persistence, tools check, full marks)
 - `logs.txt`: exported console output (existing export logic can be reused) ([src/screens/LogsScreen.tsx](../src/screens/LogsScreen.tsx))
 
 ### Implementation approach

@@ -61,5 +61,5 @@ body:
     id: logs
     attributes:
       label: Support info, logs, or screenshots
-      description: Use Copy Support Info in HalalDL when possible. Remove private information before posting.
+      description: Use Copy support info in HalalDL (Settings → About, Performance, or Logs). It includes startup timings. Remove private information before posting.
       render: shell

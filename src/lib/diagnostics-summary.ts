@@ -8,6 +8,14 @@ export type DiagnosticsSummaryTool = {
 
 export type DiagnosticsPackageType = "msi" | "nsis" | "portable" | "unknown";
 
+export type DiagnosticsPerformanceSummary = {
+  firstUsableFrameMs: number | null;
+  rustSetupCompleteMs: number | null;
+  persistenceCriticalReadyMs: number | null;
+  toolsCheckReadyMs: number | null;
+  available: boolean;
+};
+
 export type DiagnosticsSummaryInput = {
   version: string;
   mode: DiagnosticsSummaryMode;
@@ -21,6 +29,7 @@ export type DiagnosticsSummaryInput = {
     failed: number;
   };
   tools: DiagnosticsSummaryTool[];
+  performance?: DiagnosticsPerformanceSummary | null;
 };
 
 function formatMode(mode: DiagnosticsSummaryMode): string {
@@ -44,6 +53,28 @@ function formatTool(tool: DiagnosticsSummaryTool): string {
   return version ? `- ${tool.name}: ${version}` : `- ${tool.name}: ${tool.status}`;
 }
 
+function formatMs(value: number | null | undefined): string {
+  if (value == null || !Number.isFinite(value)) return "n/a";
+  return `${Math.round(value)}ms`;
+}
+
+function formatPerformanceBlock(
+  performance: DiagnosticsPerformanceSummary | null | undefined
+): string[] {
+  if (!performance?.available) {
+    return ["", "Performance:", "- Startup timings: not available yet"];
+  }
+
+  return [
+    "",
+    "Performance:",
+    `- First usable frame: ${formatMs(performance.firstUsableFrameMs)}`,
+    `- Rust setup: ${formatMs(performance.rustSetupCompleteMs)}`,
+    `- Persistence ready: ${formatMs(performance.persistenceCriticalReadyMs)}`,
+    `- Tools check ready: ${formatMs(performance.toolsCheckReadyMs)}`,
+  ];
+}
+
 export function formatDiagnosticsSummary(input: DiagnosticsSummaryInput): string {
   const tools =
     input.tools.length > 0
@@ -62,5 +93,6 @@ export function formatDiagnosticsSummary(input: DiagnosticsSummaryInput): string
     "",
     "Tools:",
     tools,
+    ...formatPerformanceBlock(input.performance),
   ].join("\n");
 }

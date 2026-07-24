@@ -20,6 +20,13 @@ const summary = formatDiagnosticsSummary({
     { name: "yt-dlp", status: "Detected", version: "2026.06.01" },
     { name: "FFmpeg", status: "Missing" },
   ],
+  performance: {
+    available: true,
+    firstUsableFrameMs: 780,
+    rustSetupCompleteMs: 120,
+    persistenceCriticalReadyMs: 450,
+    toolsCheckReadyMs: 1100,
+  },
 });
 
 assert.match(summary, /^HalalDL support info/m);
@@ -32,6 +39,11 @@ assert.match(summary, /Downloads running: 1/);
 assert.match(summary, /History: 4 total, 3 completed, 1 failed/);
 assert.match(summary, /- yt-dlp: 2026\.06\.01/);
 assert.match(summary, /- FFmpeg: Missing/);
+assert.match(summary, /Performance:/);
+assert.match(summary, /- First usable frame: 780ms/);
+assert.match(summary, /- Rust setup: 120ms/);
+assert.match(summary, /- Persistence ready: 450ms/);
+assert.match(summary, /- Tools check ready: 1100ms/);
 assert.doesNotMatch(summary, /Recent errors/);
 assert.doesNotMatch(summary, /Detected,/);
 
@@ -53,4 +65,5 @@ const noErrors = formatDiagnosticsSummary({
 
 assert.match(noErrors, /Mode: Lite/);
 assert.match(noErrors, /Tools:\n- No tools loaded/);
+assert.match(noErrors, /Performance:\n- Startup timings: not available yet/);
 assert.doesNotMatch(noErrors, /Recent errors/);

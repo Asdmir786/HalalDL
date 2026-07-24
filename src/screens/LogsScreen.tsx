@@ -281,7 +281,7 @@ export function LogsScreen() {
         osLabel: getSupportOsLabel(),
       });
       await navigator.clipboard.writeText(summary);
-      toast.success("App info copied", {
+      toast.success("Support info copied", {
         description: "Paste it into a GitHub issue if you need help.",
       });
     } catch (error: unknown) {
@@ -389,7 +389,7 @@ export function LogsScreen() {
                   ) : (
                     <Copy className="w-3.5 h-3.5 mr-2" />
                   )}
-                  Copy app info
+                  Copy support info
                 </MotionButton>
                  <MotionButton
                   variant="outline"

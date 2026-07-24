@@ -71,6 +71,7 @@ pub fn export_diagnostics_zip(app_handle: tauri::AppHandle, output_path: String,
     let presets = payload.get("presets").cloned().unwrap_or(Value::Null);
     let download_queue = payload.get("downloadQueue").cloned().unwrap_or(Value::Null);
     let history_summary = payload.get("historySummary").cloned().unwrap_or(Value::Null);
+    let performance = payload.get("performance").cloned().unwrap_or(Value::Null);
 
     let manifest = serde_json::json!({
         "schemaVersion": 1,
@@ -85,6 +86,7 @@ pub fn export_diagnostics_zip(app_handle: tauri::AppHandle, output_path: String,
             format!("{}presets.json", prefix),
             format!("{}download-queue.json", prefix),
             format!("{}history-summary.json", prefix),
+            format!("{}performance.json", prefix),
             format!("{}logs.txt", prefix),
         ]
     });
@@ -97,6 +99,7 @@ pub fn export_diagnostics_zip(app_handle: tauri::AppHandle, output_path: String,
     write_json(&mut zip, &format!("{}presets.json", prefix), &presets)?;
     write_json(&mut zip, &format!("{}download-queue.json", prefix), &download_queue)?;
     write_json(&mut zip, &format!("{}history-summary.json", prefix), &history_summary)?;
+    write_json(&mut zip, &format!("{}performance.json", prefix), &performance)?;
     write_text(&mut zip, &format!("{}logs.txt", prefix), logs_text)?;
 
     zip.finish().map_err(|e| format!("Zip finish failed: {}", e))?;

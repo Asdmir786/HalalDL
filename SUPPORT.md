@@ -18,6 +18,10 @@ Please include the basics:
 - The exact behavior you saw
 - Relevant logs or screenshots
 
+The fastest way to attach the basics is **Copy support info** in HalalDL
+(Settings → About, Settings → Performance, or Logs). Paste that block into
+the issue. It includes mode, package type, tool status, and startup timings.
+
 ## Common Checks
 
 - Confirm you are on the latest release

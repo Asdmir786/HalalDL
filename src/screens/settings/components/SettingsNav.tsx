@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import {
-  Palette, HardDrive, Bell, Gauge, Info,
+  Palette, HardDrive, Bell, Gauge, Activity, Info,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { type LucideIcon } from "lucide-react";
@@ -16,6 +16,7 @@ const NAV_ITEMS: NavItem[] = [
   { id: "storage", label: "Storage", icon: HardDrive },
   { id: "behavior", label: "Behavior", icon: Bell },
   { id: "engine", label: "Engine", icon: Gauge },
+  { id: "performance", label: "Performance", icon: Activity },
   { id: "about", label: "About", icon: Info },
 ];
 

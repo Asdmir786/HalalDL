@@ -38,7 +38,7 @@ import {
   setFullSwitchAutoInstall,
   setLastAppMode,
 } from "@/lib/runtime-flags";
-import { markStartup } from "@/lib/startup-metrics";
+import { markStartup, reportStartupSummary } from "@/lib/startup-metrics";
 
 export function usePersistenceInit(): MutableRefObject<boolean> {
   const { setSettings } = useSettingsStore();
@@ -348,12 +348,14 @@ export function usePersistenceInit(): MutableRefObject<boolean> {
 
               initialized.current = true;
               markStartup("persistence-deferred-ready");
+              void reportStartupSummary();
             } catch (e) {
               addLog({
                 level: "error",
                 message: `Deferred persistence load failed: ${String(e)}`,
               });
               initialized.current = true;
+              void reportStartupSummary();
             }
           })();
         });

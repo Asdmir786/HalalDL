@@ -61,4 +61,8 @@ Use the bug report form and include:
 - Windows version
 - Relevant logs or screenshots
 
+Prefer pasting **Copy support info** from HalalDL (Settings → About,
+Performance, or Logs). That clipboard block includes tool status and
+startup timings.
+
 Please do not post secrets, cookies, or private URLs in public issues.

@@ -290,11 +290,11 @@ export function AboutSection() {
         osLabel: getSupportOsLabel(),
       });
       await navigator.clipboard.writeText(summary);
-      toast.success("App info copied", {
+      toast.success("Support info copied", {
         description: "Paste it into a GitHub issue if you need help.",
       });
     } catch {
-      toast.error("Could not copy app info");
+      toast.error("Could not copy support info");
     }
   }, [packageLabel, version]);
 
@@ -558,7 +558,7 @@ export function AboutSection() {
                 className="w-full"
               >
                 <Copy className="h-3.5 w-3.5 mr-1.5" />
-                Copy app info
+                Copy support info
               </MotionButton>
               <MotionButton
                 variant="ghost"
@@ -644,7 +644,7 @@ export function AboutSection() {
         />
         <LinkCard
           icon={Copy}
-          title="Copy app info"
+          title="Copy support info"
           description="Paste into support requests"
           onClick={() => void handleCopySupportInfo()}
         />

@@ -6,6 +6,7 @@ import { useSettingsStore, type Settings } from "@/store/settings";
 import { useToolsStore, type Tool } from "@/store/tools";
 import { getAppMode } from "@/lib/tools/app-mode";
 import { formatDiagnosticsSummary } from "@/lib/diagnostics-summary";
+import { getStartupMetricsSnapshot } from "@/lib/startup-metrics";
 import { arch, platform, version as osVersion } from "@tauri-apps/plugin-os";
 
 type DiagnosticsRedaction = {
@@ -109,6 +110,7 @@ export function buildDiagnosticsPayload(redaction: DiagnosticsRedaction) {
 
   const settings = settingsState.settings as Settings;
   const presets = presetsState.presets as Preset[];
+  const performance = getStartupMetricsSnapshot();
 
   return {
     schemaVersion: 1,
@@ -123,6 +125,7 @@ export function buildDiagnosticsPayload(redaction: DiagnosticsRedaction) {
     presets,
     downloadQueue,
     historySummary,
+    performance,
     logsText,
   };
 }
@@ -152,6 +155,8 @@ export function buildCopyDiagnosticsSummary({
     (entry) => entry.status === "failed"
   ).length;
 
+  const performance = getStartupMetricsSnapshot();
+
   return formatDiagnosticsSummary({
     version,
     mode: getAppMode(),
@@ -169,6 +174,13 @@ export function buildCopyDiagnosticsSummary({
       status: tool.status,
       version: tool.version,
     })),
+    performance: {
+      available: performance.available,
+      firstUsableFrameMs: performance.firstUsableFrameMs,
+      rustSetupCompleteMs: performance.rustSetupCompleteMs,
+      persistenceCriticalReadyMs: performance.persistenceCriticalReadyMs,
+      toolsCheckReadyMs: performance.toolsCheckReadyMs,
+    },
   });
 }
 
