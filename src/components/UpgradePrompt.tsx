@@ -17,7 +17,7 @@ import { useLogsStore } from "@/store/logs";
 import { AnimatePresence, motion } from "framer-motion";
 import { ToolTransferStatus } from "@/components/tools/ToolTransferStatus";
 import { ToolBatchSummary } from "@/components/tools/ToolBatchSummary";
-import { getAppMode, getStartupToolIds, isStartupRequiredTool } from "@/lib/tools/app-mode";
+import { getAppMode, getStartupToolIds } from "@/lib/tools/app-mode";
 import { getMissingAppManagedToolIds } from "@/lib/tools/local-tools";
 import {
   buildToolBatchErrorMessage,
@@ -81,7 +81,6 @@ export function UpgradePrompt() {
     () => Object.fromEntries(tools.map((tool) => [tool.id, tool.name])) as Record<string, string>,
     [tools]
   );
-  const allToolsChecked = tools.length > 0 && tools.every((tool) => tool.status !== "Checking");
   const managedProbeKey = useMemo(
     () =>
       tools
@@ -128,28 +127,21 @@ export function UpgradePrompt() {
   }, [addLog, appMode, isManagedMode, managedProbeKey]);
 
   const checkedMissingIds = useMemo(() => {
-    if (!allToolsChecked) return [];
-
     if (isManagedMode) {
       // Full/Portable always require app-managed copies, even if a PATH fallback exists.
       return startupMissingToolIds ?? [];
     }
 
-    return tools
-      .filter((tool) => tool.status === "Missing" && isStartupRequiredTool(tool.id, appMode))
-      .map((tool) => tool.id);
-  }, [allToolsChecked, appMode, isManagedMode, startupMissingToolIds, tools]);
+    // LITE: no startup spawn checks — missing state is handled when the user uses yt-dlp / Tools.
+    return [];
+  }, [appMode, isManagedMode, startupMissingToolIds]);
 
   const missingIds = useMemo(() => {
-    if (allToolsChecked) {
-      return checkedMissingIds;
-    }
-    return startupMissingToolIds ?? [];
-  }, [allToolsChecked, checkedMissingIds, startupMissingToolIds]);
+    return checkedMissingIds;
+  }, [checkedMissingIds]);
   const missingKey = missingIds.slice().sort().join("|");
-  const startupReady = isManagedMode
-    ? startupMissingToolIds !== null && allToolsChecked
-    : allToolsChecked;
+  // Managed modes only need the file-exists probe; do not wait on spawn-based "Checking".
+  const startupReady = isManagedMode ? startupMissingToolIds !== null : true;
   const promptToolIds = missingIds;
   const ytDlpMissing = promptToolIds.includes("yt-dlp");
   const isMandatorySetup = isManagedMode && ytDlpMissing;

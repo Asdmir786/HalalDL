@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState, type KeyboardEvent } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, type KeyboardEvent } from "react";
 import { CheckCircle2, ClipboardPaste, Download, ExternalLink, FolderOpen, Link2, X } from "lucide-react";
 import { open as openDialog } from "@tauri-apps/plugin-dialog";
 import { toast } from "sonner";
@@ -20,6 +20,7 @@ import {
 } from "@/lib/preset-display";
 import { fetchMetadata, pickSupportedUrlFromText, startQueuedJobs } from "@/lib/downloader";
 import { hideMainWindowToTray, readTextFromClipboard, restoreMainWindow } from "@/lib/commands";
+import { normalizeUrlIdentity } from "@/lib/url-identity";
 
 export function QuickDownloadPanel() {
   const settings = useSettingsStore((state) => state.settings);
@@ -42,19 +43,38 @@ export function QuickDownloadPanel() {
   const [presetId, setPresetId] = useState(resolveExistingPresetId(quickPresets, settings.quickDefaultPreset || "default"));
   const [clipboardUrl, setClipboardUrl] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
+  const lastAutoFilledUrlRef = useRef<string | null>(null);
 
   const refreshClipboardUrl = useCallback(async () => {
+    if (!settings.autoPasteLinks && !quickDraft?.url) {
+      try {
+        const text = await readTextFromClipboard();
+        setClipboardUrl(pickSupportedUrlFromText(text) ?? null);
+      } catch {
+        setClipboardUrl(null);
+      }
+      return;
+    }
+
     try {
       const text = await readTextFromClipboard();
       const supported = pickSupportedUrlFromText(text);
       setClipboardUrl(supported ?? null);
-      if (supported && (!quickDraft || !quickDraft.url)) {
-        setUrl(supported);
-      }
+      if (!supported) return;
+      if (quickDraft?.url) return;
+
+      const normalized = normalizeUrlIdentity(supported);
+      if (lastAutoFilledUrlRef.current === normalized) return;
+
+      setUrl((current) => {
+        if (current.trim()) return current;
+        lastAutoFilledUrlRef.current = normalized;
+        return supported;
+      });
     } catch {
       setClipboardUrl(null);
     }
-  }, [quickDraft]);
+  }, [quickDraft, settings.autoPasteLinks]);
 
   useEffect(() => {
     const timer = window.setTimeout(() => {
@@ -70,6 +90,15 @@ export function QuickDownloadPanel() {
     }, 0);
     return () => window.clearTimeout(timer);
   }, [quickDraft, quickPresets, refreshClipboardUrl, settings.quickDefaultPreset]);
+
+  useEffect(() => {
+    if (!settings.autoPasteLinks) return;
+    const pollId = window.setInterval(() => {
+      if (document.visibilityState !== "visible") return;
+      void refreshClipboardUrl();
+    }, 750);
+    return () => window.clearInterval(pollId);
+  }, [refreshClipboardUrl, settings.autoPasteLinks]);
 
   const selectedPreset =
     resolvePresetById(quickPresets, presetId) ??

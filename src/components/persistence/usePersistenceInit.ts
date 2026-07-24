@@ -19,14 +19,7 @@ import { storage } from "@/lib/storage";
 import { canonicalizePresetId } from "@/lib/preset-display";
 import { invoke } from "@tauri-apps/api/core";
 import { createId } from "@/lib/id";
-import {
-  checkYtDlpVersion,
-  checkFfmpegVersion,
-  checkAria2Version,
-  checkDenoVersion,
-  listToolBackups,
-  isAutostartEnabled,
-} from "@/lib/commands";
+import { listToolBackups, isAutostartEnabled } from "@/lib/commands";
 import { toast } from "sonner";
 import { getAppMode } from "@/lib/tools/app-mode";
 import { startQueuedJobs } from "@/lib/downloader";
@@ -61,54 +54,6 @@ export function usePersistenceInit(): MutableRefObject<boolean> {
       } else {
         window.setTimeout(run, 0);
       }
-    };
-
-    const checkTools = async () => {
-      markStartup("tools-check-start");
-      addLog({ level: "debug", message: "Checking tools..." });
-
-      const checkAndNotify = async (
-        id: string,
-        checkFn: () => Promise<{
-          version: string;
-          variant?: string;
-          systemPath?: string;
-          usingFallback?: boolean;
-        } | null>
-      ) => {
-        const result = await checkFn();
-        updateTool(id, {
-          status: result?.version ? "Detected" : "Missing",
-          version: result?.version || undefined,
-          variant: result?.variant,
-          systemPath: result?.systemPath,
-          usingFallback: result?.usingFallback ?? false,
-          updateAvailable: undefined,
-          latestVersion: undefined,
-          latestCheckedAt: undefined,
-        });
-        if (id === "yt-dlp" && result?.usingFallback) {
-          addLog({
-            level: "info",
-            message: `Startup: using system/PATH fallback yt-dlp${
-              result.systemPath ? ` at ${result.systemPath}` : ""
-            }`,
-          });
-        } else if (id === "yt-dlp" && !result) {
-          addLog({
-            level: "warn",
-            message: "Startup: yt-dlp unavailable (no app-managed binary and no PATH fallback)",
-          });
-        }
-      };
-
-      await Promise.allSettled([
-        checkAndNotify("yt-dlp", checkYtDlpVersion),
-        checkAndNotify("ffmpeg", checkFfmpegVersion),
-        checkAndNotify("aria2", checkAria2Version),
-        checkAndNotify("deno", checkDenoVersion),
-      ]);
-      markStartup("tools-check-ready");
     };
 
     const init = async () => {
@@ -310,10 +255,20 @@ export function usePersistenceInit(): MutableRefObject<boolean> {
                 const mergedTools = currentTools.map((baseTool) => {
                   const saved = savedTools.find((t) => t.id === baseTool.id);
                   if (!saved) return baseTool;
+                  // Restore last-known UI state without re-spawning --version on startup.
+                  const restoredStatus =
+                    saved.status === "Checking" ? baseTool.status : (saved.status ?? baseTool.status);
                   return {
                     ...baseTool,
                     mode: saved.mode ?? baseTool.mode,
                     path: saved.path,
+                    status: restoredStatus,
+                    version: saved.version,
+                    variant: saved.variant,
+                    systemPath: saved.systemPath,
+                    usingFallback: saved.usingFallback,
+                    channel: saved.channel ?? baseTool.channel,
+                    hasBackup: saved.hasBackup,
                   };
                 });
                 setTools(mergedTools);
@@ -322,8 +277,6 @@ export function usePersistenceInit(): MutableRefObject<boolean> {
                   message: `Tools loaded (${mergedTools.length})`,
                 });
               }
-
-              await checkTools();
 
               try {
                 const backupIds = await listToolBackups();

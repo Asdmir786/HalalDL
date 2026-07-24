@@ -37,6 +37,7 @@ import {
   quickProbeMediaUrl,
   type UrlProbeResult,
 } from "@/lib/downloader";
+import { normalizeUrlIdentity } from "@/lib/url-identity";
 
 interface DownloadInputSectionProps {
   url: string;
@@ -128,6 +129,7 @@ export function DownloadInputSection({
   const probeRequestRef = useRef(0);
   const inputRef = useRef<HTMLInputElement | null>(null);
   const urlRef = useRef(url);
+  const lastAutoFilledUrlRef = useRef<string | null>(null);
   const [presetSelectOpen, setPresetSelectOpen] = useState(false);
   const presetGroups = useMemo(() => groupPresetsForSelect(presets), [presets]);
   const selectedPresetConfig = useMemo(
@@ -346,9 +348,18 @@ export function DownloadInputSection({
       if (!supportedUrl) return;
       if (shouldAutoPasteUrl && !shouldAutoPasteUrl(supportedUrl)) return;
 
+      const normalized = normalizeUrlIdentity(supportedUrl);
+      if (
+        lastAutoFilledUrlRef.current &&
+        lastAutoFilledUrlRef.current === normalized
+      ) {
+        return;
+      }
+
       const currentTarget = target ?? inputRef.current;
       if (currentTarget?.value.trim()) return;
 
+      lastAutoFilledUrlRef.current = normalized;
       handleUrlChange(supportedUrl);
     } catch {
       void 0;
@@ -382,6 +393,19 @@ export function DownloadInputSection({
     return () => {
       window.removeEventListener("focus", handleWindowFocus);
       document.removeEventListener("visibilitychange", handleVisibilityChange);
+    };
+  }, [autoPasteLinks, tryAutoPasteClipboard]);
+
+  useEffect(() => {
+    if (!autoPasteLinks) return;
+
+    const pollId = window.setInterval(() => {
+      if (document.visibilityState !== "visible") return;
+      void tryAutoPasteClipboard();
+    }, 750);
+
+    return () => {
+      window.clearInterval(pollId);
     };
   }, [autoPasteLinks, tryAutoPasteClipboard]);
 

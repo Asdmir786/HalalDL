@@ -36,7 +36,8 @@ const INITIAL_TOOLS: Tool[] = [
   {
     id: "yt-dlp",
     name: "yt-dlp",
-    status: "Checking",
+    // Not "Checking" — startup no longer probes tools; status is restored from storage or set on use.
+    status: "Missing",
     mode: "Auto",
     channel: "stable",
     required: true,
@@ -44,7 +45,7 @@ const INITIAL_TOOLS: Tool[] = [
   {
     id: "ffmpeg",
     name: "FFmpeg",
-    status: "Checking",
+    status: "Missing",
     mode: "Auto",
     channel: "stable",
     required: false,
@@ -52,7 +53,7 @@ const INITIAL_TOOLS: Tool[] = [
   {
     id: "aria2",
     name: "aria2",
-    status: "Checking",
+    status: "Missing",
     mode: "Auto",
     channel: "stable",
     required: false,
@@ -60,7 +61,7 @@ const INITIAL_TOOLS: Tool[] = [
   {
     id: "deno",
     name: "Deno",
-    status: "Checking",
+    status: "Missing",
     mode: "Auto",
     channel: "stable",
     required: false,

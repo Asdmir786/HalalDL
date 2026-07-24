@@ -43,6 +43,13 @@ export function ToolsScreen() {
 
   const modal = useDownloadProgressModal(tools);
   const actions = useToolActions(modal.modalApi);
+  const didMountCheckRef = useRef(false);
+
+  useEffect(() => {
+    if (didMountCheckRef.current) return;
+    didMountCheckRef.current = true;
+    void actions.checkAll();
+  }, [actions]);
 
   useEffect(() => {
     if (!attentionTarget || attentionTarget.screen !== "tools") return;

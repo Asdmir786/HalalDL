@@ -13,7 +13,6 @@ export interface ToolCheckResult {
 }
 
 const TOOL_CHECK_TIMEOUT_MS = 8000;
-const PIP_CHECK_TIMEOUT_MS = 5000;
 
 async function executeWithTimeout(
   program: string,
@@ -21,17 +20,64 @@ async function executeWithTimeout(
   timeoutMs = TOOL_CHECK_TIMEOUT_MS
 ): Promise<{ code: number | null; stdout: string; stderr: string }> {
   const cmd = Command.create(program, args);
+  let stdout = "";
+  let stderr = "";
+  let child: Awaited<ReturnType<typeof cmd.spawn>> | null = null;
+  let settled = false;
   let timeoutId: ReturnType<typeof setTimeout> | undefined;
 
+  cmd.stdout.on("data", (line) => {
+    stdout += `${line}`;
+  });
+  cmd.stderr.on("data", (line) => {
+    stderr += `${line}`;
+  });
+
   try {
-    return await Promise.race([
-      cmd.execute(),
-      new Promise<never>((_, reject) => {
+    return await new Promise<{ code: number | null; stdout: string; stderr: string }>(
+      (resolve, reject) => {
+        const finish = (result: { code: number | null; stdout: string; stderr: string }) => {
+          if (settled) return;
+          settled = true;
+          if (timeoutId !== undefined) clearTimeout(timeoutId);
+          resolve(result);
+        };
+        const fail = (error: Error) => {
+          if (settled) return;
+          settled = true;
+          if (timeoutId !== undefined) clearTimeout(timeoutId);
+          reject(error);
+        };
+
+        cmd.on("close", (data) => {
+          const code = typeof data.code === "number" ? data.code : null;
+          finish({ code, stdout, stderr });
+        });
+        cmd.on("error", (error) => {
+          fail(new Error(String(error)));
+        });
+
         timeoutId = setTimeout(() => {
-          reject(new Error(`Timed out after ${timeoutMs}ms`));
+          void (async () => {
+            try {
+              if (child) await child.kill();
+            } catch {
+              void 0;
+            }
+            fail(new Error(`Timed out after ${timeoutMs}ms`));
+          })();
         }, timeoutMs);
-      }),
-    ]);
+
+        cmd
+          .spawn()
+          .then((spawned) => {
+            child = spawned;
+          })
+          .catch((error) => {
+            fail(new Error(String(error)));
+          });
+      }
+    );
   } finally {
     if (timeoutId !== undefined) clearTimeout(timeoutId);
   }
@@ -42,16 +88,8 @@ export async function resolveSystemToolPath(tool: string): Promise<string | null
 }
 
 async function detectYtDlpPipVariant(): Promise<string | null> {
-  for (const pipCmd of ["pip", "pip3"]) {
-    try {
-      const pipOut = await executeWithTimeout(pipCmd, ["show", "yt-dlp"], PIP_CHECK_TIMEOUT_MS);
-      if (pipOut.code === 0 && pipOut.stdout.toLowerCase().includes("name: yt-dlp")) {
-        return "pip";
-      }
-    } catch {
-      // pip not available / timed out
-    }
-  }
+  // Pip probes are expensive and only useful for labeling system installs.
+  // Skip by default; PATH/system fallbacks are reported as "System".
   return null;
 }
 

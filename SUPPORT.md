@@ -28,6 +28,9 @@ the issue. It includes mode, package type, tool status, and startup timings.
 - If using Lite, verify `yt-dlp` and `ffmpeg` are installed and reachable
 - Re-run the action once with logs open
 - Check whether the problem is specific to one URL or all URLs
+- If downloads feel slow to *start* (not download speed), Windows Defender may be
+  scanning `yt-dlp.exe` on each launch. Adding an exclusion for HalalDL’s `bin`
+  folder can help; only do this if you trust your install source.
 
 ## Privacy Reminder
 

@@ -43,9 +43,7 @@ pub fn run() {
         .plugin(tauri_plugin_fs::init())
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_shell::init())
-        .plugin(tauri_plugin_store::Builder::new().build())
         .plugin(tauri_plugin_opener::init())
-        .plugin(tauri_plugin_notification::init())
         .invoke_handler(tauri::generate_handler![
             greet,
             tools::download_tools,
@@ -93,12 +91,6 @@ pub fn run() {
         ])
         .setup(move |app| {
             use tauri::Manager;
-            app.handle()
-                .plugin(tauri_plugin_autostart::init(
-                    tauri_plugin_autostart::MacosLauncher::LaunchAgent,
-                    Some(vec!["--autostart"]),
-                ))
-                .map_err(|e| e.to_string())?;
 
             runtime::init_tray(&app.handle()).map_err(|e| e.to_string())?;
 
@@ -106,16 +98,6 @@ pub fn run() {
                 runtime::attach_main_window_close_handler(&win, &app.handle());
                 if launched_from_autostart {
                     let _ = win.hide();
-                    let _ = runtime::update_tray_state(
-                        app.handle().clone(),
-                        app
-                            .handle()
-                            .state::<runtime::RuntimeState>()
-                            .tray_state
-                            .lock()
-                            .map(|state| state.clone())
-                            .unwrap_or_default(),
-                    );
                 } else {
                     let _ = win.set_focus();
                 }
@@ -125,6 +107,15 @@ pub fn run() {
                 runtime::append_launch_urls(&app.handle(), startup_urls.clone());
             }
             runtime::mark_setup_complete(&app.handle());
+
+            // Late plugins: not needed before first usable frame / setup metric.
+            app.handle()
+                .plugin(tauri_plugin_autostart::init(
+                    tauri_plugin_autostart::MacosLauncher::LaunchAgent,
+                    Some(vec!["--autostart"]),
+                ))
+                .map_err(|e| e.to_string())?;
+
             Ok(())
         })
         .run(tauri::generate_context!())

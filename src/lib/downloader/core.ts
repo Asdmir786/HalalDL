@@ -22,6 +22,7 @@ import { ensureFilenameTemplateExtension, getExplicitOutputPaths } from "@/lib/o
 import { buildClipSection } from "@/lib/clip";
 import { addUrlToAppArchive, getYtDlpArchivePath, isUrlInAppArchive } from "./archive";
 import { getAppPaths } from "@/lib/app-paths";
+import { ensureYtDlpAvailable } from "@/lib/tools/ensure-ytdlp";
 import {
   normalizeSubtitlePreferences,
   resolveSubtitleLanguages,
@@ -120,10 +121,29 @@ function launchJob(jobId: string) {
     eta: undefined,
   });
 
-  void startDownload(jobId).finally(() => {
-    startingJobs.delete(jobId);
-    void startQueuedJobs();
-  });
+  void (async () => {
+    const ready = await ensureYtDlpAvailable();
+    if (!ready) {
+      updateJob(jobId, {
+        status: "Failed",
+        phase: "Resolving formats",
+        statusDetail: "yt-dlp is not available",
+        progress: 0,
+        speed: undefined,
+        eta: undefined,
+      });
+      startingJobs.delete(jobId);
+      void startQueuedJobs();
+      return;
+    }
+
+    try {
+      await startDownload(jobId);
+    } finally {
+      startingJobs.delete(jobId);
+      void startQueuedJobs();
+    }
+  })();
 
   return true;
 }
