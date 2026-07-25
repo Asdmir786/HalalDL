@@ -10,7 +10,7 @@ export type TrayLeftClickAction = "quick-panel" | "open-app" | "none";
 export type TrayDoubleClickAction = "none" | "open-app";
 
 export const ACCENT_COLORS: { id: AccentColor; label: string; swatch: string }[] = [
-  { id: "default", label: "Default", swatch: "oklch(0.55 0.01 250)" },
+  { id: "default", label: "Default", swatch: "#2C3E55" },
   { id: "blue",    label: "Blue",    swatch: "oklch(0.58 0.22 260)" },
   { id: "green",   label: "Green",   swatch: "oklch(0.60 0.19 155)" },
   { id: "purple",  label: "Purple",  swatch: "oklch(0.55 0.24 290)" },

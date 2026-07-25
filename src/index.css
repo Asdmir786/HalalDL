@@ -6,25 +6,34 @@
 @custom-variant dark (&:is(.dark *));
 
 :root {
-  --background: oklch(1 0 0);
-  --foreground: oklch(0.145 0.045 235.812);
-  --card: oklch(1 0 0);
-  --card-foreground: oklch(0.145 0.045 235.812);
-  --popover: oklch(1 0 0);
-  --popover-foreground: oklch(0.145 0.045 235.812);
-  --primary: oklch(0.205 0.047 255.885);
-  --primary-foreground: oklch(0.985 0.003 247.858);
-  --secondary: oklch(0.967 0.007 247.896);
-  --secondary-foreground: oklch(0.205 0.047 255.885);
-  --muted: oklch(0.967 0.007 247.896);
-  --muted-foreground: oklch(0.556 0.021 252.152);
-  --accent: oklch(0.967 0.007 247.896);
-  --accent-foreground: oklch(0.205 0.047 255.885);
+  /* Locked HalalDL brand palette */
+  --brand-deep-navy: #080e17;
+  --brand-primary-steel: #2c3e55;
+  --brand-muted-steel: #5b7fa8;
+  --brand-mint: #26e0c6;
+  --brand-mint-accessible: #0b7f72;
+  --brand-soft-light: #f5f7fb;
+  --brand-white: #ffffff;
+
+  --background: var(--brand-soft-light);
+  --foreground: var(--brand-deep-navy);
+  --card: var(--brand-white);
+  --card-foreground: var(--brand-deep-navy);
+  --popover: var(--brand-white);
+  --popover-foreground: var(--brand-deep-navy);
+  --primary: var(--brand-primary-steel);
+  --primary-foreground: var(--brand-white);
+  --secondary: color-mix(in srgb, var(--brand-muted-steel) 14%, var(--brand-soft-light));
+  --secondary-foreground: var(--brand-deep-navy);
+  --muted: color-mix(in srgb, var(--brand-muted-steel) 12%, var(--brand-soft-light));
+  --muted-foreground: var(--brand-muted-steel);
+  --accent: color-mix(in srgb, var(--brand-muted-steel) 14%, var(--brand-soft-light));
+  --accent-foreground: var(--brand-deep-navy);
   --destructive: oklch(0.577 0.245 27.325);
-  --destructive-foreground: oklch(0.985 0.003 247.858);
-  --border: oklch(0.922 0.011 240.503);
-  --input: oklch(0.922 0.011 240.503);
-  --ring: oklch(0.145 0.045 235.812);
+  --destructive-foreground: var(--brand-white);
+  --border: color-mix(in srgb, var(--brand-muted-steel) 22%, var(--brand-soft-light));
+  --input: color-mix(in srgb, var(--brand-muted-steel) 22%, var(--brand-soft-light));
+  --ring: var(--brand-primary-steel);
   --chart-1: oklch(0.646 0.222 41.116);
   --chart-2: oklch(0.6 0.118 184.704);
   --chart-3: oklch(0.398 0.07 227.392);
@@ -34,25 +43,25 @@
 }
 
 .dark {
-  --background: oklch(0.145 0.045 235.812);
-  --foreground: oklch(0.985 0.003 247.858);
-  --card: oklch(0.145 0.045 235.812);
-  --card-foreground: oklch(0.985 0.003 247.858);
-  --popover: oklch(0.145 0.045 235.812);
-  --popover-foreground: oklch(0.985 0.003 247.858);
-  --primary: oklch(0.985 0.003 247.858);
-  --primary-foreground: oklch(0.205 0.047 255.885);
-  --secondary: oklch(0.269 0.048 266.299);
-  --secondary-foreground: oklch(0.985 0.003 247.858);
-  --muted: oklch(0.269 0.048 266.299);
-  --muted-foreground: oklch(0.708 0.015 255.542);
-  --accent: oklch(0.269 0.048 266.299);
-  --accent-foreground: oklch(0.985 0.003 247.858);
+  --background: var(--brand-deep-navy);
+  --foreground: var(--brand-soft-light);
+  --card: color-mix(in srgb, var(--brand-primary-steel) 55%, var(--brand-deep-navy));
+  --card-foreground: var(--brand-soft-light);
+  --popover: color-mix(in srgb, var(--brand-primary-steel) 55%, var(--brand-deep-navy));
+  --popover-foreground: var(--brand-soft-light);
+  --primary: var(--brand-mint);
+  --primary-foreground: var(--brand-deep-navy);
+  --secondary: color-mix(in srgb, var(--brand-primary-steel) 70%, var(--brand-deep-navy));
+  --secondary-foreground: var(--brand-soft-light);
+  --muted: color-mix(in srgb, var(--brand-primary-steel) 65%, var(--brand-deep-navy));
+  --muted-foreground: var(--brand-muted-steel);
+  --accent: color-mix(in srgb, var(--brand-primary-steel) 70%, var(--brand-deep-navy));
+  --accent-foreground: var(--brand-soft-light);
   --destructive: oklch(0.396 0.141 25.723);
-  --destructive-foreground: oklch(0.985 0.003 247.858);
-  --border: oklch(0.269 0.048 266.299);
-  --input: oklch(0.269 0.048 266.299);
-  --ring: oklch(0.439 0.067 240.302);
+  --destructive-foreground: var(--brand-white);
+  --border: color-mix(in srgb, var(--brand-muted-steel) 35%, var(--brand-deep-navy));
+  --input: color-mix(in srgb, var(--brand-muted-steel) 35%, var(--brand-deep-navy));
+  --ring: var(--brand-mint);
   --chart-1: oklch(0.488 0.243 264.376);
   --chart-2: oklch(0.696 0.17 162.48);
   --chart-3: oklch(0.769 0.188 70.08);

@@ -17,6 +17,7 @@ import { getVersion } from "@tauri-apps/api/app";
 import { exit } from "@tauri-apps/plugin-process";
 import { open } from "@tauri-apps/plugin-shell";
 import { MotionButton } from "@/components/motion/MotionButton";
+import { BrandLogo } from "@/components/BrandLogo";
 import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
 import {
@@ -310,6 +311,7 @@ export function AboutSection() {
         <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
           <div className="min-w-0 space-y-2">
             <div className="flex flex-wrap items-center gap-2">
+              <BrandLogo className="h-9 w-9" />
               <span className="text-2xl font-bold tracking-tight">HalalDL</span>
               <Badge variant="secondary" className="font-mono text-xs">
                 v{version}

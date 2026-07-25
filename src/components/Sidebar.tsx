@@ -16,6 +16,7 @@ import {
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { MotionButton } from "@/components/motion/MotionButton";
+import { BrandLogo } from "@/components/BrandLogo";
 import { getVersion } from "@tauri-apps/api/app";
 import { useEffect, useMemo, useState } from "react";
 import { useDownloadsStore } from "@/store/downloads";
@@ -150,12 +151,13 @@ export function Sidebar() {
         sidebarCollapsed ? "px-4" : "px-6"
       )}>
         {!sidebarCollapsed && (
-          <h1 className="text-xl font-bold tracking-tight truncate">HalalDL</h1>
+          <div className="flex min-w-0 items-center gap-2.5">
+            <BrandLogo className="h-8 w-8" />
+            <h1 className="truncate text-xl font-bold tracking-tight">HalalDL</h1>
+          </div>
         )}
         {sidebarCollapsed && (
-          <div className="w-8 h-8 rounded-lg bg-primary/10 flex items-center justify-center">
-             <span className="text-xs font-bold text-primary">H</span>
-          </div>
+          <BrandLogo className="h-8 w-8" />
         )}
       </div>
 
