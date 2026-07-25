@@ -54,7 +54,6 @@ export function PerformanceSection() {
   const packageLabel = formatDiagnosticsPackageLabel(installerType);
 
   useEffect(() => {
-    setSummary(getLastStartupSummary());
     return subscribeStartupSummary(() => {
       setSummary(getLastStartupSummary());
     });

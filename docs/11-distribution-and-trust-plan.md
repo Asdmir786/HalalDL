@@ -4,7 +4,7 @@ This is the current practical plan for getting HalalDL in front of more real Win
 
 ## Current Baseline
 
-- Latest public release: `v0.5.0`
+- Latest public release: `v0.5.1`
 - Main installer signal: the Full setup EXE is the primary download path
 - Trust state: releases are unsigned, so Windows SmartScreen may warn on first run
 - Existing trust assets: public source, GitHub Actions release workflow, GitHub Releases, `SHA256SUMS.txt`, WinGet package ID
@@ -33,7 +33,7 @@ Download only from the official GitHub Releases page, then verify the file again
 PowerShell command for the recommended build:
 
 ```powershell
-Get-FileHash .\HalalDL-Full-v0.5.0-win10+11-x64-setup.exe -Algorithm SHA256
+Get-FileHash .\HalalDL-Full-v0.5.1-win10+11-x64-setup.exe -Algorithm SHA256
 ```
 
 ## Channel Order

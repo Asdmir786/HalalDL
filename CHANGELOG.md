@@ -1,5 +1,14 @@
 # Changelog
 
+## 0.5.1 - 2026-07-26
+- **Trust / Support**: Added gentle Star and Feedback prompts after three completed downloads in Settings/About and History, plus an Install Trust card that explains GitHub Releases, SmartScreen, and SHA256 verification.
+- **Diagnostics**: Added Copy Diagnostics so users can paste version, mode, package type, tool status, history counts, and startup timings into bug reports.
+- **Startup / Performance**: Skipped automatic startup tool probes, added a Settings Performance section with startup timings, and moved tool checks to on-demand paths for faster launch.
+- **Tools / Reliability**: Hardened yt-dlp checks to avoid hangs, required Full/Portable reinstall when managed yt-dlp is missing, preferred GitHub FFmpeg mirrors for portable/CI, and made menus/errors clearer with copy actions.
+- **Brand**: Applied the official Steel Blue + Mint palette, theme-aware BrandLogo, and regenerated Windows/Tauri icon assets from the approved marks.
+- **UI Polish**: Tightened download and logs UI states, unique ASAP URL autofill, and support/diagnostics copy throughout About and Logs.
+- **Release Assets**: Added v0.5.1 release notes with light/dark promo and screenshot image pairs.
+
 ## 0.5.0 - 2026-05-05
 - **Portable Mode (#8)**: Added a dedicated Portable ZIP for Windows, with app state, thumbnails, archive data, and managed tools stored beside the executable under `portable-data`.
 - **Portable Tools**: Bundled `yt-dlp`, `ffmpeg`, `ffprobe`, `aria2c`, and `deno` for Portable builds so locked-down setups can run without a separate tool install flow.

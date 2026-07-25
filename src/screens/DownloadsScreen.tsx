@@ -265,11 +265,8 @@ export function DownloadsScreen() {
     };
   }, [url]);
 
-  useEffect(() => {
-    if (instagramMediaSummary?.isImageOnly && showOutputConfig) {
-      setShowOutputConfig(false);
-    }
-  }, [instagramMediaSummary?.isImageOnly, showOutputConfig]);
+  const isInstagramImageOnly = instagramMediaSummary?.isImageOnly ?? false;
+  const outputConfigOpen = showOutputConfig && !isInstagramImageOnly;
 
   const prevJobsCountRef = useRef(jobs.length);
   useEffect(() => {
@@ -514,13 +511,13 @@ export function DownloadsScreen() {
             subtitleLanguagesToString(presetSubtitleDefaults.languages));
 
       const overrides =
-        showOutputConfig ||
+        outputConfigOpen ||
         isCustomPreset ||
         Boolean(customDirTrimmed) ||
         subtitleOverridesNeeded ||
         clipOverridesNeeded
           ? {
-              ...(showOutputConfig || isCustomPreset ? { filenameTemplate: finalTemplate } : {}),
+              ...(outputConfigOpen || isCustomPreset ? { filenameTemplate: finalTemplate } : {}),
               ...(isCustomPreset ? { format: outputFormat } : {}),
               ...(customDirTrimmed ? { downloadDir: customDirTrimmed } : {}),
               ...(clipOverridesNeeded
@@ -556,7 +553,7 @@ export function DownloadsScreen() {
       const safeOverrides = isDirectImageInput || instagramMediaSummary?.isImageOnly
         ? {
             ...(customDirTrimmed ? { downloadDir: customDirTrimmed } : {}),
-            ...(showOutputConfig || isCustomPreset ? { filenameTemplate: finalTemplate } : {}),
+            ...(outputConfigOpen || isCustomPreset ? { filenameTemplate: finalTemplate } : {}),
           }
         : overrides;
       const id = addJob(trimmedUrl, presetIdToUse, safeOverrides);
@@ -745,8 +742,11 @@ export function DownloadsScreen() {
                     isDirectImageUrl={isDirectImageInput}
                     addMode={addMode}
                     setAddMode={setAddMode}
-                    showOutputConfig={showOutputConfig}
-                    onToggleOutputConfig={() => setShowOutputConfig(!showOutputConfig)}
+                    showOutputConfig={outputConfigOpen}
+                    onToggleOutputConfig={() => {
+                      if (isInstagramImageOnly) return;
+                      setShowOutputConfig(!showOutputConfig);
+                    }}
                     filenameBase={filenameBase}
                     onFilenameChange={setFilenameBase}
                     outputFormat={outputFormat}

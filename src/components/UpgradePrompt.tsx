@@ -134,7 +134,7 @@ export function UpgradePrompt() {
 
     // LITE: no startup spawn checks — missing state is handled when the user uses yt-dlp / Tools.
     return [];
-  }, [appMode, isManagedMode, startupMissingToolIds]);
+  }, [isManagedMode, startupMissingToolIds]);
 
   const missingIds = useMemo(() => {
     return checkedMissingIds;

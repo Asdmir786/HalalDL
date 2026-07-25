@@ -91,7 +91,7 @@ HalalDL releases are currently **not code-signed**, so Windows SmartScreen may w
 Open PowerShell in the folder where you downloaded the installer and run:
 
 ```powershell
-Get-FileHash .\HalalDL-Full-v0.5.0-win10+11-x64-setup.exe -Algorithm SHA256
+Get-FileHash .\HalalDL-Full-v0.5.1-win10+11-x64-setup.exe -Algorithm SHA256
 ```
 
 Compare the `Hash` value with the matching line in `SHA256SUMS.txt` from the same GitHub Release. If the filename differs, replace the filename in the command with the file you downloaded.

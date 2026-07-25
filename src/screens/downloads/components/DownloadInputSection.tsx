@@ -442,13 +442,8 @@ export function DownloadInputSection({
 
   const isInstagramImageOnly = instagramMediaSummary?.isImageOnly ?? false;
   const presetSelectionLocked = isDirectImageUrl || isInstagramImageOnly;
-  const presetSelectionDisabled = presetSelectionLocked && !presetSelectOpen;
-
-  useEffect(() => {
-    if (presetSelectionLocked && presetSelectOpen) {
-      setPresetSelectOpen(false);
-    }
-  }, [presetSelectionLocked, presetSelectOpen]);
+  const presetSelectOpenEffective = presetSelectionLocked ? false : presetSelectOpen;
+  const presetSelectionDisabled = presetSelectionLocked;
 
   const instagramPresetMessage = useMemo(() => {
     if (!instagramMediaSummary) return null;
@@ -574,8 +569,14 @@ export function DownloadInputSection({
           <Select
             value={selectedPreset}
             onValueChange={onPresetChange}
-            open={presetSelectOpen}
-            onOpenChange={setPresetSelectOpen}
+            open={presetSelectOpenEffective}
+            onOpenChange={(open) => {
+              if (presetSelectionLocked) {
+                setPresetSelectOpen(false);
+                return;
+              }
+              setPresetSelectOpen(open);
+            }}
             disabled={presetSelectionDisabled}
           >
             <SelectTrigger className="h-10 rounded-lg border-border/65 bg-background/95 px-3 shadow-sm focus:ring-1 disabled:cursor-not-allowed disabled:opacity-70 dark:border-white/10 dark:bg-background/90">
