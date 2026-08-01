@@ -17,6 +17,7 @@ import { toast } from "sonner";
 import { History as HistoryIcon, MessageSquare, Star, X } from "lucide-react";
 import { copyFilesToClipboard } from "@/lib/commands";
 import { buildHistoryCopyState } from "./copy-actions.ts";
+import { isDemoModeEnabled } from "@/lib/demo-mode";
 import {
   dismissSupportPrompt,
   markSupportPromptFeedback,
@@ -227,6 +228,7 @@ export function HistoryScreen() {
   const [gridColumns, setGridColumns] = useState(4);
   const completedDownloadCount = entries.filter((entry) => entry.status === "completed").length;
   const shouldShowSupportFooter =
+    !isDemoModeEnabled() &&
     completedDownloadCount >= SUPPORT_PROMPT_COMPLETED_DOWNLOADS &&
     !supportPromptDismissed;
 
@@ -248,6 +250,17 @@ export function HistoryScreen() {
   }, []);
 
   useEffect(() => {
+    if (isDemoModeEnabled()) {
+      const next: Record<string, boolean> = {};
+      for (const entry of entries) {
+        if (entry.status === "completed" && entry.outputPath) {
+          next[entry.id] = true;
+        }
+      }
+      setFileExistsMap(next);
+      return;
+    }
+
     let cancelled = false;
     if (retryTimeoutRef.current) {
       window.clearTimeout(retryTimeoutRef.current);
@@ -694,7 +707,7 @@ export function HistoryScreen() {
           onScroll={handleScroll}
           className="px-8 pb-8"
         >
-          {entries.length > 0 && (
+          {entries.length > 0 && !isDemoModeEnabled() && (
             <div className="flex flex-col gap-3 mb-4">
               <HistoryInsights entries={entries} expanded={insightsExpanded} onToggle={() => setInsightsExpanded((p) => !p)} />
               {insightsExpanded && (

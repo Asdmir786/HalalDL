@@ -16,6 +16,7 @@ import { ToolsProgressModal } from "./components/ToolsProgressModal";
 import { useDownloadProgressModal } from "./hooks/useDownloadProgressModal";
 import { useToolActions } from "./hooks/useToolActions";
 import { getAppMode } from "@/lib/tools/app-mode";
+import { isDemoModeEnabled } from "@/lib/demo-mode";
 
 export function ToolsScreen() {
   const { tools } = useToolsStore();
@@ -48,6 +49,8 @@ export function ToolsScreen() {
   useEffect(() => {
     if (didMountCheckRef.current) return;
     didMountCheckRef.current = true;
+    // Marketing demo seeds installed tools — don't overwrite with real Missing probes.
+    if (isDemoModeEnabled()) return;
     void actions.checkAll();
   }, [actions]);
 

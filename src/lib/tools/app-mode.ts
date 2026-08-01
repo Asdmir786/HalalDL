@@ -4,6 +4,12 @@ export const APP_MANAGED_TOOL_IDS = ["yt-dlp", "ffmpeg", "aria2", "deno"] as con
 export const LITE_REQUIRED_TOOL_IDS = ["yt-dlp"] as const;
 
 export function getAppMode(): AppMode {
+  if (typeof window !== "undefined") {
+    const demo = new URLSearchParams(window.location.search).get("demo")?.trim().toLowerCase();
+    if (demo === "marketing" || demo === "1" || demo === "true") {
+      return "FULL";
+    }
+  }
   const appMode = String(import.meta.env.VITE_APP_MODE ?? "").trim().toUpperCase();
   if (appMode === "FULL") return "FULL";
   if (appMode === "PORTABLE") return "PORTABLE";

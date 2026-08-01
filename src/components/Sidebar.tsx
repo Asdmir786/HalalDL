@@ -39,7 +39,7 @@ import { motion } from "framer-motion";
 export function Sidebar() {
   const { currentScreen, setScreen, sidebarCollapsed, toggleSidebar } = useNavigationStore();
   const jobs = useDownloadsStore((s) => s.jobs);
-  const [version, setVersion] = useState(() => (isDemoModeEnabled() ? "0.4.0" : "..."));
+  const [version, setVersion] = useState(() => (isDemoModeEnabled() ? "0.5.1" : "..."));
   const appMode = getAppMode();
   const appModeLabel =
     appMode === "FULL" ? "Full" : appMode === "PORTABLE" ? "Portable" : "Lite";

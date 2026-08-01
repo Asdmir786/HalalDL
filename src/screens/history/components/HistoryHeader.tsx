@@ -13,6 +13,7 @@ import { Input } from "@/components/ui/input";
 import { MotionButton } from "@/components/motion/MotionButton";
 import { cn } from "@/lib/utils";
 import { FadeInItem } from "@/components/motion/StaggerContainer";
+import { isDemoModeEnabled } from "@/lib/demo-mode";
 
 export type StatusFilter = "all" | "completed" | "failed";
 export type DateFilter = "all" | "24h" | "today" | "week" | "month";
@@ -74,6 +75,7 @@ export function HistoryHeader({
   onClearAll,
   children,
 }: HistoryHeaderProps) {
+  const marketingShot = isDemoModeEnabled();
   const activeFilterCount = [
     statusFilter !== "all",
     dateFilter !== "all",
@@ -84,19 +86,24 @@ export function HistoryHeader({
 
   return (
     <div className="flex flex-col gap-4">
-      <FadeInItem className="rounded-[28px] border border-border/55 bg-[linear-gradient(135deg,rgba(248,250,252,0.98),rgba(241,245,249,0.96))] p-5 shadow-[0_24px_70px_rgba(15,23,42,0.08)] dark:border-border/40 dark:bg-[linear-gradient(135deg,rgba(17,24,39,0.72),rgba(10,15,27,0.94))] dark:shadow-[0_24px_70px_rgba(2,6,23,0.22)]">
-        <div className="flex flex-col gap-4">
+      <FadeInItem className={cn(
+        "rounded-[28px] border border-border/55 bg-[linear-gradient(135deg,rgba(248,250,252,0.98),rgba(241,245,249,0.96))] shadow-[0_24px_70px_rgba(15,23,42,0.08)] dark:border-border/40 dark:bg-[linear-gradient(135deg,rgba(17,24,39,0.72),rgba(10,15,27,0.94))] dark:shadow-[0_24px_70px_rgba(2,6,23,0.22)]",
+        marketingShot ? "p-4" : "p-5"
+      )}>
+        <div className={cn("flex flex-col", marketingShot ? "gap-3" : "gap-4")}>
           <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
-            <div className="min-w-0 space-y-2">
+            <div className={cn("min-w-0", marketingShot ? "space-y-1.5" : "space-y-2")}>
               <div className="inline-flex items-center gap-2 rounded-full border border-primary/20 bg-primary/10 px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.24em] text-primary/90">
                 <History className="h-3.5 w-3.5" />
                 Archive
               </div>
-              <div className="space-y-1">
-                <h2 className="text-3xl font-bold tracking-tight text-foreground">History</h2>
+              <div className={cn("space-y-1", marketingShot && "space-y-0")}>
+                <h2 className={cn("font-bold tracking-tight text-foreground", marketingShot ? "text-2xl" : "text-3xl")}>History</h2>
+                {!marketingShot && (
                 <p className="max-w-2xl text-sm text-muted-foreground">
                   Review finished jobs, grab files again fast, and rerun anything worth keeping.
                 </p>
+                )}
               </div>
             </div>
 
@@ -134,7 +141,8 @@ export function HistoryHeader({
                     </span>
                   </button>
                 </div>
-                {children}
+                {!marketingShot && children}
+                {!marketingShot && (
                 <MotionButton
                   variant="outline"
                   size="sm"
@@ -146,20 +154,16 @@ export function HistoryHeader({
                   <Trash2 className="mr-2 h-4 w-4" />
                   Clear Archive
                 </MotionButton>
+                )}
               </div>
             )}
           </div>
 
-          <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+          <div className={cn("grid gap-3", marketingShot ? "grid-cols-2" : "sm:grid-cols-2 xl:grid-cols-4")}>
             <SummaryPill
               label="Archived"
               value={String(totalCount)}
               detail={totalCount === 0 ? "Nothing saved yet" : "Total stored jobs"}
-            />
-            <SummaryPill
-              label="Showing"
-              value={String(filteredCount)}
-              detail={activeFilterCount > 0 ? `${activeFilterCount} filter${activeFilterCount === 1 ? "" : "s"} active` : "Current view"}
             />
             <SummaryPill
               label="Completed"
@@ -167,17 +171,26 @@ export function HistoryHeader({
               detail="Ready to reopen or copy"
               icon={<CheckCircle2 className="h-3.5 w-3.5 text-emerald-400" />}
             />
-            <SummaryPill
-              label="Failed"
-              value={String(failedCount)}
-              detail={selectedCount > 0 ? `${selectedCount} selected` : "Available for retry"}
-              icon={<XCircle className="h-3.5 w-3.5 text-rose-400" />}
-            />
+            {!marketingShot && (
+              <>
+                <SummaryPill
+                  label="Showing"
+                  value={String(filteredCount)}
+                  detail={activeFilterCount > 0 ? `${activeFilterCount} filter${activeFilterCount === 1 ? "" : "s"} active` : "Current view"}
+                />
+                <SummaryPill
+                  label="Failed"
+                  value={String(failedCount)}
+                  detail={selectedCount > 0 ? `${selectedCount} selected` : "Available for retry"}
+                  icon={<XCircle className="h-3.5 w-3.5 text-rose-400" />}
+                />
+              </>
+            )}
           </div>
         </div>
       </FadeInItem>
 
-      {totalCount > 0 && (
+      {totalCount > 0 && !marketingShot && (
         <FadeInItem className="rounded-2xl border border-border/50 bg-card/72 p-4 backdrop-blur-sm dark:border-border/40 dark:bg-card/35">
           <div className="flex flex-col gap-3">
             <div className="flex flex-col gap-3 lg:flex-row lg:items-center">

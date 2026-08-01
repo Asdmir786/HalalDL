@@ -33,3 +33,7 @@ out/
 .portable-build/
 tsconfig.tsbuildinfo
 manifests/
+
+tmp-playwright-capture/
+.tmp-playwright/
+

@@ -38,25 +38,21 @@ The project tries to keep the strong parts of the CLI ecosystem while making the
 
 ## Screenshots
 
-### Downloads
+Paste a URL. Pick a preset. Watch progress and logs. Reopen finished files from History.
 
-![HalalDL downloads screen](./docs/assets/screenshots/halaldl-downloads.png)
+![HalalDL — Downloads](./docs/assets/screenshots/halaldl-downloads.png)
 
-### Presets
+![HalalDL — Presets](./docs/assets/screenshots/halaldl-presets.png)
 
-![HalalDL presets screen](./docs/assets/screenshots/halaldl-presets.png)
+![HalalDL — Tools](./docs/assets/screenshots/halaldl-tools.png)
 
-### Tools
+![HalalDL — History](./docs/assets/screenshots/halaldl-history.png)
 
-![HalalDL tools screen](./docs/assets/screenshots/halaldl-tools.png)
+![HalalDL — Logs](./docs/assets/screenshots/halaldl-logs.png)
 
-### History
+![HalalDL — Settings](./docs/assets/screenshots/halaldl-settings.png)
 
-![HalalDL history screen](./docs/assets/screenshots/halaldl-history.png)
-
-### Logs
-
-![HalalDL logs screen](./docs/assets/screenshots/halaldl-logs.png)
+Dark mode, Install Trust, Performance, and more shots live in [`docs/assets/screenshots/`](./docs/assets/screenshots/).
 
 ## Download Flow
 

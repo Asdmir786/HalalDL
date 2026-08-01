@@ -68,6 +68,20 @@ export function getLastStartupSummary(): StartupSummary | null {
   return buildSummary();
 }
 
+/** Seed realistic timings for marketing demo screenshots (browser / ?demo=marketing). */
+export function seedDemoStartupSummary() {
+  marks.length = 0;
+  marks.push(
+    { name: "first-usable-frame", ms: 186 },
+    { name: "persistence-critical-ready", ms: 248 },
+    { name: "tools-ready", ms: 312 },
+    { name: "ui-idle", ms: 340 }
+  );
+  rustSetupCompleteMs = 54;
+  summaryCapturedAt = new Date().toISOString();
+  notifySummaryListeners();
+}
+
 export function getMarkMs(summary: StartupSummary | null, name: string): number | null {
   if (!summary) return null;
   const mark = summary.marks.find((entry) => entry.name === name);
@@ -140,6 +154,23 @@ export function formatPerformanceReport(
 }
 
 export async function reportStartupSummary() {
+  const demo =
+    typeof window !== "undefined" &&
+    ["marketing", "1", "true"].includes(
+      new URLSearchParams(window.location.search).get("demo")?.trim().toLowerCase() ?? ""
+    );
+
+  if (demo) {
+    // Keep seeded marketing timings instead of nulling Rust setup outside Tauri.
+    summaryCapturedAt = new Date().toISOString();
+    const summary = buildSummary();
+    if (summary) {
+      notifySummaryListeners();
+      console.info("[startup] demo summary", summary);
+      return summary;
+    }
+  }
+
   const rust = isTauriRuntime()
     ? await invoke<RustStartupTimings>("startup_timings").catch(() => null)
     : null;

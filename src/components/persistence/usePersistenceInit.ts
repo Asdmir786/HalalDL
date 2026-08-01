@@ -66,7 +66,6 @@ export function usePersistenceInit(): MutableRefObject<boolean> {
           useRuntimeStore.getState().setPersistenceReady(true);
           initialized.current = true;
           markStartup("persistence-demo-ready");
-          addLog({ level: "info", message: "Marketing demo mode seeded" });
           return;
         }
 

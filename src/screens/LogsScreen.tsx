@@ -545,24 +545,26 @@ export function LogsScreen() {
 
         {/* Console View */}
         <FadeInItem className="flex-1 min-h-0">
-          <div className="h-full rounded-xl border border-border/50 bg-[#0c0c0c] flex flex-col shadow-inner relative overflow-hidden group/console">
+          <div className="h-full rounded-xl border border-border/50 bg-muted/40 dark:bg-[#0c0c0c] flex flex-col shadow-inner relative overflow-hidden group/console">
              {/* Status Bar */}
-            <div className="absolute top-0 left-0 right-0 h-8 bg-white/5 border-b border-white/5 flex items-center px-3 justify-between z-10 backdrop-blur-md select-none">
-              <div className="flex items-center gap-2 text-[10px] font-mono text-white/40">
+            <div className="absolute top-0 left-0 right-0 h-8 bg-background/80 dark:bg-white/5 border-b border-border/50 dark:border-white/5 flex items-center px-3 justify-between z-10 backdrop-blur-md select-none">
+              <div className="flex items-center gap-2 text-[10px] font-mono text-muted-foreground dark:text-white/40">
                 <Terminal className="w-3 h-3" />
                 <span>OUTPUT</span>
               </div>
               <div className="flex items-center gap-3">
                  <div className={cn(
                     "flex items-center gap-1.5 px-2 py-0.5 rounded-full text-[10px] font-medium transition-colors cursor-pointer",
-                    autoScroll ? "bg-primary/20 text-primary hover:bg-primary/30" : "bg-white/5 text-white/40 hover:bg-white/10"
+                    autoScroll
+                      ? "bg-primary/15 text-primary hover:bg-primary/25 dark:bg-primary/20 dark:hover:bg-primary/30"
+                      : "bg-muted text-muted-foreground hover:bg-muted/80 dark:bg-white/5 dark:text-white/40 dark:hover:bg-white/10"
                  )}
                  onClick={() => setAutoScroll(!autoScroll)}
                  >
                     <ArrowDown className={cn("w-3 h-3", autoScroll && "animate-pulse")} />
                     {autoScroll ? "Auto-scroll On" : "Auto-scroll Off"}
                  </div>
-                <span className="text-[10px] font-mono text-white/30 border-l border-white/10 pl-3">
+                <span className="text-[10px] font-mono text-muted-foreground/70 dark:text-white/30 border-l border-border/50 dark:border-white/10 pl-3">
                   {formatLineCount(filteredLogs.length)}
                 </span>
               </div>
@@ -570,26 +572,26 @@ export function LogsScreen() {
 
             <div
               ref={parentRef}
-              className="flex-1 overflow-y-auto overflow-x-hidden p-4 pt-10 font-mono text-xs scrollbar-thin scrollbar-thumb-white/10 scrollbar-track-transparent hover:scrollbar-thumb-white/20"
+              className="flex-1 overflow-y-auto overflow-x-hidden p-4 pt-10 font-mono text-xs scrollbar-thin scrollbar-thumb-border dark:scrollbar-thumb-white/10 scrollbar-track-transparent hover:scrollbar-thumb-muted-foreground/40 dark:hover:scrollbar-thumb-white/20"
               onScroll={handleScroll}
               tabIndex={0}
             >
               {loadStatus === "loading" && (
-                <div className="h-full flex flex-col items-center justify-center text-white/40 gap-3">
+                <div className="h-full flex flex-col items-center justify-center text-muted-foreground dark:text-white/40 gap-3">
                   <LoaderCircle className="w-6 h-6 animate-spin" />
                   <div className="text-[12px]">Initializing console...</div>
                 </div>
               )}
               
               {loadStatus === "error" && (
-                <div className="h-full flex flex-col items-center justify-center text-red-400/80 gap-3">
+                <div className="h-full flex flex-col items-center justify-center text-red-600/80 dark:text-red-400/80 gap-3">
                   <AlertCircle className="w-8 h-8 opacity-50" />
                   <div className="text-sm font-medium">Failed to load logs</div>
                   <MotionButton
                     variant="outline"
                     size="sm"
                     onClick={() => loadLogs()}
-                    className="border-white/10 hover:bg-white/5"
+                    className="border-border/60 hover:bg-muted dark:border-white/10 dark:hover:bg-white/5"
                   >
                     Retry Connection
                   </MotionButton>
@@ -613,7 +615,7 @@ export function LogsScreen() {
                         data-index={virtualRow.index}
                         ref={rowVirtualizer.measureElement}
                         className={cn(
-                          "absolute top-0 left-0 w-full flex items-start gap-3 py-1 px-2 hover:bg-white/5 transition-colors rounded-sm group/line",
+                          "absolute top-0 left-0 w-full flex items-start gap-3 py-1 px-2 hover:bg-foreground/5 dark:hover:bg-white/5 transition-colors rounded-sm group/line",
                           log.level === "error" && "bg-red-500/5"
                         )}
                         style={{
@@ -636,7 +638,7 @@ export function LogsScreen() {
                             <div className="flex-1 min-w-0 font-mono text-[11px] leading-relaxed break-all whitespace-pre-wrap select-text text-foreground/90">
                               {log.message}
                               {log.command && (
-                                <div className="mt-1 p-2 rounded bg-background/50 border border-border/40 text-[10px] text-muted-foreground font-mono overflow-x-auto">
+                                <div className="mt-1 p-2 rounded bg-background/80 dark:bg-background/50 border border-border/40 text-[10px] text-muted-foreground font-mono overflow-x-auto">
                                   $ {log.command}
                                 </div>
                               )}
@@ -650,7 +652,7 @@ export function LogsScreen() {
               )}
               
               {loadStatus === "ready" && filteredLogs.length === 0 && (
-                <div className="h-full flex flex-col items-center justify-center text-white/20 select-none">
+                <div className="h-full flex flex-col items-center justify-center text-muted-foreground/40 dark:text-white/20 select-none">
                   <Terminal className="w-12 h-12 mb-4 opacity-10" />
                   <p className="text-sm font-medium">No output found</p>
                   <p className="text-xs opacity-50 mt-1">Try adjusting your filters</p>

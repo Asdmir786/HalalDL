@@ -2,12 +2,15 @@ import { useEffect, useRef } from "react";
 import { getCurrentWindow, ProgressBarStatus } from "@tauri-apps/api/window";
 import { useDownloadsStore } from "@/store/downloads";
 import { useLogsStore } from "@/store/logs";
+import { isDemoModeEnabled } from "@/lib/demo-mode";
 
 export function useTaskbarProgress() {
   const jobs = useDownloadsStore((state) => state.jobs);
   const loggedErrorRef = useRef(false);
 
   useEffect(() => {
+    if (isDemoModeEnabled()) return;
+
     const activeJobs = jobs.filter(
       (job) => job.status === "Downloading" || job.status === "Post-processing"
     );

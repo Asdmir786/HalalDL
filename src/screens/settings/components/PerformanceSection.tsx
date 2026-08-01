@@ -46,7 +46,7 @@ export function PerformanceSection() {
     getLastStartupSummary()
   );
   const [version, setVersion] = useState(() =>
-    isDemoModeEnabled() ? "0.4.0" : "..."
+    isDemoModeEnabled() ? "0.5.1" : "..."
   );
   const installerType =
     useAppUpdateStore((state) => state.installContext?.installerType) ??

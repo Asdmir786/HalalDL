@@ -37,6 +37,7 @@ import {
   setFullSwitchAutoInstall,
 } from "@/lib/runtime-flags";
 import { isTauriRuntime } from "@/lib/tauri-runtime";
+import { isDemoModeEnabled } from "@/lib/demo-mode";
 
 interface DownloadProgress {
   tool: string;
@@ -97,6 +98,10 @@ export function UpgradePrompt() {
     let cancelled = false;
 
     if (!isManagedMode) return;
+    if (isDemoModeEnabled()) {
+      setStartupMissingToolIds([]);
+      return;
+    }
 
     void getMissingAppManagedToolIds(getStartupToolIds(appMode)).then(
       (ids) => {

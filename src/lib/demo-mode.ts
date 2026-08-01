@@ -7,10 +7,15 @@ import { useNavigationStore, type Screen } from "@/store/navigation";
 import { useToolsStore, type Tool } from "@/store/tools";
 import { useRuntimeStore } from "@/store/runtime";
 import { useAppUpdateStore } from "@/store/app-update";
+import { useAttentionStore } from "@/store/attention";
+import { seedDemoStartupSummary } from "@/lib/startup-metrics";
 
 type DemoMode = "marketing";
+type DemoSettingsSection = "appearance" | "performance" | "about";
 
 const DEMO_SCREENS: Screen[] = ["downloads", "presets", "tools", "logs", "history", "settings"];
+const DEMO_SETTINGS_SECTIONS: DemoSettingsSection[] = ["appearance", "performance", "about"];
+const DEMO_USER_ROOT = "C:\\Users\\Demo";
 
 function getSearchParams() {
   if (typeof window === "undefined") return null;
@@ -39,6 +44,15 @@ function getRequestedTheme(): "light" | "dark" {
   const params = getSearchParams();
   const raw = params?.get("theme")?.trim().toLowerCase();
   return raw === "dark" ? "dark" : "light";
+}
+
+function getRequestedSettingsSection(): DemoSettingsSection | null {
+  const params = getSearchParams();
+  const raw = params?.get("section")?.trim().toLowerCase();
+  if (!raw) return null;
+  return DEMO_SETTINGS_SECTIONS.includes(raw as DemoSettingsSection)
+    ? (raw as DemoSettingsSection)
+    : null;
 }
 
 function svgThumbnail(title: string, colorA: string, colorB: string) {
@@ -81,10 +95,10 @@ function buildDemoJobs(now: number): DownloadJob[] {
       subtitleStatus: "unavailable",
       fallbackUsed: true,
       fallbackFormat: "downloadgram",
-      outputPath: "C:\\Users\\halal\\Downloads\\HalalDL\\instagram-carousel",
+      outputPath: `${DEMO_USER_ROOT}\\Downloads\\HalalDL\\instagram-carousel`,
       outputPaths: [
-        "C:\\Users\\halal\\Downloads\\HalalDL\\instagram-carousel\\slide-01.mp4",
-        "C:\\Users\\halal\\Downloads\\HalalDL\\instagram-carousel\\slide-02.mp4",
+        `${DEMO_USER_ROOT}\\Downloads\\HalalDL\\instagram-carousel\\slide-01.mp4`,
+        `${DEMO_USER_ROOT}\\Downloads\\HalalDL\\instagram-carousel\\slide-02.mp4`,
       ],
       hasManualSubtitles: false,
       hasAutoSubtitles: false,
@@ -157,7 +171,7 @@ function buildDemoJobs(now: number): DownloadJob[] {
       thumbnailStatus: "ready",
       subtitleStatus: "unavailable",
       ffmpegProgressKnown: false,
-      outputPath: "C:\\Users\\halal\\Downloads\\HalalDL\\editing-cut.mp4",
+      outputPath: `${DEMO_USER_ROOT}\\Downloads\\HalalDL\\editing-cut.mp4`,
       overrides: { origin: "app" },
     },
     {
@@ -174,27 +188,10 @@ function buildDemoJobs(now: number): DownloadJob[] {
       statusChangedAt: now - 15 * 60 * 1000,
       thumbnailStatus: "ready",
       subtitleStatus: "idle",
-      outputPath: "C:\\Users\\halal\\Downloads\\HalalDL\\source-audio.mp3",
-      outputPaths: ["C:\\Users\\halal\\Downloads\\HalalDL\\source-audio.mp3"],
+      outputPath: `${DEMO_USER_ROOT}\\Downloads\\HalalDL\\source-audio.mp3`,
+      outputPaths: [`${DEMO_USER_ROOT}\\Downloads\\HalalDL\\source-audio.mp3`],
       fileSize: 12400000,
       mediaDurationSeconds: 605,
-      overrides: { origin: "app" },
-    },
-    {
-      id: "demo-job-failed",
-      url: "https://www.tiktok.com/@demo/video/fail05",
-      title: "Private post requiring login",
-      thumbnail: svgThumbnail("Login Required", "#dc2626", "#7f1d1d"),
-      progress: 12,
-      status: "Failed",
-      phase: "Resolving formats",
-      statusDetail: "Extractor requires cookies or sign-in",
-      presetId: "default",
-      createdAt: now - 90 * 60 * 1000,
-      statusChangedAt: now - 82 * 60 * 1000,
-      thumbnailStatus: "ready",
-      subtitleStatus: "unavailable",
-      fallbackUsed: false,
       overrides: { origin: "app" },
     },
   ];
@@ -210,8 +207,8 @@ function buildDemoHistory(now: number): HistoryEntry[] {
       format: "mp3",
       fileSize: 12400000,
       mediaDurationSeconds: 605,
-      outputPath: "C:\\Users\\halal\\Downloads\\HalalDL\\source-audio.mp3",
-      outputPaths: ["C:\\Users\\halal\\Downloads\\HalalDL\\source-audio.mp3"],
+      outputPath: `${DEMO_USER_ROOT}\\Downloads\\HalalDL\\source-audio.mp3`,
+      outputPaths: [`${DEMO_USER_ROOT}\\Downloads\\HalalDL\\source-audio.mp3`],
       presetId: "mp3",
       presetName: "Audio MP3",
       downloadedAt: now - 15 * 60 * 1000,
@@ -230,11 +227,11 @@ function buildDemoHistory(now: number): HistoryEntry[] {
       format: "mp4",
       fileSize: 88400000,
       mediaDurationSeconds: 74,
-      outputPath: "C:\\Users\\halal\\Downloads\\HalalDL\\instagram-carousel\\slide-01.mp4",
+      outputPath: `${DEMO_USER_ROOT}\\Downloads\\HalalDL\\instagram-carousel\\slide-01.mp4`,
       outputPaths: [
-        "C:\\Users\\halal\\Downloads\\HalalDL\\instagram-carousel\\slide-01.mp4",
-        "C:\\Users\\halal\\Downloads\\HalalDL\\instagram-carousel\\slide-02.mp4",
-        "C:\\Users\\halal\\Downloads\\HalalDL\\instagram-carousel\\slide-03.jpg",
+        `${DEMO_USER_ROOT}\\Downloads\\HalalDL\\instagram-carousel\\slide-01.mp4`,
+        `${DEMO_USER_ROOT}\\Downloads\\HalalDL\\instagram-carousel\\slide-02.mp4`,
+        `${DEMO_USER_ROOT}\\Downloads\\HalalDL\\instagram-carousel\\slide-03.jpg`,
       ],
       presetId: "whatsapp-optimized",
       presetName: "WhatsApp Ready",
@@ -252,10 +249,10 @@ function buildDemoHistory(now: number): HistoryEntry[] {
       format: "mp4",
       fileSize: 164000000,
       mediaDurationSeconds: 1805,
-      outputPath: "C:\\Users\\halal\\Downloads\\HalalDL\\lecture-subs.mp4",
+      outputPath: `${DEMO_USER_ROOT}\\Downloads\\HalalDL\\lecture-subs.mp4`,
       outputPaths: [
-        "C:\\Users\\halal\\Downloads\\HalalDL\\lecture-subs.mp4",
-        "C:\\Users\\halal\\Downloads\\HalalDL\\lecture-subs.en.srt",
+        `${DEMO_USER_ROOT}\\Downloads\\HalalDL\\lecture-subs.mp4`,
+        `${DEMO_USER_ROOT}\\Downloads\\HalalDL\\lecture-subs.en.srt`,
       ],
       presetId: "default-subs",
       presetName: "Best Video + Subtitles",
@@ -267,19 +264,6 @@ function buildDemoHistory(now: number): HistoryEntry[] {
       notes: "Manual English subtitles were available.",
     },
     {
-      id: "history-04",
-      url: "https://www.tiktok.com/@demo/video/fail05",
-      title: "Private post requiring login",
-      thumbnail: svgThumbnail("Login Required", "#dc2626", "#7f1d1d"),
-      presetId: "default",
-      presetName: "Best Video",
-      downloadedAt: now - 40 * 60 * 60 * 1000,
-      domain: "tiktok.com",
-      status: "failed",
-      failReason: "Login required or cookies missing",
-      tags: ["failed"],
-    },
-    {
       id: "history-05",
       url: "https://www.youtube.com/watch?v=demoClip08",
       title: "Quick highlight clip for WhatsApp",
@@ -287,8 +271,8 @@ function buildDemoHistory(now: number): HistoryEntry[] {
       format: "mp4",
       fileSize: 36200000,
       mediaDurationSeconds: 49,
-      outputPath: "C:\\Users\\halal\\Downloads\\HalalDL\\quick-highlight.mp4",
-      outputPaths: ["C:\\Users\\halal\\Downloads\\HalalDL\\quick-highlight.mp4"],
+      outputPath: `${DEMO_USER_ROOT}\\Downloads\\HalalDL\\quick-highlight.mp4`,
+      outputPaths: [`${DEMO_USER_ROOT}\\Downloads\\HalalDL\\quick-highlight.mp4`],
       presetId: "whatsapp-optimized",
       presetName: "WhatsApp Ready",
       downloadedAt: now - 4 * 24 * 60 * 60 * 1000,
@@ -336,28 +320,43 @@ function buildDemoLogs(now: number): LogEntry[] {
     {
       id: "log-05",
       timestamp: stamp(12),
-      level: "warn",
+      level: "info",
       jobId: "demo-job-paused",
       message: "Queue paused by user. Waiting to resume.",
     },
     {
       id: "log-06",
       timestamp: stamp(10),
-      level: "error",
-      jobId: "demo-job-failed",
-      message: "Extractor requires login or cookies for this URL.",
+      level: "info",
+      jobId: "demo-job-done",
+      message: "Download finished successfully: source-audio.mp3",
     },
     {
       id: "log-07",
       timestamp: stamp(8),
       level: "info",
-      message: "Background update check found HalalDL v0.4.0 ready.",
+      message: "Background update check found HalalDL v0.5.1 ready.",
     },
     {
       id: "log-08",
       timestamp: stamp(4),
       level: "info",
       message: "yt-dlp stable update available: 2026.03.29",
+    },
+    {
+      id: "log-09",
+      timestamp: stamp(3),
+      level: "info",
+      jobId: "demo-job-downloadgram",
+      message: "Carousel item 2/4 saved.",
+    },
+    {
+      id: "log-10",
+      timestamp: stamp(2),
+      level: "command",
+      jobId: "demo-job-subs",
+      message: "Preparing subtitle sidecars",
+      command: "yt-dlp --write-subs --sub-langs en.*",
     },
   ];
 }
@@ -368,11 +367,11 @@ function buildDemoTools(now: number): Tool[] {
       id: "yt-dlp",
       name: "yt-dlp",
       status: "Detected",
-      version: "2026.03.21",
+      version: "2026.03.29",
       latestVersion: "2026.03.29",
-      updateAvailable: true,
+      updateAvailable: false,
       latestCheckedAt: now,
-      path: "C:\\Users\\halal\\AppData\\Roaming\\HalalDL\\bin\\yt-dlp.exe",
+      path: `${DEMO_USER_ROOT}\\AppData\\Roaming\\HalalDL\\bin\\yt-dlp.exe`,
       mode: "Bundled",
       channel: "stable",
       required: true,
@@ -386,7 +385,7 @@ function buildDemoTools(now: number): Tool[] {
       latestVersion: "7.1.1",
       updateAvailable: false,
       latestCheckedAt: now,
-      path: "C:\\Users\\halal\\AppData\\Roaming\\HalalDL\\bin\\ffmpeg.exe",
+      path: `${DEMO_USER_ROOT}\\AppData\\Roaming\\HalalDL\\bin\\ffmpeg.exe`,
       mode: "Bundled",
       channel: "stable",
       required: false,
@@ -400,7 +399,7 @@ function buildDemoTools(now: number): Tool[] {
       latestVersion: "1.37.0",
       updateAvailable: false,
       latestCheckedAt: now,
-      path: "C:\\Users\\halal\\AppData\\Roaming\\HalalDL\\bin\\aria2c.exe",
+      path: `${DEMO_USER_ROOT}\\AppData\\Roaming\\HalalDL\\bin\\aria2c.exe`,
       mode: "Bundled",
       channel: "stable",
       required: false,
@@ -410,11 +409,11 @@ function buildDemoTools(now: number): Tool[] {
       id: "deno",
       name: "Deno",
       status: "Detected",
-      version: "2.4.1",
+      version: "2.5.0",
       latestVersion: "2.5.0",
-      updateAvailable: true,
+      updateAvailable: false,
       latestCheckedAt: now,
-      path: "C:\\Users\\halal\\AppData\\Roaming\\HalalDL\\bin\\deno.exe",
+      path: `${DEMO_USER_ROOT}\\AppData\\Roaming\\HalalDL\\bin\\deno.exe`,
       mode: "Bundled",
       channel: "stable",
       required: false,
@@ -428,7 +427,7 @@ export function seedMarketingDemoState() {
   const settings = {
     ...DEFAULT_SETTINGS,
     theme: getRequestedTheme(),
-    defaultDownloadDir: "C:\\Users\\halal\\Downloads\\HalalDL",
+    defaultDownloadDir: `${DEMO_USER_ROOT}\\Downloads\\HalalDL`,
     downloadsAddMode: "start" as const,
     downloadsSelectedPreset: "default",
     quickDefaultPreset: "whatsapp-optimized",
@@ -438,6 +437,11 @@ export function seedMarketingDemoState() {
     checkAppUpdatesInBackground: false,
   };
 
+  seedDemoStartupSummary();
+  // Re-apply after App/persistence startup reporting so marketing shots stay stable.
+  if (typeof window !== "undefined") {
+    window.setTimeout(() => seedDemoStartupSummary(), 400);
+  }
   useSettingsStore.getState().setSettings(settings);
   usePresetsStore.getState().setPresets(BUILT_IN_PRESETS);
   useDownloadsStore.setState({
@@ -450,7 +454,7 @@ export function seedMarketingDemoState() {
     logs: buildDemoLogs(now),
     loadStatus: "ready",
     loadError: undefined,
-    activeJobId: "demo-job-downloadgram",
+    activeJobId: undefined,
   });
   useToolsStore.getState().setTools(buildDemoTools(now));
   useRuntimeStore.setState({
@@ -459,27 +463,40 @@ export function seedMarketingDemoState() {
     lastFullScreen: getRequestedScreen(),
     trayStatus: {
       activeDownloads: 2,
-      failedJobs: 1,
+      failedJobs: 0,
       queuePaused: false,
-      appUpdateAvailable: true,
-      toolUpdateCount: 2,
+      appUpdateAvailable: false,
+      toolUpdateCount: 0,
     },
     quickDraft: null,
   });
   useNavigationStore.getState().setScreen(getRequestedScreen());
-  useAppUpdateStore.getState().setUpdate({
-    version: "0.4.0",
-    releaseUrl: "https://github.com/Asdmir786/HalalDL/releases/tag/v0.4.0",
-    downloadUrl: "https://github.com/Asdmir786/HalalDL/releases/download/v0.4.0/HalalDL-Full-v0.4.0-win10+11-x64-setup.exe",
-    assetName: "HalalDL-Full-v0.4.0-win10+11-x64-setup.exe",
-    checksumUrl: "https://github.com/Asdmir786/HalalDL/releases/download/v0.4.0/SHA256SUMS.txt",
+  useAppUpdateStore.setState({
+    updateAvailable: false,
+    latestVersion: null,
+    releaseUrl: null,
+    downloadUrl: null,
+    assetName: null,
+    checksumUrl: null,
   });
   useAppUpdateStore.getState().setInstallContext({
     installerType: "nsis",
     installScope: "user",
-    installDir: "C:\\Users\\halal\\AppData\\Local\\Programs\\HalalDL",
-    uninstallCommand: "\"C:\\Users\\halal\\AppData\\Local\\Programs\\HalalDL\\uninstall.exe\"",
+    installDir: `${DEMO_USER_ROOT}\\AppData\\Local\\Programs\\HalalDL`,
+    uninstallCommand: `"${DEMO_USER_ROOT}\\AppData\\Local\\Programs\\HalalDL\\uninstall.exe"`,
     detectedFrom: "marketing-demo",
     registryKey: "HKCU\\Software\\Microsoft\\Windows\\CurrentVersion\\Uninstall\\HalalDL",
   });
+
+  const section = getRequestedSettingsSection();
+  if (getRequestedScreen() === "settings" && section) {
+    window.setTimeout(() => {
+      useAttentionStore.getState().setTarget({
+        screen: "settings",
+        reason: "marketing-demo-section",
+        targetType: "section",
+        targetId: section,
+      });
+    }, 120);
+  }
 }
