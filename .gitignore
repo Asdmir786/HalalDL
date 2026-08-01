@@ -36,4 +36,8 @@ manifests/
 
 tmp-playwright-capture/
 .tmp-playwright/
+.winget-work/
 
+# Chocolatey build artifacts
+*.nupkg
+chocolatey/*.nupkg

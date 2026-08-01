@@ -11,11 +11,12 @@ HalalDL is a local-first Windows media downloader powered by `yt-dlp`, with pres
 - **Best for most users:** download the latest release and choose `HalalDL-Full-...-setup.exe`
 - **Best for power users:** choose `HalalDL-Lite-...-setup.exe` if you want to manage `yt-dlp`, `ffmpeg`, and optional tools yourself
 - **Best for no-install use:** choose `HalalDL-Portable-...zip` if you want the app, settings, archive, thumbnails, and managed tools kept together in one folder
-- **WinGet:** `winget install --id Asdmir786.HalalDL`
+- **WinGet:** `winget install --id Asdmir786.HalalDL` (Lite/Portable package IDs are in review)
+- **Scoop / Chocolatey:** submissions in review — install commands will land here once approved
 - **Platform today:** Windows 10 and Windows 11, x64
 - **Use it responsibly:** only download content you are allowed to access and save; respect platform rules, copyright, and local law
 
-WinGet catalog updates can lag behind GitHub Releases, so the latest GitHub release is the fastest path to a new version.
+Package managers can lag behind GitHub Releases, so the latest GitHub release is still the fastest path to a new version.
 
 ## Why People Try HalalDL
 

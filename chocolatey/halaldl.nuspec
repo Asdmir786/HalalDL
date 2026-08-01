@@ -1,0 +1,44 @@
+<?xml version="1.0" encoding="utf-8"?>
+<package xmlns="http://schemas.microsoft.com/packaging/2015/06/nuspec.xsd">
+  <metadata>
+    <id>halaldl</id>
+    <version>0.5.1</version>
+    <title>HalalDL</title>
+    <authors>Asdmir786</authors>
+    <owners>Asdmir786</owners>
+    <copyright>Copyright (c) Asdmir786</copyright>
+    <projectUrl>https://github.com/Asdmir786/HalalDL</projectUrl>
+    <projectSourceUrl>https://github.com/Asdmir786/HalalDL</projectSourceUrl>
+    <docsUrl>https://github.com/Asdmir786/HalalDL/tree/main/docs</docsUrl>
+    <bugTrackerUrl>https://github.com/Asdmir786/HalalDL/issues</bugTrackerUrl>
+    <packageSourceUrl>https://github.com/Asdmir786/HalalDL/tree/main/chocolatey</packageSourceUrl>
+    <iconUrl>https://cdn.jsdelivr.net/gh/Asdmir786/HalalDL@main/src-tauri/icons/icon.png</iconUrl>
+    <licenseUrl>https://github.com/Asdmir786/HalalDL/blob/main/LICENSE</licenseUrl>
+    <requireLicenseAcceptance>false</requireLicenseAcceptance>
+    <summary>Local-first Windows media downloader powered by yt-dlp</summary>
+    <description><![CDATA[
+HalalDL is a local-first Windows media downloader powered by yt-dlp.
+
+Paste a URL, pick a preset, and download with visible logs — no account and no telemetry.
+
+This package installs the **Full** setup build (app-managed tools).
+
+## Features
+
+- Presets for common video and audio workflows
+- Visible raw yt-dlp logs
+- Tray and clipboard-aware quick downloads
+- Download history and tools management
+
+## Notes
+
+- Official site: [https://halaldl.vercel.app](https://halaldl.vercel.app)
+- Releases are not code-signed yet; Windows SmartScreen may warn on first run
+]]></description>
+    <releaseNotes>https://github.com/Asdmir786/HalalDL/releases/tag/v0.5.1</releaseNotes>
+    <tags>halaldl yt-dlp video-downloader media-downloader tauri ffmpeg windows local-first</tags>
+  </metadata>
+  <files>
+    <file src="tools\**" target="tools" />
+  </files>
+</package>
