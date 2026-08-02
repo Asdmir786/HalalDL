@@ -300,6 +300,9 @@ export function SettingsScreen() {
               maxConcurrency: defaults.maxConcurrency,
               maxRetries: defaults.maxRetries,
               maxSpeed: defaults.maxSpeed,
+              sponsorBlockMode: defaults.sponsorBlockMode,
+              sponsorBlockCategories: defaults.sponsorBlockCategories,
+              instagramEngine: defaults.instagramEngine,
             };
 
       setDraftFromSettings({ ...draftSettings, ...partial });
@@ -419,6 +422,12 @@ export function SettingsScreen() {
               onMaxRetriesChange={(v) => setDraftValue("maxRetries", v)}
               maxSpeed={draftSettings.maxSpeed}
               onMaxSpeedChange={(v) => setDraftValue("maxSpeed", v)}
+              sponsorBlockMode={draftSettings.sponsorBlockMode}
+              onSponsorBlockModeChange={(v) => setDraftValue("sponsorBlockMode", v)}
+              sponsorBlockCategories={draftSettings.sponsorBlockCategories}
+              onSponsorBlockCategoriesChange={(v) => setDraftValue("sponsorBlockCategories", v)}
+              instagramEngine={draftSettings.instagramEngine}
+              onInstagramEngineChange={(v) => setDraftValue("instagramEngine", v)}
             />
 
             <PerformanceSection />

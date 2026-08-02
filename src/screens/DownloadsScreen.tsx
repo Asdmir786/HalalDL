@@ -19,24 +19,31 @@ import { FadeInStagger, FadeInItem } from "@/components/motion/StaggerContainer"
 import {
   changePausedJobPreset,
   cleanupThumbnailByJobId,
+  fetchMediaInfo,
   fetchMetadata,
-  inspectInstagramMedia,
+  instagramSummaryFromMediaCollection,
   isDirectImageUrl,
+  isYouTubeUrl,
   pauseActiveDownload,
+  quickProbeMediaUrl,
   resumePausedDownload,
   retryFailedJobs,
   startQueuedJobs,
   stopPostProcessingJob,
   type InstagramMediaSummary,
+  type MediaMetadataProbe,
 } from "@/lib/downloader";
 import { isInstagramUrl } from "@/lib/media-engine";
 import { copyFilesToClipboard } from "@/lib/commands";
 import { getExplicitOutputPaths } from "@/lib/output-paths";
 import { toast } from "sonner";
+import type { SponsorBlockCategoryId } from "@/lib/sponsorblock";
+import type { SponsorBlockMode } from "@/store/settings";
 
 import { DownloadInputSection } from "./downloads/components/DownloadInputSection";
 import { DownloadStatsBar, type DownloadStatusFilter } from "./downloads/components/DownloadStatsBar";
 import { DownloadList } from "./downloads/components/DownloadList";
+import type { UrlPreviewStatus } from "./downloads/components/UrlInfoPreview";
 import { getJobTs } from "./downloads/utils";
 import { buildClipSection } from "@/lib/clip";
 import { normalizeUrlIdentity } from "@/lib/url-identity";
@@ -170,6 +177,11 @@ export function DownloadsScreen() {
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
   const [isAdding, setIsAdding] = useState(false);
   const [instagramMediaSummary, setInstagramMediaSummary] = useState<InstagramMediaSummary | null>(null);
+  const [urlPreview, setUrlPreview] = useState<MediaMetadataProbe | null>(null);
+  const [urlPreviewStatus, setUrlPreviewStatus] = useState<UrlPreviewStatus>("idle");
+  const [urlPreviewError, setUrlPreviewError] = useState<string | null>(null);
+  const urlPreviewCacheRef = useRef(new Map<string, MediaMetadataProbe>());
+  const urlPreviewRequestRef = useRef(0);
 
   // Handle Drag & Drop Pending URL
   useEffect(() => {
@@ -236,34 +248,88 @@ export function DownloadsScreen() {
 
   useEffect(() => {
     const trimmed = url.trim();
-    let cancelled = false;
+    const requestId = urlPreviewRequestRef.current + 1;
+    urlPreviewRequestRef.current = requestId;
+    const useDownloadGram =
+      isInstagramUrl(trimmed) && settings.instagramEngine !== "yt-dlp";
+    const cacheKey = `${settings.instagramEngine}:${trimmed}`;
 
-    if (!trimmed || !isInstagramUrl(trimmed)) {
+    if (!trimmed || isDirectImageUrl(trimmed)) {
       const timer = window.setTimeout(() => {
-        if (!cancelled) setInstagramMediaSummary(null);
+        if (urlPreviewRequestRef.current !== requestId) return;
+        setUrlPreview(null);
+        setUrlPreviewError(null);
+        setUrlPreviewStatus("idle");
+        setInstagramMediaSummary(null);
       }, 0);
-      return () => {
-        cancelled = true;
-        window.clearTimeout(timer);
-      };
+      return () => window.clearTimeout(timer);
     }
 
-    inspectInstagramMedia(trimmed)
-      .then((summary) => {
-        if (!cancelled) {
-          setInstagramMediaSummary(summary);
-        }
-      })
-      .catch(() => {
-        if (!cancelled) {
+    if (!isInstagramUrl(trimmed) && quickProbeMediaUrl(trimmed) === "unsupported") {
+      const timer = window.setTimeout(() => {
+        if (urlPreviewRequestRef.current !== requestId) return;
+        setUrlPreview(null);
+        setUrlPreviewError(null);
+        setUrlPreviewStatus("idle");
+        setInstagramMediaSummary(null);
+      }, 0);
+      return () => window.clearTimeout(timer);
+    }
+
+    const cached = urlPreviewCacheRef.current.get(cacheKey);
+    if (cached) {
+      const timer = window.setTimeout(() => {
+        if (urlPreviewRequestRef.current !== requestId) return;
+        setUrlPreview(cached);
+        setUrlPreviewError(null);
+        setUrlPreviewStatus("ready");
+        setInstagramMediaSummary(
+          useDownloadGram
+            ? instagramSummaryFromMediaCollection(cached.mediaCollectionSummary)
+            : null
+        );
+      }, 0);
+      return () => window.clearTimeout(timer);
+    }
+
+    const loadingTimer = window.setTimeout(() => {
+      if (urlPreviewRequestRef.current !== requestId) return;
+      setUrlPreview(null);
+      setUrlPreviewError(null);
+      setUrlPreviewStatus("loading");
+      if (!useDownloadGram) {
+        setInstagramMediaSummary(null);
+      }
+    }, 0);
+
+    const fetchTimer = window.setTimeout(() => {
+      fetchMediaInfo(trimmed)
+        .then((info) => {
+          urlPreviewCacheRef.current.set(cacheKey, info);
+          if (urlPreviewRequestRef.current !== requestId) return;
+          setUrlPreview(info);
+          setUrlPreviewError(null);
+          setUrlPreviewStatus("ready");
+          setInstagramMediaSummary(
+            useDownloadGram
+              ? instagramSummaryFromMediaCollection(info.mediaCollectionSummary)
+              : null
+          );
+        })
+        .catch((error) => {
+          if (urlPreviewRequestRef.current !== requestId) return;
+          setUrlPreview(null);
+          setUrlPreviewError(String(error).replace(/^Error:\s*/i, "").slice(0, 220));
+          setUrlPreviewStatus("error");
           setInstagramMediaSummary(null);
-        }
-      });
+        });
+    }, 320);
 
     return () => {
-      cancelled = true;
+      window.clearTimeout(loadingTimer);
+      window.clearTimeout(fetchTimer);
     };
-  }, [url]);
+  }, [settings.instagramEngine, url]);
 
   const isInstagramImageOnly = instagramMediaSummary?.isImageOnly ?? false;
   const outputConfigOpen = showOutputConfig && !isInstagramImageOnly;
@@ -478,9 +544,9 @@ export function DownloadsScreen() {
         });
         return;
       }
-      if (clipOverridesNeeded && isInstagramUrl(trimmedUrl)) {
+      if (clipOverridesNeeded && isInstagramUrl(trimmedUrl) && settings.instagramEngine !== "yt-dlp") {
         toast.error("Clip download is not available for Instagram yet", {
-          description: "Leave start and end blank for Instagram downloads.",
+          description: "Leave start and end blank for Instagram downloads, or switch Instagram Engine to yt-dlp in Settings.",
         });
         return;
       }
@@ -558,7 +624,32 @@ export function DownloadsScreen() {
         : overrides;
       const id = addJob(trimmedUrl, presetIdToUse, safeOverrides);
 
+      if (urlPreview && urlPreviewStatus === "ready") {
+        updateJob(id, {
+          ...(urlPreview.title ? { title: urlPreview.title } : {}),
+          ...(urlPreview.thumbnailUrl && /^https?:/i.test(urlPreview.thumbnailUrl)
+            ? { thumbnail: urlPreview.thumbnailUrl, thumbnailStatus: "ready" as const }
+            : {}),
+          ...(urlPreview.mediaDurationSeconds
+            ? { mediaDurationSeconds: urlPreview.mediaDurationSeconds }
+            : {}),
+          ...(urlPreview.mediaCollectionSummary
+            ? { mediaCollectionSummary: urlPreview.mediaCollectionSummary }
+            : {}),
+          subtitleStatus:
+            urlPreview.hasManualSubtitles || urlPreview.hasAutoSubtitles
+              ? "available"
+              : "unavailable",
+          hasManualSubtitles: urlPreview.hasManualSubtitles,
+          hasAutoSubtitles: urlPreview.hasAutoSubtitles,
+          availableSubtitleLanguages: urlPreview.availableSubtitleLanguages,
+        });
+      }
+
       setUrl("");
+      setUrlPreview(null);
+      setUrlPreviewError(null);
+      setUrlPreviewStatus("idle");
 
       if (addMode === "start") {
         const started = startQueuedJobs([id], { ignoreQueuePaused: true });
@@ -604,6 +695,25 @@ export function DownloadsScreen() {
       ? null
       : "Enter a valid range like 0:30 to 2:15. End time must be after start time.";
   }, [clipEndTime, clipStartTime]);
+
+  const sponsorBlockDisabled = Boolean(url.trim()) && !isYouTubeUrl(url.trim());
+  const sponsorBlockDisabledReason = isInstagramUrl(url.trim())
+    ? "Instagram downloads do not use yt-dlp, so SponsorBlock cannot apply."
+    : "SponsorBlock only works on YouTube URLs.";
+
+  const handleSponsorBlockModeChange = useCallback(
+    (mode: SponsorBlockMode) => {
+      updateSettings({ sponsorBlockMode: mode });
+    },
+    [updateSettings]
+  );
+
+  const handleSponsorBlockCategoriesChange = useCallback(
+    (categories: SponsorBlockCategoryId[]) => {
+      updateSettings({ sponsorBlockCategories: categories });
+    },
+    [updateSettings]
+  );
 
   const handleRetryFailed = () => {
     retryFailedJobs();
@@ -772,6 +882,15 @@ export function DownloadsScreen() {
                     onClipEndTimeChange={setClipEndTime}
                     clipValidationMessage={clipValidationMessage}
                     instagramMediaSummary={instagramMediaSummary}
+                    urlPreviewStatus={urlPreviewStatus}
+                    urlPreview={urlPreview}
+                    urlPreviewError={urlPreviewError}
+                    sponsorBlockMode={settings.sponsorBlockMode}
+                    onSponsorBlockModeChange={handleSponsorBlockModeChange}
+                    sponsorBlockCategories={settings.sponsorBlockCategories}
+                    onSponsorBlockCategoriesChange={handleSponsorBlockCategoriesChange}
+                    sponsorBlockDisabled={sponsorBlockDisabled}
+                    sponsorBlockDisabledReason={sponsorBlockDisabledReason}
                   />
 
                   <DownloadStatsBar 

@@ -1,4 +1,4 @@
-import { Gauge, Layers, RotateCcw, Zap, Trash2 } from "lucide-react";
+import { Gauge, Layers, RotateCcw, Zap, Trash2, Images } from "lucide-react";
 import { Slider } from "@/components/ui/slider";
 import { Input } from "@/components/ui/input";
 import {
@@ -13,6 +13,9 @@ import { motion, AnimatePresence } from "framer-motion";
 import { toast } from "sonner";
 import { clearYtDlpCache } from "@/lib/commands";
 import { MotionButton } from "@/components/motion/MotionButton";
+import { SponsorBlockControls } from "@/components/SponsorBlockControls";
+import type { SponsorBlockCategoryId } from "@/lib/sponsorblock";
+import type { InstagramEngine, SponsorBlockMode } from "@/store/settings";
 import { SettingsSection } from "./SettingsSection";
 import { SettingRow } from "./SettingRow";
 
@@ -30,12 +33,21 @@ interface EngineSectionProps {
   onMaxRetriesChange: (val: number) => void;
   maxSpeed: number;
   onMaxSpeedChange: (val: number) => void;
+  sponsorBlockMode: SponsorBlockMode;
+  onSponsorBlockModeChange: (val: SponsorBlockMode) => void;
+  sponsorBlockCategories: SponsorBlockCategoryId[];
+  onSponsorBlockCategoriesChange: (val: SponsorBlockCategoryId[]) => void;
+  instagramEngine: InstagramEngine;
+  onInstagramEngineChange: (val: InstagramEngine) => void;
 }
 
 export function EngineSection({
   maxConcurrency, onMaxConcurrencyChange,
   maxRetries, onMaxRetriesChange,
   maxSpeed, onMaxSpeedChange,
+  sponsorBlockMode, onSponsorBlockModeChange,
+  sponsorBlockCategories, onSponsorBlockCategoriesChange,
+  instagramEngine, onInstagramEngineChange,
 }: EngineSectionProps) {
   const [speedUnit, setSpeedUnit] = useState<number>(1);
   const [localSpeedValue, setLocalSpeedValue] = useState<number>(0);
@@ -149,6 +161,38 @@ export function EngineSection({
           </Select>
         </div>
       </SettingRow>
+
+      <SettingRow
+        icon={Images}
+        label="Instagram Engine"
+        description="DownloadGram is the reliable default. yt-dlp can work on public posts with a modern x64 build (curl_cffi is already inside HalalDL’s managed yt-dlp.exe)."
+        vertical
+      >
+        <Select
+          value={instagramEngine}
+          onValueChange={(value) => onInstagramEngineChange(value as InstagramEngine)}
+        >
+          <SelectTrigger className="w-full max-w-sm bg-muted/30 border-border/30">
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="downloadgram">DownloadGram (recommended)</SelectItem>
+            <SelectItem value="yt-dlp">yt-dlp</SelectItem>
+          </SelectContent>
+        </Select>
+        {instagramEngine === "yt-dlp" ? (
+          <p className="mt-2 text-[11px] text-muted-foreground">
+            Some posts still need cookies or login. Prefer DownloadGram if downloads fail or look blocked.
+          </p>
+        ) : null}
+      </SettingRow>
+
+      <SponsorBlockControls
+        mode={sponsorBlockMode}
+        onModeChange={onSponsorBlockModeChange}
+        categories={sponsorBlockCategories}
+        onCategoriesChange={onSponsorBlockCategoriesChange}
+      />
 
       <SettingRow
         icon={Trash2}

@@ -29,15 +29,19 @@ import {
   groupPresetsForSelect,
   resolvePresetById,
 } from "@/lib/preset-display";
+import type { SponsorBlockCategoryId } from "@/lib/sponsorblock";
 import {
   getProbeHostLabel,
   type InstagramMediaSummary,
+  type MediaMetadataProbe,
   pickSupportedUrlFromText,
   probeMediaUrl,
   quickProbeMediaUrl,
   type UrlProbeResult,
 } from "@/lib/downloader";
 import { normalizeUrlIdentity } from "@/lib/url-identity";
+import type { SponsorBlockMode } from "@/store/settings";
+import { UrlInfoPreview, type UrlPreviewStatus } from "./UrlInfoPreview";
 
 interface DownloadInputSectionProps {
   url: string;
@@ -81,6 +85,15 @@ interface DownloadInputSectionProps {
   onClipEndTimeChange: (val: string) => void;
   clipValidationMessage: string | null;
   instagramMediaSummary: InstagramMediaSummary | null;
+  urlPreviewStatus: UrlPreviewStatus;
+  urlPreview: MediaMetadataProbe | null;
+  urlPreviewError?: string | null;
+  sponsorBlockMode: SponsorBlockMode;
+  onSponsorBlockModeChange: (val: SponsorBlockMode) => void;
+  sponsorBlockCategories: SponsorBlockCategoryId[];
+  onSponsorBlockCategoriesChange: (val: SponsorBlockCategoryId[]) => void;
+  sponsorBlockDisabled?: boolean;
+  sponsorBlockDisabledReason?: string;
 }
 
 export function DownloadInputSection({
@@ -111,6 +124,15 @@ export function DownloadInputSection({
   onClipEndTimeChange,
   clipValidationMessage,
   instagramMediaSummary,
+  urlPreviewStatus,
+  urlPreview,
+  urlPreviewError,
+  sponsorBlockMode,
+  onSponsorBlockModeChange,
+  sponsorBlockCategories,
+  onSponsorBlockCategoriesChange,
+  sponsorBlockDisabled,
+  sponsorBlockDisabledReason,
 }: DownloadInputSectionProps) {
   const [probeState, setProbeState] = useState<{
     url: string;
@@ -537,6 +559,12 @@ export function DownloadInputSection({
         </div>
       )}
 
+      <UrlInfoPreview
+        status={urlPreviewStatus}
+        preview={urlPreview}
+        errorMessage={urlPreviewError}
+      />
+
       <div className="rounded-xl border border-border/60 bg-background/82 px-3 py-2 shadow-sm dark:border-white/8 dark:bg-background/65">
         <div className="space-y-1.5">
           <div className="flex items-center justify-between gap-3">
@@ -666,6 +694,12 @@ export function DownloadInputSection({
           clipEndTime={clipEndTime}
           onClipEndTimeChange={onClipEndTimeChange}
           clipValidationMessage={clipValidationMessage}
+          sponsorBlockMode={sponsorBlockMode}
+          onSponsorBlockModeChange={onSponsorBlockModeChange}
+          sponsorBlockCategories={sponsorBlockCategories}
+          onSponsorBlockCategoriesChange={onSponsorBlockCategoriesChange}
+          sponsorBlockDisabled={sponsorBlockDisabled}
+          sponsorBlockDisabledReason={sponsorBlockDisabledReason}
         />
       )}
     </div>

@@ -2,13 +2,16 @@ import { Settings2, FolderOpen, Languages, Scissors } from "lucide-react";
 import { MotionButton } from "@/components/motion/MotionButton";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { SponsorBlockControls } from "@/components/SponsorBlockControls";
 import { cn } from "@/lib/utils";
+import type { SponsorBlockCategoryId } from "@/lib/sponsorblock";
 import type {
   SubtitleFormat,
   SubtitleLanguageMode,
   SubtitleMode,
   SubtitleSourcePolicy,
 } from "@/lib/subtitles";
+import type { SponsorBlockMode } from "@/store/settings";
 
 interface DownloadOutputOptionsProps {
   filenameBase: string;
@@ -35,6 +38,12 @@ interface DownloadOutputOptionsProps {
   clipEndTime: string;
   onClipEndTimeChange: (val: string) => void;
   clipValidationMessage: string | null;
+  sponsorBlockMode: SponsorBlockMode;
+  onSponsorBlockModeChange: (val: SponsorBlockMode) => void;
+  sponsorBlockCategories: SponsorBlockCategoryId[];
+  onSponsorBlockCategoriesChange: (val: SponsorBlockCategoryId[]) => void;
+  sponsorBlockDisabled?: boolean;
+  sponsorBlockDisabledReason?: string;
 }
 
 export function DownloadOutputOptions({
@@ -62,6 +71,12 @@ export function DownloadOutputOptions({
   clipEndTime,
   onClipEndTimeChange,
   clipValidationMessage,
+  sponsorBlockMode,
+  onSponsorBlockModeChange,
+  sponsorBlockCategories,
+  onSponsorBlockCategoriesChange,
+  sponsorBlockDisabled = false,
+  sponsorBlockDisabledReason,
 }: DownloadOutputOptionsProps) {
   
   const insertPlaceholder = (placeholder: string) => {
@@ -209,6 +224,16 @@ export function DownloadOutputOptions({
            {clipValidationMessage || "Use seconds, mm:ss, or hh:mm:ss. Clips are cut at stream keyframes unless re-encoded."}
          </p>
        </div>
+
+       <SponsorBlockControls
+         compact
+         mode={sponsorBlockMode}
+         onModeChange={onSponsorBlockModeChange}
+         categories={sponsorBlockCategories}
+         onCategoriesChange={onSponsorBlockCategoriesChange}
+         disabled={sponsorBlockDisabled}
+         disabledReason={sponsorBlockDisabledReason}
+       />
 
        <div className="grid gap-3 rounded-xl border border-muted/40 bg-muted/15 p-3">
          <div className="flex items-center justify-between gap-3">

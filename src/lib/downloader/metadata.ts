@@ -22,14 +22,34 @@ import {
 const IMAGE_FILE_EXTENSIONS = new Set(["jpg", "jpeg", "png", "webp", "gif", "bmp", "avif"]);
 const VIDEO_FILE_EXTENSIONS = new Set(["mp4", "mov", "webm", "mkv", "avi", "m4v"]);
 
+export interface MediaFormatOption {
+  /** Stable id for UI keys, e.g. "h:1080" or "audio". */
+  id: string;
+  /** Short label shown in the preview, e.g. "1080p" or "Audio". */
+  label: string;
+  height?: number;
+  fps?: number;
+  ext?: string;
+  hasVideo: boolean;
+  hasAudio: boolean;
+  filesizeBytes?: number;
+  /** Optional note such as "60fps" or "HDR". */
+  note?: string;
+  /** yt-dlp `-f` expression when the user picks this quality later. */
+  formatSelector: string;
+}
+
 export interface MediaMetadataProbe {
   title: string;
   thumbnailUrl: string;
+  uploader?: string;
   mediaDurationSeconds?: number;
   mediaCollectionSummary?: DownloadJob["mediaCollectionSummary"];
   hasManualSubtitles: boolean;
   hasAutoSubtitles: boolean;
   availableSubtitleLanguages: string[];
+  /** Curated quality options derived from yt-dlp `formats`. */
+  formats: MediaFormatOption[];
 }
 
 function shellPayloadToBytes(output: unknown): Uint8Array | null {
@@ -71,6 +91,130 @@ function extractLanguageKeys(value: unknown): string[] {
     .sort((a, b) => a.localeCompare(b));
 }
 
+function isNoneCodec(value: unknown): boolean {
+  if (value == null) return true;
+  const text = String(value).trim().toLowerCase();
+  return !text || text === "none";
+}
+
+function pickFilesize(entry: Record<string, unknown>): number | undefined {
+  const exact = Number(entry.filesize);
+  if (Number.isFinite(exact) && exact > 0) return exact;
+  const approx = Number(entry.filesize_approx);
+  if (Number.isFinite(approx) && approx > 0) return approx;
+  return undefined;
+}
+
+function formatNoteFromEntry(entry: Record<string, unknown>, fps?: number): string | undefined {
+  const bits: string[] = [];
+  if (fps && fps >= 50) bits.push(`${Math.round(fps)}fps`);
+  const dynamicRange = String(entry.dynamic_range ?? "").trim().toUpperCase();
+  if (dynamicRange && dynamicRange !== "SDR") bits.push(dynamicRange);
+  const note = String(entry.format_note ?? "").trim();
+  if (note && /hdr|hlg|dv/i.test(note) && !bits.some((bit) => /hdr|hlg|dv/i.test(bit))) {
+    bits.push(note);
+  }
+  return bits.length > 0 ? bits.join(" · ") : undefined;
+}
+
+/**
+ * Collapse yt-dlp's raw `formats` list into a short quality chip list:
+ * unique video heights (best file for each) plus one audio option when present.
+ */
+export function summarizeMediaFormats(rawFormats: unknown): MediaFormatOption[] {
+  if (!Array.isArray(rawFormats)) return [];
+
+  type HeightBucket = {
+    height: number;
+    fps?: number;
+    ext?: string;
+    filesizeBytes?: number;
+    note?: string;
+    hasAudio: boolean;
+  };
+
+  const byHeight = new Map<number, HeightBucket>();
+  let bestAudio:
+    | {
+        ext?: string;
+        filesizeBytes?: number;
+      }
+    | undefined;
+
+  for (const item of rawFormats) {
+    if (!item || typeof item !== "object" || Array.isArray(item)) continue;
+    const entry = item as Record<string, unknown>;
+    const hasVideo = !isNoneCodec(entry.vcodec);
+    const hasAudio = !isNoneCodec(entry.acodec);
+    if (!hasVideo && !hasAudio) continue;
+
+    const height = Number(entry.height);
+    const fpsRaw = Number(entry.fps);
+    const fps = Number.isFinite(fpsRaw) && fpsRaw > 0 ? fpsRaw : undefined;
+    const ext = String(entry.ext ?? "").trim().toLowerCase() || undefined;
+    const filesizeBytes = pickFilesize(entry);
+
+    if (hasVideo && Number.isFinite(height) && height > 0) {
+      const existing = byHeight.get(height);
+      const candidate: HeightBucket = {
+        height,
+        fps,
+        ext,
+        filesizeBytes,
+        note: formatNoteFromEntry(entry, fps),
+        hasAudio,
+      };
+
+      if (!existing) {
+        byHeight.set(height, candidate);
+      } else {
+        const existingScore =
+          (existing.filesizeBytes ?? 0) + (existing.hasAudio ? 1_000_000_000 : 0) + (existing.fps ?? 0);
+        const candidateScore =
+          (candidate.filesizeBytes ?? 0) + (candidate.hasAudio ? 1_000_000_000 : 0) + (candidate.fps ?? 0);
+        if (candidateScore >= existingScore) {
+          byHeight.set(height, candidate);
+        }
+      }
+      continue;
+    }
+
+    if (!hasVideo && hasAudio) {
+      if (!bestAudio || (filesizeBytes ?? 0) >= (bestAudio.filesizeBytes ?? 0)) {
+        bestAudio = { ext, filesizeBytes };
+      }
+    }
+  }
+
+  const heights = Array.from(byHeight.values()).sort((a, b) => b.height - a.height);
+  const options: MediaFormatOption[] = heights.slice(0, 8).map((bucket) => ({
+    id: `h:${bucket.height}`,
+    label: `${bucket.height}p`,
+    height: bucket.height,
+    fps: bucket.fps,
+    ext: bucket.ext,
+    hasVideo: true,
+    hasAudio: bucket.hasAudio,
+    filesizeBytes: bucket.filesizeBytes,
+    note: bucket.note,
+    formatSelector: `bv*[height<=${bucket.height}]+ba/b[height<=${bucket.height}]`,
+  }));
+
+  if (bestAudio || options.some((option) => option.hasAudio)) {
+    options.push({
+      id: "audio",
+      label: "Audio",
+      ext: bestAudio?.ext,
+      hasVideo: false,
+      hasAudio: true,
+      filesizeBytes: bestAudio?.filesizeBytes,
+      formatSelector: "bestaudio/best",
+    });
+  }
+
+  return options;
+}
+
 function getExtension(path: string): string {
   const cleanPath = path.split("?")[0]?.split("#")[0] ?? "";
   const match = cleanPath.match(/\.([a-z0-9]+)$/i);
@@ -86,7 +230,11 @@ function findLocalOutputByExtension(
 
 export async function fetchMediaInfo(url: string): Promise<MediaMetadataProbe> {
   if (isInstagramUrl(url)) {
-    return fetchInstagramMediaInfo(url);
+    const engine = useSettingsStore.getState().settings.instagramEngine;
+    if (engine !== "yt-dlp") {
+      return fetchInstagramMediaInfo(url);
+    }
+    // Fall through to yt-dlp dump-json for Instagram when that engine is selected.
   }
 
   const ytDlp = await resolveTool("yt-dlp");
@@ -115,14 +263,17 @@ export async function fetchMediaInfo(url: string): Promise<MediaMetadataProbe> {
   const autoLanguages = extractLanguageKeys(payload?.automatic_captions);
   const mergedLanguages = Array.from(new Set([...manualLanguages, ...autoLanguages]));
   const duration = Number(payload?.duration);
+  const uploader = String(payload?.uploader ?? payload?.channel ?? payload?.creator ?? "").trim();
 
   return {
     title: String(payload?.title ?? "").trim(),
     thumbnailUrl: String(payload?.thumbnail ?? "").trim(),
+    ...(uploader ? { uploader } : {}),
     mediaDurationSeconds: Number.isFinite(duration) && duration > 0 ? duration : undefined,
     hasManualSubtitles: manualLanguages.length > 0,
     hasAutoSubtitles: autoLanguages.length > 0,
     availableSubtitleLanguages: mergedLanguages,
+    formats: summarizeMediaFormats(payload?.formats),
   };
 }
 

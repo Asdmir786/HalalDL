@@ -520,13 +520,61 @@ function getInstagramDownloadProgressLabel(
 
 export async function fetchInstagramMediaInfo(url: string) {
   const resolved = await resolveInstagramWithDownloadgram(url);
+  const summary = summarizeInstagramItems(resolved);
+  const formats = [
+    ...(summary.imageCount > 0
+      ? [
+          {
+            id: "ig:images",
+            label: summary.imageCount === 1 ? "1 image" : `${summary.imageCount} images`,
+            hasVideo: false,
+            hasAudio: false,
+            formatSelector: "original",
+          },
+        ]
+      : []),
+    ...(summary.videoCount > 0
+      ? [
+          {
+            id: "ig:videos",
+            label: summary.videoCount === 1 ? "1 video" : `${summary.videoCount} videos`,
+            hasVideo: true,
+            hasAudio: true,
+            formatSelector: "original",
+          },
+        ]
+      : []),
+  ];
+
   return {
     title: buildInstagramTitle(url, resolved),
     thumbnailUrl: getPreferredInstagramThumbnail(resolved.items) ?? "",
-    mediaCollectionSummary: summarizeInstagramItems(resolved),
+    mediaCollectionSummary: summary,
     hasManualSubtitles: false,
     hasAutoSubtitles: false,
     availableSubtitleLanguages: [] as string[],
+    formats,
+  };
+}
+
+export function instagramSummaryFromMediaCollection(
+  summary: DownloadJob["mediaCollectionSummary"] | undefined
+): InstagramMediaSummary | null {
+  if (!summary) return null;
+
+  const hasImage = summary.imageCount > 0;
+  const hasVideo = summary.videoCount > 0;
+
+  return {
+    kind: summary.kind ?? (summary.totalItems > 1 ? "carousel" : "single"),
+    itemCount: summary.totalItems,
+    imageCount: summary.imageCount,
+    videoCount: summary.videoCount,
+    hasImage,
+    hasVideo,
+    isImageOnly: hasImage && !hasVideo,
+    isVideoOnly: hasVideo && !hasImage,
+    isMixedCarousel: (summary.kind ?? "single") === "carousel" && hasImage && hasVideo,
   };
 }
 
@@ -554,7 +602,7 @@ export async function inspectInstagramMedia(
 
 function summarizeInstagramItems(
   resolved: InstagramResolveResult
-): DownloadJob["mediaCollectionSummary"] {
+): NonNullable<DownloadJob["mediaCollectionSummary"]> {
   const imageCount = resolved.items.filter((item) => item.type === "image").length;
   const videoCount = resolved.items.filter((item) => item.type === "video").length;
 

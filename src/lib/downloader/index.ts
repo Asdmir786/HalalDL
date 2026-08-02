@@ -7,8 +7,12 @@ export {
   startQueuedJobs,
   stopPostProcessingJob,
 } from "./core";
-export { fetchMetadata, fetchMediaInfo, type MediaMetadataProbe } from "./metadata";
-export { inspectInstagramMedia, type InstagramMediaSummary } from "./instagram";
+export { fetchMetadata, fetchMediaInfo, summarizeMediaFormats, type MediaFormatOption, type MediaMetadataProbe } from "./metadata";
+export {
+  inspectInstagramMedia,
+  instagramSummaryFromMediaCollection,
+  type InstagramMediaSummary,
+} from "./instagram";
 export { cleanupThumbnailByJobId } from "./thumbnails";
 export {
   probeMediaUrl,
@@ -18,3 +22,4 @@ export {
   pickSupportedUrlFromText,
   type UrlProbeResult,
 } from "./validation";
+export { isYouTubeUrl } from "./tool-env";

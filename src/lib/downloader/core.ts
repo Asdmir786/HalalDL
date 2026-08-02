@@ -9,7 +9,8 @@ import { useAttentionStore } from "@/store/attention";
 import { join } from "@tauri-apps/api/path";
 import { OutputParser } from "@/lib/output-parser";
 import { copyFilesToClipboard, deleteFile, renameFile } from "@/lib/commands";
-import { resolveTool, ytDlpEnv, sendDownloadCompleteNotification } from "./tool-env";
+import { resolveTool, ytDlpEnv, sendDownloadCompleteNotification, isYouTubeUrl } from "./tool-env";
+import { formatSponsorBlockCategories } from "@/lib/sponsorblock";
 import { cleanupThumbnailByJobId } from "./thumbnails";
 import { fetchMediaInfo, fetchMetadata } from "./metadata";
 import { downloadInstagramJob } from "./instagram";
@@ -657,7 +658,7 @@ export async function startDownload(jobId: string) {
     }
   }
 
-  if (isInstagramUrl(job.url)) {
+  if (isInstagramUrl(job.url) && settings.instagramEngine !== "yt-dlp") {
     const instagramResult = await downloadInstagramJob({
       job,
       preset,
@@ -673,6 +674,15 @@ export async function startDownload(jobId: string) {
       await finalizeFailedDownload(instagramResult.failDetail);
     }
     return;
+  }
+
+  if (isInstagramUrl(job.url) && settings.instagramEngine === "yt-dlp") {
+    addLog({
+      level: "info",
+      message:
+        "Instagram engine: yt-dlp (needs a recent x64 yt-dlp with curl_cffi, or cookies for some posts)",
+      jobId,
+    });
   }
 
   const ytDlp = await resolveTool("yt-dlp");
@@ -892,6 +902,25 @@ export async function startDownload(jobId: string) {
   if (clipSection) {
     args.push("--download-sections", clipSection);
     addLog({ level: "info", message: `Clip range applied: ${clipSection.slice(1)}`, jobId });
+  }
+
+  if (settings.sponsorBlockMode !== "off" && isYouTubeUrl(job.url)) {
+    const categories = formatSponsorBlockCategories(settings.sponsorBlockCategories);
+    if (settings.sponsorBlockMode === "mark") {
+      args.push("--sponsorblock-mark", categories);
+      addLog({
+        level: "info",
+        message: `SponsorBlock: marking ${categories} as chapters`,
+        jobId,
+      });
+    } else if (settings.sponsorBlockMode === "remove") {
+      args.push("--sponsorblock-remove", categories);
+      addLog({
+        level: "info",
+        message: `SponsorBlock: removing ${categories}`,
+        jobId,
+      });
+    }
   }
 
   try {

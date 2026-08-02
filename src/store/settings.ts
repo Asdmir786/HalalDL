@@ -1,4 +1,9 @@
 import { create } from "zustand";
+import {
+  DEFAULT_SPONSORBLOCK_CATEGORIES,
+  normalizeSponsorBlockCategories,
+  type SponsorBlockCategoryId,
+} from "@/lib/sponsorblock";
 
 export type Theme = "system" | "light" | "dark";
 export type AccentColor = "default" | "blue" | "green" | "purple" | "rose" | "orange" | "teal";
@@ -8,6 +13,10 @@ export type QuickActionBehavior = "ask" | "instant";
 export type QuickDestinationMode = "default" | "ask";
 export type TrayLeftClickAction = "quick-panel" | "open-app" | "none";
 export type TrayDoubleClickAction = "none" | "open-app";
+/** YouTube SponsorBlock handling via yt-dlp (no effect on Instagram / non-YouTube). */
+export type SponsorBlockMode = "off" | "mark" | "remove";
+/** Instagram resolver: DownloadGram (default) or yt-dlp (needs impersonation/cookies for many posts). */
+export type InstagramEngine = "downloadgram" | "yt-dlp";
 
 export const ACCENT_COLORS: { id: AccentColor; label: string; swatch: string }[] = [
   { id: "default", label: "Default", swatch: "#2C3E55" },
@@ -59,6 +68,13 @@ export interface Settings {
   quickDownloadStartMode: DownloadsAddMode;
   quickDownloadDestinationMode: QuickDestinationMode;
 
+  // YouTube SponsorBlock (yt-dlp native; ignored for Instagram / non-YouTube)
+  sponsorBlockMode: SponsorBlockMode;
+  sponsorBlockCategories: SponsorBlockCategoryId[];
+
+  // Instagram download backend
+  instagramEngine: InstagramEngine;
+
   // History
   historyRetention: number; // max entries to keep, 0 = unlimited
 }
@@ -102,17 +118,32 @@ export const DEFAULT_SETTINGS: Settings = {
   quickActionBehavior: "ask",
   quickDownloadStartMode: "start",
   quickDownloadDestinationMode: "default",
+  sponsorBlockMode: "off",
+  sponsorBlockCategories: [...DEFAULT_SPONSORBLOCK_CATEGORIES],
+  instagramEngine: "downloadgram",
   historyRetention: 0,
 };
 
 export const SETTINGS_KEYS = Object.keys(DEFAULT_SETTINGS) as (keyof Settings)[];
 
+function normalizeSettings(settings: Settings): Settings {
+  return {
+    ...settings,
+    sponsorBlockMode:
+      settings.sponsorBlockMode === "mark" || settings.sponsorBlockMode === "remove"
+        ? settings.sponsorBlockMode
+        : "off",
+    sponsorBlockCategories: normalizeSponsorBlockCategories(settings.sponsorBlockCategories),
+    instagramEngine: settings.instagramEngine === "yt-dlp" ? "yt-dlp" : "downloadgram",
+  };
+}
+
 export const useSettingsStore = create<SettingsState>((set) => ({
   settings: DEFAULT_SETTINGS,
-  setSettings: (settings) => set({ settings }),
+  setSettings: (settings) => set({ settings: normalizeSettings(settings) }),
   updateSettings: (newSettings) =>
     set((state) => ({
-      settings: { ...state.settings, ...newSettings },
+      settings: normalizeSettings({ ...state.settings, ...newSettings }),
     })),
   resetSettings: () => set({ settings: DEFAULT_SETTINGS }),
 }));
