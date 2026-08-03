@@ -48,8 +48,10 @@ $runId = $null
 while ((Get-Date) -lt $deadline) {
   $runsJson = gh run list --workflow nightly.yml --branch main --limit 25 --json databaseId,headSha,status,conclusion,url,createdAt,displayTitle
   $runs = $runsJson | ConvertFrom-Json
+  $prefixLen = [Math]::Min(7, $Sha.Length)
+  $prefix = $Sha.Substring(0, $prefixLen)
   $match = $runs | Where-Object {
-    $_.headSha -and $_.headSha.ToLowerInvariant().StartsWith($Sha.Substring(0, [Math]::Min(7, $Sha.Length)))
+    $_.headSha -and $_.headSha.ToLowerInvariant().StartsWith($prefix)
   } | Select-Object -First 1
 
   if (-not $match -and $Sha.Length -ge 40) {
@@ -58,11 +60,12 @@ while ((Get-Date) -lt $deadline) {
 
   if ($match) {
     $runId = [string]$match.databaseId
-    Write-Host "Found run $runId ($($match.status)) $($match.url)"
+    Write-Host ("Found run {0} ({1}) {2}" -f $runId, $match.status, $match.url)
     break
   }
 
-  Write-Host "$(Get-Date -Format 'HH:mm:ss')  no run yet for $shortSha — polling every ${PollSeconds}s..."
+  $now = Get-Date -Format "HH:mm:ss"
+  Write-Host ("{0}  no run yet for {1} - polling every {2}s..." -f $now, $shortSha, $PollSeconds)
   Start-Sleep -Seconds $PollSeconds
 }
 
@@ -75,7 +78,7 @@ gh run watch $runId --exit-status
 
 $runView = gh run view $runId --json conclusion,headSha,url | ConvertFrom-Json
 if ($runView.conclusion -ne "success") {
-  throw "Nightly run failed (conclusion=$($runView.conclusion)). See $($runView.url)"
+  throw ("Nightly run failed (conclusion={0}). See {1}" -f $runView.conclusion, $runView.url)
 }
 
 $fullSha = $runView.headSha
@@ -91,7 +94,8 @@ gh run download $runId -n $artifactName -D $OutDir
 
 $zip = Get-ChildItem -Path $OutDir -Filter "HalalDL-Portable-*.zip" -File | Select-Object -First 1
 if (-not $zip) {
-  throw "Portable ZIP not found under $OutDir. Files: $((Get-ChildItem $OutDir -File | ForEach-Object Name) -join ', ')"
+  $names = @(Get-ChildItem $OutDir -File | ForEach-Object { $_.Name }) -join ", "
+  throw "Portable ZIP not found under $OutDir. Files: $names"
 }
 
 $extractDir = Join-Path $OutDir "portable-extract"
@@ -108,10 +112,10 @@ if (-not (Test-Path $exe)) {
 $binDir = Join-Path $extractDir "portable-data\bin"
 Write-Host ""
 Write-Host "Portable ready:"
-Write-Host "  ZIP:  $($zip.FullName)"
-Write-Host "  App:  $exe"
+Write-Host ("  ZIP:  {0}" -f $zip.FullName)
+Write-Host ("  App:  {0}" -f $exe)
 if (Test-Path $binDir) {
-  Write-Host "  Bin:  $binDir"
+  Write-Host ("  Bin:  {0}" -f $binDir)
   Get-ChildItem $binDir -File | ForEach-Object {
     Write-Host ("         - {0}" -f $_.Name)
   }
@@ -119,22 +123,22 @@ if (Test-Path $binDir) {
 
 $sumFile = Join-Path $OutDir "SHA256SUMS.txt"
 if (Test-Path $sumFile) {
-  $expected = (Get-Content $sumFile | Where-Object { $_ -like "*$($zip.Name)" } | Select-Object -First 1)
+  $expected = (Get-Content $sumFile | Where-Object { $_ -like ("*{0}*" -f $zip.Name) } | Select-Object -First 1)
   if ($expected) {
     $hash = (Get-FileHash -Path $zip.FullName -Algorithm SHA256).Hash.ToLowerInvariant()
     $want = ($expected -split '\s+', 2)[0].ToLowerInvariant()
     if ($hash -ne $want) {
-      throw "SHA256 mismatch for $($zip.Name): got $hash expected $want"
+      throw ("SHA256 mismatch for {0}: got {1} expected {2}" -f $zip.Name, $hash, $want)
     }
     Write-Host "  SHA256 OK"
   }
 }
 
 if ($NoLaunch) {
-  Write-Host "Done (-NoLaunch). Run manually: $exe"
+  Write-Host ("Done (-NoLaunch). Run manually: {0}" -f $exe)
   exit 0
 }
 
 Write-Host "Launching..."
 Start-Process -FilePath $exe
-Write-Host "Launched Portable from commit $shortSha"
+Write-Host ("Launched Portable from commit {0}" -f $shortSha)
