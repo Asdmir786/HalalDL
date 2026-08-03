@@ -27,7 +27,7 @@ import {
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { open as openUrl } from "@tauri-apps/plugin-shell";
-import { revealToolInExplorer } from "@/lib/commands";
+import { revealToolInExplorer, isPipYtDlpTool } from "@/lib/commands";
 import {
   TOOL_URLS,
   TOOL_DESCRIPTIONS,
@@ -44,6 +44,7 @@ export interface ToolRowProps {
   spotlightReason?: string | null;
   onRefresh: (id: string) => void;
   onInstallOrUpdate: (tool: Tool) => void;
+  onInstallManaged: (tool: Tool) => void;
   onPipUpgrade: (tool: Tool) => void;
   onUpdateOriginal: (tool: Tool) => void;
   onChannelChange: (tool: Tool, channel: ToolChannel) => void;
@@ -62,6 +63,7 @@ export function ToolRow({
   spotlightReason = null,
   onRefresh,
   onInstallOrUpdate,
+  onInstallManaged,
   onPipUpgrade,
   onUpdateOriginal,
   onChannelChange,
@@ -70,7 +72,7 @@ export function ToolRow({
   onRollback,
   onCleanupBackup,
 }: ToolRowProps) {
-  const isPip = tool.variant === "pip";
+  const isPip = isPipYtDlpTool(tool);
   const disableUpgradeActions = isTransferActive;
 
   return (
@@ -223,13 +225,11 @@ export function ToolRow({
           <MotionButton
             size="sm"
             className="h-8 px-3 text-xs"
-            onClick={() =>
-              isPip ? onPipUpgrade(tool) : onInstallOrUpdate(tool)
-            }
+            onClick={() => onInstallOrUpdate(tool)}
             disabled={disableUpgradeActions}
           >
             <RefreshCcw className="w-3.5 h-3.5 mr-1.5" />
-            {isPip ? "pip upgrade" : "Update"}
+            Update
           </MotionButton>
         ) : (
           <Badge
@@ -257,7 +257,7 @@ export function ToolRow({
             </DropdownMenuItem>
             {isPip && tool.id === "yt-dlp" && tool.status === "Detected" && (
               <DropdownMenuItem
-                onClick={() => onInstallOrUpdate(tool)}
+                onClick={() => onInstallManaged(tool)}
                 disabled={isBusy || disableUpgradeActions}
               >
                 <Download className="w-3.5 h-3.5 mr-2" />

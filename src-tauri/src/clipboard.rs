@@ -38,13 +38,6 @@ pub fn copy_files_to_clipboard(paths: Vec<String>) -> Result<(), String> {
             )
         }
 
-        fn make_png_format_name() -> Vec<u16> {
-            OsStr::new("PNG")
-                .encode_wide()
-                .chain(std::iter::once(0))
-                .collect()
-        }
-
         fn make_clipboard_format_name(name: &str) -> Vec<u16> {
             OsStr::new(name)
                 .encode_wide()
@@ -302,7 +295,7 @@ pub fn copy_files_to_clipboard(paths: Vec<String>) -> Result<(), String> {
                 if let Some((dib_bytes, png_bytes)) = load_image_clipboard_payload(&valid_paths[0]) {
                     let _ = set_clipboard_bytes(CF_DIB, &dib_bytes);
 
-                    let png_format_id = RegisterClipboardFormatW(make_png_format_name().as_ptr());
+                    let png_format_id = RegisterClipboardFormatW(make_clipboard_format_name("PNG").as_ptr());
                     if png_format_id != 0 {
                         let _ = set_clipboard_bytes(png_format_id, &png_bytes);
                     }

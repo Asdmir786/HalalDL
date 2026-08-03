@@ -1,36 +1,30 @@
-use std::collections::HashMap;
 use std::fs;
 use std::io::Write;
 use std::path::PathBuf;
 
-use crate::fs_utils::{temp_path_for, safe_replace_with_backup};
 use crate::download::emit_progress;
-use crate::download::sha256_of_path;
+use crate::fs_utils::{safe_replace_with_backup, temp_path_for};
 
-pub fn extract_from_zip(app_handle: &tauri::AppHandle, tool_name: &str, zip_path: &PathBuf, dest_dir: &PathBuf, targets: Vec<&str>) -> Result<Vec<String>, String> {
-    extract_from_zip_with_hashes(app_handle, tool_name, zip_path, dest_dir, targets, None)
-}
-
-pub fn extract_from_zip_with_hashes(
+pub fn extract_from_zip(
     app_handle: &tauri::AppHandle,
     tool_name: &str,
     zip_path: &PathBuf,
     dest_dir: &PathBuf,
     targets: Vec<&str>,
-    expected_hashes: Option<HashMap<String, String>>,
 ) -> Result<Vec<String>, String> {
     emit_progress(app_handle, tool_name, 99.0, "Opening archive...");
     let file = fs::File::open(zip_path).map_err(|e| format!("Failed to open zip: {}", e))?;
-    let mut archive = zip::ZipArchive::new(file).map_err(|e| format!("Failed to read zip archive: {}", e))?;
+    let mut archive =
+        zip::ZipArchive::new(file).map_err(|e| format!("Failed to read zip archive: {}", e))?;
 
     let mut found_targets = Vec::new();
-    let expected = expected_hashes.map(|map| {
-        map.into_iter()
-            .map(|(k, v)| (k.to_lowercase(), v.to_lowercase()))
-            .collect::<HashMap<String, String>>()
-    });
 
-    emit_progress(app_handle, tool_name, 99.0, &format!("Scanning {} files...", archive.len()));
+    emit_progress(
+        app_handle,
+        tool_name,
+        99.0,
+        &format!("Scanning {} files...", archive.len()),
+    );
 
     for i in 0..archive.len() {
         let mut file = archive.by_index(i).map_err(|e| e.to_string())?;
@@ -40,37 +34,38 @@ pub fn extract_from_zip_with_hashes(
         };
 
         let filename = outpath.file_name().unwrap_or_default().to_string_lossy();
-        
-        if targets.iter().any(|&t| filename.to_lowercase() == t.to_lowercase()) {
+
+        if targets
+            .iter()
+            .any(|&t| filename.to_lowercase() == t.to_lowercase())
+        {
             let target_name = filename.to_string();
             let dest_file = dest_dir.join(&target_name);
             let temp_dest = temp_path_for(&dest_file)?;
-            
-            emit_progress(app_handle, tool_name, 99.0, &format!("Extracting {}...", target_name));
-            
+
+            emit_progress(
+                app_handle,
+                tool_name,
+                99.0,
+                &format!("Extracting {}...", target_name),
+            );
+
             if temp_dest.exists() {
                 let _ = fs::remove_file(&temp_dest);
             }
-            let mut outfile = fs::File::create(&temp_dest).map_err(|e| format!("Failed to create output file {}: {}", target_name, e))?;
-            std::io::copy(&mut file, &mut outfile).map_err(|e| format!("Failed to extract file {}: {}", target_name, e))?;
-            outfile.flush().map_err(|e| format!("Failed to flush file {}: {}", target_name, e))?;
-            
-            let metadata = fs::metadata(&temp_dest).map_err(|e| format!("Failed to read metadata for {}: {}", target_name, e))?;
+            let mut outfile = fs::File::create(&temp_dest).map_err(|e| {
+                format!("Failed to create output file {}: {}", target_name, e)
+            })?;
+            std::io::copy(&mut file, &mut outfile)
+                .map_err(|e| format!("Failed to extract file {}: {}", target_name, e))?;
+            outfile
+                .flush()
+                .map_err(|e| format!("Failed to flush file {}: {}", target_name, e))?;
+
+            let metadata = fs::metadata(&temp_dest)
+                .map_err(|e| format!("Failed to read metadata for {}: {}", target_name, e))?;
             if metadata.len() == 0 {
                 return Err(format!("Extracted file {} is empty", target_name));
-            }
-
-            if let Some(map) = &expected {
-                if let Some(expected_hash) = map.get(&target_name.to_lowercase()) {
-                    let actual = sha256_of_path(&temp_dest)?;
-                    if actual.to_lowercase() != expected_hash.to_lowercase() {
-                        let _ = fs::remove_file(&temp_dest);
-                        return Err(format!(
-                            "Checksum mismatch for {} (expected {}, got {})",
-                            target_name, expected_hash, actual
-                        ));
-                    }
-                }
             }
 
             #[cfg(unix)]
@@ -86,10 +81,12 @@ pub fn extract_from_zip_with_hashes(
         }
     }
 
-    if found_targets.len() != targets.len() {
-        return Err(format!("Missing files. Found {:?}, expected {:?}", found_targets, targets));
+    if found_targets.is_empty() {
+        return Err(format!(
+            "None of the expected files ({}) were found in the archive",
+            targets.join(", ")
+        ));
     }
 
     Ok(found_targets)
 }
-

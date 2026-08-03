@@ -58,7 +58,6 @@ pub async fn download_url_to_file(
     let user_agent = sanitize_header_value(user_agent, BROWSER_USER_AGENT);
     let accept_language = sanitize_header_value(accept_language, DEFAULT_ACCEPT_LANGUAGE);
     let client = reqwest::Client::builder()
-        .danger_accept_invalid_certs(true)
         .build()
         .map_err(|e| format!("HTTP client error: {}", e))?;
 
@@ -139,7 +138,6 @@ pub async fn post_form_for_text(
     let user_agent = sanitize_header_value(user_agent, BROWSER_USER_AGENT);
     let accept_language = sanitize_header_value(accept_language, DEFAULT_ACCEPT_LANGUAGE);
     let client = reqwest::Client::builder()
-        .danger_accept_invalid_certs(true)
         .build()
         .map_err(|e| format!("HTTP client error: {}", e))?;
 
@@ -404,6 +402,7 @@ async fn download_file_once(
     let mut file = fs::File::create(&temp_dest).map_err(|e| e.to_string())?;
 
     let mut last_percentage = 0.0;
+    let mut last_unsized_emit = 0u64;
 
     while let Some(item) = stream.next().await {
         let chunk = item.map_err(|e| e.to_string())?;
@@ -425,13 +424,14 @@ async fn download_file_once(
                 );
                 last_percentage = percentage;
             }
-        } else {
+        } else if downloaded.saturating_sub(last_unsized_emit) >= 1_048_576 {
             emit_progress(
                 app_handle,
                 tool_name,
                 0.0,
                 &format!("Downloading {:.1} MB...", downloaded as f64 / 1_048_576.0),
             );
+            last_unsized_emit = downloaded;
         }
     }
 

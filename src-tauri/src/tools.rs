@@ -8,14 +8,23 @@ use crate::download::{
 use crate::extract::extract_from_zip;
 use crate::fs_utils::{safe_replace_with_backup, temp_path_for};
 
-/// Resolve the full system path of a tool using `where` (Windows).
+/// Resolve the full system path of a tool using `where` / `which`.
 #[tauri::command]
 pub fn resolve_system_tool_path(tool: String) -> Result<Option<String>, String> {
+    #[cfg(target_os = "windows")]
     let bin_name = match tool.as_str() {
         "yt-dlp" => "yt-dlp.exe",
         "ffmpeg" => "ffmpeg.exe",
         "aria2" => "aria2c.exe",
         "deno" => "deno.exe",
+        _ => return Err(format!("Unknown tool: {}", tool)),
+    };
+    #[cfg(not(target_os = "windows"))]
+    let bin_name = match tool.as_str() {
+        "yt-dlp" => "yt-dlp",
+        "ffmpeg" => "ffmpeg",
+        "aria2" => "aria2c",
+        "deno" => "deno",
         _ => return Err(format!("Unknown tool: {}", tool)),
     };
 
@@ -41,7 +50,7 @@ pub fn resolve_system_tool_path(tool: String) -> Result<Option<String>, String> 
     #[cfg(not(target_os = "windows"))]
     {
         let output = std::process::Command::new("which")
-            .arg(bin_name.trim_end_matches(".exe"))
+            .arg(bin_name)
             .output()
             .map_err(|e| format!("Failed to run 'which': {}", e))?;
 
@@ -55,6 +64,80 @@ pub fn resolve_system_tool_path(tool: String) -> Result<Option<String>, String> 
     }
 
     Ok(None)
+}
+
+fn run_quiet(program: &Path, args: &[&str]) -> Result<(), String> {
+    #[cfg(target_os = "windows")]
+    use std::os::windows::process::CommandExt;
+
+    let mut cmd = std::process::Command::new(program);
+    cmd.args(args);
+    #[cfg(target_os = "windows")]
+    {
+        cmd.creation_flags(0x08000000); // CREATE_NO_WINDOW
+    }
+    let output = cmd
+        .output()
+        .map_err(|e| format!("Failed to run {}: {}", program.display(), e))?;
+    if output.status.success() {
+        return Ok(());
+    }
+    let err = String::from_utf8_lossy(&output.stderr);
+    let out = String::from_utf8_lossy(&output.stdout);
+    let detail = if !err.trim().is_empty() {
+        err.trim()
+    } else {
+        out.trim()
+    };
+    Err(format!("{} failed: {}", program.display(), detail))
+}
+
+/// Upgrade pip-installed yt-dlp. Prefers pip/python beside the active binary.
+#[tauri::command]
+pub fn upgrade_ytdlp_via_pip(system_path: Option<String>) -> Result<String, String> {
+    let mut candidates: Vec<(PathBuf, Vec<&'static str>)> = Vec::new();
+
+    if let Some(raw) = system_path.as_deref().map(str::trim).filter(|s| !s.is_empty()) {
+        let ytdlp = PathBuf::from(raw);
+        let lower = ytdlp.to_string_lossy().to_ascii_lowercase();
+        if lower.contains("\\scripts\\") || lower.contains("/scripts/") {
+            if let Some(scripts) = ytdlp.parent() {
+                #[cfg(target_os = "windows")]
+                let pip = scripts.join("pip.exe");
+                #[cfg(not(target_os = "windows"))]
+                let pip = scripts.join("pip");
+                if pip.is_file() {
+                    candidates.push((pip, vec!["install", "--upgrade", "yt-dlp"]));
+                }
+
+                #[cfg(target_os = "windows")]
+                let python = scripts.parent().map(|p| p.join("python.exe"));
+                #[cfg(not(target_os = "windows"))]
+                let python = scripts.parent().map(|p| p.join("python"));
+                if let Some(python) = python.filter(|p| p.is_file()) {
+                    candidates.push((python, vec!["-m", "pip", "install", "--upgrade", "yt-dlp"]));
+                }
+            }
+        }
+    }
+
+    candidates.push((PathBuf::from("pip"), vec!["install", "--upgrade", "yt-dlp"]));
+    candidates.push((PathBuf::from("pip3"), vec!["install", "--upgrade", "yt-dlp"]));
+
+    let mut last_err = String::from("no pip candidates");
+    for (program, args) in candidates {
+        match run_quiet(&program, &args) {
+            Ok(()) => {
+                return Ok(format!(
+                    "yt-dlp upgraded via {} {}",
+                    program.display(),
+                    args.join(" ")
+                ));
+            }
+            Err(e) => last_err = e,
+        }
+    }
+    Err(format!("pip upgrade failed: {}", last_err))
 }
 
 async fn download_tool_payload(
@@ -117,21 +200,22 @@ async fn download_ytdlp(
 async fn download_ffmpeg(
     app_handle: &tauri::AppHandle,
     dest: &PathBuf,
-    variant: Option<String>,
+    _variant: Option<String>,
     is_nightly: bool,
 ) -> Result<(), String> {
-    let _ = variant;
-    let _ = is_nightly;
-
-    let mirror_url = resolve_latest_ffmpeg_essentials_zip_url(app_handle)
-        .await
-        .ok();
+    // Essentials only — Full/Shared variants are not shipped by HalalDL.
     let mut sources = Vec::new();
-    if let Some(url) = mirror_url {
-        sources.push(url);
+    if is_nightly {
+        sources.push("https://www.gyan.dev/ffmpeg/builds/ffmpeg-git-essentials.zip".to_string());
+    } else {
+        let mirror_url = resolve_latest_ffmpeg_essentials_zip_url(app_handle)
+            .await
+            .ok();
+        if let Some(url) = mirror_url {
+            sources.push(url);
+        }
+        sources.push("https://www.gyan.dev/ffmpeg/builds/ffmpeg-release-essentials.zip".to_string());
     }
-    // Keep gyan.dev last — GitHub mirrors are preferred when available.
-    sources.push("https://www.gyan.dev/ffmpeg/builds/ffmpeg-release-essentials.zip".to_string());
 
     let zip_path = dest.join("ffmpeg-update.zip");
     download_tool_payload_from_sources(app_handle, "ffmpeg", &sources, &zip_path).await?;
@@ -244,8 +328,7 @@ async fn download_single_tool(
 }
 
 /// Update a tool at its original (system) location instead of the app bin dir.
-/// `variant` controls which FFmpeg build to download (Full Build / Essentials / Shared).
-/// `channel` controls stable vs nightly (only yt-dlp and ffmpeg support nightly).
+/// FFmpeg installs essentials only. `channel` selects stable vs nightly for yt-dlp/ffmpeg.
 #[tauri::command]
 pub async fn update_tool_at_path(
     app_handle: tauri::AppHandle,
@@ -412,7 +495,12 @@ pub fn stage_manual_tool(
             let sidecar_source = parent.join(sidecar_name);
             if sidecar_source.exists() && sidecar_source.is_file() {
                 let sidecar_dest = bin_dir.join(sidecar_name);
-                let _ = fs::copy(sidecar_source, sidecar_dest);
+                fs::copy(&sidecar_source, &sidecar_dest).map_err(|e| {
+                    format!(
+                        "Staged {} but failed to copy sidecar {}: {}",
+                        dest_name, sidecar_name, e
+                    )
+                })?;
             }
         }
     }
@@ -509,7 +597,9 @@ pub fn rollback_tool(
         .ok_or_else(|| format!("Unknown tool: {}", tool))?;
 
     let mut rolled_back = Vec::new();
+    // Prefer app-managed bin; only fall through to extra path dirs if needed.
     for dir in &dirs {
+        let mut dir_hits = Vec::new();
         for &bin_name in binaries {
             let current = dir.join(bin_name);
             let backup = dir.join(format!("{}.old", bin_name));
@@ -529,7 +619,7 @@ pub fn rollback_tool(
                     if temp.exists() {
                         let _ = fs::remove_file(&temp);
                     }
-                    rolled_back.push(format!("{} ({})", bin_name, dir.display()));
+                    dir_hits.push(format!("{} ({})", bin_name, dir.display()));
                 }
                 Err(e) => {
                     if temp.exists() {
@@ -538,6 +628,10 @@ pub fn rollback_tool(
                     return Err(format!("Failed to restore backup for {}: {}", bin_name, e));
                 }
             }
+        }
+        if !dir_hits.is_empty() {
+            rolled_back.extend(dir_hits);
+            break;
         }
     }
 

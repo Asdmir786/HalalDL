@@ -1,4 +1,5 @@
 use std::fs;
+use std::io;
 use std::path::{Path, PathBuf};
 
 pub fn temp_path_for(path: &Path) -> Result<PathBuf, String> {
@@ -15,6 +16,12 @@ pub fn backup_path_for(path: &Path) -> Result<PathBuf, String> {
         .and_then(|name| name.to_str())
         .ok_or_else(|| format!("Invalid target path: {}", path.display()))?;
     Ok(path.with_file_name(format!("{}.old", file_name)))
+}
+
+fn copy_replace(from: &Path, to: &Path) -> io::Result<()> {
+    fs::copy(from, to)?;
+    fs::remove_file(from)?;
+    Ok(())
 }
 
 pub fn safe_replace_with_backup(dest: &Path, incoming: &Path) -> Result<(), String> {
@@ -38,6 +45,10 @@ pub fn safe_replace_with_backup(dest: &Path, incoming: &Path) -> Result<(), Stri
     match fs::rename(incoming, dest) {
         Ok(()) => Ok(()),
         Err(e) => {
+            // Cross-volume renames fail on Windows; fall back to copy+remove.
+            if copy_replace(incoming, dest).is_ok() {
+                return Ok(());
+            }
             if backup.exists() {
                 let _ = fs::rename(&backup, dest);
             }

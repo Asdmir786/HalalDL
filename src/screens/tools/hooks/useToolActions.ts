@@ -20,6 +20,7 @@ import {
   cleanupToolBackup,
   cleanupAllBackups,
   updateToolAtPath,
+  isPipYtDlpTool,
   type ToolCheckResult,
 } from "@/lib/commands";
 import { toast } from "sonner";
@@ -252,8 +253,8 @@ export function useToolActions(modalApi: ModalApi) {
     }
   };
 
-  /* ── Install / Update (with progress modal) ── */
-  const installOrUpdate = async (tool: Tool) => {
+  /* ── Install / Update managed binary (GitHub download) ── */
+  const installOrUpdateManaged = async (tool: Tool) => {
     if (transferLockRef.current) {
       toast.info("Wait for the current download to finish.");
       return;
@@ -362,17 +363,19 @@ export function useToolActions(modalApi: ModalApi) {
       const targetVersions = await resolveTargetVersions([tool]);
       setModalToolVersions(targetVersions);
       pushModalLog(`[yt-dlp] Target: ${formatToolTarget(tool, targetVersions)}`);
+      pushModalLog(`[yt-dlp] Active install: ${tool.systemPath || tool.path || "PATH"} (pip)`);
       setModalCurrentStatus(
         targetVersions[tool.id]
           ? `Running pip command for v${targetVersions[tool.id]}`
           : "Running pip command for latest version"
       );
 
-      const ok = await upgradeYtDlpViaPip();
+      const ok = await upgradeYtDlpViaPip(tool.systemPath || tool.path);
       if (ok) {
         setModalProgress(100);
         setModalToolProgress({ [tool.id]: 100 });
         pushModalLog(`[yt-dlp] pip upgrade completed for ${formatToolTarget(tool, targetVersions)}`);
+        await refreshToolIds(["yt-dlp"]);
         await autoRestartAfterUpdate("yt-dlp was updated successfully. HalalDL will restart now.");
       } else {
         setModalError("pip upgrade failed — check logs for details");
@@ -385,6 +388,19 @@ export function useToolActions(modalApi: ModalApi) {
     } finally {
       setBusyTools((prev) => ({ ...prev, [tool.id]: false }));
     }
+  };
+
+  /** Auto-pick: pip → pip upgrade; Full/Portable/managed → GitHub binary. */
+  const installOrUpdate = async (tool: Tool) => {
+    if (tool.id === "yt-dlp" && tool.status !== "Missing" && isPipYtDlpTool(tool)) {
+      addLog({
+        level: "info",
+        message: "yt-dlp Update routed to pip upgrade (active install is pip)",
+      });
+      await handlePipUpgrade(tool);
+      return;
+    }
+    await installOrUpdateManaged(tool);
   };
 
   /* ── Update at original (system) location ── */
@@ -472,6 +488,10 @@ export function useToolActions(modalApi: ModalApi) {
     );
     if (toUpdate.length === 0) return;
 
+    const pipYtDlp = toUpdate.find(
+      (t) => t.id === "yt-dlp" && t.status !== "Missing" && isPipYtDlpTool(t)
+    );
+    const managedTools = toUpdate.filter((t) => t !== pipYtDlp);
     const ids = toUpdate.map((t) => t.id);
     const knownTargetVersions = Object.fromEntries(
       toUpdate
@@ -484,7 +504,11 @@ export function useToolActions(modalApi: ModalApi) {
       ids,
       [
         `Queued: ${toUpdate
-          .map((t) => (t.latestVersion ? `${t.name} v${t.latestVersion}` : t.name))
+          .map((t) => {
+            const version = t.latestVersion ? ` v${t.latestVersion}` : "";
+            const via = t === pipYtDlp ? " via pip" : "";
+            return `${t.name}${version}${via}`;
+          })
           .join(", ")}`,
       ],
       knownTargetVersions
@@ -493,7 +517,11 @@ export function useToolActions(modalApi: ModalApi) {
       return;
     }
     for (const t of toUpdate) {
-      pushModalLog(`[${t.name}] Queued on ${t.channel} track`);
+      pushModalLog(
+        t === pipYtDlp
+          ? `[${t.name}] Queued pip upgrade on ${t.channel} track`
+          : `[${t.name}] Queued managed download on ${t.channel} track`
+      );
     }
     setBusyTools((prev) => {
       const next = { ...prev };
@@ -508,38 +536,67 @@ export function useToolActions(modalApi: ModalApi) {
       for (const t of toUpdate) {
         pushModalLog(`[${t.name}] Target: ${formatToolTarget(t, targetVersions)}`);
       }
-      setModalCurrentStatus("Downloading selected versions...");
 
-      const ch: Record<string, string> = {};
-      for (const t of toUpdate) {
-        if (t.channel !== "stable") ch[t.id] = t.channel;
-      }
-      const result = await downloadTools(ids, Object.keys(ch).length > 0 ? ch : undefined);
-      setModalBatchResult(result);
-
-      const succeeded = getSuccessfulToolResults(result);
-      const failed = getFailedToolResults(result);
-
-      if (succeeded.length > 0) {
-        setModalToolProgress((prev) => ({
-          ...prev,
-          ...Object.fromEntries(succeeded.map((item) => [item.tool, 100])),
-        }));
+      let pipFailed = false;
+      if (pipYtDlp) {
+        setModalCurrentStatus("Upgrading yt-dlp via pip...");
+        pushModalLog(
+          `[yt-dlp] Active install: ${pipYtDlp.systemPath || pipYtDlp.path || "PATH"} (pip)`
+        );
+        const ok = await upgradeYtDlpViaPip(pipYtDlp.systemPath || pipYtDlp.path);
+        if (ok) {
+          setModalToolProgress((prev) => ({ ...prev, "yt-dlp": 100 }));
+          pushModalLog("[yt-dlp] pip upgrade completed");
+        } else {
+          pipFailed = true;
+          pushModalLog("[yt-dlp] pip upgrade failed");
+        }
       }
 
-      if (result.allSucceeded) {
+      let managedResult: Awaited<ReturnType<typeof downloadTools>> | null = null;
+      if (managedTools.length > 0) {
+        setModalCurrentStatus("Downloading selected versions...");
+        const managedIds = managedTools.map((t) => t.id);
+        const ch: Record<string, string> = {};
+        for (const t of managedTools) {
+          if (t.channel !== "stable") ch[t.id] = t.channel;
+        }
+        managedResult = await downloadTools(
+          managedIds,
+          Object.keys(ch).length > 0 ? ch : undefined
+        );
+        setModalBatchResult(managedResult);
+
+        const succeeded = getSuccessfulToolResults(managedResult);
+        if (succeeded.length > 0) {
+          setModalToolProgress((prev) => ({
+            ...prev,
+            ...Object.fromEntries(succeeded.map((item) => [item.tool, 100])),
+          }));
+        }
+      }
+
+      const managedOk = !managedResult || managedResult.allSucceeded;
+      if (managedOk && !pipFailed) {
         setModalProgress(100);
         pushModalLog("All selected tool updates completed.");
         await refreshToolIds(ids);
         await autoRestartAfterUpdate(`${toUpdate.length} tool updates completed. HalalDL will restart now.`);
       } else {
         const toolNameById = Object.fromEntries(tools.map((tool) => [tool.id, tool.name])) as Record<string, string>;
-        setModalError(buildToolBatchErrorMessage(result, toolNameById));
-        for (const item of succeeded) {
-          pushModalLog(`[${toolNameById[item.tool] ?? item.tool}] ${item.message}`);
+        const parts: string[] = [];
+        if (pipFailed) parts.push("yt-dlp pip upgrade failed");
+        if (managedResult && !managedResult.allSucceeded) {
+          parts.push(buildToolBatchErrorMessage(managedResult, toolNameById));
         }
-        for (const item of failed) {
-          pushModalLog(`[${toolNameById[item.tool] ?? item.tool}] Failed: ${item.message}`);
+        setModalError(parts.join(" · ") || "Update failed");
+        if (managedResult) {
+          for (const item of getSuccessfulToolResults(managedResult)) {
+            pushModalLog(`[${toolNameById[item.tool] ?? item.tool}] ${item.message}`);
+          }
+          for (const item of getFailedToolResults(managedResult)) {
+            pushModalLog(`[${toolNameById[item.tool] ?? item.tool}] Failed: ${item.message}`);
+          }
         }
         await refreshToolIds(ids);
       }
@@ -636,6 +693,7 @@ export function useToolActions(modalApi: ModalApi) {
     refreshTool,
     checkAll,
     installOrUpdate,
+    installOrUpdateManaged,
     handlePipUpgrade,
     handleUpdateOriginal,
     handleChannelChange,

@@ -36,6 +36,8 @@ manifests/
 
 tmp-playwright-capture/
 .tmp-playwright/
+.tmp-nightly/
+.tmp-nightly-*/
 .winget-work/
 
 # Chocolatey build artifacts

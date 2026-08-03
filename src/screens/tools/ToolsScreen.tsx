@@ -176,6 +176,7 @@ export function ToolsScreen() {
                     spotlightReason={spotlightReason}
                     onRefresh={actions.refreshTool}
                     onInstallOrUpdate={actions.installOrUpdate}
+                    onInstallManaged={actions.installOrUpdateManaged}
                     onPipUpgrade={actions.handlePipUpgrade}
                     onUpdateOriginal={actions.handleUpdateOriginal}
                     onChannelChange={actions.handleChannelChange}

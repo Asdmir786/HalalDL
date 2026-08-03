@@ -87,10 +87,30 @@ export async function resolveSystemToolPath(tool: string): Promise<string | null
   return invoke<string | null>("resolve_system_tool_path", { tool });
 }
 
-async function detectYtDlpPipVariant(): Promise<string | null> {
-  // Pip probes are expensive and only useful for labeling system installs.
-  // Skip by default; PATH/system fallbacks are reported as "System".
-  return null;
+/** Cheap path heuristic: pip installs land under Scripts or site-packages. */
+export function isYtDlpPipPath(path?: string | null): boolean {
+  if (!path) return false;
+  const lower = path.toLowerCase().replace(/\\/g, "/");
+  const base = lower.split("/").pop() || "";
+  if (!(base === "yt-dlp" || base === "yt-dlp.exe" || base.startsWith("yt-dlp."))) {
+    return false;
+  }
+  return lower.includes("/scripts/") || lower.includes("/site-packages/");
+}
+
+export function isPipYtDlpTool(tool: {
+  id: string;
+  variant?: string;
+  systemPath?: string;
+  path?: string;
+}): boolean {
+  if (tool.id !== "yt-dlp") return false;
+  if (tool.variant?.toLowerCase() === "pip") return true;
+  return isYtDlpPipPath(tool.systemPath) || isYtDlpPipPath(tool.path);
+}
+
+function detectYtDlpPipVariant(path?: string | null): string | null {
+  return isYtDlpPipPath(path) ? "pip" : null;
 }
 
 export async function checkYtDlpVersion(): Promise<ToolCheckResult | null> {
@@ -149,8 +169,7 @@ export async function checkYtDlpVersion(): Promise<ToolCheckResult | null> {
         const output = await executeWithTimeout("yt-dlp", ["--version"], TOOL_CHECK_TIMEOUT_MS);
         if (output.code === 0) {
           const version = output.stdout.trim();
-          const pipVariant = await detectYtDlpPipVariant();
-          const variant = pipVariant ?? "System";
+          const variant = "System";
           addLog({
             level: "info",
             message: `Using system/PATH fallback yt-dlp ${version || "Detected"} (${variant})`,
@@ -184,7 +203,7 @@ export async function checkYtDlpVersion(): Promise<ToolCheckResult | null> {
     const output = await executeWithTimeout(command, ["--version"]);
     if (output.code === 0) {
       const version = output.stdout.trim();
-      const pipVariant = await detectYtDlpPipVariant();
+      const pipVariant = detectYtDlpPipVariant(systemPath);
       const variant = pipVariant ?? "System";
       const resolvedPath = systemPath ?? undefined;
       addLog({
@@ -357,24 +376,44 @@ export async function checkDenoVersion(): Promise<ToolCheckResult | null> {
   return null;
 }
 
-export async function upgradeYtDlpViaPip(): Promise<boolean> {
+export async function upgradeYtDlpViaPip(systemPath?: string | null): Promise<boolean> {
   const { addLog } = useLogsStore.getState();
-  for (const pipCmd of ["pip", "pip3"]) {
-    try {
-      addLog({ level: "command", message: `Upgrading yt-dlp via ${pipCmd}...`, command: `${pipCmd} install --upgrade yt-dlp` });
-      const cmd = Command.create(pipCmd, ["install", "--upgrade", "yt-dlp"]);
-      const output = await cmd.execute();
-      if (output.code === 0) {
-        addLog({ level: "info", message: `yt-dlp upgraded via ${pipCmd}` });
-        return true;
+  try {
+    addLog({
+      level: "command",
+      message: "Upgrading yt-dlp via pip...",
+      command: `invoke("upgrade_ytdlp_via_pip", { systemPath: ${JSON.stringify(systemPath ?? null)} })`,
+    });
+    const result = await invoke<string>("upgrade_ytdlp_via_pip", {
+      systemPath: systemPath ?? null,
+    });
+    addLog({ level: "info", message: result });
+    return true;
+  } catch (e) {
+    addLog({ level: "error", message: `pip upgrade failed: ${String(e)}` });
+    for (const pipCmd of ["pip", "pip3"]) {
+      try {
+        addLog({
+          level: "command",
+          message: `Upgrading yt-dlp via ${pipCmd}...`,
+          command: `${pipCmd} install --upgrade yt-dlp`,
+        });
+        const cmd = Command.create(pipCmd, ["install", "--upgrade", "yt-dlp"]);
+        const output = await cmd.execute();
+        if (output.code === 0) {
+          addLog({ level: "info", message: `yt-dlp upgraded via ${pipCmd}` });
+          return true;
+        }
+        addLog({
+          level: "warn",
+          message: `${pipCmd} upgrade returned code ${output.code}: ${output.stderr}`,
+        });
+      } catch (err) {
+        addLog({ level: "debug", message: `${pipCmd} not available: ${String(err)}` });
       }
-      addLog({ level: "warn", message: `${pipCmd} upgrade returned code ${output.code}: ${output.stderr}` });
-    } catch (e) {
-      addLog({ level: "debug", message: `${pipCmd} not available: ${String(e)}` });
     }
+    return false;
   }
-  addLog({ level: "error", message: "pip upgrade failed: neither pip nor pip3 available" });
-  return false;
 }
 
 export async function fetchLatestYtDlpVersion(channel: string = "stable"): Promise<string | null> {

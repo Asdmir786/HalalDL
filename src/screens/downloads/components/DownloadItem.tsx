@@ -4,7 +4,7 @@ import {
   X, FolderOpen, Terminal,
   Copy, RotateCcw, Play,
   Link, Clock, Pause, Square,
-  ArrowUp, ArrowDown, Check, HardDrive, Images, Timer,
+  ArrowUp, ArrowDown, Check, HardDrive, Images, Timer, Info,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { DownloadJob } from "@/store/downloads";
@@ -16,6 +16,7 @@ import { revealInExplorer, deleteFile, openFile, copyFilesToClipboard } from "@/
 import { getExplicitOutputPaths, getPreferredThumbnailSource } from "@/lib/output-paths";
 import { ContextMenu, ContextMenuContent, ContextMenuItem, ContextMenuTrigger, ContextMenuSeparator } from "@/components/ui/context-menu";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { MediaPropertiesDialog } from "@/components/media/MediaPropertiesDialog";
 import { Select, SelectContent, SelectGroup, SelectItem, SelectLabel, SelectSeparator, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { toast } from "sonner";
 import { copyText, formatJobErrorText } from "@/lib/copy-text";
@@ -132,6 +133,7 @@ export function DownloadItem({
   const { presets } = usePresetsStore();
   const [thumbErrorSource, setThumbErrorSource] = useState<string | null>(null);
   const [sheetOpen, setSheetOpen] = useState(false);
+  const [propertiesOpen, setPropertiesOpen] = useState(false);
   const ts = getJobTs(job);
   const relative = formatRelativeTime(ts);
   const absolute = new Date(ts).toLocaleString();
@@ -992,6 +994,10 @@ export function DownloadItem({
             </>
           )}
           <ContextMenuSeparator />
+          <ContextMenuItem onClick={() => setPropertiesOpen(true)}>
+            <Info className="mr-2 h-3.5 w-3.5" />
+            Properties
+          </ContextMenuItem>
           {hasThumbnailSheet && (
             <ContextMenuItem onClick={() => setSheetOpen(true)}>
               <Images className="mr-2 h-3.5 w-3.5" />
@@ -1040,6 +1046,20 @@ export function DownloadItem({
           )}
         </DialogContent>
       </Dialog>
+      <MediaPropertiesDialog
+        open={propertiesOpen}
+        onOpenChange={setPropertiesOpen}
+        stored={{
+          title: job.title,
+          url: job.url,
+          outputPath: job.outputPath,
+          fileSize: job.fileSize,
+          mediaDurationSeconds: job.mediaDurationSeconds,
+          format: job.fallbackFormat || job.overrides?.format,
+          presetName: resolvePresetById(presets, job.presetId)?.name,
+          createdAt: job.createdAt,
+        }}
+      />
     </motion.div>
   );
 }

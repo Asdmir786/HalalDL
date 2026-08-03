@@ -232,7 +232,7 @@ export function HistoryItem({
             <button
               onClick={() => setDetailsOpen(true)}
               className="p-1.5 rounded-md hover:bg-primary/10 text-muted-foreground hover:text-primary transition-colors"
-              title="Details & Notes"
+              title="Properties"
             >
               <Pencil className="w-3.5 h-3.5" />
             </button>
@@ -283,7 +283,7 @@ export function HistoryItem({
           </ContextMenuItem>
         )}
         <ContextMenuItem onClick={() => setDetailsOpen(true)}>
-          <Pencil className="w-3.5 h-3.5 mr-2" /> Details & Notes
+          <Pencil className="w-3.5 h-3.5 mr-2" /> Properties
         </ContextMenuItem>
         <ContextMenuSeparator />
         <ContextMenuItem onClick={() => toggleFavorite(entry.id)}>

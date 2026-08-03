@@ -12,11 +12,6 @@ mod shell;
 mod tools;
 mod version;
 
-#[tauri::command]
-fn greet(name: &str) -> String {
-    format!("Hello, {}! You've been greeted from Rust!", name)
-}
-
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     let launch_args: Vec<String> = std::env::args().collect();
@@ -44,8 +39,8 @@ pub fn run() {
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_shell::init())
         .plugin(tauri_plugin_opener::init())
+        .plugin(tauri_plugin_positioner::init())
         .invoke_handler(tauri::generate_handler![
-            greet,
             tools::download_tools,
             tools::stage_manual_tool,
             shell::add_to_user_path,
@@ -81,6 +76,7 @@ pub fn run() {
             app_update::get_install_context,
             app_update::download_and_verify_app_update,
             tools::resolve_system_tool_path,
+            tools::upgrade_ytdlp_via_pip,
             tools::update_tool_at_path,
             tools::list_tool_backups,
             tools::rollback_tool,

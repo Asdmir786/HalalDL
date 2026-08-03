@@ -19,6 +19,8 @@ export {
   checkDenoVersion,
   upgradeYtDlpViaPip,
   resolveSystemToolPath,
+  isYtDlpPipPath,
+  isPipYtDlpTool,
   fetchLatestYtDlpVersion,
   fetchLatestAria2Version,
   fetchLatestDenoVersion,

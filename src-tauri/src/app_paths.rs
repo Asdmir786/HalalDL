@@ -117,8 +117,7 @@ fn remove_dir_if_exists(path: &PathBuf) -> Result<bool, String> {
     Ok(true)
 }
 
-/// Clears HalalDL-managed yt-dlp cache plus common system yt-dlp cache folders.
-/// Helps when extractors keep reusing stale challenge/login state.
+/// Clears HalalDL-managed and known yt-dlp cache folders (not config).
 #[tauri::command]
 pub fn clear_ytdlp_cache(app_handle: tauri::AppHandle) -> Result<String, String> {
     let paths = ensure_app_dirs(&app_handle)?;
@@ -132,16 +131,10 @@ pub fn clear_ytdlp_cache(app_handle: tauri::AppHandle) -> Result<String, String>
     }
 
     if let Ok(local) = std::env::var("LOCALAPPDATA") {
+        // Windows yt-dlp cache root (config lives under APPDATA, not here).
         let candidate = PathBuf::from(local).join("yt-dlp");
         if remove_dir_if_exists(&candidate)? {
-            cleared.push(format!("LocalAppData ({})", candidate.display()));
-        }
-    }
-
-    if let Ok(roaming) = std::env::var("APPDATA") {
-        let candidate = PathBuf::from(roaming).join("yt-dlp");
-        if remove_dir_if_exists(&candidate)? {
-            cleared.push(format!("AppData ({})", candidate.display()));
+            cleared.push(format!("LocalAppData cache ({})", candidate.display()));
         }
     }
 
