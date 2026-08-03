@@ -28,6 +28,9 @@ import {
 import { cn } from "@/lib/utils";
 import { open as openUrl } from "@tauri-apps/plugin-shell";
 import { revealToolInExplorer, isPipYtDlpTool } from "@/lib/commands";
+import { Switch } from "@/components/ui/switch";
+import { useSettingsStore } from "@/store/settings";
+import { toast } from "sonner";
 import {
   TOOL_URLS,
   TOOL_DESCRIPTIONS,
@@ -74,6 +77,10 @@ export function ToolRow({
 }: ToolRowProps) {
   const isPip = isPipYtDlpTool(tool);
   const disableUpgradeActions = isTransferActive;
+  const aria2Enabled = useSettingsStore((s) => s.settings.aria2Enabled);
+  const updateSettings = useSettingsStore((s) => s.updateSettings);
+  const isAria2 = tool.id === "aria2";
+  const aria2UsageDisabled = isAria2 && tool.status === "Detected" && !aria2Enabled;
 
   return (
     <div
@@ -131,6 +138,14 @@ export function ToolRow({
                 Fallback
               </Badge>
             )}
+            {aria2UsageDisabled && (
+              <Badge
+                variant="outline"
+                className="text-[9px] h-4 px-1.5 font-medium text-muted-foreground border-white/10"
+              >
+                Not used
+              </Badge>
+            )}
             {tool.channel === "nightly" && (
               <Badge
                 variant="outline"
@@ -156,6 +171,8 @@ export function ToolRow({
                 ? `Using system/PATH fallback${tool.systemPath ? `: ${tool.systemPath}` : ""}`
                 : tool.status === "Missing" && tool.id === "yt-dlp"
                   ? "Unavailable — install yt-dlp or add it to PATH"
+                  : aria2UsageDisabled
+                    ? "Installed, but disabled for downloads (yt-dlp native used instead)"
                   : tool.systemPath
                     ? tool.systemPath
                     : TOOL_DESCRIPTIONS[tool.id]}
@@ -201,6 +218,23 @@ export function ToolRow({
 
       {/* Primary action + overflow */}
       <div className="relative z-10 flex items-center gap-1.5 shrink-0">
+        {isAria2 && tool.status === "Detected" && (
+          <label className="mr-1 flex items-center gap-2 text-[11px] text-muted-foreground">
+            <span className="hidden sm:inline">Use</span>
+            <Switch
+              checked={aria2Enabled}
+              onCheckedChange={(checked) => {
+                updateSettings({ aria2Enabled: checked });
+                toast.success(
+                  checked
+                    ? "aria2 enabled for downloads"
+                    : "aria2 disabled — downloads will use yt-dlp native"
+                );
+              }}
+              aria-label="Use aria2 for downloads"
+            />
+          </label>
+        )}
         {isBusy ? (
           <MotionButton
             variant="outline"

@@ -769,12 +769,18 @@ export async function startDownload(jobId: string) {
     args.push("--ffmpeg-location", ffmpegDir);
   }
 
-  if (aria2.isLocal) {
+  if (aria2.isLocal && settings.aria2Enabled) {
     addLog({ level: "info", message: `Using local aria2c: ${aria2.path}`, jobId });
     args.push("--external-downloader", aria2.path);
     args.push("--external-downloader-args", "aria2c:-x 16 -s 16 -k 1M --summary-interval=0");
+  } else if (aria2.isLocal && !settings.aria2Enabled) {
+    addLog({
+      level: "info",
+      message: "aria2c is installed but disabled in Tools — using yt-dlp native downloader",
+      jobId,
+    });
   } else {
-    addLog({ level: "info", message: "Aria2c not found in local bin, checking system PATH...", jobId });
+    addLog({ level: "info", message: "Aria2c not found in local bin — using yt-dlp native downloader", jobId });
   }
 
   if (subtitlePreferences.mode !== "off") {
@@ -951,6 +957,31 @@ export async function startDownload(jobId: string) {
       "--embed-thumbnail"
     );
     addLog({ level: "info", message: "Metadata backup enabled", jobId });
+  }
+
+  const wantsAudioExtract =
+    preset.group === "audio" ||
+    args.includes("-x") ||
+    args.includes("--extract-audio") ||
+    args.includes("--audio-format");
+
+  if (settings.squareAlbumArt && wantsAudioExtract) {
+    if (!args.includes("--embed-thumbnail")) {
+      args.push("--embed-thumbnail");
+    }
+    if (!args.includes("--convert-thumbnails")) {
+      args.push("--convert-thumbnails", "jpg");
+    }
+    // Center-crop to a square before embedding (YouTube thumbs are usually 16:9).
+    args.push(
+      "--postprocessor-args",
+      "ThumbnailsConvertor+ffmpeg_o:-c:v mjpeg -vf crop=min(iw\\,ih):min(iw\\,ih)"
+    );
+    addLog({
+      level: "info",
+      message: "Square album art enabled (1:1 crop + embed thumbnail)",
+      jobId,
+    });
   }
   if (settings.maxSpeed && settings.maxSpeed > 0) {
     args.push("--limit-rate", `${settings.maxSpeed}K`);
@@ -1236,11 +1267,20 @@ export async function startDownload(jobId: string) {
     if (attemptResult.code !== 0 && usesExternalDownloader && attemptResult.aria2Error) {
       const nativeArgs = stripExternalDownloaderArgs(effectiveArgs);
       const nativeQuoted = nativeArgs.map(arg => arg.includes(" ") ? `"${arg}"` : arg).join(" ");
-      addLog({ level: "warn", message: "aria2c error detected, retrying with native downloader", jobId });
-      addLog({ level: "info", message: `Retrying without external downloader:\n${ytDlp.path} ${nativeQuoted}`, jobId });
+      addLog({
+        level: "warn",
+        message:
+          "aria2c failed during download — falling back to yt-dlp's built-in (native) downloader for this job",
+        jobId,
+      });
+      addLog({
+        level: "info",
+        message: `Retrying without aria2 external downloader:\n${ytDlp.path} ${nativeQuoted}`,
+        jobId,
+      });
       updateJob(jobId, {
         phase: "Downloading streams",
-        statusDetail: "Retrying with native downloader",
+        statusDetail: "Retrying with yt-dlp native (aria2 failed)",
       });
       effectiveArgs = nativeArgs;
       attemptResult = await runDownload(effectiveArgs);

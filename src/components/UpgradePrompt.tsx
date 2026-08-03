@@ -94,14 +94,13 @@ export function UpgradePrompt() {
     activeToolIdsRef.current = operationToolIds;
   }, [operationToolIds]);
 
+  const demoMode = isDemoModeEnabled();
+
   useEffect(() => {
     let cancelled = false;
 
-    if (!isManagedMode) return;
-    if (isDemoModeEnabled()) {
-      setStartupMissingToolIds([]);
-      return;
-    }
+    // Demo skips the managed-tool probe; missing list is treated as empty via demoMode below.
+    if (!isManagedMode || demoMode) return;
 
     void getMissingAppManagedToolIds(getStartupToolIds(appMode)).then(
       (ids) => {
@@ -129,24 +128,27 @@ export function UpgradePrompt() {
     };
     // Re-probe when tool availability changes so deleting yt-dlp while the app is open
     // re-opens the mandatory Full/Portable setup modal.
-  }, [addLog, appMode, isManagedMode, managedProbeKey]);
+  }, [addLog, appMode, demoMode, isManagedMode, managedProbeKey]);
 
   const checkedMissingIds = useMemo(() => {
     if (isManagedMode) {
+      if (demoMode) return [];
       // Full/Portable always require app-managed copies, even if a PATH fallback exists.
       return startupMissingToolIds ?? [];
     }
 
     // LITE: no startup spawn checks — missing state is handled when the user uses yt-dlp / Tools.
     return [];
-  }, [isManagedMode, startupMissingToolIds]);
+  }, [demoMode, isManagedMode, startupMissingToolIds]);
 
   const missingIds = useMemo(() => {
     return checkedMissingIds;
   }, [checkedMissingIds]);
   const missingKey = missingIds.slice().sort().join("|");
   // Managed modes only need the file-exists probe; do not wait on spawn-based "Checking".
-  const startupReady = isManagedMode ? startupMissingToolIds !== null : true;
+  const startupReady = isManagedMode
+    ? demoMode || startupMissingToolIds !== null
+    : true;
   const promptToolIds = missingIds;
   const ytDlpMissing = promptToolIds.includes("yt-dlp");
   const isMandatorySetup = isManagedMode && ytDlpMissing;

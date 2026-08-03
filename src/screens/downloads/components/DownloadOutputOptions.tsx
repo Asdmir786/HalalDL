@@ -1,6 +1,7 @@
-import { Settings2, FolderOpen, Languages, Scissors } from "lucide-react";
+import { Settings2, FolderOpen, Languages, Scissors, Image } from "lucide-react";
 import { MotionButton } from "@/components/motion/MotionButton";
 import { Input } from "@/components/ui/input";
+import { Checkbox } from "@/components/ui/checkbox";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { SponsorBlockControls } from "@/components/SponsorBlockControls";
 import { cn } from "@/lib/utils";
@@ -44,6 +45,8 @@ interface DownloadOutputOptionsProps {
   onSponsorBlockCategoriesChange: (val: SponsorBlockCategoryId[]) => void;
   sponsorBlockDisabled?: boolean;
   sponsorBlockDisabledReason?: string;
+  squareAlbumArt: boolean;
+  onSquareAlbumArtChange: (val: boolean) => void;
 }
 
 export function DownloadOutputOptions({
@@ -77,6 +80,8 @@ export function DownloadOutputOptions({
   onSponsorBlockCategoriesChange,
   sponsorBlockDisabled = false,
   sponsorBlockDisabledReason,
+  squareAlbumArt,
+  onSquareAlbumArtChange,
 }: DownloadOutputOptionsProps) {
   
   const insertPlaceholder = (placeholder: string) => {
@@ -234,6 +239,29 @@ export function DownloadOutputOptions({
          disabled={sponsorBlockDisabled}
          disabledReason={sponsorBlockDisabledReason}
        />
+
+       <div className="grid gap-2 rounded-xl border border-muted/40 bg-muted/15 p-3">
+         <div className="flex items-start gap-3">
+           <Checkbox
+             id="square-album-art"
+             checked={squareAlbumArt}
+             onCheckedChange={(checked) => onSquareAlbumArtChange(checked === true)}
+             className="mt-0.5"
+           />
+           <div className="min-w-0 space-y-1">
+             <label
+               htmlFor="square-album-art"
+               className="flex cursor-pointer items-center gap-2 text-xs font-medium"
+             >
+               <Image className="h-3.5 w-3.5 text-primary/80" />
+               Square album art (1:1)
+             </label>
+             <p className="text-[11px] text-muted-foreground">
+               For audio presets (MP3, Source Audio, etc.): crop the thumbnail to a square and embed it.
+             </p>
+           </div>
+         </div>
+       </div>
 
        <div className="grid gap-3 rounded-xl border border-muted/40 bg-muted/15 p-3">
          <div className="flex items-center justify-between gap-3">

@@ -40,6 +40,10 @@ function PropertyRow({ label, value }: { label: string; value: string }) {
   );
 }
 
+function fileNameFromPath(path?: string) {
+  return path ? path.split(/[\\/]/).pop() || "" : "";
+}
+
 export function MediaPropertiesDialog({
   open,
   onOpenChange,
@@ -53,43 +57,32 @@ export function MediaPropertiesDialog({
   const setEntries = useHistoryStore((s) => s.setEntries);
   const entries = useHistoryStore((s) => s.entries);
 
-  const [probe, setProbe] = useState<MediaProbeInfo | null>(null);
-  const [probing, setProbing] = useState(false);
-  const [note, setNote] = useState(historyEntry?.notes || "");
+  const probePath = open ? stored.outputPath : undefined;
+  const [probeResult, setProbeResult] = useState<{
+    path: string;
+    info: MediaProbeInfo | null;
+  } | null>(null);
+  const [noteDraft, setNoteDraft] = useState<string | null>(null);
   const [tagInput, setTagInput] = useState("");
   const [isRenaming, setIsRenaming] = useState(false);
-  const [newFilename, setNewFilename] = useState(
-    stored.outputPath ? stored.outputPath.split(/[\\/]/).pop() || "" : ""
-  );
+  const [filenameDraft, setFilenameDraft] = useState<string | null>(null);
+
+  const note = noteDraft ?? historyEntry?.notes ?? "";
+  const newFilename = filenameDraft ?? fileNameFromPath(stored.outputPath);
+  const probe =
+    probeResult && probeResult.path === probePath ? probeResult.info : null;
+  const probing = Boolean(probePath) && probeResult?.path !== probePath;
 
   useEffect(() => {
-    if (!open) return;
-    setNote(historyEntry?.notes || "");
-    setTagInput("");
-    setIsRenaming(false);
-    setNewFilename(stored.outputPath ? stored.outputPath.split(/[\\/]/).pop() || "" : "");
-  }, [open, historyEntry?.id, historyEntry?.notes, stored.outputPath]);
-
-  useEffect(() => {
-    if (!open || !stored.outputPath) {
-      setProbe(null);
-      setProbing(false);
-      return;
-    }
-
+    if (!probePath) return;
     let cancelled = false;
-    setProbing(true);
-    void probeMediaFile(stored.outputPath).then((info) => {
-      if (!cancelled) {
-        setProbe(info);
-        setProbing(false);
-      }
+    void probeMediaFile(probePath).then((info) => {
+      if (!cancelled) setProbeResult({ path: probePath, info });
     });
-
     return () => {
       cancelled = true;
     };
-  }, [open, stored.outputPath]);
+  }, [probePath]);
 
   const rows = buildMediaPropertyRows(stored, probe);
   const hasMedia = rows.length > 0;
@@ -126,6 +119,7 @@ export function MediaPropertiesDialog({
       setEntries(entries.map((e) => (e.id === historyEntry.id ? { ...e, outputPath: newPath } : e)));
       toast.success("File renamed");
       setIsRenaming(false);
+      setFilenameDraft(null);
     } catch {
       toast.error("Failed to rename file");
     }
@@ -199,22 +193,27 @@ export function MediaPropertiesDialog({
                   <div className="mt-1 flex gap-2">
                     <Input
                       value={newFilename}
-                      onChange={(e) => setNewFilename(e.target.value)}
+                      onChange={(e) => setFilenameDraft(e.target.value)}
                       className="h-8 text-sm"
                     />
                     <Button size="sm" onClick={() => void handleRename()}>
                       Save
                     </Button>
-                    <Button size="sm" variant="ghost" onClick={() => setIsRenaming(false)}>
+                    <Button
+                      size="sm"
+                      variant="ghost"
+                      onClick={() => {
+                        setIsRenaming(false);
+                        setFilenameDraft(null);
+                      }}
+                    >
                       Cancel
                     </Button>
                   </div>
                 ) : (
                   <div className="group mt-1 flex items-center justify-between">
                     <p className="break-all font-mono text-sm">
-                      {historyEntry.outputPath
-                        ? historyEntry.outputPath.split(/[\\/]/).pop()
-                        : "—"}
+                      {fileNameFromPath(historyEntry.outputPath) || "—"}
                     </p>
                     {historyEntry.outputPath && fileExists && (
                       <Button
@@ -240,7 +239,7 @@ export function MediaPropertiesDialog({
                   className="flex min-h-[120px] w-full resize-none rounded-md border border-input bg-transparent px-3 py-2 text-sm shadow-sm placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-50"
                   placeholder="Add personal notes here..."
                   value={note}
-                  onChange={(e) => setNote(e.target.value)}
+                  onChange={(e) => setNoteDraft(e.target.value)}
                   onBlur={handleSaveNote}
                 />
                 <p className="text-right text-[10px] text-muted-foreground">Auto-saved on blur</p>

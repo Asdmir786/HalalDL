@@ -891,6 +891,8 @@ export function DownloadsScreen() {
                     onSponsorBlockCategoriesChange={handleSponsorBlockCategoriesChange}
                     sponsorBlockDisabled={sponsorBlockDisabled}
                     sponsorBlockDisabledReason={sponsorBlockDisabledReason}
+                    squareAlbumArt={settings.squareAlbumArt}
+                    onSquareAlbumArtChange={(val) => updateSettings({ squareAlbumArt: val })}
                   />
 
                   <DownloadStatsBar 

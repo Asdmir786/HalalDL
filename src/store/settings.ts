@@ -75,6 +75,12 @@ export interface Settings {
   // Instagram download backend
   instagramEngine: InstagramEngine;
 
+  /** When false, skip aria2 even if the binary is installed (yt-dlp native downloader). */
+  aria2Enabled: boolean;
+
+  /** Embed a center-cropped 1:1 thumbnail for audio downloads. */
+  squareAlbumArt: boolean;
+
   // History
   historyRetention: number; // max entries to keep, 0 = unlimited
 }
@@ -121,6 +127,8 @@ export const DEFAULT_SETTINGS: Settings = {
   sponsorBlockMode: "off",
   sponsorBlockCategories: [...DEFAULT_SPONSORBLOCK_CATEGORIES],
   instagramEngine: "downloadgram",
+  aria2Enabled: true,
+  squareAlbumArt: false,
   historyRetention: 0,
 };
 
@@ -135,6 +143,8 @@ function normalizeSettings(settings: Settings): Settings {
         : "off",
     sponsorBlockCategories: normalizeSponsorBlockCategories(settings.sponsorBlockCategories),
     instagramEngine: settings.instagramEngine === "yt-dlp" ? "yt-dlp" : "downloadgram",
+    aria2Enabled: settings.aria2Enabled !== false,
+    squareAlbumArt: settings.squareAlbumArt === true,
   };
 }
 
