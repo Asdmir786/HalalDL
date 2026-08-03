@@ -1,4 +1,4 @@
-import { exists } from "@tauri-apps/plugin-fs";
+import { invoke } from "@tauri-apps/api/core";
 import { useLogsStore } from "@/store/logs";
 import { notifyUser } from "@/lib/notifications";
 import type { AttentionTargetInput } from "@/store/attention";
@@ -15,15 +15,22 @@ export function toLocalCommandName(baseName: string, portable = false): string {
   return `${portable ? "portable" : "local"}-${baseName}`;
 }
 
+/**
+ * Prefer app-managed binaries (Full: AppData bin, Portable: portable-data/bin).
+ * Existence is checked in Rust so Portable tools are found even when the FS
+ * plugin cannot `exists()` absolute paths under `$EXE/portable-data`.
+ */
 export async function resolveTool(baseName: string): Promise<ToolResolution> {
   try {
-    const { binDir, isPortable } = await getAppPaths();
-    const exeSuffix = navigator.userAgent.toLowerCase().includes("windows") ? ".exe" : "";
-    const separator = binDir.includes("\\") ? "\\" : "/";
-    const localPath = `${binDir}${separator}${baseName}${exeSuffix}`;
-    if (await exists(localPath)) {
+    const { isPortable } = await getAppPaths();
+    const usePortableSidecar = isPortable || getAppMode() === "PORTABLE";
+    const localPath = await invoke<string | null>("resolve_app_bin_tool", {
+      binaryName: baseName,
+    });
+
+    if (localPath) {
       return {
-        command: toLocalCommandName(baseName, isPortable || getAppMode() === "PORTABLE"),
+        command: toLocalCommandName(baseName, usePortableSidecar),
         path: localPath,
         isLocal: true,
       };

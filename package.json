@@ -24,7 +24,8 @@
     "build:lite": "cross-env VITE_APP_MODE=LITE pnpm tauri build && node scripts/rename-release.js LITE",
     "build:full": "cross-env VITE_APP_MODE=FULL pnpm tauri build && node scripts/rename-release.js FULL",
     "build:portable": "cross-env VITE_APP_MODE=PORTABLE pnpm tauri build --no-bundle && node scripts/package-portable.js",
-    "build:all": "pnpm build:lite && pnpm build:full && pnpm build:portable"
+    "build:all": "pnpm build:lite && pnpm build:full && pnpm build:portable",
+    "qa:portable": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/wait-download-portable.ps1"
   },
   "dependencies": {
     "@radix-ui/react-checkbox": "1.3.4",

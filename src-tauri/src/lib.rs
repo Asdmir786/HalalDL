@@ -72,6 +72,7 @@ pub fn run() {
             notifications::send_native_windows_toast,
             app_paths::resolve_app_paths,
             app_paths::get_missing_app_managed_tools,
+            app_paths::resolve_app_bin_tool,
             app_paths::clear_ytdlp_cache,
             app_update::get_install_context,
             app_update::download_and_verify_app_update,

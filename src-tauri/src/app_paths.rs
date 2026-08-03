@@ -181,6 +181,37 @@ pub fn get_missing_app_managed_tools(
     Ok(missing)
 }
 
+/// Resolve an executable in the app-managed bin dir (Full AppData or Portable `portable-data/bin`).
+/// `binary_name` is the base/runtime name: yt-dlp, ffmpeg, ffprobe, aria2c, deno.
+/// Uses native filesystem checks — not the frontend FS plugin scope — so Portable tools are found reliably.
+#[tauri::command]
+pub fn resolve_app_bin_tool(
+    app_handle: tauri::AppHandle,
+    binary_name: String,
+) -> Result<Option<String>, String> {
+    let paths = ensure_app_dirs(&app_handle)?;
+    let bin_dir = PathBuf::from(&paths.bin_dir);
+    let name = binary_name.trim();
+    if name.is_empty() || name.contains(['/', '\\']) {
+        return Err("Invalid tool binary name".to_string());
+    }
+
+    let file_name = if name.ends_with(".exe") {
+        name.to_string()
+    } else if cfg!(windows) {
+        format!("{name}.exe")
+    } else {
+        name.to_string()
+    };
+
+    let path = bin_dir.join(&file_name);
+    if path.is_file() {
+        Ok(Some(path.to_string_lossy().to_string()))
+    } else {
+        Ok(None)
+    }
+}
+
 #[tauri::command]
 pub fn resolve_app_paths(app_handle: tauri::AppHandle) -> Result<AppPaths, String> {
     ensure_app_dirs(&app_handle)

@@ -1,4 +1,3 @@
-import { exists } from "@tauri-apps/plugin-fs";
 import { invoke } from "@tauri-apps/api/core";
 import { Command } from "@tauri-apps/plugin-shell";
 import { open as openDialog } from "@tauri-apps/plugin-dialog";
@@ -57,16 +56,18 @@ export async function revealToolInExplorer(toolId: string, currentPath?: string)
   if (!entry) return;
   const isWindows = navigator.userAgent.toLowerCase().includes("windows");
   const fileName = isWindows ? entry.windows : entry.unix;
+  const baseName = fileName.replace(/\.exe$/i, "");
 
-  const { binDir } = await getAppPaths();
-  const separator = binDir.includes("\\") ? "\\" : "/";
-  const toolPath = `${binDir}${separator}${fileName}`;
+  const managedPath = await invoke<string | null>("resolve_app_bin_tool", {
+    binaryName: baseName,
+  }).catch(() => null);
 
-  if (await exists(toolPath)) {
-    await revealInExplorer(toolPath);
+  if (managedPath) {
+    await revealInExplorer(managedPath);
     return;
   }
 
+  const { binDir } = await getAppPaths();
   await revealInExplorer(binDir);
 }
 

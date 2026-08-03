@@ -38,6 +38,7 @@ tmp-playwright-capture/
 .tmp-playwright/
 .tmp-nightly/
 .tmp-nightly-*/
+.tmp-qa-nightly/
 .winget-work/
 
 # Chocolatey build artifacts

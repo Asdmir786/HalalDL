@@ -64,13 +64,13 @@ jobs:
           $hashLines | Set-Content -Path out/SHA256SUMS.txt -Encoding ascii
 
       - name: Upload build artifacts
-        if: success() && (github.event_name == 'schedule' || github.event_name == 'workflow_dispatch')
+        if: success()
         uses: actions/upload-artifact@v6
         with:
           name: HalalDL-nightly-${{ github.sha }}
           path: out/*
           if-no-files-found: error
-          retention-days: 1
+          retention-days: 3
 
       - name: Upload logs (always)
         if: always() && (github.event_name == 'schedule' || github.event_name == 'workflow_dispatch')

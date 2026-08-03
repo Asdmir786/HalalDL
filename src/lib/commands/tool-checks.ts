@@ -121,7 +121,7 @@ export async function checkYtDlpVersion(): Promise<ToolCheckResult | null> {
     if (tool.isLocal) {
       addLog({
         level: "command",
-        message: "Checking app-managed yt-dlp binary...",
+        message: "Checking app-managed yt-dlp (Portable/Full bin preferred over pip/PATH)...",
         command: `${tool.path} --version`,
       });
       try {
@@ -142,18 +142,19 @@ export async function checkYtDlpVersion(): Promise<ToolCheckResult | null> {
         }
         addLog({
           level: "warn",
-          message: `App-managed yt-dlp returned code ${output.code}; checking for a system fallback...`,
+          message: `App-managed yt-dlp returned code ${output.code}; checking for a system fallback (pip/PATH)...`,
         });
       } catch (e) {
         addLog({
           level: "warn",
-          message: `App-managed yt-dlp check failed (${String(e)}); checking for a system fallback...`,
+          message: `App-managed yt-dlp check failed (${String(e)}); checking for a system fallback (pip/PATH)...`,
         });
       }
     } else {
       addLog({
         level: "info",
-        message: "App-managed yt-dlp is unavailable; checking system/PATH fallback...",
+        message:
+          "No app-managed yt-dlp in bin (Portable: portable-data\\bin, Full: AppData\\bin); checking system/PATH/pip fallback...",
       });
     }
 
