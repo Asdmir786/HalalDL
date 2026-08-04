@@ -223,8 +223,16 @@ export function useToolActions(modalApi: ModalApi) {
 
   const checkAll = async () => {
     setIsCheckingAll(true);
+    const ids = useToolsStore.getState().tools.map((t) => t.id);
+    // Immediate UI state so rows don't sit on stale Missing while the first probes start.
+    for (const id of ids) {
+      updateTool(id, { status: "Checking" });
+    }
     try {
-      await Promise.all(tools.map((t) => refreshTool(t.id)));
+      // Sequential probes: parallel cold starts of large bins often hit timeouts on Windows.
+      for (const id of ids) {
+        await refreshTool(id);
+      }
     } finally {
       setIsCheckingAll(false);
     }

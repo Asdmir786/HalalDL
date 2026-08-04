@@ -12,7 +12,8 @@ export interface ToolCheckResult {
   usingFallback?: boolean;
 }
 
-const TOOL_CHECK_TIMEOUT_MS = 8000;
+/** Cold starts of app-managed yt-dlp/deno (esp. first Portable launch) often exceed 8s. */
+const TOOL_CHECK_TIMEOUT_MS = 30000;
 
 export async function resolveSystemToolPath(tool: string): Promise<string | null> {
   return invoke<string | null>("resolve_system_tool_path", { tool });
