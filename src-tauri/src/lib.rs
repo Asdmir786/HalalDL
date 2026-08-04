@@ -1,3 +1,4 @@
+mod app_bin;
 mod app_paths;
 mod app_update;
 mod clipboard;
@@ -27,6 +28,7 @@ pub fn run() {
 
     tauri::Builder::default()
         .manage(runtime_state)
+        .manage(app_bin::AppBinChildren::default())
         .plugin(tauri_plugin_single_instance::init(|app, args, _cwd| {
             let urls = runtime::capture_launch_urls(&args);
             runtime::append_launch_urls(app, urls);
@@ -74,6 +76,9 @@ pub fn run() {
             app_paths::get_missing_app_managed_tools,
             app_paths::resolve_app_bin_tool,
             app_paths::clear_ytdlp_cache,
+            app_bin::run_app_bin_tool,
+            app_bin::start_app_bin_tool,
+            app_bin::kill_app_bin_tool,
             app_update::get_install_context,
             app_update::download_and_verify_app_update,
             tools::resolve_system_tool_path,

@@ -1,6 +1,6 @@
-import { Command } from "@tauri-apps/plugin-shell";
 import { stat } from "@tauri-apps/plugin-fs";
 import { resolveTool } from "@/lib/downloader/tool-env";
+import { runResolvedTool } from "@/lib/process/app-bin";
 
 export type MediaProbeInfo = {
   width?: number;
@@ -106,16 +106,20 @@ export async function probeMediaFile(path: string): Promise<MediaProbeInfo | nul
 
   try {
     const ffprobe = await resolveTool("ffprobe");
-    const cmd = Command.create(ffprobe.command, [
-      "-v",
-      "quiet",
-      "-print_format",
-      "json",
-      "-show_format",
-      "-show_streams",
-      path,
-    ]);
-    const result = await cmd.execute();
+    const result = await runResolvedTool(
+      ffprobe,
+      "ffprobe",
+      [
+        "-v",
+        "quiet",
+        "-print_format",
+        "json",
+        "-show_format",
+        "-show_streams",
+        path,
+      ],
+      { timeoutMs: 20000 }
+    );
     if (result.code !== 0) {
       probeCache.set(path, null);
       return null;

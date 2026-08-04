@@ -1,7 +1,7 @@
-import { Command } from "@tauri-apps/plugin-shell";
 import { useLogsStore } from "@/store/logs";
 import { invoke } from "@tauri-apps/api/core";
 import { resolveTool } from "@/lib/downloader/tool-env";
+import { runResolvedTool } from "@/lib/process/app-bin";
 import { fetchText, fetchJson } from "./version-utils";
 
 export interface ToolCheckResult {
@@ -13,75 +13,6 @@ export interface ToolCheckResult {
 }
 
 const TOOL_CHECK_TIMEOUT_MS = 8000;
-
-async function executeWithTimeout(
-  program: string,
-  args: string[],
-  timeoutMs = TOOL_CHECK_TIMEOUT_MS
-): Promise<{ code: number | null; stdout: string; stderr: string }> {
-  const cmd = Command.create(program, args);
-  let stdout = "";
-  let stderr = "";
-  let child: Awaited<ReturnType<typeof cmd.spawn>> | null = null;
-  let settled = false;
-  let timeoutId: ReturnType<typeof setTimeout> | undefined;
-
-  cmd.stdout.on("data", (line) => {
-    stdout += `${line}`;
-  });
-  cmd.stderr.on("data", (line) => {
-    stderr += `${line}`;
-  });
-
-  try {
-    return await new Promise<{ code: number | null; stdout: string; stderr: string }>(
-      (resolve, reject) => {
-        const finish = (result: { code: number | null; stdout: string; stderr: string }) => {
-          if (settled) return;
-          settled = true;
-          if (timeoutId !== undefined) clearTimeout(timeoutId);
-          resolve(result);
-        };
-        const fail = (error: Error) => {
-          if (settled) return;
-          settled = true;
-          if (timeoutId !== undefined) clearTimeout(timeoutId);
-          reject(error);
-        };
-
-        cmd.on("close", (data) => {
-          const code = typeof data.code === "number" ? data.code : null;
-          finish({ code, stdout, stderr });
-        });
-        cmd.on("error", (error) => {
-          fail(new Error(String(error)));
-        });
-
-        timeoutId = setTimeout(() => {
-          void (async () => {
-            try {
-              if (child) await child.kill();
-            } catch {
-              void 0;
-            }
-            fail(new Error(`Timed out after ${timeoutMs}ms`));
-          })();
-        }, timeoutMs);
-
-        cmd
-          .spawn()
-          .then((spawned) => {
-            child = spawned;
-          })
-          .catch((error) => {
-            fail(new Error(String(error)));
-          });
-      }
-    );
-  } finally {
-    if (timeoutId !== undefined) clearTimeout(timeoutId);
-  }
-}
 
 export async function resolveSystemToolPath(tool: string): Promise<string | null> {
   return invoke<string | null>("resolve_system_tool_path", { tool });
@@ -125,7 +56,9 @@ export async function checkYtDlpVersion(): Promise<ToolCheckResult | null> {
         command: `${tool.path} --version`,
       });
       try {
-        const output = await executeWithTimeout(tool.command, ["--version"]);
+        const output = await runResolvedTool(tool, "yt-dlp", ["--version"], {
+          timeoutMs: TOOL_CHECK_TIMEOUT_MS,
+        });
         if (output.code === 0) {
           const version = output.stdout.trim();
           addLog({
@@ -159,6 +92,7 @@ export async function checkYtDlpVersion(): Promise<ToolCheckResult | null> {
     }
 
     const systemPath = await resolveSystemToolPath("yt-dlp").catch(() => null);
+    const pathTool = { command: "yt-dlp", path: systemPath || "yt-dlp", isLocal: false as const };
     if (!systemPath && !tool.isLocal) {
       // Last-chance PATH spawn with a short timeout (covers non-.exe launchers).
       addLog({
@@ -167,7 +101,9 @@ export async function checkYtDlpVersion(): Promise<ToolCheckResult | null> {
         command: "yt-dlp --version",
       });
       try {
-        const output = await executeWithTimeout("yt-dlp", ["--version"], TOOL_CHECK_TIMEOUT_MS);
+        const output = await runResolvedTool(pathTool, "yt-dlp", ["--version"], {
+          timeoutMs: TOOL_CHECK_TIMEOUT_MS,
+        });
         if (output.code === 0) {
           const version = output.stdout.trim();
           const variant = "System";
@@ -194,14 +130,15 @@ export async function checkYtDlpVersion(): Promise<ToolCheckResult | null> {
       return null;
     }
 
-    const command = tool.isLocal ? "yt-dlp" : tool.command;
     const probePath = systemPath || "yt-dlp";
     addLog({
       level: "command",
       message: "Checking system/PATH yt-dlp fallback...",
       command: `${probePath} --version`,
     });
-    const output = await executeWithTimeout(command, ["--version"]);
+    const output = await runResolvedTool(pathTool, "yt-dlp", ["--version"], {
+      timeoutMs: TOOL_CHECK_TIMEOUT_MS,
+    });
     if (output.code === 0) {
       const version = output.stdout.trim();
       const pipVariant = detectYtDlpPipVariant(systemPath);
@@ -242,7 +179,9 @@ export async function checkFfmpegVersion(): Promise<ToolCheckResult | null> {
     }
 
     addLog({ level: "command", message: "Checking for ffmpeg binary...", command: `${tool.path} -version` });
-    const output = await executeWithTimeout(tool.command, ["-version"]);
+    const output = await runResolvedTool(tool, "ffmpeg", ["-version"], {
+      timeoutMs: TOOL_CHECK_TIMEOUT_MS,
+    });
     if (output.code === 0) {
       const firstLine = output.stdout.split("\n")[0] || "";
       const rawMatch = firstLine.match(/version\s+(\S+)/i);
@@ -310,7 +249,9 @@ export async function checkAria2Version(): Promise<ToolCheckResult | null> {
     }
 
     addLog({ level: "command", message: "Checking for aria2c binary...", command: `${tool.path} --version` });
-    const output = await executeWithTimeout(tool.command, ["--version"]);
+    const output = await runResolvedTool(tool, "aria2c", ["--version"], {
+      timeoutMs: TOOL_CHECK_TIMEOUT_MS,
+    });
     if (output.code === 0) {
       const firstLine = output.stdout.split("\n")[0] || "";
       const versionMatch = firstLine.match(/version\s+(\S+)/i);
@@ -350,7 +291,9 @@ export async function checkDenoVersion(): Promise<ToolCheckResult | null> {
     }
 
     addLog({ level: "command", message: "Checking for deno binary...", command: `${tool.path} --version` });
-    const output = await executeWithTimeout(tool.command, ["--version"]);
+    const output = await runResolvedTool(tool, "deno", ["--version"], {
+      timeoutMs: TOOL_CHECK_TIMEOUT_MS,
+    });
     if (output.code === 0) {
       const firstLine = output.stdout.split("\n")[0] || "";
       const versionMatch = firstLine.match(/deno\s+(\S+)/i);
@@ -392,6 +335,7 @@ export async function upgradeYtDlpViaPip(systemPath?: string | null): Promise<bo
     return true;
   } catch (e) {
     addLog({ level: "error", message: `pip upgrade failed: ${String(e)}` });
+    const { Command } = await import("@tauri-apps/plugin-shell");
     for (const pipCmd of ["pip", "pip3"]) {
       try {
         addLog({

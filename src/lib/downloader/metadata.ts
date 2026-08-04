@@ -1,4 +1,3 @@
-import { Command } from "@tauri-apps/plugin-shell";
 import { convertFileSrc } from "@tauri-apps/api/core";
 import { useDownloadsStore } from "@/store/downloads";
 import type { DownloadJob } from "@/store/downloads";
@@ -10,6 +9,7 @@ import { downloadUrlToFile } from "@/lib/commands";
 import { isInstagramUrl } from "@/lib/media-engine";
 import { getExplicitOutputPaths } from "@/lib/output-paths";
 import { resolveTool, ytDlpEnv, isYouTubeUrl } from "./tool-env";
+import { runResolvedTool } from "@/lib/process/app-bin";
 import { getAppPaths } from "@/lib/app-paths";
 import { fetchInstagramMediaInfo } from "./instagram";
 import {
@@ -50,28 +50,6 @@ export interface MediaMetadataProbe {
   availableSubtitleLanguages: string[];
   /** Curated quality options derived from yt-dlp `formats`. */
   formats: MediaFormatOption[];
-}
-
-function shellPayloadToBytes(output: unknown): Uint8Array | null {
-  if (output instanceof Uint8Array) return output;
-  if (output instanceof ArrayBuffer) return new Uint8Array(output);
-  if (ArrayBuffer.isView(output)) {
-    return new Uint8Array(output.buffer, output.byteOffset, output.byteLength);
-  }
-  if (Array.isArray(output)) return new Uint8Array(output);
-
-  if (output && typeof output === "object") {
-    const data = (output as { data?: unknown }).data;
-    if (Array.isArray(data)) return new Uint8Array(data);
-  }
-
-  return null;
-}
-
-function decodeShellOutput(output: unknown): string {
-  if (typeof output === "string") return output;
-  const bytes = shellPayloadToBytes(output);
-  return bytes ? new TextDecoder().decode(bytes) : String(output ?? "");
 }
 
 function isTauriLocalAssetUrl(value: string): boolean {
@@ -245,14 +223,12 @@ export async function fetchMediaInfo(url: string): Promise<MediaMetadataProbe> {
   } catch {
     // Keep default cache when app paths are unavailable.
   }
-  const command = Command.create(
-    ytDlp.command,
-    args,
-    { env: ytDlpEnv(), encoding: "raw" }
-  );
-  const result = await command.execute();
-  const stdout = decodeShellOutput(result.stdout);
-  const stderr = decodeShellOutput(result.stderr);
+  const result = await runResolvedTool(ytDlp, "yt-dlp", args, {
+    env: ytDlpEnv(),
+    timeoutMs: 60000,
+  });
+  const stdout = result.stdout;
+  const stderr = result.stderr;
 
   if (result.code !== 0) {
     throw new Error(stderr.trim() || `yt-dlp exited with code ${result.code}`);
@@ -410,15 +386,15 @@ export async function fetchMetadata(jobId: string) {
 
     addLog({ level: "info", message: `[meta] Falling back to ffmpeg thumbnail extraction`, jobId });
 
-    const mediaCmd = Command.create(
-      (await resolveTool("yt-dlp")).command,
+    const ytDlpTool = await resolveTool("yt-dlp");
+    const mediaOutput = await runResolvedTool(
+      ytDlpTool,
+      "yt-dlp",
       ["-f", "best", "-g", "--no-playlist", "--referer", job.url, job.url],
-      { env: ytDlpEnv(), encoding: "raw" }
+      { env: ytDlpEnv(), timeoutMs: 60000 }
     );
-
-    const mediaOutput = await mediaCmd.execute();
-    const mediaStdout = decodeShellOutput(mediaOutput.stdout);
-    const mediaStderr = decodeShellOutput(mediaOutput.stderr);
+    const mediaStdout = mediaOutput.stdout;
+    const mediaStderr = mediaOutput.stderr;
     if (mediaStderr.trim()) {
       addLog({
         level: "warn",

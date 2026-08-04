@@ -1,10 +1,10 @@
-import { Command } from "@tauri-apps/plugin-shell";
 import { useDownloadsStore } from "@/store/downloads";
 import { useLogsStore } from "@/store/logs";
 import { exists, mkdir } from "@tauri-apps/plugin-fs";
 import { convertFileSrc } from "@tauri-apps/api/core";
 import { deleteFile } from "@/lib/commands";
 import { resolveTool } from "./tool-env";
+import { runResolvedTool } from "@/lib/process/app-bin";
 import { useSettingsStore } from "@/store/settings";
 import { getAppPaths } from "@/lib/app-paths";
 
@@ -49,18 +49,21 @@ export async function generateThumbnailFromMediaUrl(jobId: string, mediaUrl: str
     addLog({ level: "info", message: `[thumb] ffmpeg primary: extracting frame from ${mediaUrl.substring(0, 150)}...`, jobId });
     addLog({ level: "info", message: `[thumb] ffmpeg output path: ${outputPath}`, jobId });
 
-    const primary = Command.create(ffmpeg.command, [
-      "-y",
-      "-i",
-      mediaUrl,
-      "-frames:v",
-      "1",
-      "-vf",
-      filter,
-      outputPath,
-    ]);
-
-    const primaryOutput = await primary.execute();
+    const primaryOutput = await runResolvedTool(
+      ffmpeg,
+      "ffmpeg",
+      [
+        "-y",
+        "-i",
+        mediaUrl,
+        "-frames:v",
+        "1",
+        "-vf",
+        filter,
+        outputPath,
+      ],
+      { timeoutMs: 120000 }
+    );
     addLog({ level: "info", message: `[thumb] ffmpeg primary exit code: ${primaryOutput.code}`, jobId });
     if (primaryOutput.stderr.trim()) {
       const stderrTail = primaryOutput.stderr.trim().slice(-300);
@@ -79,18 +82,21 @@ export async function generateThumbnailFromMediaUrl(jobId: string, mediaUrl: str
 
     addLog({ level: "warn", message: `[thumb] Primary extraction failed, trying simple fallback`, jobId });
 
-    const fallback = Command.create(ffmpeg.command, [
-      "-y",
-      "-i",
-      mediaUrl,
-      "-frames:v",
-      "1",
-      "-vf",
-      "thumbnail,scale=320:-1",
-      outputPath,
-    ]);
-
-    const fallbackOutput = await fallback.execute();
+    const fallbackOutput = await runResolvedTool(
+      ffmpeg,
+      "ffmpeg",
+      [
+        "-y",
+        "-i",
+        mediaUrl,
+        "-frames:v",
+        "1",
+        "-vf",
+        "thumbnail,scale=320:-1",
+        outputPath,
+      ],
+      { timeoutMs: 120000 }
+    );
     addLog({ level: "info", message: `[thumb] ffmpeg fallback exit code: ${fallbackOutput.code}`, jobId });
     if (fallbackOutput.stderr.trim()) {
       const stderrTail = fallbackOutput.stderr.trim().slice(-300);
@@ -135,18 +141,21 @@ export async function generateThumbnailContactSheet(jobId: string, mediaUrl: str
 
     addLog({ level: "info", message: `[thumb] ffmpeg contact sheet: ${outputPath}`, jobId });
 
-    const command = Command.create(ffmpeg.command, [
-      "-y",
-      "-i",
-      mediaUrl,
-      "-frames:v",
-      "1",
-      "-vf",
-      filter,
-      outputPath,
-    ]);
-
-    const result = await command.execute();
+    const result = await runResolvedTool(
+      ffmpeg,
+      "ffmpeg",
+      [
+        "-y",
+        "-i",
+        mediaUrl,
+        "-frames:v",
+        "1",
+        "-vf",
+        filter,
+        outputPath,
+      ],
+      { timeoutMs: 180000 }
+    );
     addLog({ level: "info", message: `[thumb] ffmpeg contact sheet exit code: ${result.code}`, jobId });
     if (result.stderr.trim()) {
       addLog({ level: "info", message: `[thumb] contact sheet stderr (tail): ${result.stderr.trim().slice(-300)}`, jobId });

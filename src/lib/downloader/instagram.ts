@@ -1,4 +1,3 @@
-import { Command } from "@tauri-apps/plugin-shell";
 import { downloadDir as defaultDownloadDir, join } from "@tauri-apps/api/path";
 import { exists, mkdir } from "@tauri-apps/plugin-fs";
 import type { DownloadJob } from "@/store/downloads";
@@ -15,6 +14,7 @@ import {
   type InstagramResolveResult,
 } from "@/lib/media-engine";
 import { resolveTool } from "./tool-env";
+import { runResolvedTool } from "@/lib/process/app-bin";
 
 type InstagramDownloadResult =
   | {
@@ -1161,8 +1161,9 @@ async function runFfmpegPostProcess(options: {
     jobId: job.id,
   });
 
-  const cmd = Command.create(ffmpeg.command, ffmpegArgs);
-  const result = await cmd.execute();
+  const result = await runResolvedTool(ffmpeg, "ffmpeg", ffmpegArgs, {
+    timeoutMs: 600000,
+  });
   if (result.stdout.trim()) {
     addLog({
       level: "info",

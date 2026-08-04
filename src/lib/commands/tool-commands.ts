@@ -1,5 +1,4 @@
 import { invoke } from "@tauri-apps/api/core";
-import { Command } from "@tauri-apps/plugin-shell";
 import { open as openDialog } from "@tauri-apps/plugin-dialog";
 import { useLogsStore } from "@/store/logs";
 import { useToolsStore } from "@/store/tools";
@@ -7,6 +6,7 @@ import { revealInExplorer } from "./file-commands";
 import type { ToolBatchResult } from "@/lib/tools/tool-batch";
 import { getAppPaths } from "@/lib/app-paths";
 import { resolveTool } from "@/lib/downloader/tool-env";
+import { runResolvedTool } from "@/lib/process/app-bin";
 
 export async function updateToolAtPath(tool: string, destDir: string, variant?: string, channel?: string): Promise<string> {
   const { addLog } = useLogsStore.getState();
@@ -159,8 +159,9 @@ export async function clearYtDlpCache(): Promise<string> {
 
   try {
     const tool = await resolveTool("yt-dlp");
-    const cmd = Command.create(tool.command, ["--rm-cache-dir"]);
-    const output = await cmd.execute();
+    const output = await runResolvedTool(tool, "yt-dlp", ["--rm-cache-dir"], {
+      timeoutMs: 30000,
+    });
     if (output.code === 0) {
       addLog({ level: "info", message: "yt-dlp --rm-cache-dir completed" });
       return `${summary}. Also ran yt-dlp --rm-cache-dir.`;

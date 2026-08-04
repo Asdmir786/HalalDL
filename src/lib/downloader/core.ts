@@ -1,4 +1,3 @@
-import { Child, Command } from "@tauri-apps/plugin-shell";
 import { useDownloadsStore } from "@/store/downloads";
 import { useLogsStore } from "@/store/logs";
 import { usePresetsStore } from "@/store/presets";
@@ -10,6 +9,7 @@ import { join } from "@tauri-apps/api/path";
 import { OutputParser } from "@/lib/output-parser";
 import { copyFilesToClipboard, deleteFile, renameFile } from "@/lib/commands";
 import { resolveTool, ytDlpEnv, sendDownloadCompleteNotification, isYouTubeUrl } from "./tool-env";
+import { runResolvedTool, spawnResolvedTool, type SpawnedProcess } from "@/lib/process/app-bin";
 import { formatSponsorBlockCategories } from "@/lib/sponsorblock";
 import { cleanupThumbnailByJobId } from "./thumbnails";
 import { fetchMediaInfo, fetchMetadata } from "./metadata";
@@ -37,8 +37,8 @@ const ACTIVE_JOB_STATUSES = new Set<DownloadJob["status"]>([
 ]);
 
 const startingJobs = new Set<string>();
-const activeYtDlpChildren = new Map<string, Child>();
-const activeFfmpegChildren = new Map<string, Child>();
+const activeYtDlpChildren = new Map<string, SpawnedProcess>();
+const activeFfmpegChildren = new Map<string, SpawnedProcess>();
 const holdRequestedJobs = new Map<string, "pause" | "stop">();
 
 function shellPayloadToBytes(output: unknown): Uint8Array | null {
@@ -356,16 +356,12 @@ async function probeMediaDurationSeconds(
 ) {
   try {
     const ffprobe = await resolveTool("ffprobe");
-    const probeCmd = Command.create(ffprobe.command, [
-      "-v",
-      "error",
-      "-show_entries",
-      "format=duration",
-      "-of",
-      "default=nw=1:nk=1",
-      inputPath,
-    ]);
-    const result = await probeCmd.execute();
+    const result = await runResolvedTool(
+      ffprobe,
+      "ffprobe",
+      ["-v", "error", "-show_entries", "format=duration", "-of", "default=nw=1:nk=1", inputPath],
+      { timeoutMs: 15000 }
+    );
     if (result.code !== 0) {
       addLog({
         level: "warn",
@@ -1090,7 +1086,6 @@ export async function startDownload(jobId: string) {
   };
 
   const runDownload = async (runArgs: string[]) => {
-    const cmd = Command.create(ytDlp.command, runArgs, { env: ytDlpEnv(), encoding: "raw" });
     let lastKnownOutputPath: string | undefined;
     let formatUnavailable = false;
     let aria2Error = false;
@@ -1193,68 +1188,50 @@ export async function startDownload(jobId: string) {
       }
     };
 
-    cmd.stdout.on("data", (chunk) => {
+    const onStdoutChunk = (chunk: string | Uint8Array) => {
       stdoutBuffer += decodeShellChunk(stdoutDecoder, chunk);
       const parts = stdoutBuffer.split(/\n/);
       stdoutBuffer = parts.pop() ?? "";
       for (const part of parts) flushStdoutLine(part);
-    });
+    };
 
-    cmd.stderr.on("data", (chunk) => {
+    const onStderrChunk = (chunk: string | Uint8Array) => {
       stderrBuffer += decodeShellChunk(stderrDecoder, chunk);
       const parts = stderrBuffer.split(/\n/);
       stderrBuffer = parts.pop() ?? "";
       for (const part of parts) flushStderrLine(part);
-    });
+    };
 
-    return new Promise<{
-      code: number;
-      lastKnownOutputPath?: string;
-      formatUnavailable: boolean;
-      aria2Error: boolean;
-      archiveSkipped: boolean;
-    }>((resolve) => {
-      let settled = false;
-      let childRef: Child | null = null;
-      const finish = (code: number) => {
-        if (settled) return;
-        settled = true;
-        if (childRef && activeYtDlpChildren.get(jobId)?.pid === childRef.pid) {
-          activeYtDlpChildren.delete(jobId);
-        }
-        resolve({ code, lastKnownOutputPath, formatUnavailable, aria2Error, archiveSkipped });
-      };
-
-      cmd.on("close", (data) => {
-        stdoutBuffer += stdoutDecoder.decode();
-        stderrBuffer += stderrDecoder.decode();
-        flushStdoutLine(stdoutBuffer);
-        flushStderrLine(stderrBuffer);
-        const code = typeof data.code === "number" ? data.code : 1;
-        addLog({ level: "info", message: `Process finished with code ${code}`, jobId });
-        finish(code);
-      });
-
-      cmd.on("error", (error) => {
-        const message = String(error);
-        if (message.toLowerCase().includes("invalid utf-8 sequence")) {
-          addLog({ level: "warn", message: `Process output decode warning: ${message}`, jobId });
-          return;
-        }
-        addLog({ level: "error", message: `Process error: ${message}`, jobId });
-        finish(1);
-      });
-
-      cmd.spawn()
-        .then((child) => {
-          childRef = child;
-          activeYtDlpChildren.set(jobId, child);
-        })
-        .catch((e) => {
-          addLog({ level: "error", message: `Failed to spawn process: ${e}`, jobId });
-          finish(1);
-        });
-    });
+    try {
+      const proc = await spawnResolvedTool(
+        ytDlp,
+        "yt-dlp",
+        runArgs,
+        {
+          onStdoutChunk,
+          onStderrChunk,
+          onStdoutLine: flushStdoutLine,
+          onStderrLine: flushStderrLine,
+        },
+        { env: ytDlpEnv(), encoding: "raw" }
+      );
+      activeYtDlpChildren.set(jobId, proc);
+      const code = await proc.wait();
+      // Flush partial line buffers after PATH-shell chunk mode.
+      stdoutBuffer += stdoutDecoder.decode();
+      stderrBuffer += stderrDecoder.decode();
+      flushStdoutLine(stdoutBuffer);
+      flushStderrLine(stderrBuffer);
+      if (activeYtDlpChildren.get(jobId) === proc) {
+        activeYtDlpChildren.delete(jobId);
+      }
+      addLog({ level: "info", message: `Process finished with code ${code}`, jobId });
+      return { code, lastKnownOutputPath, formatUnavailable, aria2Error, archiveSkipped };
+    } catch (e) {
+      addLog({ level: "error", message: `Failed to spawn process: ${e}`, jobId });
+      activeYtDlpChildren.delete(jobId);
+      return { code: 1, lastKnownOutputPath, formatUnavailable, aria2Error, archiveSkipped };
+    }
   };
 
   const runAttemptWithDownloaderFallback = async (runArgs: string[]) => {
@@ -1375,119 +1352,106 @@ export async function startDownload(jobId: string) {
       const ffmpegQuoted = ffmpegArgs.map(a => a.includes(" ") ? `"${a}"` : a).join(" ");
       addLog({ level: "info", message: `Running separate FFmpeg conversion:\n${ffmpeg.path} ${ffmpegQuoted}`, jobId });
 
-      const ffmpegCmd = Command.create(ffmpeg.command, ffmpegArgs);
-      const ffmpegResult = await new Promise<{ code: number; stderr: string }>((resolve) => {
-        let stdoutBuffer = "";
-        let stderrBuffer = "";
-        let childRef: Child | null = null;
-        const progressState: {
-          outTimeUs?: number;
-          speed?: string;
-        } = {};
-        let lastProgressUpdate = 0;
+      let stdoutBuffer = "";
+      let stderrBuffer = "";
+      const progressState: {
+        outTimeUs?: number;
+        speed?: string;
+      } = {};
+      let lastProgressUpdate = 0;
 
-        const flushProgressLine = (line: string) => {
-          const trimmed = line.replace(/\r/g, "").trim();
-          if (!trimmed) return;
+      const flushProgressLine = (line: string) => {
+        const trimmed = line.replace(/\r/g, "").trim();
+        if (!trimmed) return;
 
-          const eqIndex = trimmed.indexOf("=");
-          if (eqIndex === -1) {
-            addLog({ level: "info", message: `[ffmpeg] ${trimmed}`, jobId });
-            return;
-          }
-
-          const key = trimmed.slice(0, eqIndex);
-          const value = trimmed.slice(eqIndex + 1);
-
-          if (key === "out_time_us" || key === "out_time_ms") {
-            const parsed = Number.parseInt(value, 10);
-            if (Number.isFinite(parsed)) {
-              progressState.outTimeUs = parsed;
-            }
-          }
-
-          if (key === "speed") {
-            progressState.speed = value.trim();
-          }
-
-          if (key === "progress") {
-            if (value === "continue" || value === "end") {
-              const now = Date.now();
-              const shouldUpdate = value === "end" || now - lastProgressUpdate >= 250;
-
-              if (inputDurationSeconds && shouldUpdate) {
-                const outTimeUs = progressState.outTimeUs ?? 0;
-                const percent = Math.max(
-                  0,
-                  Math.min(100, (outTimeUs / (inputDurationSeconds * 1_000_000)) * 100)
-                );
-                updateJob(jobId, {
-                  progress: percent,
-                  speed: progressState.speed,
-                  statusDetail:
-                    value === "end"
-                      ? "Wrapping up FFmpeg conversion"
-                      : `Converting to target format (${Math.round(percent)}%)`,
-                });
-                lastProgressUpdate = now;
-              }
-            }
-            return;
-          }
-        };
-
-        const flushStderrLine = (line: string) => {
-          const trimmed = line.replace(/\r/g, "");
-          if (!trimmed) return;
+        const eqIndex = trimmed.indexOf("=");
+        if (eqIndex === -1) {
           addLog({ level: "info", message: `[ffmpeg] ${trimmed}`, jobId });
-        };
+          return;
+        }
 
-        ffmpegCmd.stdout.on("data", (chunk) => {
-          stdoutBuffer += chunk;
-          const parts = stdoutBuffer.split(/\n/);
-          stdoutBuffer = parts.pop() ?? "";
-          for (const part of parts) flushProgressLine(part);
-        });
+        const key = trimmed.slice(0, eqIndex);
+        const value = trimmed.slice(eqIndex + 1);
 
-        ffmpegCmd.stderr.on("data", (chunk) => {
-          stderrBuffer += chunk;
-          const parts = stderrBuffer.split(/\n/);
-          stderrBuffer = parts.pop() ?? "";
-          for (const part of parts) flushStderrLine(part);
-        });
-
-        ffmpegCmd.on("close", (data) => {
-          flushProgressLine(stdoutBuffer);
-          flushStderrLine(stderrBuffer);
-          if (childRef && activeFfmpegChildren.get(jobId)?.pid === childRef.pid) {
-            activeFfmpegChildren.delete(jobId);
+        if (key === "out_time_us" || key === "out_time_ms") {
+          const parsed = Number.parseInt(value, 10);
+          if (Number.isFinite(parsed)) {
+            progressState.outTimeUs = parsed;
           }
-          resolve({
-            code: typeof data.code === "number" ? data.code : 1,
-            stderr: stderrBuffer,
-          });
-        });
+        }
 
-        ffmpegCmd.on("error", (error) => {
-          const message = String(error);
-          if (childRef && activeFfmpegChildren.get(jobId)?.pid === childRef.pid) {
-            activeFfmpegChildren.delete(jobId);
+        if (key === "speed") {
+          progressState.speed = value.trim();
+        }
+
+        if (key === "progress") {
+          if (value === "continue" || value === "end") {
+            const now = Date.now();
+            const shouldUpdate = value === "end" || now - lastProgressUpdate >= 250;
+
+            if (inputDurationSeconds && shouldUpdate) {
+              const outTimeUs = progressState.outTimeUs ?? 0;
+              const percent = Math.max(
+                0,
+                Math.min(100, (outTimeUs / (inputDurationSeconds * 1_000_000)) * 100)
+              );
+              updateJob(jobId, {
+                progress: percent,
+                speed: progressState.speed,
+                statusDetail:
+                  value === "end"
+                    ? "Wrapping up FFmpeg conversion"
+                    : `Converting to target format (${Math.round(percent)}%)`,
+              });
+              lastProgressUpdate = now;
+            }
           }
-          addLog({ level: "error", message: `FFmpeg process error: ${message}`, jobId });
-          resolve({ code: 1, stderr: message });
-        });
+        }
+      };
 
-        ffmpegCmd.spawn()
-          .then((child) => {
-            childRef = child;
-            activeFfmpegChildren.set(jobId, child);
-          })
-          .catch((error) => {
-            const message = String(error);
-            addLog({ level: "error", message: `Failed to spawn FFmpeg: ${message}`, jobId });
-            resolve({ code: 1, stderr: message });
-          });
-      });
+      const flushStderrLine = (line: string) => {
+        const trimmed = line.replace(/\r/g, "");
+        if (!trimmed) return;
+        addLog({ level: "info", message: `[ffmpeg] ${trimmed}`, jobId });
+      };
+
+      let ffmpegResult: { code: number; stderr: string };
+      try {
+        const proc = await spawnResolvedTool(
+          ffmpeg,
+          "ffmpeg",
+          ffmpegArgs,
+          {
+            onStdoutLine: flushProgressLine,
+            onStderrLine: flushStderrLine,
+            onStdoutChunk: (chunk) => {
+              stdoutBuffer += String(chunk);
+              const parts = stdoutBuffer.split(/\n/);
+              stdoutBuffer = parts.pop() ?? "";
+              for (const part of parts) flushProgressLine(part);
+            },
+            onStderrChunk: (chunk) => {
+              stderrBuffer += String(chunk);
+              const parts = stderrBuffer.split(/\n/);
+              stderrBuffer = parts.pop() ?? "";
+              for (const part of parts) flushStderrLine(part);
+            },
+          }
+        );
+        activeFfmpegChildren.set(jobId, proc);
+        const code = await proc.wait();
+        flushProgressLine(stdoutBuffer);
+        flushStderrLine(stderrBuffer);
+        if (activeFfmpegChildren.get(jobId) === proc) {
+          activeFfmpegChildren.delete(jobId);
+        }
+        ffmpegResult = { code, stderr: stderrBuffer };
+      } catch (error) {
+        const message = String(error);
+        addLog({ level: "error", message: `Failed to spawn FFmpeg: ${message}`, jobId });
+        activeFfmpegChildren.delete(jobId);
+        ffmpegResult = { code: 1, stderr: message };
+      }
 
       const holdRequest = consumeHoldRequest(jobId);
       if (holdRequest) {

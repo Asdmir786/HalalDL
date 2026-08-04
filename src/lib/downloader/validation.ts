@@ -1,6 +1,6 @@
-import { Command } from "@tauri-apps/plugin-shell";
 import { isInstagramUrl, resolveInstagramWithDownloadgram } from "@/lib/media-engine";
 import { resolveTool, ytDlpEnv } from "./tool-env";
+import { runResolvedTool } from "@/lib/process/app-bin";
 
 export type UrlProbeResult = "supported" | "unsupported" | "unknown";
 
@@ -93,8 +93,9 @@ export async function probeMediaUrl(url: string): Promise<UrlProbeResult> {
 
   try {
     const ytDlp = await resolveTool("yt-dlp");
-    const cmd = Command.create(
-      ytDlp.command,
+    const output = await runResolvedTool(
+      ytDlp,
+      "yt-dlp",
       [
         "--skip-download",
         "--no-playlist",
@@ -103,10 +104,9 @@ export async function probeMediaUrl(url: string): Promise<UrlProbeResult> {
         "%(id)s",
         url,
       ],
-      { env: ytDlpEnv() }
+      { env: ytDlpEnv(), timeoutMs: 20000 }
     );
 
-    const output = await cmd.execute();
     if (output.code === 0 && output.stdout.trim()) {
       return "supported";
     }
