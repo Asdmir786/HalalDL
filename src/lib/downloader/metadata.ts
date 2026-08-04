@@ -11,6 +11,7 @@ import { getExplicitOutputPaths } from "@/lib/output-paths";
 import { resolveTool, ytDlpEnv, isYouTubeUrl } from "./tool-env";
 import { runResolvedTool } from "@/lib/process/app-bin";
 import { getAppPaths } from "@/lib/app-paths";
+import { appendCookiesArgs } from "./cookies";
 import { fetchInstagramMediaInfo } from "./instagram";
 import {
   ensureThumbnailDir,
@@ -217,6 +218,7 @@ export async function fetchMediaInfo(url: string): Promise<MediaMetadataProbe> {
 
   const ytDlp = await resolveTool("yt-dlp");
   const args = ["--dump-single-json", "--skip-download", "--no-playlist", "--referer", url, url];
+  appendCookiesArgs(args);
   try {
     const { ytdlpCacheDir } = await getAppPaths();
     args.splice(0, 0, "--cache-dir", ytdlpCacheDir);
@@ -387,10 +389,12 @@ export async function fetchMetadata(jobId: string) {
     addLog({ level: "info", message: `[meta] Falling back to ffmpeg thumbnail extraction`, jobId });
 
     const ytDlpTool = await resolveTool("yt-dlp");
+    const mediaUrlArgs = ["-f", "best", "-g", "--no-playlist", "--referer", job.url, job.url];
+    appendCookiesArgs(mediaUrlArgs);
     const mediaOutput = await runResolvedTool(
       ytDlpTool,
       "yt-dlp",
-      ["-f", "best", "-g", "--no-playlist", "--referer", job.url, job.url],
+      mediaUrlArgs,
       { env: ytDlpEnv(), timeoutMs: 60000 }
     );
     const mediaStdout = mediaOutput.stdout;

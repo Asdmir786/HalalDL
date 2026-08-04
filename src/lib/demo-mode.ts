@@ -459,6 +459,7 @@ export function seedMarketingDemoState() {
   useToolsStore.getState().setTools(buildDemoTools(now));
   useRuntimeStore.setState({
     windowMode: "full",
+    quickSessionId: 0,
     queuePaused: false,
     lastFullScreen: getRequestedScreen(),
     trayStatus: {

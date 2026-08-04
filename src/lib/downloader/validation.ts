@@ -1,4 +1,5 @@
 import { isInstagramUrl, resolveInstagramWithDownloadgram } from "@/lib/media-engine";
+import { appendCookiesArgs } from "./cookies";
 import { resolveTool, ytDlpEnv } from "./tool-env";
 import { runResolvedTool } from "@/lib/process/app-bin";
 
@@ -93,17 +94,19 @@ export async function probeMediaUrl(url: string): Promise<UrlProbeResult> {
 
   try {
     const ytDlp = await resolveTool("yt-dlp");
+    const probeArgs = [
+      "--skip-download",
+      "--no-playlist",
+      "--flat-playlist",
+      "--print",
+      "%(id)s",
+      url,
+    ];
+    appendCookiesArgs(probeArgs);
     const output = await runResolvedTool(
       ytDlp,
       "yt-dlp",
-      [
-        "--skip-download",
-        "--no-playlist",
-        "--flat-playlist",
-        "--print",
-        "%(id)s",
-        url,
-      ],
+      probeArgs,
       { env: ytDlpEnv(), timeoutMs: 20000 }
     );
 

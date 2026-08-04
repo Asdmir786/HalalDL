@@ -34,6 +34,7 @@ import {
   getProbeHostLabel,
   type InstagramMediaSummary,
   type MediaMetadataProbe,
+  type PlaylistEntry,
   pickSupportedUrlFromText,
   probeMediaUrl,
   quickProbeMediaUrl,
@@ -42,6 +43,7 @@ import {
 import { normalizeUrlIdentity } from "@/lib/url-identity";
 import type { SponsorBlockMode } from "@/store/settings";
 import { UrlInfoPreview, type UrlPreviewStatus } from "./UrlInfoPreview";
+import { PlaylistPicker, type PlaylistPickerStatus } from "./PlaylistPicker";
 
 interface DownloadInputSectionProps {
   url: string;
@@ -96,6 +98,15 @@ interface DownloadInputSectionProps {
   sponsorBlockDisabledReason?: string;
   squareAlbumArt: boolean;
   onSquareAlbumArtChange: (val: boolean) => void;
+  playlistStatus: PlaylistPickerStatus;
+  playlistEntries: PlaylistEntry[];
+  playlistSelectedKeys: Set<string>;
+  onPlaylistSelectedKeysChange: (next: Set<string>) => void;
+  playlistError?: string | null;
+  playlistTruncated?: boolean;
+  canPreferSingleVideo?: boolean;
+  preferSingleVideo?: boolean;
+  onPreferSingleVideoChange?: (value: boolean) => void;
 }
 
 export function DownloadInputSection({
@@ -137,6 +148,15 @@ export function DownloadInputSection({
   sponsorBlockDisabledReason,
   squareAlbumArt,
   onSquareAlbumArtChange,
+  playlistStatus,
+  playlistEntries,
+  playlistSelectedKeys,
+  onPlaylistSelectedKeysChange,
+  playlistError,
+  playlistTruncated,
+  canPreferSingleVideo,
+  preferSingleVideo,
+  onPreferSingleVideoChange,
 }: DownloadInputSectionProps) {
   const [probeState, setProbeState] = useState<{
     url: string;
@@ -484,6 +504,21 @@ export function DownloadInputSection({
     return null;
   }, [instagramMediaSummary]);
 
+  const playlistSelectedCount = useMemo(
+    () => playlistEntries.filter((entry) => playlistSelectedKeys.has(entry.key)).length,
+    [playlistEntries, playlistSelectedKeys]
+  );
+  const addLabel =
+    playlistStatus !== "idle" && playlistSelectedCount > 0
+      ? addMode === "start"
+        ? `Start ${playlistSelectedCount}`
+        : `Add ${playlistSelectedCount}`
+      : isAdding
+        ? "Adding..."
+        : addMode === "start"
+          ? "Start"
+          : "Add";
+
   return (
     <div className="flex flex-col gap-1.5 rounded-2xl border border-border/60 bg-card/60 p-1.5 dark:border-white/8 dark:bg-white/[0.03]">
       <div className="flex flex-col gap-1.5 xl:flex-row xl:items-center">
@@ -538,11 +573,11 @@ export function DownloadInputSection({
 
           <MotionButton
             onClick={onAdd}
-            disabled={!url.trim() || isAdding}
+            disabled={!url.trim() || isAdding || playlistStatus === "loading"}
             className="h-9 rounded-xl bg-linear-to-r from-primary/95 via-primary to-primary/85 px-4 shadow-md shadow-primary/20 hover:from-primary hover:to-primary"
           >
             <Plus className="mr-2 h-4 w-4" />
-            {isAdding ? "Adding..." : addMode === "start" ? "Start" : "Add"}
+            {isAdding ? "Adding..." : addLabel}
           </MotionButton>
         </div>
       </div>
@@ -567,6 +602,18 @@ export function DownloadInputSection({
         status={urlPreviewStatus}
         preview={urlPreview}
         errorMessage={urlPreviewError}
+      />
+
+      <PlaylistPicker
+        status={playlistStatus}
+        entries={playlistEntries}
+        selectedKeys={playlistSelectedKeys}
+        onSelectedKeysChange={onPlaylistSelectedKeysChange}
+        errorMessage={playlistError}
+        truncated={playlistTruncated}
+        canPreferSingleVideo={canPreferSingleVideo}
+        preferSingleVideo={preferSingleVideo}
+        onPreferSingleVideoChange={onPreferSingleVideoChange}
       />
 
       <div className="rounded-xl border border-border/60 bg-background/82 px-3 py-2 shadow-sm dark:border-white/8 dark:bg-background/65">

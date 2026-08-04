@@ -29,6 +29,10 @@ export type DiagnosticsSummaryInput = {
   };
   tools: DiagnosticsSummaryTool[];
   performance?: DiagnosticsPerformanceSummary | null;
+  lastFailedJob?: {
+    url: string;
+    statusDetail: string;
+  } | null;
 };
 
 function formatMode(mode: DiagnosticsSummaryMode): string {
@@ -79,7 +83,7 @@ export function formatDiagnosticsSummary(input: DiagnosticsSummaryInput): string
       ? input.tools.map(formatTool).join("\n")
       : "- No tools loaded";
 
-  return [
+  const lines = [
     "HalalDL support info",
     `Version: ${input.version}`,
     `Mode: ${formatMode(input.mode)}`,
@@ -88,9 +92,17 @@ export function formatDiagnosticsSummary(input: DiagnosticsSummaryInput): string
     `User agent: ${input.userAgent}`,
     `Downloads running: ${input.activeDownloadCount}`,
     `History: ${input.history.total} total, ${input.history.completed} completed, ${input.history.failed} failed`,
-    "",
-    "Tools:",
-    tools,
-    ...formatPerformanceBlock(input.performance),
-  ].join("\n");
+  ];
+
+  if (input.lastFailedJob) {
+    lines.push(
+      "",
+      "Last failed download:",
+      `- URL: ${input.lastFailedJob.url}`,
+      `- Error: ${input.lastFailedJob.statusDetail}`
+    );
+  }
+
+  lines.push("", "Tools:", tools, ...formatPerformanceBlock(input.performance));
+  return lines.join("\n");
 }

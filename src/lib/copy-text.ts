@@ -25,6 +25,7 @@ export function formatJobErrorText(input: {
   url?: string;
   statusDetail?: string;
   failReason?: string;
+  logHints?: string[];
 }): string {
   const lines = [
     input.title ? `Title: ${input.title}` : null,
@@ -33,6 +34,18 @@ export function formatJobErrorText(input: {
     input.failReason && input.failReason !== input.statusDetail
       ? `Reason: ${input.failReason}`
       : null,
-  ].filter(Boolean);
+  ].filter(Boolean) as string[];
+
+  const hints = (input.logHints ?? [])
+    .map((line) => line.trim())
+    .filter(Boolean)
+    .slice(-8);
+  if (hints.length > 0) {
+    lines.push("", "Recent log lines:");
+    for (const hint of hints) {
+      lines.push(`- ${hint}`);
+    }
+  }
+
   return lines.join("\n");
 }

@@ -25,6 +25,12 @@ import { addUrlToAppArchive, getYtDlpArchivePath, isUrlInAppArchive } from "./ar
 import { getAppPaths } from "@/lib/app-paths";
 import { ensureYtDlpAvailable } from "@/lib/tools/ensure-ytdlp";
 import {
+  appendCookiesArgs,
+  cookiesEnabled,
+  redactCookiesInCommandLine,
+} from "./cookies";
+import { classifyYtDlpFailure } from "./failure-messages";
+import {
   normalizeSubtitlePreferences,
   resolveSubtitleLanguages,
   resolveSubtitlePlan,
@@ -983,10 +989,23 @@ export async function startDownload(jobId: string) {
     args.push("--limit-rate", `${settings.maxSpeed}K`);
   }
 
+  appendCookiesArgs(args);
+  if (cookiesEnabled()) {
+    addLog({
+      level: "info",
+      message: "Cookies file attached for this download",
+      jobId,
+    });
+  }
+
   args.push(job.url);
 
   const quotedArgs = args.map(arg => arg.includes(' ') ? `"${arg}"` : arg).join(" ");
-  addLog({ level: "info", message: `Executing Command:\n${ytDlp.path} ${quotedArgs}`, jobId });
+  addLog({
+    level: "info",
+    message: `Executing Command:\n${redactCookiesInCommandLine(`${ytDlp.path} ${quotedArgs}`)}`,
+    jobId,
+  });
   updateJob(jobId, {
     status: "Downloading",
     phase: "Resolving formats",
@@ -1090,6 +1109,7 @@ export async function startDownload(jobId: string) {
     let formatUnavailable = false;
     let aria2Error = false;
     let archiveSkipped = false;
+    const errorHints: string[] = [];
 
     const outputParser = new OutputParser();
     let lastUpdate = 0;
@@ -1150,6 +1170,10 @@ export async function startDownload(jobId: string) {
 
       const isWarning = /^warning:/i.test(trimmedLine) || /\bwarning\b/i.test(trimmedLine);
       addLog({ level: isWarning ? "warn" : "error", message: `STDERR: ${trimmedLine}`, jobId });
+      if (!isWarning) {
+        errorHints.push(trimmedLine);
+        if (errorHints.length > 40) errorHints.shift();
+      }
 
       if (/requested format is not available/i.test(trimmedLine)) {
         formatUnavailable = true;
@@ -1226,11 +1250,18 @@ export async function startDownload(jobId: string) {
         activeYtDlpChildren.delete(jobId);
       }
       addLog({ level: "info", message: `Process finished with code ${code}`, jobId });
-      return { code, lastKnownOutputPath, formatUnavailable, aria2Error, archiveSkipped };
+      return { code, lastKnownOutputPath, formatUnavailable, aria2Error, archiveSkipped, errorHints };
     } catch (e) {
       addLog({ level: "error", message: `Failed to spawn process: ${e}`, jobId });
       activeYtDlpChildren.delete(jobId);
-      return { code: 1, lastKnownOutputPath, formatUnavailable, aria2Error, archiveSkipped };
+      return {
+        code: 1,
+        lastKnownOutputPath,
+        formatUnavailable,
+        aria2Error,
+        archiveSkipped,
+        errorHints: [...errorHints, String(e)],
+      };
     }
   };
 
@@ -1252,7 +1283,7 @@ export async function startDownload(jobId: string) {
       });
       addLog({
         level: "info",
-        message: `Retrying without aria2 external downloader:\n${ytDlp.path} ${nativeQuoted}`,
+        message: `Retrying without aria2 external downloader:\n${redactCookiesInCommandLine(`${ytDlp.path} ${nativeQuoted}`)}`,
         jobId,
       });
       updateJob(jobId, {
@@ -1286,7 +1317,7 @@ export async function startDownload(jobId: string) {
       });
       const fallbackQuoted = attempt.args.map(arg => arg.includes(" ") ? `"${arg}"` : arg).join(" ");
       addLog({ level: "warn", message: `Falling back to format: ${attempt.format}`, jobId });
-      addLog({ level: "info", message: `Retrying with fallback format:\n${ytDlp.path} ${fallbackQuoted}`, jobId });
+      addLog({ level: "info", message: `Retrying with fallback format:\n${redactCookiesInCommandLine(`${ytDlp.path} ${fallbackQuoted}`)}`, jobId });
       const fallbackRun = await runAttemptWithDownloaderFallback(attempt.args);
       result = fallbackRun.attemptResult;
       if (await finalizeHoldRequest()) {
@@ -1496,7 +1527,8 @@ export async function startDownload(jobId: string) {
     }
     const failDetail = result.formatUnavailable
       ? "Failed to resolve a compatible format"
-      : "Download failed (see logs)";
+      : classifyYtDlpFailure((result.errorHints ?? []).join("\n")) ??
+        "Download failed — open Logs for this job for full details";
     await finalizeFailedDownload(failDetail);
   }
 }

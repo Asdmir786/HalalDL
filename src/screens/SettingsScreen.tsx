@@ -422,6 +422,8 @@ export function SettingsScreen() {
               onMaxRetriesChange={(v) => setDraftValue("maxRetries", v)}
               maxSpeed={draftSettings.maxSpeed}
               onMaxSpeedChange={(v) => setDraftValue("maxSpeed", v)}
+              cookiesFilePath={draftSettings.cookiesFilePath}
+              onCookiesFilePathChange={(v) => setDraftValue("cookiesFilePath", v)}
               sponsorBlockMode={draftSettings.sponsorBlockMode}
               onSponsorBlockModeChange={(v) => setDraftValue("sponsorBlockMode", v)}
               sponsorBlockCategories={draftSettings.sponsorBlockCategories}

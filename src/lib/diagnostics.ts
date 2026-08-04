@@ -42,6 +42,10 @@ function redactLogLine(line: string, redaction: DiagnosticsRedaction): string {
   }
   out = out.replace(/(authorization:\s*)(.+)$/gim, "$1(REDACTED)");
   out = out.replace(/(cookie:\s*)(.+)$/gim, "$1(REDACTED)");
+  out = out.replace(
+    /(^|\s)(--cookies(?:-from-browser)?)\s+(?:"(?:\\.|[^"])*"|'(?:\\.|[^'])*'|\S+)/gi,
+    "$1$2 (REDACTED)"
+  );
   return out;
 }
 
@@ -108,7 +112,18 @@ export function buildDiagnosticsPayload(redaction: DiagnosticsRedaction) {
     recent: historyState.entries.slice(0, 50).map((e) => sanitizeHistory(e, redaction)),
   };
 
-  const settings = settingsState.settings as Settings;
+  const settings = {
+    ...settingsState.settings,
+    ...(redaction.redactPaths && settingsState.settings.cookiesFilePath
+      ? { cookiesFilePath: redactPath(settingsState.settings.cookiesFilePath) }
+      : {}),
+    ...(redaction.redactPaths && settingsState.settings.defaultDownloadDir
+      ? { defaultDownloadDir: redactPath(settingsState.settings.defaultDownloadDir) }
+      : {}),
+    ...(redaction.redactPaths && settingsState.settings.tempDir
+      ? { tempDir: redactPath(settingsState.settings.tempDir) }
+      : {}),
+  } as Settings;
   const presets = presetsState.presets as Preset[];
   const performance = getStartupMetricsSnapshot();
 
@@ -157,6 +172,20 @@ export function buildCopyDiagnosticsSummary({
 
   const performance = getStartupMetricsSnapshot();
 
+  const failedQueueJob = downloadsState.jobs.find((job) => job.status === "Failed");
+  const failedHistory = historyState.entries.find((entry) => entry.status === "failed");
+  const lastFailedJob = failedQueueJob
+    ? {
+        url: failedQueueJob.url,
+        statusDetail: failedQueueJob.statusDetail || "Failed",
+      }
+    : failedHistory
+      ? {
+          url: failedHistory.url,
+          statusDetail: failedHistory.failReason || "Failed",
+        }
+      : null;
+
   return formatDiagnosticsSummary({
     version,
     mode: getAppMode(),
@@ -180,6 +209,7 @@ export function buildCopyDiagnosticsSummary({
       rustSetupCompleteMs: performance.rustSetupCompleteMs,
       persistenceCriticalReadyMs: performance.persistenceCriticalReadyMs,
     },
+    lastFailedJob,
   });
 }
 

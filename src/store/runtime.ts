@@ -27,6 +27,8 @@ interface RuntimeState {
   lastFullScreen: Screen;
   trayStatus: TrayStatusState;
   quickDraft: QuickDownloadDraft | null;
+  /** Bumps on every open so Quick panel hard-remounts with fresh state. */
+  quickSessionId: number;
   openQuickMode: (draft: QuickDownloadDraft) => void;
   closeQuickMode: () => void;
   restoreFullMode: (screen?: Screen) => void;
@@ -51,10 +53,12 @@ export const useRuntimeStore = create<RuntimeState>((set) => ({
   lastFullScreen: "downloads",
   trayStatus: DEFAULT_TRAY_STATUS,
   quickDraft: null,
+  quickSessionId: 0,
   openQuickMode: (draft) =>
     set((state) => ({
       windowMode: "quick",
       quickDraft: draft,
+      quickSessionId: state.quickSessionId + 1,
       lastFullScreen: state.lastFullScreen,
     })),
   closeQuickMode: () =>

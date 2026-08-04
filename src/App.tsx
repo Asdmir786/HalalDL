@@ -4,6 +4,7 @@ import { useNavigationStore } from "@/store/navigation";
 import { PersistenceManager } from "@/components/PersistenceManager";
 import { UpgradePrompt } from "@/components/UpgradePrompt";
 import { Toaster } from "@/components/ui/sonner";
+import { toast } from "sonner";
 import { AnimatePresence, motion } from "framer-motion";
 import { PageTransition } from "@/components/motion/PageTransition";
 import { DownloadsScreen } from "@/screens/DownloadsScreen"; // Keep critical path eager
@@ -147,6 +148,7 @@ export default function App() {
   const appUpdateAvailable = useAppUpdateStore((state) => state.updateAvailable);
   const {
     windowMode,
+    quickSessionId,
     queuePaused,
     persistenceReady,
     setTrayStatus,
@@ -406,28 +408,43 @@ export default function App() {
           });
           break;
         case "quick-download":
-          await showQuickDownloadWindow().catch(() => {
-            void 0;
-          });
           runtime.openQuickMode({
             url: "",
             presetId: quickPresetId,
             startMode: latestSettings.quickDownloadStartMode,
             destinationMode: latestSettings.quickDownloadDestinationMode,
           });
+          await showQuickDownloadWindow().catch(() => {
+            void 0;
+          });
           break;
         case "download-clipboard":
           if (latestSettings.quickActionBehavior === "instant") {
-            await addClipboardDownload(false);
+            try {
+              await addClipboardDownload(false);
+            } catch (error) {
+              const message = error instanceof Error ? error.message : String(error);
+              toast.error(message || "Clipboard download failed");
+              // Fall open quick panel so the user can paste manually.
+              runtime.openQuickMode({
+                url: "",
+                presetId: quickPresetId,
+                startMode: latestSettings.quickDownloadStartMode,
+                destinationMode: latestSettings.quickDownloadDestinationMode,
+              });
+              await showQuickDownloadWindow().catch(() => {
+                void 0;
+              });
+            }
           } else {
-            await showQuickDownloadWindow().catch(() => {
-              void 0;
-            });
             runtime.openQuickMode({
               url: "",
               presetId: quickPresetId,
               startMode: latestSettings.quickDownloadStartMode,
               destinationMode: latestSettings.quickDownloadDestinationMode,
+            });
+            await showQuickDownloadWindow().catch(() => {
+              void 0;
             });
           }
           break;
@@ -689,7 +706,7 @@ export default function App() {
         <AnimatePresence mode="wait">
           {windowMode === "quick" ? (
             <motion.div
-              key="quick-download"
+              key={`quick-download-${quickSessionId}`}
               className="h-full w-full"
               initial={{ opacity: 0, y: 8 }}
               animate={{ opacity: 1, y: 0 }}

@@ -21,9 +21,13 @@ import {
   cleanupThumbnailByJobId,
   fetchMediaInfo,
   fetchMetadata,
+  fetchPlaylistEntries,
   instagramSummaryFromMediaCollection,
   isDirectImageUrl,
   isYouTubeUrl,
+  looksLikePlaylistUrl,
+  canPreferSingleVideoFromUrl,
+  singleVideoUrlFromMixedUrl,
   pauseActiveDownload,
   quickProbeMediaUrl,
   resumePausedDownload,
@@ -32,6 +36,7 @@ import {
   stopPostProcessingJob,
   type InstagramMediaSummary,
   type MediaMetadataProbe,
+  type PlaylistEntry,
 } from "@/lib/downloader";
 import { isInstagramUrl } from "@/lib/media-engine";
 import { copyFilesToClipboard } from "@/lib/commands";
@@ -44,6 +49,7 @@ import { DownloadInputSection } from "./downloads/components/DownloadInputSectio
 import { DownloadStatsBar, type DownloadStatusFilter } from "./downloads/components/DownloadStatsBar";
 import { DownloadList } from "./downloads/components/DownloadList";
 import type { UrlPreviewStatus } from "./downloads/components/UrlInfoPreview";
+import type { PlaylistPickerStatus } from "./downloads/components/PlaylistPicker";
 import { getJobTs } from "./downloads/utils";
 import { buildClipSection } from "@/lib/clip";
 import { normalizeUrlIdentity } from "@/lib/url-identity";
@@ -182,6 +188,13 @@ export function DownloadsScreen() {
   const [urlPreviewError, setUrlPreviewError] = useState<string | null>(null);
   const urlPreviewCacheRef = useRef(new Map<string, MediaMetadataProbe>());
   const urlPreviewRequestRef = useRef(0);
+  const [playlistStatus, setPlaylistStatus] = useState<PlaylistPickerStatus>("idle");
+  const [playlistEntries, setPlaylistEntries] = useState<PlaylistEntry[]>([]);
+  const [playlistSelectedKeys, setPlaylistSelectedKeys] = useState<Set<string>>(new Set());
+  const [playlistError, setPlaylistError] = useState<string | null>(null);
+  const [playlistTruncated, setPlaylistTruncated] = useState(false);
+  const [preferSingleVideo, setPreferSingleVideo] = useState(false);
+  const playlistRequestRef = useRef(0);
 
   // Handle Drag & Drop Pending URL
   useEffect(() => {
@@ -254,13 +267,15 @@ export function DownloadsScreen() {
       isInstagramUrl(trimmed) && settings.instagramEngine !== "yt-dlp";
     const cacheKey = `${settings.instagramEngine}:${trimmed}`;
 
-    if (!trimmed || isDirectImageUrl(trimmed)) {
+    if (!trimmed || isDirectImageUrl(trimmed) || (looksLikePlaylistUrl(trimmed) && !preferSingleVideo)) {
       const timer = window.setTimeout(() => {
         if (urlPreviewRequestRef.current !== requestId) return;
         setUrlPreview(null);
         setUrlPreviewError(null);
         setUrlPreviewStatus("idle");
-        setInstagramMediaSummary(null);
+        if (!isInstagramUrl(trimmed)) {
+          setInstagramMediaSummary(null);
+        }
       }, 0);
       return () => window.clearTimeout(timer);
     }
@@ -329,7 +344,66 @@ export function DownloadsScreen() {
       window.clearTimeout(loadingTimer);
       window.clearTimeout(fetchTimer);
     };
-  }, [settings.instagramEngine, url]);
+  }, [settings.instagramEngine, url, preferSingleVideo]);
+
+  useEffect(() => {
+    const trimmed = url.trim();
+    const requestId = playlistRequestRef.current + 1;
+    playlistRequestRef.current = requestId;
+
+    if (!trimmed || !looksLikePlaylistUrl(trimmed) || preferSingleVideo) {
+      const timer = window.setTimeout(() => {
+        if (playlistRequestRef.current !== requestId) return;
+        setPlaylistStatus(preferSingleVideo && looksLikePlaylistUrl(trimmed) ? "ready" : "idle");
+        if (!preferSingleVideo) {
+          setPlaylistEntries([]);
+          setPlaylistSelectedKeys(new Set());
+          setPlaylistError(null);
+          setPlaylistTruncated(false);
+        }
+      }, 0);
+      return () => window.clearTimeout(timer);
+    }
+
+    const loadingTimer = window.setTimeout(() => {
+      if (playlistRequestRef.current !== requestId) return;
+      setPlaylistStatus("loading");
+      setPlaylistEntries([]);
+      setPlaylistSelectedKeys(new Set());
+      setPlaylistError(null);
+      setPlaylistTruncated(false);
+    }, 0);
+
+    const scanTimer = window.setTimeout(() => {
+      fetchPlaylistEntries(trimmed)
+        .then((result) => {
+          if (playlistRequestRef.current !== requestId) return;
+          setPlaylistEntries(result.entries);
+          setPlaylistSelectedKeys(new Set(result.entries.map((entry) => entry.key)));
+          setPlaylistTruncated(Boolean(result.truncated));
+          setPlaylistError(null);
+          setPlaylistStatus("ready");
+        })
+        .catch((error) => {
+          if (playlistRequestRef.current !== requestId) return;
+          setPlaylistEntries([]);
+          setPlaylistSelectedKeys(new Set());
+          setPlaylistError(String(error).replace(/^Error:\s*/i, "").slice(0, 280));
+          setPlaylistStatus("error");
+          setPlaylistTruncated(false);
+        });
+    }, 360);
+
+    return () => {
+      window.clearTimeout(loadingTimer);
+      window.clearTimeout(scanTimer);
+    };
+  }, [url, settings.cookiesFilePath, preferSingleVideo]);
+
+  // Reset single-video preference when the pasted URL changes.
+  useEffect(() => {
+    setPreferSingleVideo(false);
+  }, [url]);
 
   const isInstagramImageOnly = instagramMediaSummary?.isImageOnly ?? false;
   const outputConfigOpen = showOutputConfig && !isInstagramImageOnly;
@@ -531,6 +605,37 @@ export function DownloadsScreen() {
     const trimmedUrl = url.trim();
     if (!trimmedUrl || isAdding) return;
 
+    const isPlaylistFlow = looksLikePlaylistUrl(trimmedUrl) && !preferSingleVideo;
+    const selectedPlaylistEntries =
+      isPlaylistFlow && playlistStatus === "ready"
+        ? playlistEntries.filter((entry) => playlistSelectedKeys.has(entry.key))
+        : [];
+
+    const singleFromMixed =
+      preferSingleVideo ? singleVideoUrlFromMixedUrl(trimmedUrl) : null;
+    const jobUrl = singleFromMixed || trimmedUrl;
+
+    if (isPlaylistFlow) {
+      if (playlistStatus === "loading") {
+        toast.error("Still scanning playlist", {
+          description: "Wait for the entry list to finish, then add selected items.",
+        });
+        return;
+      }
+      if (playlistStatus === "error" || playlistEntries.length === 0) {
+        toast.error("Playlist could not be loaded", {
+          description:
+            playlistError ||
+            "Private lists need a cookies.txt file in Settings → Download Engine.",
+        });
+        return;
+      }
+      if (selectedPlaylistEntries.length === 0) {
+        toast.error("Pick at least one playlist item");
+        return;
+      }
+    }
+
     setIsAdding(true);
     try {
       const finalTemplate = `${filenameBase.trim() || "%(title)s"}.%(ext)s`;
@@ -553,6 +658,12 @@ export function DownloadsScreen() {
       if (clipOverridesNeeded && isDirectImageInput) {
         toast.error("Clip download is only for timed media", {
           description: "Images do not have a timeline, so leave start and end blank.",
+        });
+        return;
+      }
+      if (clipOverridesNeeded && isPlaylistFlow && selectedPlaylistEntries.length > 1) {
+        toast.error("Clip range applies to one video at a time", {
+          description: "Select a single playlist item, or clear clip start/end for batch add.",
         });
         return;
       }
@@ -622,47 +733,93 @@ export function DownloadsScreen() {
             ...(outputConfigOpen || isCustomPreset ? { filenameTemplate: finalTemplate } : {}),
           }
         : overrides;
-      const id = addJob(trimmedUrl, presetIdToUse, safeOverrides);
 
-      if (urlPreview && urlPreviewStatus === "ready") {
-        updateJob(id, {
-          ...(urlPreview.title ? { title: urlPreview.title } : {}),
-          ...(urlPreview.thumbnailUrl && /^https?:/i.test(urlPreview.thumbnailUrl)
-            ? { thumbnail: urlPreview.thumbnailUrl, thumbnailStatus: "ready" as const }
-            : {}),
-          ...(urlPreview.mediaDurationSeconds
-            ? { mediaDurationSeconds: urlPreview.mediaDurationSeconds }
-            : {}),
-          ...(urlPreview.mediaCollectionSummary
-            ? { mediaCollectionSummary: urlPreview.mediaCollectionSummary }
-            : {}),
-          subtitleStatus:
-            urlPreview.hasManualSubtitles || urlPreview.hasAutoSubtitles
-              ? "available"
-              : "unavailable",
-          hasManualSubtitles: urlPreview.hasManualSubtitles,
-          hasAutoSubtitles: urlPreview.hasAutoSubtitles,
-          availableSubtitleLanguages: urlPreview.availableSubtitleLanguages,
-        });
+      const targets =
+        isPlaylistFlow && selectedPlaylistEntries.length > 0
+          ? selectedPlaylistEntries.map((entry) => ({
+              url: entry.url,
+              title: entry.title,
+              mediaDurationSeconds: entry.durationSeconds,
+            }))
+          : [
+              {
+                url: jobUrl,
+                title: urlPreview?.title,
+                mediaDurationSeconds: urlPreview?.mediaDurationSeconds,
+                preview: urlPreviewStatus === "ready" ? urlPreview : null,
+              },
+            ];
+
+      const createdIds: string[] = [];
+      for (const target of targets) {
+        const id = addJob(target.url, presetIdToUse, safeOverrides);
+        createdIds.push(id);
+
+        if ("preview" in target && target.preview) {
+          const preview = target.preview;
+          updateJob(id, {
+            ...(preview.title ? { title: preview.title } : {}),
+            ...(preview.thumbnailUrl && /^https?:/i.test(preview.thumbnailUrl)
+              ? { thumbnail: preview.thumbnailUrl, thumbnailStatus: "ready" as const }
+              : {}),
+            ...(preview.mediaDurationSeconds
+              ? { mediaDurationSeconds: preview.mediaDurationSeconds }
+              : {}),
+            ...(preview.mediaCollectionSummary
+              ? { mediaCollectionSummary: preview.mediaCollectionSummary }
+              : {}),
+            subtitleStatus:
+              preview.hasManualSubtitles || preview.hasAutoSubtitles
+                ? "available"
+                : "unavailable",
+            hasManualSubtitles: preview.hasManualSubtitles,
+            hasAutoSubtitles: preview.hasAutoSubtitles,
+            availableSubtitleLanguages: preview.availableSubtitleLanguages,
+          });
+        } else {
+          updateJob(id, {
+            ...(target.title ? { title: target.title } : {}),
+            ...(target.mediaDurationSeconds
+              ? { mediaDurationSeconds: target.mediaDurationSeconds }
+              : {}),
+          });
+        }
       }
 
       setUrl("");
       setUrlPreview(null);
       setUrlPreviewError(null);
       setUrlPreviewStatus("idle");
+      setPlaylistStatus("idle");
+      setPlaylistEntries([]);
+      setPlaylistSelectedKeys(new Set());
+      setPlaylistError(null);
+      setPlaylistTruncated(false);
+      setPreferSingleVideo(false);
 
       if (addMode === "start") {
-        const started = startQueuedJobs([id], { ignoreQueuePaused: true });
-        if (started === 0) {
-          updateJob(id, {
-            statusDetail: "Waiting for an open slot",
-          });
+        startQueuedJobs(createdIds, { ignoreQueuePaused: true });
+        for (const id of createdIds) {
+          const job = useDownloadsStore.getState().jobs.find((j) => j.id === id);
+          if (job?.status === "Queued") {
+            updateJob(id, { statusDetail: "Waiting for an open slot" });
+          }
         }
       } else {
-        updateJob(id, { statusDetail: "Queued" });
+        for (const id of createdIds) {
+          updateJob(id, { statusDetail: "Queued" });
+        }
       }
 
-      void fetchMetadata(id);
+      for (const id of createdIds) {
+        void fetchMetadata(id);
+      }
+
+      if (createdIds.length > 1) {
+        toast.success(`Added ${createdIds.length} playlist items`, {
+          description: addMode === "start" ? "Downloads will start as slots open." : "Queued for later.",
+        });
+      }
     } finally {
       setIsAdding(false);
     }
@@ -893,6 +1050,15 @@ export function DownloadsScreen() {
                     sponsorBlockDisabledReason={sponsorBlockDisabledReason}
                     squareAlbumArt={settings.squareAlbumArt}
                     onSquareAlbumArtChange={(val) => updateSettings({ squareAlbumArt: val })}
+                    playlistStatus={playlistStatus}
+                    playlistEntries={playlistEntries}
+                    playlistSelectedKeys={playlistSelectedKeys}
+                    onPlaylistSelectedKeysChange={setPlaylistSelectedKeys}
+                    playlistError={playlistError}
+                    playlistTruncated={playlistTruncated}
+                    canPreferSingleVideo={canPreferSingleVideoFromUrl(url.trim())}
+                    preferSingleVideo={preferSingleVideo}
+                    onPreferSingleVideoChange={setPreferSingleVideo}
                   />
 
                   <DownloadStatsBar 

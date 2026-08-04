@@ -81,6 +81,13 @@ export interface Settings {
   /** Embed a center-cropped 1:1 thumbnail for audio downloads. */
   squareAlbumArt: boolean;
 
+  /**
+   * Netscape cookies.txt for age-gated / private / members content.
+   * Chrome cannot auto-export cookies anymore; pick a file from an extension export.
+   * Empty string = do not pass --cookies.
+   */
+  cookiesFilePath: string;
+
   // History
   historyRetention: number; // max entries to keep, 0 = unlimited
 }
@@ -129,6 +136,7 @@ export const DEFAULT_SETTINGS: Settings = {
   instagramEngine: "downloadgram",
   aria2Enabled: true,
   squareAlbumArt: false,
+  cookiesFilePath: "",
   historyRetention: 0,
 };
 
@@ -145,6 +153,8 @@ function normalizeSettings(settings: Settings): Settings {
     instagramEngine: settings.instagramEngine === "yt-dlp" ? "yt-dlp" : "downloadgram",
     aria2Enabled: settings.aria2Enabled !== false,
     squareAlbumArt: settings.squareAlbumArt === true,
+    cookiesFilePath:
+      typeof settings.cookiesFilePath === "string" ? settings.cookiesFilePath.trim() : "",
   };
 }
 

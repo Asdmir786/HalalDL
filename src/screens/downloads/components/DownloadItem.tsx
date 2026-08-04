@@ -207,13 +207,24 @@ export function DownloadItem({
   };
 
   const handleCopyError = () => {
+    const logHints = useLogsStore
+      .getState()
+      .logs.filter(
+        (entry) =>
+          entry.jobId === job.id && (entry.level === "error" || entry.level === "warn")
+      )
+      .slice(-10)
+      .map((entry) => entry.message.replace(/^STDERR:\s*/i, "").trim())
+      .filter(Boolean);
+
     void copyText(
       formatJobErrorText({
         title: job.title,
         url: job.url,
         statusDetail: job.statusDetail,
+        logHints,
       }),
-      "Error copied"
+      "Error details copied"
     );
   };
 
@@ -805,10 +816,23 @@ export function DownloadItem({
                             e.stopPropagation();
                             handleCopyError();
                           }}
-                          title="Copy error"
-                          aria-label="Copy error"
+                          title="Copy error details"
+                          aria-label="Copy error details"
                         >
                           <Copy className="h-3.5 w-3.5" />
+                        </MotionButton>
+                        <MotionButton
+                          variant="ghost"
+                          size="icon"
+                          className="h-8 w-8 rounded-full border border-border/50 bg-background/40 hover:bg-muted/60"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            onViewLogs(job.id);
+                          }}
+                          title="View job logs"
+                          aria-label="View job logs"
+                        >
+                          <Terminal className="h-3.5 w-3.5" />
                         </MotionButton>
                         <MotionButton
                           variant="ghost"

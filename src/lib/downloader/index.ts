@@ -22,4 +22,15 @@ export {
   pickSupportedUrlFromText,
   type UrlProbeResult,
 } from "./validation";
+export {
+  looksLikePlaylistUrl,
+  fetchPlaylistEntries,
+  canPreferSingleVideoFromUrl,
+  singleVideoUrlFromMixedUrl,
+  PLAYLIST_ENTRY_LIMIT,
+  type PlaylistEntry,
+  type PlaylistScanResult,
+} from "./playlist";
+export { classifyYtDlpFailure, collectJobLogHints } from "./failure-messages";
+export { getCookiesFilePath, cookiesEnabled, appendCookiesArgs } from "./cookies";
 export { isYouTubeUrl } from "./tool-env";

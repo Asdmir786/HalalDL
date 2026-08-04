@@ -1,4 +1,4 @@
-import { Gauge, Layers, RotateCcw, Zap, Trash2, Images } from "lucide-react";
+import { Cookie, Gauge, Layers, RotateCcw, Zap, Trash2, Images, Search, X } from "lucide-react";
 import { Slider } from "@/components/ui/slider";
 import { Input } from "@/components/ui/input";
 import {
@@ -11,6 +11,8 @@ import {
 import { useEffect, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { toast } from "sonner";
+import { open } from "@tauri-apps/plugin-dialog";
+import { exists } from "@tauri-apps/plugin-fs";
 import { clearYtDlpCache } from "@/lib/commands";
 import { MotionButton } from "@/components/motion/MotionButton";
 import { SponsorBlockControls } from "@/components/SponsorBlockControls";
@@ -33,6 +35,8 @@ interface EngineSectionProps {
   onMaxRetriesChange: (val: number) => void;
   maxSpeed: number;
   onMaxSpeedChange: (val: number) => void;
+  cookiesFilePath: string;
+  onCookiesFilePathChange: (val: string) => void;
   sponsorBlockMode: SponsorBlockMode;
   onSponsorBlockModeChange: (val: SponsorBlockMode) => void;
   sponsorBlockCategories: SponsorBlockCategoryId[];
@@ -45,6 +49,7 @@ export function EngineSection({
   maxConcurrency, onMaxConcurrencyChange,
   maxRetries, onMaxRetriesChange,
   maxSpeed, onMaxSpeedChange,
+  cookiesFilePath, onCookiesFilePathChange,
   sponsorBlockMode, onSponsorBlockModeChange,
   sponsorBlockCategories, onSponsorBlockCategoriesChange,
   instagramEngine, onInstagramEngineChange,
@@ -52,6 +57,7 @@ export function EngineSection({
   const [speedUnit, setSpeedUnit] = useState<number>(1);
   const [localSpeedValue, setLocalSpeedValue] = useState<number>(0);
   const [isClearingCache, setIsClearingCache] = useState(false);
+  const [cookiesFileMissing, setCookiesFileMissing] = useState(false);
 
   useEffect(() => {
     const rawKb = maxSpeed || 0;
@@ -65,6 +71,25 @@ export function EngineSection({
     }, 0);
     return () => clearTimeout(timer);
   }, [maxSpeed, speedUnit]);
+
+  useEffect(() => {
+    const path = cookiesFilePath?.trim() || "";
+    if (!path) {
+      setCookiesFileMissing(false);
+      return;
+    }
+    let cancelled = false;
+    void exists(path)
+      .then((ok) => {
+        if (!cancelled) setCookiesFileMissing(!ok);
+      })
+      .catch(() => {
+        if (!cancelled) setCookiesFileMissing(true);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [cookiesFilePath]);
 
   const updateSpeed = (val: number, unitMult: number) => {
     const kb = val * unitMult;
@@ -163,6 +188,65 @@ export function EngineSection({
       </SettingRow>
 
       <SettingRow
+        icon={Cookie}
+        label="Cookies file"
+        description="Netscape cookies.txt for age-gated, private, or members-only videos. Chrome cannot auto-share cookies anymore — export a cookies.txt with a browser extension, then pick the file here."
+        vertical
+      >
+        <div className="flex flex-col gap-2">
+          <div className="flex gap-2">
+            <Input
+              value={cookiesFilePath || ""}
+              readOnly
+              placeholder="No cookies file selected"
+              className="bg-muted/30 border-border/30"
+            />
+            <MotionButton
+              type="button"
+              variant="outline"
+              whileHover={{ scale: 1.05 }}
+              whileTap={{ scale: 0.95 }}
+              onClick={async () => {
+                const selected = await open({
+                  directory: false,
+                  multiple: false,
+                  filters: [
+                    { name: "Cookies", extensions: ["txt"] },
+                    { name: "All files", extensions: ["*"] },
+                  ],
+                });
+                if (selected && !Array.isArray(selected)) onCookiesFilePathChange(selected);
+              }}
+            >
+              <Search className="w-4 h-4 mr-2" />
+              Browse
+            </MotionButton>
+            {cookiesFilePath ? (
+              <MotionButton
+                type="button"
+                variant="outline"
+                whileHover={{ scale: 1.05 }}
+                whileTap={{ scale: 0.95 }}
+                onClick={() => onCookiesFilePathChange("")}
+                aria-label="Clear cookies file"
+              >
+                <X className="w-4 h-4" />
+              </MotionButton>
+            ) : null}
+          </div>
+          <p className="text-[11px] text-muted-foreground">
+            Used for yt-dlp downloads, link preview, and private playlists. Never paste cookie file contents into GitHub issues.
+            {cookiesFilePath ? " Path is active — yt-dlp will receive --cookies." : ""}
+          </p>
+          {cookiesFileMissing ? (
+            <p className="text-[11px] text-amber-700 dark:text-amber-300">
+              File not found at this path. Browse again after exporting cookies.txt.
+            </p>
+          ) : null}
+        </div>
+      </SettingRow>
+
+      <SettingRow
         icon={Images}
         label="Instagram Engine"
         description="DownloadGram is the reliable default. yt-dlp can work on public posts with a modern x64 build (curl_cffi is already inside HalalDL’s managed yt-dlp.exe)."
@@ -182,7 +266,7 @@ export function EngineSection({
         </Select>
         {instagramEngine === "yt-dlp" ? (
           <p className="mt-2 text-[11px] text-muted-foreground">
-            Some posts still need cookies or login. Prefer DownloadGram if downloads fail or look blocked.
+            Some posts still need a cookies.txt file (above). Prefer DownloadGram if downloads fail or look blocked.
           </p>
         ) : null}
       </SettingRow>
