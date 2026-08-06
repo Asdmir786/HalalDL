@@ -14,6 +14,8 @@ import { useToolsStore, type Tool } from "@/store/tools";
 import { useLogsStore } from "@/store/logs";
 import { useDownloadsStore, type DownloadJob } from "@/store/downloads";
 import { useHistoryStore, type HistoryEntry } from "@/store/history";
+import { useLibraryStore } from "@/store/library";
+import type { Collection, SourceRule, Watchlist } from "@/lib/library-types";
 import { useRuntimeStore } from "@/store/runtime";
 import { storage } from "@/lib/storage";
 import { canonicalizePresetId } from "@/lib/preset-display";
@@ -247,6 +249,13 @@ export function usePersistenceInit(): MutableRefObject<boolean> {
                   message: `History loaded (${savedHistory.length})`,
                 });
               }
+
+              const savedWatchlists = await storage.getWatchlists<Watchlist[]>();
+              if (Array.isArray(savedWatchlists)) useLibraryStore.getState().setWatchlists(savedWatchlists);
+              const savedCollections = await storage.getCollections<Collection[]>();
+              if (Array.isArray(savedCollections)) useLibraryStore.getState().setCollections(savedCollections);
+              const savedRules = await storage.getSourceRules<SourceRule[]>();
+              if (Array.isArray(savedRules)) useLibraryStore.getState().setRules(savedRules);
 
               const savedTools = await storage.getTools<Tool[]>();
               if (savedTools && Array.isArray(savedTools)) {

@@ -19,6 +19,7 @@ import {
   generateThumbnailContactSheet,
   generateThumbnailFromMediaUrl,
 } from "./thumbnails";
+import type { MediaChapter } from "@/lib/chapters";
 
 const IMAGE_FILE_EXTENSIONS = new Set(["jpg", "jpeg", "png", "webp", "gif", "bmp", "avif"]);
 const VIDEO_FILE_EXTENSIONS = new Set(["mp4", "mov", "webm", "mkv", "avi", "m4v"]);
@@ -44,6 +45,10 @@ export interface MediaMetadataProbe {
   title: string;
   thumbnailUrl: string;
   uploader?: string;
+  uploaderId?: string;
+  playlist?: string;
+  playlistId?: string;
+  chapters: MediaChapter[];
   mediaDurationSeconds?: number;
   mediaCollectionSummary?: DownloadJob["mediaCollectionSummary"];
   hasManualSubtitles: boolean;
@@ -211,7 +216,7 @@ export async function fetchMediaInfo(url: string): Promise<MediaMetadataProbe> {
   if (isInstagramUrl(url)) {
     const engine = useSettingsStore.getState().settings.instagramEngine;
     if (engine !== "yt-dlp") {
-      return fetchInstagramMediaInfo(url);
+      return { ...(await fetchInstagramMediaInfo(url)), chapters: [] };
     }
     // Fall through to yt-dlp dump-json for Instagram when that engine is selected.
   }
@@ -242,11 +247,21 @@ export async function fetchMediaInfo(url: string): Promise<MediaMetadataProbe> {
   const mergedLanguages = Array.from(new Set([...manualLanguages, ...autoLanguages]));
   const duration = Number(payload?.duration);
   const uploader = String(payload?.uploader ?? payload?.channel ?? payload?.creator ?? "").trim();
+  const rawChapters = Array.isArray(payload?.chapters) ? payload.chapters : [];
+  const chapters = rawChapters.map((chapter: Record<string, unknown>, index: number) => ({
+    title: String(chapter?.title ?? `Chapter ${index + 1}`).trim(),
+    startTime: Number(chapter?.start_time),
+    endTime: Number.isFinite(Number(chapter?.end_time)) ? Number(chapter?.end_time) : undefined,
+  })).filter((chapter: MediaChapter) => Number.isFinite(chapter.startTime) && chapter.startTime >= 0);
 
   return {
     title: String(payload?.title ?? "").trim(),
     thumbnailUrl: String(payload?.thumbnail ?? "").trim(),
     ...(uploader ? { uploader } : {}),
+    ...(String(payload?.uploader_id ?? payload?.channel_id ?? "").trim() ? { uploaderId: String(payload?.uploader_id ?? payload?.channel_id).trim() } : {}),
+    ...(String(payload?.playlist_title ?? payload?.playlist ?? "").trim() ? { playlist: String(payload?.playlist_title ?? payload?.playlist).trim() } : {}),
+    ...(String(payload?.playlist_id ?? "").trim() ? { playlistId: String(payload?.playlist_id).trim() } : {}),
+    chapters,
     mediaDurationSeconds: Number.isFinite(duration) && duration > 0 ? duration : undefined,
     hasManualSubtitles: manualLanguages.length > 0,
     hasAutoSubtitles: autoLanguages.length > 0,
@@ -298,6 +313,14 @@ export async function fetchMetadata(jobId: string) {
         ...(info.mediaCollectionSummary
           ? { mediaCollectionSummary: info.mediaCollectionSummary }
           : {}),
+        hasChapters: info.chapters.length > 0,
+        sourceRef: {
+          ...(job.sourceRef ?? {}),
+          ...(info.uploader ? { creator: info.uploader } : {}),
+          ...(info.uploaderId ? { creatorId: info.uploaderId } : {}),
+          ...(info.playlist ? { playlist: info.playlist } : {}),
+          ...(info.playlistId ? { playlistId: info.playlistId } : {}),
+        },
         subtitleStatus:
           info.hasManualSubtitles || info.hasAutoSubtitles ? "available" : "unavailable",
         hasManualSubtitles: info.hasManualSubtitles,

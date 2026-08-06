@@ -8,6 +8,7 @@ import { useSettingsStore } from "@/store/settings";
 import { useLogsStore } from "@/store/logs";
 import { useNavigationStore } from "@/store/navigation";
 import { useRuntimeStore } from "@/store/runtime";
+import { useLibraryStore } from "@/store/library";
 import {
   normalizeSubtitlePreferences,
   splitSubtitleLanguages,
@@ -53,6 +54,8 @@ import type { PlaylistPickerStatus } from "./downloads/components/PlaylistPicker
 import { getJobTs } from "./downloads/utils";
 import { buildClipSection } from "@/lib/clip";
 import { normalizeUrlIdentity } from "@/lib/url-identity";
+import { applySourceRule, resolveSourceRule } from "@/lib/source-rules";
+import type { ChapterMode } from "@/lib/chapters";
 
 export function DownloadsScreen() {
   const { settings, updateSettings } = useSettingsStore();
@@ -77,8 +80,10 @@ export function DownloadsScreen() {
   const [subtitleFormat, setSubtitleFormat] = useState<"original" | "srt" | "vtt">("srt");
   const [clipStartTime, setClipStartTime] = useState("");
   const [clipEndTime, setClipEndTime] = useState("");
+  const [chapterMode, setChapterMode] = useState<ChapterMode>("preserve");
 
   const { presets } = usePresetsStore();
+  const { rules: sourceRules, collections } = useLibraryStore();
   const selectedPreset = resolveExistingPresetId(presets, settings.downloadsSelectedPreset || "default");
   const selectedPresetConfig = useMemo(
     () => presets.find((preset) => preset.id === selectedPreset) ?? null,
@@ -402,7 +407,8 @@ export function DownloadsScreen() {
 
   // Reset single-video preference when the pasted URL changes.
   useEffect(() => {
-    setPreferSingleVideo(false);
+    const resetTimer = window.setTimeout(() => setPreferSingleVideo(false), 0);
+    return () => window.clearTimeout(resetTimer);
   }, [url]);
 
   const isInstagramImageOnly = instagramMediaSummary?.isImageOnly ?? false;
@@ -701,6 +707,7 @@ export function DownloadsScreen() {
                 ? {
                     ...(clipStartTrimmed ? { clipStartTime: clipStartTrimmed } : {}),
                     ...(clipEndTrimmed ? { clipEndTime: clipEndTrimmed } : {}),
+                    chapterMode,
                   }
                 : {}),
               ...(subtitleOverridesNeeded
@@ -752,8 +759,17 @@ export function DownloadsScreen() {
 
       const createdIds: string[] = [];
       for (const target of targets) {
-        const id = addJob(target.url, presetIdToUse, safeOverrides);
+        const previewSource = "preview" in target && target.preview ? {
+          ...(target.preview.uploader ? { creator: target.preview.uploader } : {}),
+          ...(target.preview.uploaderId ? { creatorId: target.preview.uploaderId } : {}),
+          ...(target.preview.playlist ? { playlist: target.preview.playlist } : {}),
+          ...(target.preview.playlistId ? { playlistId: target.preview.playlistId } : {}),
+        } : undefined;
+        const rule = resolveSourceRule(target.url, previewSource, sourceRules);
+        const collection = collections.find((item) => item.id === rule?.collectionId);
+        const id = addJob(target.url, rule?.presetId || presetIdToUse, applySourceRule(safeOverrides, rule, collection));
         createdIds.push(id);
+        if (rule) updateJob(id, { collectionId: rule.collectionId, appliedRuleId: rule.id, sourceRef: previewSource });
 
         if ("preview" in target && target.preview) {
           const preview = target.preview;
@@ -775,6 +791,13 @@ export function DownloadsScreen() {
             hasManualSubtitles: preview.hasManualSubtitles,
             hasAutoSubtitles: preview.hasAutoSubtitles,
             availableSubtitleLanguages: preview.availableSubtitleLanguages,
+            hasChapters: preview.chapters.length > 0,
+            sourceRef: {
+              ...(preview.uploader ? { creator: preview.uploader } : {}),
+              ...(preview.uploaderId ? { creatorId: preview.uploaderId } : {}),
+              ...(preview.playlist ? { playlist: preview.playlist } : {}),
+              ...(preview.playlistId ? { playlistId: preview.playlistId } : {}),
+            },
           });
         } else {
           updateJob(id, {
@@ -1038,6 +1061,8 @@ export function DownloadsScreen() {
                     clipEndTime={clipEndTime}
                     onClipEndTimeChange={setClipEndTime}
                     clipValidationMessage={clipValidationMessage}
+                    chapterMode={chapterMode}
+                    onChapterModeChange={setChapterMode}
                     instagramMediaSummary={instagramMediaSummary}
                     urlPreviewStatus={urlPreviewStatus}
                     urlPreview={urlPreview}

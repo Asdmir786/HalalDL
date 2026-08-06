@@ -20,6 +20,7 @@ import { BehaviorSection } from "./settings/components/BehaviorSection";
 import { EngineSection } from "./settings/components/EngineSection";
 import { PerformanceSection } from "./settings/components/PerformanceSection";
 import { AboutSection } from "./settings/components/AboutSection";
+import { ReliabilityCenter } from "./settings/components/ReliabilityCenter";
 import { usePresetsStore } from "@/store/presets";
 import { getQuickEligiblePresets } from "@/lib/preset-display";
 import { storage } from "@/lib/storage";
@@ -430,6 +431,12 @@ export function SettingsScreen() {
               onSponsorBlockCategoriesChange={(v) => setDraftValue("sponsorBlockCategories", v)}
               instagramEngine={draftSettings.instagramEngine}
               onInstagramEngineChange={(v) => setDraftValue("instagramEngine", v)}
+            />
+
+            <ReliabilityCenter
+              cookiesFilePath={draftSettings.cookiesFilePath}
+              deliveryMode={draftSettings.watchlistDeliveryMode}
+              onDeliveryModeChange={(v) => setDraftValue("watchlistDeliveryMode", v)}
             />
 
             <PerformanceSection />

@@ -5,6 +5,7 @@ import { useToolsStore } from "@/store/tools";
 import { useLogsStore } from "@/store/logs";
 import { useDownloadsStore } from "@/store/downloads";
 import { useHistoryStore } from "@/store/history";
+import { useLibraryStore } from "@/store/library";
 import { storage } from "@/lib/storage";
 import { setAutostartEnabled } from "@/lib/commands";
 import { isDemoModeEnabled } from "@/lib/demo-mode";
@@ -17,6 +18,9 @@ export function useAutoSave(initialized: MutableRefObject<boolean>) {
   const logs = useLogsStore((s) => s.logs);
   const jobs = useDownloadsStore((s) => s.jobs);
   const historyEntries = useHistoryStore((s) => s.entries);
+  const watchlists = useLibraryStore((s) => s.watchlists);
+  const collections = useLibraryStore((s) => s.collections);
+  const rules = useLibraryStore((s) => s.rules);
 
   useEffect(() => {
     if (!initialized.current || demoMode) return;
@@ -95,4 +99,20 @@ export function useAutoSave(initialized: MutableRefObject<boolean>) {
     }, 500);
     return () => clearTimeout(timer);
   }, [historyEntries, initialized, demoMode]);
+
+  useEffect(() => {
+    if (!initialized.current || demoMode) return;
+    const timer = setTimeout(() => { void storage.saveWatchlists(watchlists); }, 500);
+    return () => clearTimeout(timer);
+  }, [watchlists, initialized, demoMode]);
+  useEffect(() => {
+    if (!initialized.current || demoMode) return;
+    const timer = setTimeout(() => { void storage.saveCollections(collections); }, 500);
+    return () => clearTimeout(timer);
+  }, [collections, initialized, demoMode]);
+  useEffect(() => {
+    if (!initialized.current || demoMode) return;
+    const timer = setTimeout(() => { void storage.saveSourceRules(rules); }, 500);
+    return () => clearTimeout(timer);
+  }, [rules, initialized, demoMode]);
 }

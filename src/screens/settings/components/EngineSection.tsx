@@ -74,11 +74,16 @@ export function EngineSection({
 
   useEffect(() => {
     const path = cookiesFilePath?.trim() || "";
-    if (!path) {
-      setCookiesFileMissing(false);
-      return;
-    }
     let cancelled = false;
+    if (!path) {
+      const resetTimer = window.setTimeout(() => {
+        if (!cancelled) setCookiesFileMissing(false);
+      }, 0);
+      return () => {
+        cancelled = true;
+        window.clearTimeout(resetTimer);
+      };
+    }
     void exists(path)
       .then((ok) => {
         if (!cancelled) setCookiesFileMissing(!ok);

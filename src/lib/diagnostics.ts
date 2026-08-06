@@ -4,6 +4,7 @@ import { useLogsStore, type LogEntry } from "@/store/logs";
 import { usePresetsStore, type Preset } from "@/store/presets";
 import { useSettingsStore, type Settings } from "@/store/settings";
 import { useToolsStore, type Tool } from "@/store/tools";
+import { useLibraryStore } from "@/store/library";
 import { getAppMode } from "@/lib/tools/app-mode";
 import { formatDiagnosticsSummary } from "@/lib/diagnostics-summary";
 import { getStartupMetricsSnapshot } from "@/lib/startup-metrics";
@@ -84,6 +85,7 @@ export function buildDiagnosticsPayload(redaction: DiagnosticsRedaction) {
   const toolsState = useToolsStore.getState();
   const settingsState = useSettingsStore.getState();
   const presetsState = usePresetsStore.getState();
+  const libraryState = useLibraryStore.getState();
 
   const createdAt = new Date().toISOString();
 
@@ -141,6 +143,11 @@ export function buildDiagnosticsPayload(redaction: DiagnosticsRedaction) {
     downloadQueue,
     historySummary,
     performance,
+    librarySummary: {
+      watchlists: libraryState.watchlists.map((watchlist) => ({ label: watchlist.label, kind: watchlist.kind, enabled: watchlist.enabled, intervalHours: watchlist.intervalHours, lastSuccessAt: watchlist.lastSuccessAt, lastError: watchlist.lastError })),
+      collections: libraryState.collections.map((collection) => ({ name: collection.name, tags: collection.tags })),
+      rules: libraryState.rules.map((rule) => ({ name: rule.name, enabled: rule.enabled, matchType: rule.match.type, priority: rule.priority })),
+    },
     logsText,
   };
 }

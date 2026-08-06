@@ -1,4 +1,5 @@
 import { create } from "zustand";
+import type { SourceRef } from "@/lib/library-types";
 
 export interface HistoryEntry {
   id: string;
@@ -28,6 +29,10 @@ export interface HistoryEntry {
   isFavorite?: boolean;
   tags?: string[];
   notes?: string;
+  sourceRef?: SourceRef;
+  collectionId?: string;
+  appliedRuleId?: string;
+  hasChapters?: boolean;
 }
 
 interface HistoryState {

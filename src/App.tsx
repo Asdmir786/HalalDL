@@ -43,6 +43,7 @@ import {
 import { resolveExistingPresetId } from "@/lib/preset-display";
 import { isTauriRuntime } from "@/lib/tauri-runtime";
 import { markStartup, reportStartupSummary } from "@/lib/startup-metrics";
+import { checkDueWatchlists } from "@/lib/watchlists";
 import {
   readLastNotifiedAppUpdateVersion,
   readLastNotifiedToolUpdateVersions,
@@ -56,6 +57,7 @@ const ToolsScreen = lazy(() => import("@/screens/ToolsScreen").then(module => ({
 const LogsScreen = lazy(() => import("@/screens/LogsScreen").then(module => ({ default: module.LogsScreen })));
 const SettingsScreen = lazy(() => import("@/screens/SettingsScreen").then(module => ({ default: module.SettingsScreen })));
 const HistoryScreen = lazy(() => import("@/screens/HistoryScreen").then(module => ({ default: module.HistoryScreen })));
+const LibraryScreen = lazy(() => import("@/screens/LibraryScreen").then(module => ({ default: module.LibraryScreen })));
 
 interface TrayActionPayload {
   action: "open-app" | "hide-window" | "quick-download" | "download-clipboard" | "pause-queue" | "resume-queue" | "check-updates";
@@ -231,6 +233,12 @@ export default function App() {
     settings.trayLeftClickAction,
     settings.trayMenuShowHideItem,
   ]);
+
+  useEffect(() => {
+    const initial = window.setTimeout(() => { void checkDueWatchlists(); }, 20_000);
+    const interval = window.setInterval(() => { void checkDueWatchlists(); }, 60_000);
+    return () => { window.clearTimeout(initial); window.clearInterval(interval); };
+  }, []);
 
   useEffect(() => {
     if (!launchedFromAutostart) return;
@@ -692,6 +700,7 @@ export default function App() {
       case "tools": return <ToolsScreen />;
       case "logs": return <LogsScreen />;
       case "history": return <HistoryScreen />;
+      case "library": return <LibraryScreen />;
       case "settings": return <SettingsScreen />;
       default: return <DownloadsScreen />;
     }

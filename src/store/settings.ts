@@ -4,6 +4,7 @@ import {
   normalizeSponsorBlockCategories,
   type SponsorBlockCategoryId,
 } from "@/lib/sponsorblock";
+import type { WatchlistDeliveryMode } from "@/lib/library-types";
 
 export type Theme = "system" | "light" | "dark";
 export type AccentColor = "default" | "blue" | "green" | "purple" | "rose" | "orange" | "teal";
@@ -90,6 +91,7 @@ export interface Settings {
 
   // History
   historyRetention: number; // max entries to keep, 0 = unlimited
+  watchlistDeliveryMode: WatchlistDeliveryMode;
 }
 
 interface SettingsState {
@@ -138,6 +140,7 @@ export const DEFAULT_SETTINGS: Settings = {
   squareAlbumArt: false,
   cookiesFilePath: "",
   historyRetention: 0,
+  watchlistDeliveryMode: "ask",
 };
 
 export const SETTINGS_KEYS = Object.keys(DEFAULT_SETTINGS) as (keyof Settings)[];

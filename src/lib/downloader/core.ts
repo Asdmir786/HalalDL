@@ -21,8 +21,10 @@ import { createId } from "@/lib/id";
 import type { DownloadJob } from "@/store/downloads";
 import { ensureFilenameTemplateExtension, getExplicitOutputPaths } from "@/lib/output-paths";
 import { buildClipSection } from "@/lib/clip";
+import { appendChapterArgs } from "@/lib/chapters";
 import { addUrlToAppArchive, getYtDlpArchivePath, isUrlInAppArchive } from "./archive";
 import { getAppPaths } from "@/lib/app-paths";
+import { getWatchlistYtDlpArchivePath } from "./archive";
 import { ensureYtDlpAvailable } from "@/lib/tools/ensure-ytdlp";
 import {
   appendCookiesArgs,
@@ -590,6 +592,10 @@ export async function startDownload(jobId: string) {
         domain: extractDomain(doneJob.url),
         status: "completed",
         overrides: doneJob.overrides,
+        sourceRef: doneJob.sourceRef,
+        collectionId: doneJob.collectionId,
+        appliedRuleId: doneJob.appliedRuleId,
+        hasChapters: doneJob.hasChapters,
       };
       useHistoryStore.getState().addEntry(entry);
     }
@@ -644,6 +650,10 @@ export async function startDownload(jobId: string) {
         status: "failed",
         failReason: failDetail,
         overrides: failedJob.overrides,
+        sourceRef: failedJob.sourceRef,
+        collectionId: failedJob.collectionId,
+        appliedRuleId: failedJob.appliedRuleId,
+        hasChapters: failedJob.hasChapters,
       };
       useHistoryStore.getState().addEntry(entry);
     }
@@ -910,6 +920,19 @@ export async function startDownload(jobId: string) {
   if (clipSection) {
     args.push("--download-sections", clipSection);
     addLog({ level: "info", message: `Clip range applied: ${clipSection.slice(1)}`, jobId });
+  }
+  if (job.sourceRef?.watchlistId) {
+    args.push("--download-archive", await getWatchlistYtDlpArchivePath(job.sourceRef.watchlistId));
+    addLog({ level: "info", message: "Watchlist archive enabled", jobId });
+  }
+
+  if (job.overrides?.chapterMode === "split" && !ffmpeg.isLocal) {
+    await finalizeFailedDownload("Chapter splitting needs FFmpeg. Install or repair it in Tools, then retry.");
+    return;
+  }
+  appendChapterArgs(args, job.overrides?.chapterMode, job.hasChapters);
+  if (job.overrides?.chapterMode && !job.hasChapters) {
+    addLog({ level: "warn", message: "Chapter option requested, but this source has no chapters.", jobId });
   }
 
   if (settings.sponsorBlockMode !== "off" && isYouTubeUrl(job.url)) {

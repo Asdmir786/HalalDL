@@ -8,6 +8,9 @@ const FILE_NAMES = {
   downloads: "downloads.json",
   tools: "tools.json",
   history: "history.json",
+  watchlists: "watchlists.json",
+  collections: "collections.json",
+  sourceRules: "source-rules.json",
   runtimeFlags: "runtime-flags.json",
 } as const;
 
@@ -32,6 +35,9 @@ class StorageManager {
           downloads: await getStateFilePath(FILE_NAMES.downloads),
           tools: await getStateFilePath(FILE_NAMES.tools),
           history: await getStateFilePath(FILE_NAMES.history),
+          watchlists: await getStateFilePath(FILE_NAMES.watchlists),
+          collections: await getStateFilePath(FILE_NAMES.collections),
+          sourceRules: await getStateFilePath(FILE_NAMES.sourceRules),
           runtimeFlags: await getStateFilePath(FILE_NAMES.runtimeFlags),
         };
         this.initError = null;
@@ -126,6 +132,12 @@ class StorageManager {
   async saveHistory<T>(data: T) {
     await this.writeJson("history", data);
   }
+  async getWatchlists<T>() { return this.readJson<T>("watchlists"); }
+  async saveWatchlists<T>(data: T) { await this.writeJson("watchlists", data); }
+  async getCollections<T>() { return this.readJson<T>("collections"); }
+  async saveCollections<T>(data: T) { await this.writeJson("collections", data); }
+  async getSourceRules<T>() { return this.readJson<T>("sourceRules"); }
+  async saveSourceRules<T>(data: T) { await this.writeJson("sourceRules", data); }
 
   async getRuntimeFlags<T>(): Promise<T | null> {
     return this.readJson<T>("runtimeFlags");

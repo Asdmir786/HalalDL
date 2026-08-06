@@ -10,6 +10,8 @@ import type {
   SubtitleSourcePolicy,
   SubtitleStatus,
 } from "@/lib/subtitles";
+import type { ChapterMode } from "@/lib/chapters";
+import type { SourceRef } from "@/lib/library-types";
 
 export type JobStatus = "Queued" | "Paused" | "Stopped" | "Downloading" | "Post-processing" | "Done" | "Failed";
 export type DownloadPhase =
@@ -64,6 +66,10 @@ export interface DownloadJob {
     subtitleOnly?: boolean;
     clipStartTime?: string;
     clipEndTime?: string;
+    chapterMode?: ChapterMode;
+    sourceRef?: SourceRef;
+    collectionId?: string;
+    appliedRuleId?: string;
     origin?: DownloadOrigin;
   };
   thumbnailStatus?: ThumbnailStatus;
@@ -78,6 +84,10 @@ export interface DownloadJob {
   availableSubtitleLanguages?: string[];
   resolvedSubtitleSource?: SubtitleResolvedSource;
   resumeBehavior?: "continue" | "restart";
+  sourceRef?: SourceRef;
+  collectionId?: string;
+  appliedRuleId?: string;
+  hasChapters?: boolean;
 }
 
 interface DownloadsState {

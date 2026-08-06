@@ -9,6 +9,7 @@ import {
   Wrench, 
   Terminal,
   History,
+  BookOpen,
   ChevronLeft,
   ChevronRight,
   ArrowDownToLine,
@@ -31,6 +32,7 @@ const NAV_ITEMS: { id: Screen; label: string; icon: LucideIcon }[] = [
   { id: "tools", label: "Tools", icon: Wrench },
   { id: "logs", label: "Logs", icon: Terminal },
   { id: "history", label: "History", icon: History },
+  { id: "library", label: "Library", icon: BookOpen },
   { id: "settings", label: "Settings", icon: Settings },
 ];
 

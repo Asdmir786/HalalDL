@@ -68,3 +68,8 @@ export {
   type TrayStatePayload,
   type NativeWindowsToastPayload,
 } from "./runtime-commands";
+
+export async function exportCollectionZip(outputPath: string, files: string[]) {
+  const { invoke } = await import("@tauri-apps/api/core");
+  return invoke<{ outputPath: string; added: number; skipped: string[] }>("export_collection_zip", { outputPath, files });
+}

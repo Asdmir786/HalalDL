@@ -2,6 +2,7 @@ mod app_bin;
 mod app_paths;
 mod app_update;
 mod clipboard;
+mod collection_zip;
 mod diagnostics;
 mod download;
 mod extract;
@@ -90,6 +91,7 @@ pub fn run() {
             tools::cleanup_all_backups,
             tools::cleanup_bin_tools,
             diagnostics::export_diagnostics_zip
+            ,collection_zip::export_collection_zip
         ])
         .setup(move |app| {
             use tauri::Manager;

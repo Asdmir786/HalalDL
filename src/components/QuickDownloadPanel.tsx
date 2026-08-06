@@ -77,8 +77,13 @@ export function QuickDownloadPanel() {
 
   const lastAutoFilledNormRef = useRef<string | null>(null);
   const urlUserEditedRef = useRef(Boolean(quickDraft?.url?.trim()));
+  const quickDraftUrlRef = useRef(quickDraft?.url?.trim() ?? "");
   const clipboardRequestRef = useRef(0);
   const titleRequestRef = useRef(0);
+
+  useEffect(() => {
+    quickDraftUrlRef.current = quickDraft?.url?.trim() ?? "";
+  }, [quickDraft?.url]);
 
   const ytDlpTool = tools.find((tool) => tool.id === "yt-dlp");
   const ytDlpMissing = ytDlpTool?.status === "Missing";
@@ -109,7 +114,7 @@ export function QuickDownloadPanel() {
         setClipboardStatus("ready");
 
         if (options?.applyToField === false) return;
-        if (quickDraft?.url?.trim() && options?.applyToField !== true) return;
+        if (quickDraftUrlRef.current && options?.applyToField !== true) return;
 
         const supportedNorm = normalizeUrlIdentity(supported);
         setUrl((current) => {
@@ -139,24 +144,27 @@ export function QuickDownloadPanel() {
         setClipboardStatus("error");
       }
     },
-    [quickDraft?.url]
+    []
   );
 
   useEffect(() => {
     lastAutoFilledNormRef.current = null;
     urlUserEditedRef.current = Boolean(quickDraft?.url?.trim());
-    if (quickDraft?.url?.trim()) {
-      setUrl(quickDraft.url.trim());
-    }
-    setPresetId(
-      resolveExistingPresetId(
-        quickPresets,
-        quickDraft?.presetId || settings.quickDefaultPreset || "default"
-      )
-    );
-    const apply =
-      !quickDraft?.url?.trim() && settings.autoPasteLinks !== false;
-    void refreshClipboardUrl({ applyToField: apply });
+    const setupTimer = window.setTimeout(() => {
+      if (quickDraft?.url?.trim()) {
+        setUrl(quickDraft.url.trim());
+      }
+      setPresetId(
+        resolveExistingPresetId(
+          quickPresets,
+          quickDraft?.presetId || settings.quickDefaultPreset || "default"
+        )
+      );
+      const apply =
+        !quickDraft?.url?.trim() && settings.autoPasteLinks !== false;
+      void refreshClipboardUrl({ applyToField: apply });
+    }, 0);
+    return () => window.clearTimeout(setupTimer);
     // eslint-disable-next-line react-hooks/exhaustive-deps -- once per session mount
   }, []);
 
@@ -175,9 +183,12 @@ export function QuickDownloadPanel() {
     titleRequestRef.current = requestId;
 
     if (!trimmed || looksLikePlaylistUrl(trimmed) || !pickSupportedUrlFromText(trimmed)) {
-      setTitleHint(null);
-      setTitleStatus("idle");
-      return;
+      const resetTimer = window.setTimeout(() => {
+        if (titleRequestRef.current !== requestId) return;
+        setTitleHint(null);
+        setTitleStatus("idle");
+      }, 0);
+      return () => window.clearTimeout(resetTimer);
     }
 
     const loadingTimer = window.setTimeout(() => {

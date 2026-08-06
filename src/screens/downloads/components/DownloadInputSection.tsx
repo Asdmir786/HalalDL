@@ -42,6 +42,7 @@ import {
 } from "@/lib/downloader";
 import { normalizeUrlIdentity } from "@/lib/url-identity";
 import type { SponsorBlockMode } from "@/store/settings";
+import type { ChapterMode } from "@/lib/chapters";
 import { UrlInfoPreview, type UrlPreviewStatus } from "./UrlInfoPreview";
 import { PlaylistPicker, type PlaylistPickerStatus } from "./PlaylistPicker";
 
@@ -86,6 +87,8 @@ interface DownloadInputSectionProps {
   clipEndTime: string;
   onClipEndTimeChange: (val: string) => void;
   clipValidationMessage: string | null;
+  chapterMode: ChapterMode;
+  onChapterModeChange: (value: ChapterMode) => void;
   instagramMediaSummary: InstagramMediaSummary | null;
   urlPreviewStatus: UrlPreviewStatus;
   urlPreview: MediaMetadataProbe | null;
@@ -136,6 +139,8 @@ export function DownloadInputSection({
   clipEndTime,
   onClipEndTimeChange,
   clipValidationMessage,
+  chapterMode,
+  onChapterModeChange,
   instagramMediaSummary,
   urlPreviewStatus,
   urlPreview,
@@ -745,6 +750,8 @@ export function DownloadInputSection({
           clipEndTime={clipEndTime}
           onClipEndTimeChange={onClipEndTimeChange}
           clipValidationMessage={clipValidationMessage}
+          chapterMode={chapterMode}
+          onChapterModeChange={onChapterModeChange}
           sponsorBlockMode={sponsorBlockMode}
           onSponsorBlockModeChange={onSponsorBlockModeChange}
           sponsorBlockCategories={sponsorBlockCategories}

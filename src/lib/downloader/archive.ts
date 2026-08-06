@@ -33,6 +33,21 @@ export async function getYtDlpArchivePath() {
   return `${archiveDir}${separator}${YT_DLP_ARCHIVE_FILE}`;
 }
 
+export async function getWatchlistYtDlpArchivePath(watchlistId: string) {
+  const { archiveDir } = await getAppPaths();
+  const separator = archiveDir.includes("\\") ? "\\" : "/";
+  return `${archiveDir}${separator}watchlist-${watchlistId}.txt`;
+}
+
+export async function getWatchlistArchiveIds(watchlistId: string) {
+  try {
+    const raw = await readTextFile(await getWatchlistYtDlpArchivePath(watchlistId));
+    return new Set(raw.split(/\r?\n/).map((line) => line.trim().split(/\s+/).pop() || "").filter(Boolean));
+  } catch {
+    return new Set<string>();
+  }
+}
+
 export async function isUrlInAppArchive(url: string) {
   const normalized = normalizeArchiveUrl(url);
   if (!normalized) return false;
