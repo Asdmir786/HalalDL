@@ -41,6 +41,8 @@ import {
 } from "@/lib/downloader";
 import { isInstagramUrl } from "@/lib/media-engine";
 import { copyFilesToClipboard } from "@/lib/commands";
+import { probeReliability } from "@/lib/reliability";
+import { Button } from "@/components/ui/button";
 import { getExplicitOutputPaths } from "@/lib/output-paths";
 import { toast } from "sonner";
 import type { SponsorBlockCategoryId } from "@/lib/sponsorblock";
@@ -60,7 +62,10 @@ import type { ChapterMode } from "@/lib/chapters";
 export function DownloadsScreen() {
   const { settings, updateSettings } = useSettingsStore();
   const [url, setUrl] = useState("");
+  const [checkingLink, setCheckingLink] = useState(false);
+  const [linkCheckResult, setLinkCheckResult] = useState<{ url: string; message: string } | null>(null);
   const persistenceReady = useRuntimeStore((state) => state.persistenceReady);
+
   
   // Derived state for addMode from settings
   const addMode = settings.downloadsAddMode;
@@ -1085,6 +1090,14 @@ export function DownloadsScreen() {
                     preferSingleVideo={preferSingleVideo}
                     onPreferSingleVideoChange={setPreferSingleVideo}
                   />
+
+                  {url.trim() && (
+                    <div className="flex flex-col gap-2 border-t border-border/60 pt-3 sm:flex-row sm:items-center sm:justify-between">
+                      <p className="text-xs text-muted-foreground">Not sure whether this link will work? Check it first without downloading.</p>
+                      <Button variant="outline" size="sm" disabled={checkingLink} onClick={() => void (async () => { const checkedUrl = url.trim(); setCheckingLink(true); const result = await probeReliability(checkedUrl); setLinkCheckResult({ url: checkedUrl, message: result.message }); setCheckingLink(false); })()}>{checkingLink ? "Checking link…" : "Check this link"}</Button>
+                    </div>
+                  )}
+                  {linkCheckResult?.url === url.trim() && <p className="rounded-md bg-muted/60 px-3 py-2 text-xs text-muted-foreground">{linkCheckResult.message}</p>}
 
                   <DownloadStatsBar 
                     queuedCount={queuedCount}

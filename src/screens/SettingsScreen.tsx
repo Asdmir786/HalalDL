@@ -20,7 +20,7 @@ import { BehaviorSection } from "./settings/components/BehaviorSection";
 import { EngineSection } from "./settings/components/EngineSection";
 import { PerformanceSection } from "./settings/components/PerformanceSection";
 import { AboutSection } from "./settings/components/AboutSection";
-import { ReliabilityCenter } from "./settings/components/ReliabilityCenter";
+import { AiConnectionsSection } from "./settings/components/AiConnectionsSection";
 import { usePresetsStore } from "@/store/presets";
 import { getQuickEligiblePresets } from "@/lib/preset-display";
 import { storage } from "@/lib/storage";
@@ -390,7 +390,10 @@ export function SettingsScreen() {
               closeToTray={draftSettings.closeToTray}
               onCloseToTrayChange={(v) => setDraftValue("closeToTray", v)}
               launchAtLogin={draftSettings.launchAtLogin}
-              onLaunchAtLoginChange={(v) => setDraftValue("launchAtLogin", v)}
+              onLaunchAtLoginChange={(v) => {
+                setDraftValue("launchAtLogin", v);
+                if (!v) setDraftValue("startMinimizedToTray", false);
+              }}
               startMinimizedToTray={draftSettings.startMinimizedToTray}
               onStartMinimizedToTrayChange={(v) => setDraftValue("startMinimizedToTray", v)}
               trayLeftClickAction={draftSettings.trayLeftClickAction}
@@ -433,11 +436,7 @@ export function SettingsScreen() {
               onInstagramEngineChange={(v) => setDraftValue("instagramEngine", v)}
             />
 
-            <ReliabilityCenter
-              cookiesFilePath={draftSettings.cookiesFilePath}
-              deliveryMode={draftSettings.watchlistDeliveryMode}
-              onDeliveryModeChange={(v) => setDraftValue("watchlistDeliveryMode", v)}
-            />
+            <AiConnectionsSection />
 
             <PerformanceSection />
 

@@ -49,7 +49,8 @@
   --card-foreground: var(--brand-soft-light);
   --popover: color-mix(in srgb, var(--brand-primary-steel) 55%, var(--brand-deep-navy));
   --popover-foreground: var(--brand-soft-light);
-  --primary: var(--brand-mint);
+  /* Default means steel in both themes. Mint is available only when deliberately chosen. */
+  --primary: color-mix(in srgb, var(--brand-white) 38%, var(--brand-primary-steel));
   --primary-foreground: var(--brand-deep-navy);
   --secondary: color-mix(in srgb, var(--brand-primary-steel) 70%, var(--brand-deep-navy));
   --secondary-foreground: var(--brand-soft-light);
@@ -61,7 +62,7 @@
   --destructive-foreground: var(--brand-white);
   --border: color-mix(in srgb, var(--brand-muted-steel) 35%, var(--brand-deep-navy));
   --input: color-mix(in srgb, var(--brand-muted-steel) 35%, var(--brand-deep-navy));
-  --ring: var(--brand-mint);
+  --ring: var(--primary);
   --chart-1: oklch(0.488 0.243 264.376);
   --chart-2: oklch(0.696 0.17 162.48);
   --chart-3: oklch(0.769 0.188 70.08);

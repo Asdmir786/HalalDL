@@ -81,24 +81,24 @@ export function StorageSection({
 
       <SettingRow
         icon={Archive}
-        label="Download Archive"
-        description="Remember completed URLs and yt-dlp media IDs so repeats are skipped cleanly."
+        label="Avoid downloading the same video twice"
+        description="Remember finished links so HalalDL can skip a video you already downloaded. Usually leave this on."
       >
         <Switch checked={skipDownloadedBefore} onCheckedChange={onSkipDownloadedBeforeChange} />
       </SettingRow>
 
       <SettingRow
         icon={FileJson}
-        label="Metadata Backup"
-        description="Save info JSON, description, thumbnails, and embedded metadata when yt-dlp supports it."
+        label="Save video details"
+        description="Keep the title, description, thumbnail, and other details beside your download when available."
       >
         <Switch checked={saveMetadataFiles} onCheckedChange={onSaveMetadataFilesChange} />
       </SettingRow>
 
       <SettingRow
         icon={Images}
-        label="Thumbnail Contact Sheets"
-        description="Generate a 3x3 preview sheet for downloaded videos when FFmpeg is available."
+        label="Create video preview sheets"
+        description="Make a small 3×3 image preview for videos when FFmpeg is available."
       >
         <Switch checked={generateThumbnailContactSheets} onCheckedChange={onGenerateThumbnailContactSheetsChange} />
       </SettingRow>

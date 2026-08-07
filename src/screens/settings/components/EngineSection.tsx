@@ -194,8 +194,8 @@ export function EngineSection({
 
       <SettingRow
         icon={Cookie}
-        label="Cookies file"
-        description="Netscape cookies.txt for age-gated, private, or members-only videos. Chrome cannot auto-share cookies anymore — export a cookies.txt with a browser extension, then pick the file here."
+        label="Optional sign-in file"
+        description="Only needed when a site asks you to sign in. Export a cookies.txt file from your browser, then choose it here."
         vertical
       >
         <div className="flex flex-col gap-2">
@@ -240,12 +240,12 @@ export function EngineSection({
             ) : null}
           </div>
           <p className="text-[11px] text-muted-foreground">
-            Used for yt-dlp downloads, link preview, and private playlists. Never paste cookie file contents into GitHub issues.
-            {cookiesFilePath ? " Path is active — yt-dlp will receive --cookies." : ""}
+            Used only for downloads and private playlists that need sign-in. HalalDL never shows its contents or includes it in diagnostics.
+            {cookiesFilePath ? " This file is ready to use." : ""}
           </p>
           {cookiesFileMissing ? (
             <p className="text-[11px] text-amber-700 dark:text-amber-300">
-              File not found at this path. Browse again after exporting cookies.txt.
+              HalalDL cannot find this file. Choose it again after exporting a new cookies.txt file.
             </p>
           ) : null}
         </div>
@@ -285,8 +285,8 @@ export function EngineSection({
 
       <SettingRow
         icon={Trash2}
-        label="Clear yt-dlp Cache"
-        description="Reset cached extractor/challenge data when sites keep asking to sign in or fail oddly."
+        label="Clear downloader cache"
+        description="Try this if a site keeps failing or repeatedly asks you to sign in. It does not delete your downloads."
         vertical
       >
         <MotionButton
@@ -298,8 +298,8 @@ export function EngineSection({
             void (async () => {
               setIsClearingCache(true);
               try {
-                const summary = await clearYtDlpCache();
-                toast.success("yt-dlp cache cleared", { description: summary });
+                await clearYtDlpCache();
+                toast.success("Downloader cache cleared", { description: "Try the link again." });
               } catch (error) {
                 toast.error(
                   `Failed to clear cache: ${error instanceof Error ? error.message : String(error)}`

@@ -10,7 +10,6 @@ import {
   Terminal,
   History,
   BookOpen,
-  Sparkles,
   ChevronLeft,
   ChevronRight,
   ArrowDownToLine,
@@ -34,7 +33,6 @@ const NAV_ITEMS: { id: Screen; label: string; icon: LucideIcon }[] = [
   { id: "logs", label: "Logs", icon: Terminal },
   { id: "history", label: "History", icon: History },
   { id: "library", label: "Library", icon: BookOpen },
-  { id: "study", label: "Study tools", icon: Sparkles },
   { id: "settings", label: "Settings", icon: Settings },
 ];
 
@@ -42,6 +40,7 @@ import { motion } from "framer-motion";
 
 export function Sidebar() {
   const { currentScreen, setScreen, sidebarCollapsed, toggleSidebar } = useNavigationStore();
+  const effectiveCollapsed = sidebarCollapsed || currentScreen === "settings";
   const jobs = useDownloadsStore((s) => s.jobs);
   const [version, setVersion] = useState(() => (isDemoModeEnabled() ? "0.5.1" : "..."));
   const appMode = getAppMode();
@@ -148,19 +147,19 @@ export function Sidebar() {
   return (
     <aside className={cn(
       "glass flex flex-col h-full border-r border-border/55 transition-all duration-300 ease-in-out relative dark:border-white/10",
-      sidebarCollapsed ? "w-16" : "w-64"
+      effectiveCollapsed ? "w-16" : "w-64"
     )}>
       <div className={cn(
         "p-6 border-b flex items-center justify-between overflow-hidden h-[73px]",
-        sidebarCollapsed ? "px-4" : "px-6"
+        effectiveCollapsed ? "px-4" : "px-6"
       )}>
-        {!sidebarCollapsed && (
+        {!effectiveCollapsed && (
           <div className="flex min-w-0 items-center gap-2.5">
             <BrandLogo className="h-8 w-8" />
             <h1 className="truncate text-xl font-bold tracking-tight">HalalDL</h1>
           </div>
         )}
-        {sidebarCollapsed && (
+        {effectiveCollapsed && (
           <BrandLogo className="h-8 w-8" />
         )}
       </div>
@@ -181,12 +180,12 @@ export function Sidebar() {
               onClick={() => setScreen(item.id)}
               className={cn(
                 "w-full h-10 rounded-lg transition-all duration-200 cursor-pointer group relative overflow-hidden",
-                sidebarCollapsed ? "justify-center px-0" : "justify-start gap-3 px-3",
+                effectiveCollapsed ? "justify-center px-0" : "justify-start gap-3 px-3",
                 isActive 
                   ? "text-foreground font-semibold" 
                   : "text-muted-foreground hover:text-foreground"
               )}
-              title={sidebarCollapsed ? item.label : undefined}
+              title={effectiveCollapsed ? item.label : undefined}
             >
               {isActive && (
                 <motion.div
@@ -202,7 +201,7 @@ export function Sidebar() {
                   isDownloadsItem && downloadNavMeta.iconClassName,
                   !isActive && "group-hover:scale-110 transition-transform duration-200"
                 )} />
-                {isDownloadsItem && sidebarCollapsed && downloadNavMeta.count > 0 && (
+                {isDownloadsItem && effectiveCollapsed && downloadNavMeta.count > 0 && (
                   <span className={cn(
                     "absolute -top-2 -right-2 min-w-5 h-5 px-1.5 rounded-[10px] text-[10px] font-bold flex items-center justify-center ring-1 ring-background/80",
                     downloadNavMeta.badgeClassName
@@ -210,12 +209,12 @@ export function Sidebar() {
                     {downloadNavMeta.count}
                   </span>
                 )}
-                {isSettingsItem && showUpdateDot && sidebarCollapsed && (
+                {isSettingsItem && showUpdateDot && effectiveCollapsed && (
                   <span className="absolute -top-1 -right-1 w-2.5 h-2.5 rounded-full bg-blue-500 ring-2 ring-background animate-pulse" />
                 )}
               </span>
               
-              {!sidebarCollapsed && (
+              {!effectiveCollapsed && (
                 <span className="truncate z-10 relative inline-flex items-center gap-2">
                   <span className="truncate">{item.label}</span>
                   {isDownloadsItem && downloadNavMeta.count > 0 && (
@@ -242,9 +241,9 @@ export function Sidebar() {
       </nav>
 
       {showGlobalProgress && (
-        <div className={cn("px-3 pb-3", sidebarCollapsed && "px-2")}>
-          <div className={cn("glass-card rounded-xl bg-muted/25 dark:bg-muted/10", sidebarCollapsed ? "p-2" : "p-3")}>
-            {!sidebarCollapsed && (
+        <div className={cn("px-3 pb-3", effectiveCollapsed && "px-2")}>
+          <div className={cn("glass-card rounded-xl bg-muted/25 dark:bg-muted/10", effectiveCollapsed ? "p-2" : "p-3")}>
+            {!effectiveCollapsed && (
               <div className="flex items-center justify-between mb-2">
                 <span className="inline-flex items-center gap-1.5 text-xs font-semibold text-foreground/90">
                   <DownloadProgressIcon className="w-3.5 h-3.5 text-foreground/80" />
@@ -253,8 +252,8 @@ export function Sidebar() {
                 <span className="text-[10px] font-mono text-muted-foreground">{queueStatus}</span>
               </div>
             )}
-            <Progress value={overallProgress} className={cn("h-2 bg-secondary/70", sidebarCollapsed && "h-1.5")} />
-            {sidebarCollapsed && (
+            <Progress value={overallProgress} className={cn("h-2 bg-secondary/70", effectiveCollapsed && "h-1.5")} />
+            {effectiveCollapsed && (
               <div className="mt-1 text-[9px] font-mono text-muted-foreground text-center">
                 {queueStatus}
               </div>
@@ -270,8 +269,10 @@ export function Sidebar() {
           size="icon"
           className="w-full flex items-center justify-center hover:bg-accent h-10"
           onClick={toggleSidebar}
+          disabled={currentScreen === "settings"}
+          title={currentScreen === "settings" ? "Settings uses compact navigation" : undefined}
         >
-          {sidebarCollapsed ? <ChevronRight className="w-4 h-4" /> : (
+          {effectiveCollapsed ? <ChevronRight className="w-4 h-4" /> : (
             <div className="flex items-center gap-2 w-full px-1">
               <ChevronLeft className="w-4 h-4" />
               <span className="text-xs font-medium">Collapse Sidebar</span>
@@ -280,7 +281,7 @@ export function Sidebar() {
         </MotionButton>
       </div>
 
-      {!sidebarCollapsed && (
+      {!effectiveCollapsed && (
         <div className="p-4 text-[10px] text-muted-foreground/60 text-center font-mono tracking-widest uppercase">
           v{version} {appModeLabel}
         </div>
