@@ -10,6 +10,7 @@ import {
   Terminal,
   History,
   BookOpen,
+  Sparkles,
   ChevronLeft,
   ChevronRight,
   ArrowDownToLine,
@@ -33,6 +34,7 @@ const NAV_ITEMS: { id: Screen; label: string; icon: LucideIcon }[] = [
   { id: "logs", label: "Logs", icon: Terminal },
   { id: "history", label: "History", icon: History },
   { id: "library", label: "Library", icon: BookOpen },
+  { id: "study", label: "Study tools", icon: Sparkles },
   { id: "settings", label: "Settings", icon: Settings },
 ];
 

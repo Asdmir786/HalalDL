@@ -1,6 +1,6 @@
 import { create } from "zustand";
 
-export type Screen = "downloads" | "presets" | "library" | "tools" | "logs" | "history" | "settings";
+export type Screen = "downloads" | "presets" | "library" | "study" | "tools" | "logs" | "history" | "settings";
 
 interface NavigationState {
   currentScreen: Screen;

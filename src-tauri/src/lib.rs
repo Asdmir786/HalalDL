@@ -11,6 +11,7 @@ mod fs_utils;
 mod notifications;
 mod runtime;
 mod shell;
+mod secure_credentials;
 mod tools;
 mod version;
 
@@ -90,8 +91,11 @@ pub fn run() {
             tools::cleanup_tool_backup,
             tools::cleanup_all_backups,
             tools::cleanup_bin_tools,
-            diagnostics::export_diagnostics_zip
-            ,collection_zip::export_collection_zip
+            diagnostics::export_diagnostics_zip,
+            collection_zip::export_collection_zip,
+            secure_credentials::save_ai_api_key,
+            secure_credentials::has_ai_api_key,
+            secure_credentials::remove_ai_api_key
         ])
         .setup(move |app| {
             use tauri::Manager;

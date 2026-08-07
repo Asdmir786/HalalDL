@@ -6,6 +6,7 @@ import { useLogsStore } from "@/store/logs";
 import { useDownloadsStore } from "@/store/downloads";
 import { useHistoryStore } from "@/store/history";
 import { useLibraryStore } from "@/store/library";
+import { useAiProfilesStore } from "@/lib/ai-profiles";
 import { storage } from "@/lib/storage";
 import { setAutostartEnabled } from "@/lib/commands";
 import { isDemoModeEnabled } from "@/lib/demo-mode";
@@ -21,6 +22,7 @@ export function useAutoSave(initialized: MutableRefObject<boolean>) {
   const watchlists = useLibraryStore((s) => s.watchlists);
   const collections = useLibraryStore((s) => s.collections);
   const rules = useLibraryStore((s) => s.rules);
+  const aiProfiles = useAiProfilesStore((s) => s.profiles);
 
   useEffect(() => {
     if (!initialized.current || demoMode) return;
@@ -115,4 +117,9 @@ export function useAutoSave(initialized: MutableRefObject<boolean>) {
     const timer = setTimeout(() => { void storage.saveSourceRules(rules); }, 500);
     return () => clearTimeout(timer);
   }, [rules, initialized, demoMode]);
+  useEffect(() => {
+    if (!initialized.current || demoMode) return;
+    const timer = setTimeout(() => { void storage.saveAiProfiles(aiProfiles); }, 500);
+    return () => clearTimeout(timer);
+  }, [aiProfiles, initialized, demoMode]);
 }

@@ -15,6 +15,7 @@ import { useLogsStore } from "@/store/logs";
 import { useDownloadsStore, type DownloadJob } from "@/store/downloads";
 import { useHistoryStore, type HistoryEntry } from "@/store/history";
 import { useLibraryStore } from "@/store/library";
+import { useAiProfilesStore, type AiProfile } from "@/lib/ai-profiles";
 import type { Collection, SourceRule, Watchlist } from "@/lib/library-types";
 import { useRuntimeStore } from "@/store/runtime";
 import { storage } from "@/lib/storage";
@@ -256,6 +257,8 @@ export function usePersistenceInit(): MutableRefObject<boolean> {
               if (Array.isArray(savedCollections)) useLibraryStore.getState().setCollections(savedCollections);
               const savedRules = await storage.getSourceRules<SourceRule[]>();
               if (Array.isArray(savedRules)) useLibraryStore.getState().setRules(savedRules);
+              const savedAiProfiles = await storage.getAiProfiles<AiProfile[]>();
+              if (Array.isArray(savedAiProfiles)) useAiProfilesStore.setState({ profiles: savedAiProfiles });
 
               const savedTools = await storage.getTools<Tool[]>();
               if (savedTools && Array.isArray(savedTools)) {

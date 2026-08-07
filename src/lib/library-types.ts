@@ -28,7 +28,12 @@ export interface Watchlist {
   collectionId?: string;
   presetId?: string;
   chapterMode?: ChapterMode;
+  lastDiscoveredCount?: number;
+  lastQueuedCount?: number;
 }
+
+export type SourceActivityKind = "checked" | "queued" | "paused" | "resumed" | "error";
+export interface SourceActivity { id: string; watchlistId: string; kind: SourceActivityKind; detail: string; createdAt: number; }
 
 export interface Collection {
   id: string;

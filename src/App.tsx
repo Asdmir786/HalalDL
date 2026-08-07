@@ -58,6 +58,7 @@ const LogsScreen = lazy(() => import("@/screens/LogsScreen").then(module => ({ d
 const SettingsScreen = lazy(() => import("@/screens/SettingsScreen").then(module => ({ default: module.SettingsScreen })));
 const HistoryScreen = lazy(() => import("@/screens/HistoryScreen").then(module => ({ default: module.HistoryScreen })));
 const LibraryScreen = lazy(() => import("@/screens/LibraryScreen").then(module => ({ default: module.LibraryScreen })));
+const StudyScreen = lazy(() => import("@/screens/StudyScreen").then(module => ({ default: module.StudyScreen })));
 
 interface TrayActionPayload {
   action: "open-app" | "hide-window" | "quick-download" | "download-clipboard" | "pause-queue" | "resume-queue" | "check-updates";
@@ -701,6 +702,7 @@ export default function App() {
       case "logs": return <LogsScreen />;
       case "history": return <HistoryScreen />;
       case "library": return <LibraryScreen />;
+      case "study": return <StudyScreen />;
       case "settings": return <SettingsScreen />;
       default: return <DownloadsScreen />;
     }

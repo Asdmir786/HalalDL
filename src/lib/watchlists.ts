@@ -15,9 +15,10 @@ let checking = false;
 export async function checkWatchlist(watchlist: Watchlist, force = false) {
   if (checking && !force) return 0;
   checking = true;
-  const { updateWatchlist, collections, rules } = useLibraryStore.getState();
+  const { updateWatchlist, collections, rules, addActivity } = useLibraryStore.getState();
   try {
     updateWatchlist(watchlist.id, { lastCheckedAt: Date.now(), lastError: undefined });
+    addActivity({ watchlistId: watchlist.id, kind: "checked", detail: force ? "Manual check started" : "Scheduled check started" });
     const result = await fetchPlaylistEntries(watchlist.url);
     const archivedIds = await getWatchlistArchiveIds(watchlist.id);
     if (!watchlist.initializedAt && watchlist.firstRunMode === "future-only") {
@@ -25,7 +26,8 @@ export async function checkWatchlist(watchlist: Watchlist, force = false) {
       const archive = await getWatchlistYtDlpArchivePath(watchlist.id);
       const baseline = await runResolvedTool(ytDlp, "yt-dlp", ["--flat-playlist", "--skip-download", "--force-write-archive", "--download-archive", archive, watchlist.url], { env: ytDlpEnv(), timeoutMs: 120000 });
       if (baseline.code !== 0) throw new Error(baseline.stderr.trim() || "Could not create the future-only baseline.");
-      updateWatchlist(watchlist.id, { initializedAt: Date.now(), lastSuccessAt: Date.now(), lastError: undefined });
+      updateWatchlist(watchlist.id, { initializedAt: Date.now(), lastSuccessAt: Date.now(), lastError: undefined, lastDiscoveredCount: result.entries.length, lastQueuedCount: 0 });
+      addActivity({ watchlistId: watchlist.id, kind: "checked", detail: `Baseline recorded: ${result.entries.length} item(s) discovered` });
       return 0;
     }
     const existingUrls = new Set(useDownloadsStore.getState().jobs.map((job) => job.url));
@@ -47,7 +49,8 @@ export async function checkWatchlist(watchlist: Watchlist, force = false) {
       });
       updateJob(id, { title: entry.title, mediaDurationSeconds: entry.durationSeconds, sourceRef, collectionId: rule?.collectionId || watchlist.collectionId, appliedRuleId: rule?.id });
     }
-    updateWatchlist(watchlist.id, { initializedAt: watchlist.initializedAt || Date.now(), lastSuccessAt: Date.now(), lastError: undefined });
+    updateWatchlist(watchlist.id, { initializedAt: watchlist.initializedAt || Date.now(), lastSuccessAt: Date.now(), lastError: undefined, lastDiscoveredCount: result.entries.length, lastQueuedCount: candidates.length });
+    addActivity({ watchlistId: watchlist.id, kind: candidates.length ? "queued" : "checked", detail: candidates.length ? `${candidates.length} new item(s) queued` : `Checked ${result.entries.length} item(s); nothing new` });
     const delivery = useSettingsStore.getState().settings.watchlistDeliveryMode;
     if (candidates.length && delivery === "start" && !useDownloadsStore.getState().jobs.some((j) => j.status === "Paused")) startQueuedJobs();
     useLogsStore.getState().addLog({ level: "info", message: `Watchlist ${watchlist.label}: found ${candidates.length} new item(s).` });
@@ -55,6 +58,7 @@ export async function checkWatchlist(watchlist: Watchlist, force = false) {
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
     updateWatchlist(watchlist.id, { lastError: message.slice(0, 280) });
+    addActivity({ watchlistId: watchlist.id, kind: "error", detail: message.slice(0, 280) });
     useLogsStore.getState().addLog({ level: "warn", message: `Watchlist ${watchlist.label} failed: ${message}` });
     return 0;
   } finally { checking = false; }

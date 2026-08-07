@@ -12,6 +12,7 @@ const FILE_NAMES = {
   collections: "collections.json",
   sourceRules: "source-rules.json",
   runtimeFlags: "runtime-flags.json",
+  aiProfiles: "ai-profiles.json",
 } as const;
 
 class StorageManager {
@@ -39,6 +40,7 @@ class StorageManager {
           collections: await getStateFilePath(FILE_NAMES.collections),
           sourceRules: await getStateFilePath(FILE_NAMES.sourceRules),
           runtimeFlags: await getStateFilePath(FILE_NAMES.runtimeFlags),
+          aiProfiles: await getStateFilePath(FILE_NAMES.aiProfiles),
         };
         this.initError = null;
       } catch (error) {
@@ -146,6 +148,8 @@ class StorageManager {
   async saveRuntimeFlags<T>(data: T) {
     await this.writeJson("runtimeFlags", data);
   }
+  async getAiProfiles<T>() { return this.readJson<T>("aiProfiles"); }
+  async saveAiProfiles<T>(data: T) { await this.writeJson("aiProfiles", data); }
 }
 
 export const storage = new StorageManager();

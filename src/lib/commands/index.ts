@@ -73,3 +73,4 @@ export async function exportCollectionZip(outputPath: string, files: string[]) {
   const { invoke } = await import("@tauri-apps/api/core");
   return invoke<{ outputPath: string; added: number; skipped: string[] }>("export_collection_zip", { outputPath, files });
 }
+export { saveAiApiKey, hasAiApiKey, removeAiApiKey } from "./ai-credentials";
