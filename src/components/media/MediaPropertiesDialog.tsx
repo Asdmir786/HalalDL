@@ -11,8 +11,11 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { type HistoryEntry, useHistoryStore } from "@/store/history";
+import { useLibraryStore } from "@/store/library";
 import { renameFile } from "@/lib/commands";
 import { copyText, formatJobErrorText } from "@/lib/copy-text";
+import { ClipMakerDialog } from "@/components/media/ClipMakerDialog";
+import { DownloadDoctorDialog } from "@/components/download-doctor/DownloadDoctorDialog";
 import {
   buildMediaPropertyRows,
   probeMediaFile,
@@ -20,7 +23,7 @@ import {
   type MediaStoredMeta,
 } from "@/lib/media-properties";
 import { toast } from "sonner";
-import { Copy, Loader2, Pencil, Plus, Tag, X } from "lucide-react";
+import { Copy, Loader2, Pencil, Plus, Scissors, Tag, X } from "lucide-react";
 
 export type MediaPropertiesDialogProps = {
   open: boolean;
@@ -56,6 +59,9 @@ export function MediaPropertiesDialog({
   const removeTag = useHistoryStore((s) => s.removeTag);
   const setEntries = useHistoryStore((s) => s.setEntries);
   const entries = useHistoryStore((s) => s.entries);
+  const watchlists = useLibraryStore((s) => s.watchlists);
+  const collections = useLibraryStore((s) => s.collections);
+  const rules = useLibraryStore((s) => s.rules);
 
   const probePath = open ? stored.outputPath : undefined;
   const [probeResult, setProbeResult] = useState<{
@@ -66,6 +72,9 @@ export function MediaPropertiesDialog({
   const [tagInput, setTagInput] = useState("");
   const [isRenaming, setIsRenaming] = useState(false);
   const [filenameDraft, setFilenameDraft] = useState<string | null>(null);
+  const [doctorOpen, setDoctorOpen] = useState(false);
+  const [clipOpen, setClipOpen] = useState(false);
+  const [clipSession, setClipSession] = useState(0);
 
   const note = noteDraft ?? historyEntry?.notes ?? "";
   const newFilename = filenameDraft ?? fileNameFromPath(stored.outputPath);
@@ -87,6 +96,19 @@ export function MediaPropertiesDialog({
   const rows = buildMediaPropertyRows(stored, probe);
   const hasMedia = rows.length > 0;
   const showLibrary = Boolean(historyEntry);
+  const sourceWatchlist = historyEntry?.sourceRef?.watchlistId
+    ? watchlists.find((watchlist) => watchlist.id === historyEntry.sourceRef?.watchlistId)
+    : undefined;
+  const sourceCollection = historyEntry?.collectionId
+    ? collections.find((collection) => collection.id === historyEntry.collectionId)
+    : undefined;
+  const sourceRule = historyEntry?.appliedRuleId
+    ? rules.find((rule) => rule.id === historyEntry.appliedRuleId)
+    : undefined;
+  const clipDuration = historyEntry
+    ? historyEntry.mediaDurationSeconds ?? (historyEntry.duration ?? 0) / 1000
+    : 0;
+  const canMakeClip = Boolean(historyEntry?.status === "completed" && historyEntry.outputPath && fileExists && clipDuration > 1);
 
   const handleSaveNote = () => {
     if (!historyEntry) return;
@@ -126,6 +148,7 @@ export function MediaPropertiesDialog({
   };
 
   return (
+    <>
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className={showLibrary ? "max-w-2xl" : "max-w-lg"}>
         <DialogHeader>
@@ -182,6 +205,15 @@ export function MediaPropertiesDialog({
                     <Copy className="h-3.5 w-3.5" />
                     Copy error
                   </Button>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    className="ml-2 h-8 gap-1.5 border-destructive/25"
+                    onClick={() => setDoctorOpen(true)}
+                  >
+                    Fix this download
+                  </Button>
                 </div>
               </div>
             )}
@@ -229,10 +261,27 @@ export function MediaPropertiesDialog({
                 )}
               </div>
             )}
+
+            {historyEntry?.status === "completed" && (
+              <div className="rounded-lg border border-border bg-muted/20 p-3">
+                <div className="flex items-start justify-between gap-3">
+                  <div><Label className="text-xs uppercase tracking-wider text-muted-foreground">Make a clip</Label><p className="mt-1 text-sm text-muted-foreground">Export a chosen part as a new local video or audio file.</p></div>
+                  <Button size="sm" variant="outline" onClick={() => { setClipSession((value) => value + 1); setClipOpen(true); }} disabled={!canMakeClip} title={canMakeClip ? "Create a clip from this file" : "The original file and its duration are needed to make a clip."}><Scissors className="mr-1.5 h-3.5 w-3.5" />Make a clip</Button>
+                </div>
+                {!canMakeClip && <p className="mt-2 text-xs text-muted-foreground">The original file must still be on disk and have a known duration.</p>}
+              </div>
+            )}
           </div>
 
           {showLibrary && historyEntry && (
             <div className="space-y-6">
+              {sourceWatchlist && (
+                <div className="rounded-lg border border-border bg-muted/20 p-3">
+                  <Label className="text-xs uppercase tracking-wider text-muted-foreground">Why this downloaded</Label>
+                  <p className="mt-1 text-sm font-medium">You follow {sourceWatchlist.label}</p>
+                  <p className="mt-1 text-xs leading-relaxed text-muted-foreground">{sourceRule ? `Rule: ${sourceRule.name}. ` : ""}{sourceCollection ? `Saved in ${sourceCollection.name}. ` : ""}{historyEntry.presetName ? `Using ${historyEntry.presetName}.` : "Downloaded from your YouTube follow."}</p>
+                </div>
+              )}
               <div className="space-y-2">
                 <Label className="text-xs uppercase tracking-wider text-muted-foreground">Notes</Label>
                 <textarea
@@ -293,5 +342,8 @@ export function MediaPropertiesDialog({
         </DialogFooter>
       </DialogContent>
     </Dialog>
+    {historyEntry?.failReason && <DownloadDoctorDialog open={doctorOpen} onOpenChange={setDoctorOpen} title={historyEntry.title} url={historyEntry.url} failure={historyEntry.failReason} />}
+    {historyEntry && historyEntry.outputPath && <ClipMakerDialog key={clipSession} open={clipOpen} onOpenChange={setClipOpen} entry={historyEntry} inputPath={historyEntry.outputPath} />}
+    </>
   );
 }

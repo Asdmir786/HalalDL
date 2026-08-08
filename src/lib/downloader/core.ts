@@ -596,6 +596,7 @@ export async function startDownload(jobId: string) {
         collectionId: doneJob.collectionId,
         appliedRuleId: doneJob.appliedRuleId,
         hasChapters: doneJob.hasChapters,
+        chapters: doneJob.chapters,
       };
       useHistoryStore.getState().addEntry(entry);
     }
@@ -654,6 +655,7 @@ export async function startDownload(jobId: string) {
         collectionId: failedJob.collectionId,
         appliedRuleId: failedJob.appliedRuleId,
         hasChapters: failedJob.hasChapters,
+        chapters: failedJob.chapters,
       };
       useHistoryStore.getState().addEntry(entry);
     }

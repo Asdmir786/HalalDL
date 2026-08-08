@@ -797,6 +797,7 @@ export function DownloadsScreen() {
             hasAutoSubtitles: preview.hasAutoSubtitles,
             availableSubtitleLanguages: preview.availableSubtitleLanguages,
             hasChapters: preview.chapters.length > 0,
+            chapters: preview.chapters,
             sourceRef: {
               ...(preview.uploader ? { creator: preview.uploader } : {}),
               ...(preview.uploaderId ? { creatorId: preview.uploaderId } : {}),

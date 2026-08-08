@@ -1,5 +1,6 @@
 import { create } from "zustand";
 import type { SourceRef } from "@/lib/library-types";
+import type { MediaChapter } from "@/lib/chapters";
 
 export interface HistoryEntry {
   id: string;
@@ -33,6 +34,7 @@ export interface HistoryEntry {
   collectionId?: string;
   appliedRuleId?: string;
   hasChapters?: boolean;
+  chapters?: MediaChapter[];
 }
 
 interface HistoryState {

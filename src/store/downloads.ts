@@ -11,6 +11,7 @@ import type {
   SubtitleStatus,
 } from "@/lib/subtitles";
 import type { ChapterMode } from "@/lib/chapters";
+import type { MediaChapter } from "@/lib/chapters";
 import type { SourceRef } from "@/lib/library-types";
 
 export type JobStatus = "Queued" | "Paused" | "Stopped" | "Downloading" | "Post-processing" | "Done" | "Failed";
@@ -88,6 +89,7 @@ export interface DownloadJob {
   collectionId?: string;
   appliedRuleId?: string;
   hasChapters?: boolean;
+  chapters?: MediaChapter[];
 }
 
 interface DownloadsState {

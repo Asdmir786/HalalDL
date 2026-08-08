@@ -4,7 +4,7 @@ import {
   X, FolderOpen, Terminal,
   Copy, RotateCcw, Play,
   Link, Clock, Pause, Square,
-  ArrowUp, ArrowDown, Check, HardDrive, Images, Timer, Info,
+  ArrowUp, ArrowDown, Check, HardDrive, Images, Timer, Info, Wrench,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { DownloadJob } from "@/store/downloads";
@@ -17,6 +17,7 @@ import { getExplicitOutputPaths, getPreferredThumbnailSource } from "@/lib/outpu
 import { ContextMenu, ContextMenuContent, ContextMenuItem, ContextMenuTrigger, ContextMenuSeparator } from "@/components/ui/context-menu";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { MediaPropertiesDialog } from "@/components/media/MediaPropertiesDialog";
+import { DownloadDoctorDialog } from "@/components/download-doctor/DownloadDoctorDialog";
 import { Select, SelectContent, SelectGroup, SelectItem, SelectLabel, SelectSeparator, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { toast } from "sonner";
 import { copyText, formatJobErrorText } from "@/lib/copy-text";
@@ -134,6 +135,7 @@ export function DownloadItem({
   const [thumbErrorSource, setThumbErrorSource] = useState<string | null>(null);
   const [sheetOpen, setSheetOpen] = useState(false);
   const [propertiesOpen, setPropertiesOpen] = useState(false);
+  const [doctorOpen, setDoctorOpen] = useState(false);
   const ts = getJobTs(job);
   const relative = formatRelativeTime(ts);
   const absolute = new Date(ts).toLocaleString();
@@ -809,6 +811,18 @@ export function DownloadItem({
                       </p>
                       <div className="flex shrink-0 items-center gap-1">
                         <MotionButton
+                          variant="outline"
+                          size="sm"
+                          className="h-8 rounded-full border-primary/25 bg-primary/5 px-2 text-[11px] text-primary hover:bg-primary/15"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setDoctorOpen(true);
+                          }}
+                        >
+                          <Wrench className="mr-1 h-3.5 w-3.5" />
+                          Fix
+                        </MotionButton>
+                        <MotionButton
                           variant="ghost"
                           size="icon"
                           className="h-8 w-8 rounded-full border border-destructive/20 bg-background/40 hover:bg-destructive/15 hover:text-destructive"
@@ -1007,6 +1021,10 @@ export function DownloadItem({
           )}
           {job.status === "Failed" && (
             <>
+              <ContextMenuItem onClick={() => setDoctorOpen(true)}>
+                <Wrench className="mr-2 h-3.5 w-3.5" />
+                Fix this download
+              </ContextMenuItem>
               <ContextMenuItem onClick={() => onRetry(job.id)}>
                 <RotateCcw className="mr-2 h-3.5 w-3.5" />
                 Retry
@@ -1084,6 +1102,16 @@ export function DownloadItem({
           createdAt: job.createdAt,
         }}
       />
+      {job.status === "Failed" && (
+        <DownloadDoctorDialog
+          open={doctorOpen}
+          onOpenChange={setDoctorOpen}
+          title={job.title}
+          url={job.url}
+          failure={job.statusDetail || "Download failed"}
+          onRetry={() => onRetry(job.id)}
+        />
+      )}
     </motion.div>
   );
 }

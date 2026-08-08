@@ -314,6 +314,7 @@ export async function fetchMetadata(jobId: string) {
           ? { mediaCollectionSummary: info.mediaCollectionSummary }
           : {}),
         hasChapters: info.chapters.length > 0,
+        chapters: info.chapters,
         sourceRef: {
           ...(job.sourceRef ?? {}),
           ...(info.uploader ? { creator: info.uploader } : {}),
