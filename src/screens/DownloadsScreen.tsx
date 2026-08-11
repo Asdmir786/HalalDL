@@ -562,6 +562,14 @@ export function DownloadsScreen() {
     () => jobs.filter((job) => job.status === "Queued" || job.status === "Paused" || job.status === "Stopped").length,
     [jobs]
   );
+  const queueJobIds = useMemo(
+    () => jobs
+      .filter((job) => job.status === "Queued" || job.status === "Paused" || job.status === "Stopped")
+      .map((job) => job.id),
+    [jobs]
+  );
+  const allQueueJobsSelected =
+    queueJobIds.length > 0 && queueJobIds.every((id) => selectedIds.includes(id));
   const startableQueuedCount = useMemo(
     () => jobs.filter((job) => job.status === "Queued").length,
     [jobs]
@@ -911,6 +919,17 @@ export function DownloadsScreen() {
     );
   };
 
+  const handleToggleQueueSelection = () => {
+    setSelectedIds((previous) => {
+      const queueIds = new Set(queueJobIds);
+      const allSelected = queueJobIds.length > 0 && queueJobIds.every((id) => previous.includes(id));
+
+      return allSelected
+        ? previous.filter((id) => !queueIds.has(id))
+        : [...new Set([...previous, ...queueJobIds])];
+    });
+  };
+
   const handleRetrySelected = () => {
     if (!selectedIds.length) return;
     retryFailedJobs(selectedIds);
@@ -1128,6 +1147,9 @@ export function DownloadsScreen() {
           statusFilter={statusFilter}
           onResetFilter={() => setStatusFilter("all")}
           selectedIds={selectedIds}
+          queueJobIds={queueJobIds}
+          allQueueJobsSelected={allQueueJobsSelected}
+          onToggleQueueSelection={handleToggleQueueSelection}
           onToggleSelection={handleToggleSelection}
           onRetrySelected={handleRetrySelected}
           canRetrySelected={selectedFailedCount > 0 && canFillMoreSlots}

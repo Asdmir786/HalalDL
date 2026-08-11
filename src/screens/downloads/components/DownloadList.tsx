@@ -22,6 +22,9 @@ interface DownloadListProps {
   statusFilter: DownloadStatusFilter;
   onResetFilter: () => void;
   selectedIds: string[];
+  queueJobIds: string[];
+  allQueueJobsSelected: boolean;
+  onToggleQueueSelection: () => void;
   onToggleSelection: (id: string) => void;
   onRetrySelected: () => void;
   canRetrySelected: boolean;
@@ -112,6 +115,9 @@ export function DownloadList({
   statusFilter,
   onResetFilter,
   selectedIds,
+  queueJobIds,
+  allQueueJobsSelected,
+  onToggleQueueSelection,
   onToggleSelection,
   onRetrySelected,
   canRetrySelected,
@@ -139,6 +145,7 @@ export function DownloadList({
   const [spotlightToken, setSpotlightToken] = useState<number | null>(null);
   const filterEmptyCopy = FILTER_EMPTY_COPY[statusFilter];
   const latestDoneJobId = recentJobs.find((job) => job.status === "Done")?.id ?? null;
+  const selectedQueueOnly = selectedIds.length > 0 && selectedIds.every((id) => queueJobIds.includes(id));
 
   useEffect(() => {
     if (!attentionTarget || attentionTarget.screen !== "downloads") return;
@@ -334,7 +341,7 @@ export function DownloadList({
                       onClick={onRemoveSelected}
                     >
                       <X className="h-3.5 w-3.5" />
-                      Remove
+                      {selectedQueueOnly ? "Cancel & remove" : "Remove"}
                     </MotionButton>
                   </motion.div>
                 )}
@@ -381,6 +388,17 @@ export function DownloadList({
                       title="Queue"
                       count={liveJobs.length}
                       accentClassName="bg-sky-400 shadow-[0_0_16px_rgba(56,189,248,0.65)]"
+                      action={queueJobIds.length > 0 ? (
+                        <MotionButton
+                          type="button"
+                          variant="ghost"
+                          size="sm"
+                          className="h-7 rounded-full border border-border/60 bg-background/70 px-3 text-[11px] text-muted-foreground hover:border-border hover:text-foreground dark:border-white/10 dark:bg-white/5"
+                          onClick={onToggleQueueSelection}
+                        >
+                          {allQueueJobsSelected ? "Clear queue selection" : "Select queue"}
+                        </MotionButton>
+                      ) : undefined}
                     />
                     <div className="space-y-1.5">
                       <AnimatePresence mode="popLayout" initial={false}>
