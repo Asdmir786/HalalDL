@@ -21,6 +21,8 @@ export interface Watchlist {
   intervalHours: number;
   maxItemsPerCheck: number;
   firstRunMode: WatchlistFirstRunMode;
+  /** Per-source delivery takes precedence over the legacy global default. */
+  deliveryMode?: Exclude<WatchlistDeliveryMode, "ask">;
   initializedAt?: number;
   lastCheckedAt?: number;
   lastSuccessAt?: number;

@@ -51,7 +51,7 @@ export async function checkWatchlist(watchlist: Watchlist, force = false) {
     }
     updateWatchlist(watchlist.id, { initializedAt: watchlist.initializedAt || Date.now(), lastSuccessAt: Date.now(), lastError: undefined, lastDiscoveredCount: result.entries.length, lastQueuedCount: candidates.length });
     addActivity({ watchlistId: watchlist.id, kind: candidates.length ? "queued" : "checked", detail: candidates.length ? `${candidates.length} new item(s) queued` : `Checked ${result.entries.length} item(s); nothing new` });
-    const delivery = useSettingsStore.getState().settings.watchlistDeliveryMode;
+    const delivery = watchlist.deliveryMode ?? useSettingsStore.getState().settings.watchlistDeliveryMode;
     if (candidates.length && delivery === "start" && !useDownloadsStore.getState().jobs.some((j) => j.status === "Paused")) startQueuedJobs();
     useLogsStore.getState().addLog({ level: "info", message: `Watchlist ${watchlist.label}: found ${candidates.length} new item(s).` });
     return candidates.length;

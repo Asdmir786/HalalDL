@@ -1,40 +1,272 @@
 import { useMemo, useState } from "react";
-import { Archive, BookOpen, CirclePlay, Clock3, FolderArchive, Pause, Play, Plus, RefreshCw, Search, Trash2 } from "lucide-react";
+import {
+  Archive,
+  BookOpen,
+  CirclePlay,
+  Clock3,
+  FolderArchive,
+  Pause,
+  Pencil,
+  Play,
+  Plus,
+  RefreshCw,
+  Search,
+  Trash2,
+} from "lucide-react";
 import { save } from "@tauri-apps/plugin-dialog";
 import { toast } from "sonner";
+
 import { MotionButton } from "@/components/motion/MotionButton";
 import { Button } from "@/components/ui/button";
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { exportCollectionZip } from "@/lib/commands";
+import { checkWatchlist } from "@/lib/watchlists";
+import type { Watchlist, WatchlistFirstRunMode } from "@/lib/library-types";
 import { useHistoryStore } from "@/store/history";
 import { useLibraryStore } from "@/store/library";
 import { usePresetsStore } from "@/store/presets";
-import { useSettingsStore } from "@/store/settings";
-import { exportCollectionZip } from "@/lib/commands";
-import { checkWatchlist } from "@/lib/watchlists";
-import type { WatchlistFirstRunMode } from "@/lib/library-types";
 
 type Tab = "follow" | "folders" | "sorting";
+type DeliveryMode = "queue" | "start";
+
+const INTERVAL_OPTIONS = [1, 3, 6, 12, 24] as const;
+const MAX_ITEM_OPTIONS = [5, 10, 25, 50] as const;
 const card = "rounded-xl border border-border/60 bg-card p-4";
-const when = (value?: number) => value ? new Date(value).toLocaleString() : "Not checked yet";
+
+const when = (value?: number) =>
+  value ? new Date(value).toLocaleString() : "Not checked yet";
+
+function isYouTubeUrl(value: string) {
+  return /^(https?:\/\/)?(www\.)?(youtube\.com|youtu\.be)\//i.test(value.trim());
+}
+
+function watchlistKind(value: string): Watchlist["kind"] {
+  return /playlist|list=/i.test(value) ? "youtube-playlist" : "youtube-channel";
+}
 
 export function LibraryScreen() {
   const [tab, setTab] = useState<Tab>("follow");
-  const [search, setSearch] = useState(""); const [url, setUrl] = useState(""); const [label, setLabel] = useState("");
-  const [firstRun, setFirstRun] = useState<WatchlistFirstRunMode>("future-only"); const [collectionId, setCollectionId] = useState(""); const [presetId, setPresetId] = useState(""); const [folderName, setFolderName] = useState("");
-  const library = useLibraryStore(); const history = useHistoryStore((state) => state.entries); const presets = usePresetsStore((state) => state.presets); const delivery = useSettingsStore((state) => state.settings.watchlistDeliveryMode); const updateSettings = useSettingsStore((state) => state.updateSettings);
-  const query = search.trim().toLowerCase(); const followed = library.watchlists.filter((item) => !query || `${item.label} ${item.url}`.toLowerCase().includes(query));
-  const folders = useMemo(() => library.collections.map((collection) => ({ collection, count: history.filter((item) => item.collectionId === collection.id && item.status === "completed").length })), [history, library.collections]);
-  const addFollowedChannel = () => { const trimmed = url.trim(); if (!/^(https?:\/\/)?(www\.)?(youtube\.com|youtu\.be)\//i.test(trimmed)) return toast.error("Following is currently for YouTube channels and playlists. Paste a YouTube link."); if (delivery === "ask") updateSettings({ watchlistDeliveryMode: window.confirm("Start new uploads automatically? Cancel keeps them in your download list for you to start.") ? "start" : "queue" }); const isPlaylist = /playlist|list=/i.test(trimmed); library.addWatchlist({ label: label.trim() || (isPlaylist ? "YouTube playlist" : "YouTube channel"), url: trimmed, kind: isPlaylist ? "youtube-playlist" : "youtube-channel", enabled: true, intervalHours: 6, maxItemsPerCheck: 25, firstRunMode: firstRun, ...(collectionId ? { collectionId } : {}), ...(presetId ? { presetId } : {}) }); setUrl(""); setLabel(""); toast.success("YouTube follow saved", { description: "Use Check now when you are ready." }); };
-  const toggleFollow = (id: string, enabled: boolean) => { library.updateWatchlist(id, { enabled: !enabled }); library.addActivity({ watchlistId: id, kind: enabled ? "paused" : "resumed", detail: enabled ? "YouTube follow paused" : "YouTube follow resumed" }); };
-  const exportFolder = async (id: string, name: string) => { const files = history.filter((item) => item.collectionId === id && item.status === "completed").flatMap((item) => item.outputPaths?.length ? item.outputPaths : item.outputPath ? [item.outputPath] : []); if (!files.length) return toast.info("There are no completed files in this folder yet."); const output = await save({ defaultPath: `${name.replace(/[^a-z0-9]+/gi, "-") || "HalalDL-folder"}.zip`, filters: [{ name: "ZIP", extensions: ["zip"] }] }); if (!output) return; const result = await exportCollectionZip(output, files); toast.success("ZIP created", { description: `${result.added} file(s) added${result.skipped.length ? `; ${result.skipped.length} could not be added` : ""}.` }); };
-  return <div className="h-full overflow-y-auto px-4 py-5 sm:px-6 md:px-8"><div className="mx-auto max-w-5xl space-y-5 pb-10">
-    <header><p className="flex items-center gap-2 text-xs font-semibold uppercase tracking-[.14em] text-primary"><BookOpen className="h-4 w-4" /> My library</p><h2 className="mt-2 text-2xl font-bold tracking-tight">Your saved downloads, in one place</h2><p className="mt-1 text-sm text-muted-foreground">Download normally from Downloads. This page is optional: use it to follow YouTube channels or keep related files together.</p></header>
-    <div className="flex flex-col gap-3 border-y border-border/60 py-3 sm:flex-row sm:items-center sm:justify-between"><nav className="flex gap-1">{([{ id: "follow", label: "Follow YouTube" }, { id: "folders", label: "Folders" }, { id: "sorting", label: "Automatic sorting" }] as const).map((item) => <button key={item.id} onClick={() => setTab(item.id)} className={`rounded-md px-3 py-2 text-sm font-medium ${tab === item.id ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:bg-muted hover:text-foreground"}`}>{item.label}</button>)}</nav><div className="relative w-full sm:w-64"><Search className="pointer-events-none absolute left-3 top-2.5 h-4 w-4 text-muted-foreground" /><Input className="pl-9" value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Search followed channels" /></div></div>
-    {tab === "follow" && <section className="space-y-4"><div className={card}><div className="flex items-start gap-3"><CirclePlay className="mt-0.5 h-5 w-5 shrink-0 text-primary" /><div><h3 className="font-semibold">Follow a YouTube channel or playlist</h3><p className="mt-1 text-sm text-muted-foreground">HalalDL checks it for new uploads every six hours while the app is open or sitting in the tray. It does not run after you quit the app.</p></div></div><div className="mt-4 grid gap-2 lg:grid-cols-[.65fr_1.35fr_auto]"><Input value={label} onChange={(event) => setLabel(event.target.value)} placeholder="Name (optional)" /><Input value={url} onChange={(event) => setUrl(event.target.value)} placeholder="YouTube channel or playlist link" /><MotionButton onClick={addFollowedChannel}><Plus className="mr-2 h-4 w-4" />Follow</MotionButton></div><div className="mt-2 grid gap-2 md:grid-cols-3"><Select value={firstRun} onValueChange={(value) => setFirstRun(value as WatchlistFirstRunMode)}><SelectTrigger><SelectValue /></SelectTrigger><SelectContent><SelectItem value="future-only">Only get future uploads</SelectItem><SelectItem value="backlog">Get uploads already there</SelectItem></SelectContent></Select><SimpleSelect value={collectionId} onChange={setCollectionId} placeholder="Save into folder (optional)" items={library.collections} /><SimpleSelect value={presetId} onChange={setPresetId} placeholder="Use preset (optional)" items={presets} /></div><p className="mt-3 text-xs text-muted-foreground">New uploads will {delivery === "start" ? "start automatically" : delivery === "queue" ? "be added to your download list" : "ask how you want to handle them when you first follow a channel"}.</p></div><div className="grid gap-4 xl:grid-cols-[1.5fr_.8fr]"><div className="space-y-3">{followed.length === 0 ? <Empty text={query ? "No followed YouTube channel or playlist matches that search." : "You are not following any YouTube channels or playlists yet."} /> : followed.map((item) => <div key={item.id} className={card}><div className="flex flex-col gap-3 lg:flex-row lg:justify-between"><div className="min-w-0"><div className="flex items-center gap-2"><h3 className="font-semibold">{item.label}</h3><span className="rounded bg-muted px-2 py-0.5 text-[11px] text-muted-foreground">{item.kind === "youtube-playlist" ? "Playlist" : "Channel"}</span><span className="text-xs text-muted-foreground">{item.enabled ? "Following" : "Paused"}</span></div><p className="mt-1 truncate text-xs text-muted-foreground" title={item.url}>{item.url}</p><p className="mt-3 text-xs text-muted-foreground">Checked: {when(item.lastSuccessAt)} · Found last time: {item.lastDiscoveredCount ?? 0} · Next: {item.enabled && item.lastSuccessAt ? new Date(item.lastSuccessAt + item.intervalHours * 3_600_000).toLocaleString() : item.enabled ? "After first check" : "Paused"}</p>{item.lastError && <p className="mt-2 text-xs text-destructive">Last problem: {item.lastError}</p>}</div><div className="flex shrink-0 gap-2"><Button variant="outline" size="sm" onClick={() => toggleFollow(item.id, item.enabled)}>{item.enabled ? <Pause className="mr-1.5 h-3.5 w-3.5" /> : <Play className="mr-1.5 h-3.5 w-3.5" />}{item.enabled ? "Pause" : "Resume"}</Button><Button variant="outline" size="sm" onClick={() => void checkWatchlist(item, true).then((count) => toast.success("YouTube checked", { description: count ? `${count} new upload(s) added.` : "Nothing new was added." })).catch((error) => toast.error(error instanceof Error ? error.message : "Could not check YouTube."))}><RefreshCw className="mr-1.5 h-3.5 w-3.5" />Check now</Button><Button variant="ghost" size="icon" onClick={() => library.removeWatchlist(item.id)} aria-label="Stop following"><Trash2 className="h-4 w-4 text-destructive" /></Button></div></div></div>)}</div><aside className={card}><h3 className="mb-3 flex items-center gap-2 font-semibold"><Clock3 className="h-4 w-4 text-primary" /> Recent activity</h3>{library.activity.length === 0 ? <p className="text-sm text-muted-foreground">Checks and new uploads will appear here.</p> : <div className="space-y-3">{library.activity.slice(0, 6).map((entry) => <div key={entry.id} className="border-l-2 border-border pl-3"><p className="text-sm">{entry.detail}</p><p className="mt-0.5 text-xs text-muted-foreground">{when(entry.createdAt)}</p></div>)}</div>}</aside></div></section>}
-    {tab === "folders" && <section className="space-y-4"><div className={card}><h3 className="font-semibold">Create a folder</h3><p className="mt-1 text-sm text-muted-foreground">Folders group downloads in HalalDL. They do not move your original files.</p><div className="mt-3 flex gap-2"><Input value={folderName} onChange={(event) => setFolderName(event.target.value)} placeholder="For example, Friday lectures" /><MotionButton onClick={() => { if (!folderName.trim()) return toast.error("Give the folder a name."); library.addCollection({ name: folderName.trim(), tags: [] }); setFolderName(""); }}><Plus className="mr-2 h-4 w-4" />Create</MotionButton></div></div>{folders.length === 0 ? <Empty text="Create a folder when you want related downloads grouped together." /> : folders.map(({ collection, count }) => <div key={collection.id} className={card}><div className="flex items-center justify-between gap-3"><div><h3 className="font-semibold">{collection.name}</h3><p className="mt-1 text-sm text-muted-foreground">{count} completed download(s)</p></div><div className="flex gap-2"><Button variant="outline" size="sm" onClick={() => void exportFolder(collection.id, collection.name)}><FolderArchive className="mr-1.5 h-3.5 w-3.5" />Export ZIP</Button><Button variant="ghost" size="icon" onClick={() => library.removeCollection(collection.id)} aria-label="Delete folder"><Trash2 className="h-4 w-4 text-destructive" /></Button></div></div></div>)}</section>}
-    {tab === "sorting" && <section className={card}><h3 className="font-semibold">Automatic sorting</h3><p className="mt-1 max-w-2xl text-sm text-muted-foreground">This is for people who want HalalDL to put certain downloads in a folder or use a preset automatically. It is optional and still being simplified; regular downloads do not need it.</p><p className="mt-4 text-sm text-muted-foreground">For now, use a folder when adding a YouTube follow. More automatic sorting will return once it can work without asking you for technical IDs.</p></section>}
-  </div></div>;
+  const [search, setSearch] = useState("");
+  const [url, setUrl] = useState("");
+  const [label, setLabel] = useState("");
+  const [firstRun, setFirstRun] = useState<WatchlistFirstRunMode>("future-only");
+  const [intervalHours, setIntervalHours] = useState<number>(6);
+  const [maxItemsPerCheck, setMaxItemsPerCheck] = useState<number>(25);
+  const [deliveryMode, setDeliveryMode] = useState<DeliveryMode>("queue");
+  const [collectionId, setCollectionId] = useState("");
+  const [presetId, setPresetId] = useState("");
+  const [folderName, setFolderName] = useState("");
+  const [editing, setEditing] = useState<Watchlist | null>(null);
+
+  const library = useLibraryStore();
+  const history = useHistoryStore((state) => state.entries);
+  const presets = usePresetsStore((state) => state.presets);
+  const query = search.trim().toLowerCase();
+  const followed = library.watchlists.filter(
+    (item) => !query || `${item.label} ${item.url}`.toLowerCase().includes(query)
+  );
+  const folders = useMemo(
+    () =>
+      library.collections.map((collection) => ({
+        collection,
+        count: history.filter(
+          (item) => item.collectionId === collection.id && item.status === "completed"
+        ).length,
+      })),
+    [history, library.collections]
+  );
+
+  const addFollowedChannel = () => {
+    const trimmed = url.trim();
+    if (!isYouTubeUrl(trimmed)) {
+      toast.error("Following is currently for YouTube channels and playlists. Paste a YouTube link.");
+      return;
+    }
+
+    const kind = watchlistKind(trimmed);
+    library.addWatchlist({
+      label: label.trim() || (kind === "youtube-playlist" ? "YouTube playlist" : "YouTube channel"),
+      url: trimmed,
+      kind,
+      enabled: true,
+      intervalHours,
+      maxItemsPerCheck,
+      firstRunMode: firstRun,
+      deliveryMode,
+      ...(collectionId ? { collectionId } : {}),
+      ...(presetId ? { presetId } : {}),
+    });
+    setUrl("");
+    setLabel("");
+    toast.success("YouTube follow saved", {
+      description: `Checked every ${intervalHours} hour${intervalHours === 1 ? "" : "s"}.`,
+    });
+  };
+
+  const saveEdit = () => {
+    if (!editing) return;
+    const trimmedUrl = editing.url.trim();
+    if (!isYouTubeUrl(trimmedUrl)) {
+      toast.error("Following is currently for YouTube channels and playlists. Paste a YouTube link.");
+      return;
+    }
+
+    const original = library.watchlists.find((item) => item.id === editing.id);
+    const urlChanged = Boolean(original && original.url.trim() !== trimmedUrl);
+    library.updateWatchlist(editing.id, {
+      ...editing,
+      label: editing.label.trim() || "YouTube follow",
+      url: trimmedUrl,
+      kind: watchlistKind(trimmedUrl),
+      ...(urlChanged
+        ? {
+            initializedAt: undefined,
+            lastCheckedAt: undefined,
+            lastSuccessAt: undefined,
+            lastError: undefined,
+            lastDiscoveredCount: undefined,
+            lastQueuedCount: undefined,
+          }
+        : {}),
+    });
+    setEditing(null);
+    toast.success("Follow updated", {
+      description: urlChanged
+        ? "The new source will use the selected first-check behavior."
+        : "Your changes will apply to the next check.",
+    });
+  };
+
+  const toggleFollow = (id: string, enabled: boolean) => {
+    library.updateWatchlist(id, { enabled: !enabled });
+    library.addActivity({
+      watchlistId: id,
+      kind: enabled ? "paused" : "resumed",
+      detail: enabled ? "YouTube follow paused" : "YouTube follow resumed",
+    });
+  };
+
+  const exportFolder = async (id: string, name: string) => {
+    const files = history
+      .filter((item) => item.collectionId === id && item.status === "completed")
+      .flatMap((item) => (item.outputPaths?.length ? item.outputPaths : item.outputPath ? [item.outputPath] : []));
+    if (!files.length) {
+      toast.info("There are no completed files in this folder yet.");
+      return;
+    }
+    const output = await save({
+      defaultPath: `${name.replace(/[^a-z0-9]+/gi, "-") || "HalalDL-folder"}.zip`,
+      filters: [{ name: "ZIP", extensions: ["zip"] }],
+    });
+    if (!output) return;
+    const result = await exportCollectionZip(output, files);
+    toast.success("ZIP created", {
+      description: `${result.added} file(s) added${result.skipped.length ? `; ${result.skipped.length} could not be added` : ""}.`,
+    });
+  };
+
+  return (
+    <div className="h-full overflow-y-auto px-4 py-5 sm:px-6 md:px-8">
+      <div className="mx-auto max-w-5xl space-y-5 pb-10">
+        <header>
+          <p className="flex items-center gap-2 text-xs font-semibold uppercase tracking-[.14em] text-primary">
+            <BookOpen className="h-4 w-4" /> My library
+          </p>
+          <h2 className="mt-2 text-2xl font-bold tracking-tight">Your saved downloads, in one place</h2>
+          <p className="mt-1 text-sm text-muted-foreground">Download normally from Downloads. This page is optional: use it to follow YouTube channels or keep related files together.</p>
+        </header>
+
+        <div className="flex flex-col gap-3 border-y border-border/60 py-3 sm:flex-row sm:items-center sm:justify-between">
+          <nav className="flex gap-1">
+            {(["follow", "folders", "sorting"] as const).map((item) => (
+              <button key={item} onClick={() => setTab(item)} className={`rounded-md px-3 py-2 text-sm font-medium ${tab === item ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:bg-muted hover:text-foreground"}`}>
+                {item === "follow" ? "Follow YouTube" : item === "folders" ? "Folders" : "Automatic sorting"}
+              </button>
+            ))}
+          </nav>
+          <div className="relative w-full sm:w-64">
+            <Search className="pointer-events-none absolute left-3 top-2.5 h-4 w-4 text-muted-foreground" />
+            <Input className="pl-9" value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Search followed channels" />
+          </div>
+        </div>
+
+        {tab === "follow" && (
+          <section className="space-y-4">
+            <div className={card}>
+              <div className="flex items-start gap-3">
+                <CirclePlay className="mt-0.5 h-5 w-5 shrink-0 text-primary" />
+                <div>
+                  <h3 className="font-semibold">Follow a YouTube channel or playlist</h3>
+                  <p className="mt-1 text-sm text-muted-foreground">HalalDL checks while the app is open or sitting in the tray. Six hours is recommended for most follows; use one to three hours only for a few priority sources.</p>
+                </div>
+              </div>
+              <div className="mt-4 grid gap-2 lg:grid-cols-[.65fr_1.35fr_auto]">
+                <Input value={label} onChange={(event) => setLabel(event.target.value)} placeholder="Name (optional)" />
+                <Input value={url} onChange={(event) => setUrl(event.target.value)} placeholder="YouTube channel or playlist link" />
+                <MotionButton onClick={addFollowedChannel}><Plus className="mr-2 h-4 w-4" />Follow</MotionButton>
+              </div>
+              <div className="mt-2 grid gap-2 md:grid-cols-3">
+                <FirstRunSelect value={firstRun} onChange={setFirstRun} />
+                <IntervalSelect value={intervalHours} onChange={setIntervalHours} />
+                <DeliverySelect value={deliveryMode} onChange={setDeliveryMode} />
+                <SimpleSelect value={collectionId} onChange={setCollectionId} placeholder="Save into folder (optional)" items={library.collections} />
+                <SimpleSelect value={presetId} onChange={setPresetId} placeholder="Use preset (optional)" items={presets} />
+                <MaxItemsSelect value={maxItemsPerCheck} onChange={setMaxItemsPerCheck} />
+              </div>
+            </div>
+
+            <div className="grid gap-4 xl:grid-cols-[1.5fr_.8fr]">
+              <div className="space-y-3">
+                {followed.length === 0 ? <Empty text={query ? "No followed YouTube channel or playlist matches that search." : "You are not following any YouTube channels or playlists yet."} /> : followed.map((item) => (
+                  <div key={item.id} className={card}>
+                    <div className="flex flex-col gap-3 lg:flex-row lg:justify-between">
+                      <div className="min-w-0">
+                        <div className="flex items-center gap-2">
+                          <h3 className="font-semibold">{item.label}</h3>
+                          <span className="rounded bg-muted px-2 py-0.5 text-[11px] text-muted-foreground">{item.kind === "youtube-playlist" ? "Playlist" : "Channel"}</span>
+                          <span className="text-xs text-muted-foreground">{item.enabled ? "Following" : "Paused"}</span>
+                        </div>
+                        <p className="mt-1 truncate text-xs text-muted-foreground" title={item.url}>{item.url}</p>
+                        <p className="mt-3 text-xs text-muted-foreground">Every {item.intervalHours} hour{item.intervalHours === 1 ? "" : "s"} · {item.deliveryMode === "start" ? "Starts new uploads" : "Queues new uploads"} · Checked: {when(item.lastSuccessAt)} · Next: {item.enabled && item.lastSuccessAt ? new Date(item.lastSuccessAt + item.intervalHours * 3_600_000).toLocaleString() : item.enabled ? "After first check" : "Paused"}</p>
+                        {item.lastError && <p className="mt-2 text-xs text-destructive">Last problem: {item.lastError}</p>}
+                      </div>
+                      <div className="flex shrink-0 flex-wrap gap-2">
+                        <Button variant="outline" size="sm" onClick={() => setEditing(item)}><Pencil className="mr-1.5 h-3.5 w-3.5" />Edit</Button>
+                        <Button variant="outline" size="sm" onClick={() => toggleFollow(item.id, item.enabled)}>{item.enabled ? <Pause className="mr-1.5 h-3.5 w-3.5" /> : <Play className="mr-1.5 h-3.5 w-3.5" />}{item.enabled ? "Pause" : "Resume"}</Button>
+                        <Button variant="outline" size="sm" onClick={() => void checkWatchlist(item, true).then((count) => toast.success("YouTube checked", { description: count ? `${count} new upload(s) added.` : "Nothing new was added." })).catch((error) => toast.error(error instanceof Error ? error.message : "Could not check YouTube."))}><RefreshCw className="mr-1.5 h-3.5 w-3.5" />Check now</Button>
+                        <Button variant="ghost" size="icon" onClick={() => library.removeWatchlist(item.id)} aria-label="Stop following"><Trash2 className="h-4 w-4 text-destructive" /></Button>
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+              <aside className={card}>
+                <h3 className="mb-3 flex items-center gap-2 font-semibold"><Clock3 className="h-4 w-4 text-primary" /> Recent activity</h3>
+                {library.activity.length === 0 ? <p className="text-sm text-muted-foreground">Checks and new uploads will appear here.</p> : <div className="space-y-3">{library.activity.slice(0, 6).map((entry) => <div key={entry.id} className="border-l-2 border-border pl-3"><p className="text-sm">{entry.detail}</p><p className="mt-0.5 text-xs text-muted-foreground">{when(entry.createdAt)}</p></div>)}</div>}
+              </aside>
+            </div>
+          </section>
+        )}
+
+        {tab === "folders" && <section className="space-y-4"><div className={card}><h3 className="font-semibold">Create a folder</h3><p className="mt-1 text-sm text-muted-foreground">Folders group downloads in HalalDL. They do not move your original files.</p><div className="mt-3 flex gap-2"><Input value={folderName} onChange={(event) => setFolderName(event.target.value)} placeholder="For example, Friday lectures" /><MotionButton onClick={() => { if (!folderName.trim()) return toast.error("Give the folder a name."); library.addCollection({ name: folderName.trim(), tags: [] }); setFolderName(""); }}><Plus className="mr-2 h-4 w-4" />Create</MotionButton></div></div>{folders.length === 0 ? <Empty text="Create a folder when you want related downloads grouped together." /> : folders.map(({ collection, count }) => <div key={collection.id} className={card}><div className="flex items-center justify-between gap-3"><div><h3 className="font-semibold">{collection.name}</h3><p className="mt-1 text-sm text-muted-foreground">{count} completed download(s)</p></div><div className="flex gap-2"><Button variant="outline" size="sm" onClick={() => void exportFolder(collection.id, collection.name)}><FolderArchive className="mr-1.5 h-3.5 w-3.5" />Export ZIP</Button><Button variant="ghost" size="icon" onClick={() => library.removeCollection(collection.id)} aria-label="Delete folder"><Trash2 className="h-4 w-4 text-destructive" /></Button></div></div></div>)}</section>}
+        {tab === "sorting" && <section className={card}><h3 className="font-semibold">Automatic sorting</h3><p className="mt-1 max-w-2xl text-sm text-muted-foreground">This is for people who want HalalDL to put certain downloads in a folder or use a preset automatically. It is optional and still being simplified; regular downloads do not need it.</p><p className="mt-4 text-sm text-muted-foreground">For now, use a folder when adding a YouTube follow. More automatic sorting will return once it can work without asking you for technical IDs.</p></section>}
+      </div>
+
+      <EditFollowDialog editing={editing} setEditing={setEditing} collections={library.collections} presets={presets} onSave={saveEdit} />
+    </div>
+  );
 }
+
+function EditFollowDialog({ editing, setEditing, collections, presets, onSave }: { editing: Watchlist | null; setEditing: (value: Watchlist | null) => void; collections: { id: string; name: string }[]; presets: { id: string; name: string }[]; onSave: () => void }) {
+  const update = (value: Partial<Watchlist>) => setEditing(editing ? { ...editing, ...value } : null);
+  return <Dialog open={Boolean(editing)} onOpenChange={(open) => !open && setEditing(null)}><DialogContent className="max-w-lg"><DialogHeader><DialogTitle>Edit YouTube follow</DialogTitle><DialogDescription>Six hours is recommended for most sources. If you change the URL, the selected first-check behavior is applied again.</DialogDescription></DialogHeader>{editing && <div className="grid gap-3 py-2"><Input value={editing.label} onChange={(event) => update({ label: event.target.value })} placeholder="Name" /><Input value={editing.url} onChange={(event) => update({ url: event.target.value })} placeholder="YouTube channel or playlist link" /><div className="grid gap-3 sm:grid-cols-2"><IntervalSelect value={editing.intervalHours} onChange={(intervalHours) => update({ intervalHours })} /><MaxItemsSelect value={editing.maxItemsPerCheck} onChange={(maxItemsPerCheck) => update({ maxItemsPerCheck })} /><FirstRunSelect value={editing.firstRunMode} onChange={(firstRunMode) => update({ firstRunMode })} /><DeliverySelect value={editing.deliveryMode ?? "queue"} onChange={(deliveryMode) => update({ deliveryMode })} /><SimpleSelect value={editing.collectionId ?? ""} onChange={(collectionId) => update({ collectionId: collectionId || undefined })} placeholder="Save into folder (optional)" items={collections} /><SimpleSelect value={editing.presetId ?? ""} onChange={(presetId) => update({ presetId: presetId || undefined })} placeholder="Use preset (optional)" items={presets} /></div></div>}<DialogFooter><Button variant="outline" onClick={() => setEditing(null)}>Cancel</Button><Button onClick={onSave}>Save changes</Button></DialogFooter></DialogContent></Dialog>;
+}
+
+function IntervalSelect({ value, onChange }: { value: number; onChange: (value: number) => void }) { return <Select value={String(value)} onValueChange={(next) => onChange(Number(next))}><SelectTrigger><SelectValue placeholder="Check interval" /></SelectTrigger><SelectContent>{INTERVAL_OPTIONS.map((hours) => <SelectItem key={hours} value={String(hours)}>{hours} hour{hours === 1 ? "" : "s"}{hours === 6 ? " — recommended" : ""}</SelectItem>)}</SelectContent></Select>; }
+function MaxItemsSelect({ value, onChange }: { value: number; onChange: (value: number) => void }) { return <Select value={String(value)} onValueChange={(next) => onChange(Number(next))}><SelectTrigger><SelectValue placeholder="New items per check" /></SelectTrigger><SelectContent>{MAX_ITEM_OPTIONS.map((count) => <SelectItem key={count} value={String(count)}>Up to {count} new items</SelectItem>)}</SelectContent></Select>; }
+function FirstRunSelect({ value, onChange }: { value: WatchlistFirstRunMode; onChange: (value: WatchlistFirstRunMode) => void }) { return <Select value={value} onValueChange={(next) => onChange(next as WatchlistFirstRunMode)}><SelectTrigger><SelectValue placeholder="First check" /></SelectTrigger><SelectContent><SelectItem value="future-only">Only future uploads</SelectItem><SelectItem value="backlog">Include existing uploads</SelectItem></SelectContent></Select>; }
+function DeliverySelect({ value, onChange }: { value: DeliveryMode; onChange: (value: DeliveryMode) => void }) { return <Select value={value} onValueChange={(next) => onChange(next as DeliveryMode)}><SelectTrigger><SelectValue placeholder="New upload action" /></SelectTrigger><SelectContent><SelectItem value="queue">Queue new uploads</SelectItem><SelectItem value="start">Start new uploads</SelectItem></SelectContent></Select>; }
 function SimpleSelect({ value, onChange, placeholder, items }: { value: string; onChange: (value: string) => void; placeholder: string; items: { id: string; name: string }[] }) { return <Select value={value || "none"} onValueChange={(next) => onChange(next === "none" ? "" : next)}><SelectTrigger><SelectValue placeholder={placeholder} /></SelectTrigger><SelectContent><SelectItem value="none">{placeholder}</SelectItem>{items.map((item) => <SelectItem key={item.id} value={item.id}>{item.name}</SelectItem>)}</SelectContent></Select>; }
 function Empty({ text }: { text: string }) { return <div className="rounded-xl border border-dashed border-border/70 px-6 py-12 text-center text-sm text-muted-foreground"><Archive className="mx-auto mb-3 h-7 w-7 opacity-50" />{text}</div>; }
