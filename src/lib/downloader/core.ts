@@ -992,7 +992,7 @@ export async function startDownload(jobId: string) {
     args.includes("--extract-audio") ||
     args.includes("--audio-format");
 
-  if (settings.squareAlbumArt && wantsAudioExtract) {
+  if (preset.squareAlbumArt === true && wantsAudioExtract) {
     if (!args.includes("--embed-thumbnail")) {
       args.push("--embed-thumbnail");
     }
@@ -1002,7 +1002,10 @@ export async function startDownload(jobId: string) {
     // Center-crop to a square before embedding (YouTube thumbs are usually 16:9).
     args.push(
       "--postprocessor-args",
-      "ThumbnailsConvertor+ffmpeg_o:-c:v mjpeg -vf crop=min(iw\\,ih):min(iw\\,ih)"
+      // yt-dlp parses postprocessor arguments once before passing them to FFmpeg.
+      // Keep two backslashes here so FFmpeg receives the escaped comma its filter
+      // parser requires, rather than splitting min(iw,ih) into separate filters.
+      "ThumbnailsConvertor+ffmpeg_o:-c:v mjpeg -vf crop=min(iw\\\\,ih):min(iw\\\\,ih)"
     );
     addLog({
       level: "info",

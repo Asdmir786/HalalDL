@@ -255,6 +255,7 @@ export function PresetsScreen() {
                   subtitleLanguages: data.subtitleLanguages,
                   subtitleFormat: data.subtitleFormat,
                   subtitleOnly: data.subtitleOnly,
+                  squareAlbumArt: data.squareAlbumArt,
                   askFolderBehavior: data.askFolderBehavior,
                 });
                 toast.success("Preset created");

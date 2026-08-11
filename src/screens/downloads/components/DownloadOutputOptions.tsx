@@ -1,7 +1,6 @@
-import { Settings2, FolderOpen, Languages, Scissors, Image, ListTree } from "lucide-react";
+import { Settings2, FolderOpen, Languages, Scissors, ListTree } from "lucide-react";
 import { MotionButton } from "@/components/motion/MotionButton";
 import { Input } from "@/components/ui/input";
-import { Checkbox } from "@/components/ui/checkbox";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { SponsorBlockControls } from "@/components/SponsorBlockControls";
 import { cn } from "@/lib/utils";
@@ -48,8 +47,6 @@ interface DownloadOutputOptionsProps {
   onSponsorBlockCategoriesChange: (val: SponsorBlockCategoryId[]) => void;
   sponsorBlockDisabled?: boolean;
   sponsorBlockDisabledReason?: string;
-  squareAlbumArt: boolean;
-  onSquareAlbumArtChange: (val: boolean) => void;
 }
 
 export function DownloadOutputOptions({
@@ -85,8 +82,6 @@ export function DownloadOutputOptions({
   onSponsorBlockCategoriesChange,
   sponsorBlockDisabled = false,
   sponsorBlockDisabledReason,
-  squareAlbumArt,
-  onSquareAlbumArtChange,
 }: DownloadOutputOptionsProps) {
   
   const insertPlaceholder = (placeholder: string) => {
@@ -249,29 +244,6 @@ export function DownloadOutputOptions({
          <div className="flex items-center gap-2"><ListTree className="h-4 w-4 text-primary/80" /><label className="text-xs font-medium text-muted-foreground">Chapters</label></div>
          <Select value={chapterMode} onValueChange={(value) => onChapterModeChange(value as ChapterMode)}><SelectTrigger className="h-9 bg-background/50 text-xs"><SelectValue /></SelectTrigger><SelectContent><SelectItem value="preserve">Keep chapter markers when available</SelectItem><SelectItem value="split">Split into chapter files (needs FFmpeg)</SelectItem></SelectContent></Select>
          <p className="text-[11px] text-muted-foreground">If the source has no chapters, HalalDL will keep the download intact and explain why.</p>
-       </div>
-
-       <div className="grid gap-2 rounded-xl border border-muted/40 bg-muted/15 p-3">
-         <div className="flex items-start gap-3">
-           <Checkbox
-             id="square-album-art"
-             checked={squareAlbumArt}
-             onCheckedChange={(checked) => onSquareAlbumArtChange(checked === true)}
-             className="mt-0.5"
-           />
-           <div className="min-w-0 space-y-1">
-             <label
-               htmlFor="square-album-art"
-               className="flex cursor-pointer items-center gap-2 text-xs font-medium"
-             >
-               <Image className="h-3.5 w-3.5 text-primary/80" />
-               Square album art (1:1)
-             </label>
-             <p className="text-[11px] text-muted-foreground">
-               For audio presets (MP3, Source Audio, etc.): crop the thumbnail to a square and embed it.
-             </p>
-           </div>
-         </div>
        </div>
 
        <div className="grid gap-3 rounded-xl border border-muted/40 bg-muted/15 p-3">

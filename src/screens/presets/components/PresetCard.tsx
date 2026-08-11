@@ -78,6 +78,11 @@ export function PresetCard({ preset, onDuplicate, onEdit, onDelete }: PresetCard
               Filename
             </Badge>
           )}
+          {preset.squareAlbumArt === true && (
+            <Badge variant="outline" className="text-[10px]">
+              Square art
+            </Badge>
+          )}
         </div>
         {preset.filenameTemplate?.trim() && (
           <div className="rounded-lg border border-muted/45 bg-muted/20 px-3 py-2 font-mono text-[10px] text-muted-foreground">

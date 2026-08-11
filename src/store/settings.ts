@@ -79,9 +79,6 @@ export interface Settings {
   /** When false, skip aria2 even if the binary is installed (yt-dlp native downloader). */
   aria2Enabled: boolean;
 
-  /** Embed a center-cropped 1:1 thumbnail for audio downloads. */
-  squareAlbumArt: boolean;
-
   /**
    * Netscape cookies.txt for age-gated / private / members content.
    * Chrome cannot auto-export cookies anymore; pick a file from an extension export.
@@ -137,7 +134,6 @@ export const DEFAULT_SETTINGS: Settings = {
   sponsorBlockCategories: [...DEFAULT_SPONSORBLOCK_CATEGORIES],
   instagramEngine: "downloadgram",
   aria2Enabled: true,
-  squareAlbumArt: false,
   cookiesFilePath: "",
   historyRetention: 0,
   watchlistDeliveryMode: "ask",
@@ -146,8 +142,12 @@ export const DEFAULT_SETTINGS: Settings = {
 export const SETTINGS_KEYS = Object.keys(DEFAULT_SETTINGS) as (keyof Settings)[];
 
 function normalizeSettings(settings: Settings): Settings {
+  // The option moved to presets. Drop the legacy global key when old settings load.
+  const currentSettings = { ...settings } as Settings & { squareAlbumArt?: unknown };
+  delete currentSettings.squareAlbumArt;
+
   return {
-    ...settings,
+    ...currentSettings,
     sponsorBlockMode:
       settings.sponsorBlockMode === "mark" || settings.sponsorBlockMode === "remove"
         ? settings.sponsorBlockMode
@@ -155,7 +155,6 @@ function normalizeSettings(settings: Settings): Settings {
     sponsorBlockCategories: normalizeSponsorBlockCategories(settings.sponsorBlockCategories),
     instagramEngine: settings.instagramEngine === "yt-dlp" ? "yt-dlp" : "downloadgram",
     aria2Enabled: settings.aria2Enabled !== false,
-    squareAlbumArt: settings.squareAlbumArt === true,
     cookiesFilePath:
       typeof settings.cookiesFilePath === "string" ? settings.cookiesFilePath.trim() : "",
   };

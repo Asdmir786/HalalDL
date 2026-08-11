@@ -51,6 +51,7 @@ export function PresetEditor({ preset, isOpen, onClose, onSave }: PresetEditorPr
   const [subtitleFormat, setSubtitleFormat] = useState<"original" | "srt" | "vtt">(
     preset?.subtitleFormat ?? "srt"
   );
+  const [squareAlbumArt, setSquareAlbumArt] = useState(preset?.squareAlbumArt === true);
 
   const handleSave = () => {
     const trimmedFilenameTemplate = filenameTemplate.trim();
@@ -67,6 +68,7 @@ export function PresetEditor({ preset, isOpen, onClose, onSave }: PresetEditorPr
       subtitleLanguages: splitSubtitleLanguages(subtitleLanguagesText),
       subtitleFormat,
       subtitleOnly: subtitleMode === "only",
+      squareAlbumArt,
     });
     onClose();
   };
@@ -169,6 +171,19 @@ export function PresetEditor({ preset, isOpen, onClose, onSave }: PresetEditorPr
               </div>
             </div>
             <Switch checked={quickEligible} onCheckedChange={setQuickEligible} />
+          </div>
+          <div className="flex items-center justify-between gap-4 rounded-lg border border-border/40 bg-muted/20 px-3 py-2.5">
+            <div className="space-y-0.5">
+              <Label htmlFor="preset-square-album-art" className="text-sm font-medium">Square album art (1:1)</Label>
+              <p className="text-xs text-muted-foreground">
+                For audio presets: crop and embed the thumbnail as square cover art.
+              </p>
+            </div>
+            <Switch
+              id="preset-square-album-art"
+              checked={squareAlbumArt}
+              onCheckedChange={setSquareAlbumArt}
+            />
           </div>
           <div className="grid gap-4 rounded-lg border border-border/40 bg-muted/20 p-3">
             <div className="text-sm font-medium">Subtitle defaults</div>

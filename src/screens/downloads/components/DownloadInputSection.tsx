@@ -99,8 +99,6 @@ interface DownloadInputSectionProps {
   onSponsorBlockCategoriesChange: (val: SponsorBlockCategoryId[]) => void;
   sponsorBlockDisabled?: boolean;
   sponsorBlockDisabledReason?: string;
-  squareAlbumArt: boolean;
-  onSquareAlbumArtChange: (val: boolean) => void;
   playlistStatus: PlaylistPickerStatus;
   playlistEntries: PlaylistEntry[];
   playlistSelectedKeys: Set<string>;
@@ -151,8 +149,6 @@ export function DownloadInputSection({
   onSponsorBlockCategoriesChange,
   sponsorBlockDisabled,
   sponsorBlockDisabledReason,
-  squareAlbumArt,
-  onSquareAlbumArtChange,
   playlistStatus,
   playlistEntries,
   playlistSelectedKeys,
@@ -758,8 +754,6 @@ export function DownloadInputSection({
           onSponsorBlockCategoriesChange={onSponsorBlockCategoriesChange}
           sponsorBlockDisabled={sponsorBlockDisabled}
           sponsorBlockDisabledReason={sponsorBlockDisabledReason}
-          squareAlbumArt={squareAlbumArt}
-          onSquareAlbumArtChange={onSquareAlbumArtChange}
         />
       )}
     </div>

@@ -34,6 +34,8 @@ export interface Preset {
   subtitleLanguages?: string[];
   subtitleFormat?: SubtitleFormat;
   subtitleOnly?: boolean;
+  /** Embed a center-cropped 1:1 thumbnail when this preset extracts audio. */
+  squareAlbumArt?: boolean;
   askFolderBehavior?: PresetFolderBehavior;
 }
 
