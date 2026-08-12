@@ -16,19 +16,15 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
-const outDir = path.resolve(__dirname, "../docs/assets/screenshots");
+const outDir = path.resolve(__dirname, "../docs/assets/releases/0.6.0/screenshots");
 const base = "http://localhost:1420/";
 
 const shots = [
-  { file: "halaldl-downloads", screen: "downloads" },
-  { file: "halaldl-presets", screen: "presets" },
-  { file: "halaldl-tools", screen: "tools" },
-  { file: "halaldl-history", screen: "history" },
-  { file: "halaldl-logs", screen: "logs" },
-  { file: "halaldl-settings", screen: "settings", section: "appearance" },
-  { file: "halaldl-settings-performance", screen: "settings", section: "performance" },
-  { file: "halaldl-about-trust", screen: "settings", section: "about" },
-  { file: "halaldl-support-prompt", screen: "settings", section: "about" },
+  { file: "playlist", screen: "downloads", state: "playlist" },
+  { file: "queue-selection", screen: "downloads", state: "queue" },
+  { file: "download-doctor", screen: "downloads", state: "doctor" },
+  { file: "library-follow", screen: "library", state: "library" },
+  { file: "clip-maker", screen: "history", state: "clips" },
 ];
 
 function urlFor(theme, shot) {
@@ -38,6 +34,7 @@ function urlFor(theme, shot) {
     screen: shot.screen,
   });
   if (shot.section) params.set("section", shot.section);
+  if (shot.state) params.set("state", shot.state);
   return `${base}?${params.toString()}`;
 }
 
@@ -46,38 +43,8 @@ async function captureTheme(page, theme) {
     const suffix = theme === "dark" ? "-dark" : "";
     const dest = path.join(outDir, `${shot.file}${suffix}.png`);
     await page.goto(urlFor(theme, shot), { waitUntil: "networkidle" });
-    await page.waitForTimeout(900);
-    if (shot.screen === "logs") {
-      await page.waitForTimeout(300);
-      await page.getByRole("combobox").click();
-      await page.getByRole("option", { name: "All Jobs" }).click();
-      await page.waitForTimeout(400);
-    }
-    if (shot.section === "about" || shot.section === "performance") {
-      await page.waitForTimeout(500);
-      await page.evaluate((sectionId) => {
-        document.getElementById(sectionId)?.scrollIntoView({ block: "start" });
-      }, shot.section);
-      await page.waitForTimeout(500);
-    }
-    if (shot.file === "halaldl-support-prompt") {
-      await page.evaluate(() => {
-        const el = Array.from(document.querySelectorAll("p, h2, h3, span, button")).find((node) =>
-          /help improve|star|feedback|not now/i.test(node.textContent || "")
-        );
-        el?.scrollIntoView?.({ block: "center" });
-      });
-      await page.waitForTimeout(400);
-    }
-    if (shot.file === "halaldl-about-trust") {
-      await page.evaluate(() => {
-        const el = Array.from(document.querySelectorAll("p, h2, h3")).find((node) =>
-          /install trust/i.test(node.textContent || "")
-        );
-        el?.scrollIntoView?.({ block: "center" });
-      });
-      await page.waitForTimeout(400);
-    }
+    // History mounts after the persisted fixture pass; give its nested dialogs time to settle.
+    await page.waitForTimeout(shot.state === "clips" ? 5000 : 1200);
     await page.screenshot({ path: dest, type: "png" });
     console.log(`wrote ${dest}`);
   }

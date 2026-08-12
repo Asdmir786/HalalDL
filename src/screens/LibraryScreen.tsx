@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import {
   Archive,
   BookOpen,
@@ -27,6 +27,7 @@ import type { Watchlist, WatchlistFirstRunMode } from "@/lib/library-types";
 import { useHistoryStore } from "@/store/history";
 import { useLibraryStore } from "@/store/library";
 import { usePresetsStore } from "@/store/presets";
+import { getMarketingCaptureState } from "@/lib/demo-mode";
 
 type Tab = "follow" | "folders" | "sorting";
 type DeliveryMode = "queue" | "start";
@@ -64,6 +65,14 @@ export function LibraryScreen() {
   const history = useHistoryStore((state) => state.entries);
   const presets = usePresetsStore((state) => state.presets);
   const query = search.trim().toLowerCase();
+
+  useEffect(() => {
+    if (getMarketingCaptureState() !== "library") return;
+    const demoFollow = library.watchlists.find((item) => item.id === "demo-follow-garden");
+    if (!demoFollow) return;
+    const timer = window.setTimeout(() => setEditing(demoFollow), 0);
+    return () => window.clearTimeout(timer);
+  }, [library.watchlists]);
   const followed = library.watchlists.filter(
     (item) => !query || `${item.label} ${item.url}`.toLowerCase().includes(query)
   );

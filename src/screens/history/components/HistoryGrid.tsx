@@ -16,8 +16,9 @@ import { useNavigationStore } from "@/store/navigation";
 import { toast } from "sonner";
 import { Checkbox } from "@/components/ui/checkbox";
 import { HistoryDetails } from "./HistoryDetails";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { getExplicitOutputPaths, getPreferredThumbnailSource } from "@/lib/output-paths";
+import { getMarketingCaptureState } from "@/lib/demo-mode";
 
 interface HistoryGridProps {
   entry: HistoryEntry;
@@ -49,6 +50,12 @@ export function HistoryGrid({
   const setScreen = useNavigationStore((s) => s.setScreen);
   const toggleFavorite = useHistoryStore((s) => s.toggleFavorite);
   const explicitOutputPaths = getExplicitOutputPaths(entry);
+
+  useEffect(() => {
+    if (entry.id !== "history-06-clips" || getMarketingCaptureState() !== "clips") return;
+    const timer = window.setTimeout(() => setDetailsOpen(true), 0);
+    return () => window.clearTimeout(timer);
+  }, [entry.id]);
 
   const handleRedownload = () => {
     addJob(entry.url, entry.presetId, entry.overrides);

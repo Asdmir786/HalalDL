@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { motion, Variants } from "framer-motion";
 import {
   X, FolderOpen, Terminal,
@@ -25,6 +25,7 @@ import { PRESET_GROUP_LABELS, getPresetGroup, groupPresetsForSelect, resolvePres
 import { isInstagramUrl } from "@/lib/media-engine";
 import { formatBytes, formatMediaDuration, getJobTs } from "../utils";
 import { getStatusMeta, PHASE_ORDER, type Phase } from "../constants";
+import { getMarketingCaptureState } from "@/lib/demo-mode";
 
 interface DownloadItemProps {
   job: DownloadJob;
@@ -136,6 +137,11 @@ export function DownloadItem({
   const [sheetOpen, setSheetOpen] = useState(false);
   const [propertiesOpen, setPropertiesOpen] = useState(false);
   const [doctorOpen, setDoctorOpen] = useState(false);
+  useEffect(() => {
+    if (job.id !== "demo-job-failed" || getMarketingCaptureState() !== "doctor") return;
+    const timer = window.setTimeout(() => setDoctorOpen(true), 0);
+    return () => window.clearTimeout(timer);
+  }, [job.id]);
   const ts = getJobTs(job);
   const relative = formatRelativeTime(ts);
   const absolute = new Date(ts).toLocaleString();

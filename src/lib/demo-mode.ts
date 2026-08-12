@@ -5,6 +5,8 @@ import { useHistoryStore, type HistoryEntry } from "@/store/history";
 import { useLogsStore, type LogEntry } from "@/store/logs";
 import { useNavigationStore, type Screen } from "@/store/navigation";
 import { useToolsStore, type Tool } from "@/store/tools";
+import { useLibraryStore } from "@/store/library";
+import type { Collection, Watchlist } from "@/lib/library-types";
 import { useRuntimeStore } from "@/store/runtime";
 import { useAppUpdateStore } from "@/store/app-update";
 import { useAttentionStore } from "@/store/attention";
@@ -13,9 +15,11 @@ import { seedDemoStartupSummary } from "@/lib/startup-metrics";
 type DemoMode = "marketing";
 type DemoSettingsSection = "appearance" | "performance" | "about";
 
-const DEMO_SCREENS: Screen[] = ["downloads", "presets", "tools", "logs", "history", "settings"];
+const DEMO_SCREENS: Screen[] = ["downloads", "presets", "tools", "logs", "history", "library", "settings"];
 const DEMO_SETTINGS_SECTIONS: DemoSettingsSection[] = ["appearance", "performance", "about"];
 const DEMO_USER_ROOT = "C:\\Users\\Demo";
+
+export type MarketingCaptureState = "playlist" | "queue" | "doctor" | "clips" | "library" | null;
 
 function getSearchParams() {
   if (typeof window === "undefined") return null;
@@ -32,6 +36,15 @@ export function getRequestedDemoMode(): DemoMode | null {
 
 export function isDemoModeEnabled() {
   return getRequestedDemoMode() !== null;
+}
+
+/** A URL-only, deterministic state used exclusively by release screenshot capture. */
+export function getMarketingCaptureState(): MarketingCaptureState {
+  if (!isDemoModeEnabled()) return null;
+  const raw = getSearchParams()?.get("state")?.trim().toLowerCase();
+  return raw === "playlist" || raw === "queue" || raw === "doctor" || raw === "clips" || raw === "library"
+    ? raw
+    : null;
 }
 
 function getRequestedScreen(): Screen {
@@ -194,11 +207,40 @@ function buildDemoJobs(now: number): DownloadJob[] {
       mediaDurationSeconds: 605,
       overrides: { origin: "app" },
     },
+    {
+      id: "demo-job-failed",
+      url: "https://www.youtube.com/watch?v=demoDoctor05",
+      title: "Archive talk that needs a sign-in check",
+      thumbnail: svgThumbnail("Safe Recovery", "#b91c1c", "#7f1d1d"),
+      progress: 0,
+      status: "Failed",
+      phase: "Resolving formats",
+      statusDetail: "Sign in is required by the source. Choose a cookies.txt sign-in file to continue.",
+      presetId: "default",
+      createdAt: now - 74 * 60 * 1000,
+      statusChangedAt: now - 2 * 60 * 1000,
+      thumbnailStatus: "ready",
+      subtitleStatus: "idle",
+      overrides: { origin: "app" },
+    },
   ];
 }
 
 function buildDemoHistory(now: number): HistoryEntry[] {
   return [
+    {
+      id: "history-00-doctor",
+      url: "https://www.youtube.com/watch?v=demoDoctor05",
+      title: "Archive talk that needs a sign-in check",
+      thumbnail: svgThumbnail("Safe Recovery", "#b91c1c", "#7f1d1d"),
+      presetId: "default",
+      presetName: "Best quality",
+      downloadedAt: now - 2 * 60 * 1000,
+      domain: "youtube.com",
+      status: "failed",
+      failReason: "ERROR: Sign in to confirm you’re not a bot. Use cookies.txt or sign in through your browser.",
+      tags: ["needs review"],
+    },
     {
       id: "history-01",
       url: "https://www.youtube.com/watch?v=demoDone04",
@@ -281,7 +323,56 @@ function buildDemoHistory(now: number): HistoryEntry[] {
       status: "completed",
       tags: ["share"],
     },
+    {
+      id: "history-06-clips",
+      url: "https://www.youtube.com/watch?v=demoClipMaker09",
+      title: "Community garden: finished local interview",
+      thumbnail: svgThumbnail("Local Clip", "#0f766e", "#0f172a"),
+      format: "mp4",
+      fileSize: 142_000_000,
+      mediaDurationSeconds: 492,
+      outputPath: `${DEMO_USER_ROOT}\\Downloads\\HalalDL\\community-garden-interview.mp4`,
+      outputPaths: [`${DEMO_USER_ROOT}\\Downloads\\HalalDL\\community-garden-interview.mp4`],
+      presetId: "editors-capcut-1080p-mp4",
+      presetName: "Editor 1080p MP4",
+      downloadedAt: now - 6 * 60 * 60 * 1000,
+      duration: 492,
+      domain: "youtube.com",
+      status: "completed",
+      hasChapters: true,
+      chapters: [
+        { startTime: 0, endTime: 96, title: "Welcome" },
+        { startTime: 96, endTime: 282, title: "Garden tour" },
+        { startTime: 282, endTime: 492, title: "Harvest tips" },
+      ],
+      tags: ["interview", "local media"],
+      notes: "Ready for a short social clip.",
+    },
   ];
+}
+
+function buildDemoLibrary(now: number): { watchlists: Watchlist[]; collections: Collection[] } {
+  return {
+    collections: [{ id: "demo-folder-learning", name: "Learning & talks", folder: `${DEMO_USER_ROOT}\\Videos\\Learning`, tags: ["lecture", "archive"], presetId: "editors-capcut-1080p-mp4", createdAt: now - 7 * 24 * 60 * 60 * 1000 }],
+    watchlists: [{
+      id: "demo-follow-garden",
+      label: "Community Garden Network",
+      url: "https://www.youtube.com/@CommunityGardenNetwork",
+      kind: "youtube-channel",
+      enabled: true,
+      intervalHours: 6,
+      maxItemsPerCheck: 25,
+      firstRunMode: "future-only",
+      deliveryMode: "queue",
+      collectionId: "demo-folder-learning",
+      presetId: "editors-capcut-1080p-mp4",
+      initializedAt: now - 7 * 24 * 60 * 60 * 1000,
+      lastCheckedAt: now - 34 * 60 * 1000,
+      lastSuccessAt: now - 34 * 60 * 1000,
+      lastDiscoveredCount: 2,
+      lastQueuedCount: 2,
+    }],
+  };
 }
 
 function buildDemoLogs(now: number): LogEntry[] {
@@ -335,7 +426,7 @@ function buildDemoLogs(now: number): LogEntry[] {
       id: "log-07",
       timestamp: stamp(8),
       level: "info",
-      message: "Background update check found HalalDL v0.5.1 ready.",
+      message: "Background update check found HalalDL v0.6.0 ready.",
     },
     {
       id: "log-08",
@@ -450,6 +541,8 @@ export function seedMarketingDemoState() {
     composeDraft: undefined,
   });
   useHistoryStore.setState({ entries: buildDemoHistory(now) });
+  const library = buildDemoLibrary(now);
+  useLibraryStore.setState({ watchlists: library.watchlists, collections: library.collections, rules: [], activity: [] });
   useLogsStore.setState({
     logs: buildDemoLogs(now),
     loadStatus: "ready",

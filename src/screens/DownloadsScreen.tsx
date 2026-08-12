@@ -58,6 +58,16 @@ import { buildClipSection } from "@/lib/clip";
 import { normalizeUrlIdentity } from "@/lib/url-identity";
 import { applySourceRule, resolveSourceRule } from "@/lib/source-rules";
 import type { ChapterMode } from "@/lib/chapters";
+import { getMarketingCaptureState, isDemoModeEnabled } from "@/lib/demo-mode";
+
+const MARKETING_PLAYLIST_URL = "https://www.youtube.com/playlist?list=PLdemoHalalDL060";
+const MARKETING_PLAYLIST_ENTRIES: PlaylistEntry[] = [
+  { key: "garden-01", id: "garden-01", index: 1, title: "Community garden: welcome and plan", url: "https://www.youtube.com/watch?v=garden01", durationSeconds: 486 },
+  { key: "garden-02", id: "garden-02", index: 2, title: "Five easy harvest tips", url: "https://www.youtube.com/watch?v=garden02", durationSeconds: 332 },
+  { key: "garden-03", id: "garden-03", index: 3, title: "Water-wise growing for beginners", url: "https://www.youtube.com/watch?v=garden03", durationSeconds: 628 },
+  { key: "garden-04", id: "garden-04", index: 4, title: "Volunteer day highlights", url: "https://www.youtube.com/watch?v=garden04", durationSeconds: 214 },
+  { key: "garden-05", id: "garden-05", index: 5, title: "Saving seeds for next season", url: "https://www.youtube.com/watch?v=garden05", durationSeconds: 571 },
+];
 
 export function DownloadsScreen() {
   const { settings, updateSettings } = useSettingsStore();
@@ -205,6 +215,28 @@ export function DownloadsScreen() {
   const [playlistTruncated, setPlaylistTruncated] = useState(false);
   const [preferSingleVideo, setPreferSingleVideo] = useState(false);
   const playlistRequestRef = useRef(0);
+
+  useEffect(() => {
+    if (!isDemoModeEnabled() || getMarketingCaptureState() !== "queue") return;
+    const timer = window.setTimeout(() => {
+      setSelectedIds(jobs.filter((job) => ["Queued", "Paused", "Stopped"].includes(job.status)).map((job) => job.id));
+    }, 0);
+    return () => window.clearTimeout(timer);
+  }, [jobs]);
+
+  useEffect(() => {
+    if (isDemoModeEnabled() && getMarketingCaptureState() === "playlist") {
+      const timer = window.setTimeout(() => {
+        setUrl(MARKETING_PLAYLIST_URL);
+        setPlaylistEntries(MARKETING_PLAYLIST_ENTRIES);
+        setPlaylistSelectedKeys(new Set(["garden-01", "garden-03", "garden-04"]));
+        setPlaylistStatus("ready");
+        setPlaylistError(null);
+        setPlaylistTruncated(false);
+      }, 0);
+      return () => window.clearTimeout(timer);
+    }
+  }, []);
 
   // Handle Drag & Drop Pending URL
   useEffect(() => {
@@ -360,6 +392,18 @@ export function DownloadsScreen() {
     const trimmed = url.trim();
     const requestId = playlistRequestRef.current + 1;
     playlistRequestRef.current = requestId;
+
+    if (isDemoModeEnabled() && getMarketingCaptureState() === "playlist") {
+      const timer = window.setTimeout(() => {
+        if (playlistRequestRef.current !== requestId) return;
+        setPlaylistEntries(MARKETING_PLAYLIST_ENTRIES);
+        setPlaylistSelectedKeys(new Set(["garden-01", "garden-03", "garden-04"]));
+        setPlaylistStatus("ready");
+        setPlaylistError(null);
+        setPlaylistTruncated(false);
+      }, 0);
+      return () => window.clearTimeout(timer);
+    }
 
     if (!trimmed || !looksLikePlaylistUrl(trimmed) || preferSingleVideo) {
       const timer = window.setTimeout(() => {

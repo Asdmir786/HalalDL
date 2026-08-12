@@ -42,7 +42,7 @@ export function Sidebar() {
   const { currentScreen, setScreen, sidebarCollapsed, toggleSidebar } = useNavigationStore();
   const effectiveCollapsed = sidebarCollapsed || currentScreen === "settings";
   const jobs = useDownloadsStore((s) => s.jobs);
-  const [version, setVersion] = useState(() => (isDemoModeEnabled() ? "0.5.1" : "..."));
+  const [version, setVersion] = useState(() => (isDemoModeEnabled() ? "0.6.0" : "..."));
   const appMode = getAppMode();
   const appModeLabel =
     appMode === "FULL" ? "Full" : appMode === "PORTABLE" ? "Portable" : "Lite";

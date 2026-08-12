@@ -14,6 +14,7 @@ import { type HistoryEntry, useHistoryStore } from "@/store/history";
 import { useLibraryStore } from "@/store/library";
 import { renameFile } from "@/lib/commands";
 import { copyText, formatJobErrorText } from "@/lib/copy-text";
+import { getMarketingCaptureState } from "@/lib/demo-mode";
 import { ClipMakerDialog } from "@/components/media/ClipMakerDialog";
 import { DownloadDoctorDialog } from "@/components/download-doctor/DownloadDoctorDialog";
 import {
@@ -108,7 +109,16 @@ export function MediaPropertiesDialog({
   const clipDuration = historyEntry
     ? historyEntry.mediaDurationSeconds ?? (historyEntry.duration ?? 0) / 1000
     : 0;
-  const canMakeClip = Boolean(historyEntry?.status === "completed" && historyEntry.outputPath && fileExists && clipDuration > 1);
+  const canMakeClip = Boolean(
+    historyEntry?.status === "completed" && historyEntry.outputPath &&
+    (fileExists || getMarketingCaptureState() === "clips") && clipDuration > 1
+  );
+
+  useEffect(() => {
+    if (!open || historyEntry?.id !== "history-06-clips" || getMarketingCaptureState() !== "clips") return;
+    const timer = window.setTimeout(() => setClipOpen(true), 0);
+    return () => window.clearTimeout(timer);
+  }, [historyEntry?.id, open]);
 
   const handleSaveNote = () => {
     if (!historyEntry) return;

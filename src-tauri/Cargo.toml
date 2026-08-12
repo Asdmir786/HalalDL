@@ -1,6 +1,6 @@
 [package]
 name = "halaldl"
-version = "0.5.1"
+version = "0.6.0"
 description = "Local-first Windows media downloader powered by yt-dlp"
 authors = ["Asdmir786"]
 edition = "2021"

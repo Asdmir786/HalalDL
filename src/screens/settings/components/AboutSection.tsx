@@ -77,7 +77,7 @@ async function openUrl(url: string) {
 }
 
 export function AboutSection() {
-  const [version, setVersion] = useState(() => (isDemoModeEnabled() ? "0.5.1" : "..."));
+  const [version, setVersion] = useState(() => (isDemoModeEnabled() ? "0.6.0" : "..."));
   const [latestVersion, setLatestVersion] = useState<string | null>(null);
   const [releaseUrl, setReleaseUrl] = useState<string>(RELEASES_URL);
   const [downloadUrl, setDownloadUrl] = useState<string | null>(null);

@@ -5,7 +5,7 @@ const { formatDiagnosticsSummary } = await import(
 );
 
 const summary = formatDiagnosticsSummary({
-  version: "0.5.1",
+  version: "0.6.0",
   mode: "FULL",
   packageLabel: "NSIS",
   osLabel: "Windows 11 x64",
@@ -29,7 +29,7 @@ const summary = formatDiagnosticsSummary({
 });
 
 assert.match(summary, /^HalalDL support info/m);
-assert.match(summary, /Version: 0\.5\.1/);
+assert.match(summary, /Version: 0\.6\.0/);
 assert.match(summary, /Mode: Full/);
 assert.match(summary, /Package: NSIS/);
 assert.match(summary, /OS: Windows 11 x64/);
