@@ -10,6 +10,13 @@ export function classifyYtDlpFailure(text: string): string | null {
   const s = raw.toLowerCase();
 
   if (
+    /http error 429|too many requests|rate.?limit/i.test(raw) &&
+    /sign in to confirm|confirm you.?re not a bot/i.test(raw)
+  ) {
+    return "YouTube blocked this request (rate limit + bot check). Wait before retrying; if it continues, add an exported cookies.txt from a signed-in browser in Settings → Download Engine.";
+  }
+
+  if (
     /sign in to confirm|confirm you.?re not a bot|login required|members-only|join this channel|private video|this video is private|video unavailable|not available on this app/i.test(
       raw
     ) ||

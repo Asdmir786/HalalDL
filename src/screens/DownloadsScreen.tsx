@@ -72,7 +72,11 @@ export function DownloadsScreen() {
   const { settings, updateSettings } = useSettingsStore();
   const [url, setUrl] = useState("");
   const [checkingLink, setCheckingLink] = useState(false);
-  const [linkCheckResult, setLinkCheckResult] = useState<{ url: string; message: string } | null>(null);
+  const [linkCheckResult, setLinkCheckResult] = useState<{
+    url: string;
+    message: string;
+    needsCookies?: boolean;
+  } | null>(null);
   const persistenceReady = useRuntimeStore((state) => state.persistenceReady);
 
   
@@ -607,8 +611,17 @@ export function DownloadsScreen() {
       .map((job) => job.id),
     [jobs]
   );
+  const activeDownloadJobIds = useMemo(
+    () =>
+      jobs
+        .filter((job) => job.status === "Downloading" && !isInstagramUrl(job.url))
+        .map((job) => job.id),
+    [jobs]
+  );
   const allQueueJobsSelected =
     queueJobIds.length > 0 && queueJobIds.every((id) => selectedIds.includes(id));
+  const allActiveDownloadsSelected =
+    activeDownloadJobIds.length > 0 && activeDownloadJobIds.every((id) => selectedIds.includes(id));
   const startableQueuedCount = useMemo(
     () => jobs.filter((job) => job.status === "Queued").length,
     [jobs]
@@ -937,6 +950,17 @@ export function DownloadsScreen() {
     });
   };
 
+  const handleToggleActiveDownloadSelection = () => {
+    setSelectedIds((previous) => {
+      const activeIds = new Set(activeDownloadJobIds);
+      const allSelected = activeDownloadJobIds.length > 0 && activeDownloadJobIds.every((id) => previous.includes(id));
+
+      return allSelected
+        ? previous.filter((id) => !activeIds.has(id))
+        : [...new Set([...previous, ...activeDownloadJobIds])];
+    });
+  };
+
   const handleRetrySelected = () => {
     if (!selectedIds.length) return;
     retryFailedJobs(selectedIds);
@@ -1127,10 +1151,19 @@ export function DownloadsScreen() {
                   {url.trim() && (
                     <div className="flex flex-col gap-2 border-t border-border/60 pt-3 sm:flex-row sm:items-center sm:justify-between">
                       <p className="text-xs text-muted-foreground">Not sure whether this link will work? Check it first without downloading.</p>
-                      <Button variant="outline" size="sm" disabled={checkingLink} onClick={() => void (async () => { const checkedUrl = url.trim(); setCheckingLink(true); const result = await probeReliability(checkedUrl); setLinkCheckResult({ url: checkedUrl, message: result.message }); setCheckingLink(false); })()}>{checkingLink ? "Checking link…" : "Check this link"}</Button>
+                      <Button variant="outline" size="sm" disabled={checkingLink} onClick={() => void (async () => { const checkedUrl = url.trim(); setCheckingLink(true); const result = await probeReliability(checkedUrl); setLinkCheckResult({ url: checkedUrl, message: result.message, needsCookies: result.needsCookies }); setCheckingLink(false); })()}>{checkingLink ? "Checking link…" : "Check this link"}</Button>
                     </div>
                   )}
-                  {linkCheckResult?.url === url.trim() && <p className="rounded-md bg-muted/60 px-3 py-2 text-xs text-muted-foreground">{linkCheckResult.message}</p>}
+                  {linkCheckResult?.url === url.trim() && (
+                    <div className="flex flex-col gap-2 rounded-lg border border-amber-500/25 bg-amber-500/10 px-3 py-2 text-xs text-amber-950 dark:text-amber-100 sm:flex-row sm:items-center sm:justify-between">
+                      <p>{linkCheckResult.message}</p>
+                      {linkCheckResult.needsCookies ? (
+                        <Button variant="outline" size="sm" className="shrink-0" onClick={() => setScreen("settings")}>
+                          Open Download Engine
+                        </Button>
+                      ) : null}
+                    </div>
+                  )}
 
                   <DownloadStatsBar 
                     queuedCount={queuedCount}
@@ -1165,6 +1198,9 @@ export function DownloadsScreen() {
           queueJobIds={queueJobIds}
           allQueueJobsSelected={allQueueJobsSelected}
           onToggleQueueSelection={handleToggleQueueSelection}
+          activeDownloadJobIds={activeDownloadJobIds}
+          allActiveDownloadsSelected={allActiveDownloadsSelected}
+          onToggleActiveDownloadSelection={handleToggleActiveDownloadSelection}
           onToggleSelection={handleToggleSelection}
           onRetrySelected={handleRetrySelected}
           canRetrySelected={selectedFailedCount > 0 && canFillMoreSlots}

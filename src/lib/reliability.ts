@@ -12,10 +12,12 @@ export async function validateCookiesFile(path: string) {
 }
 
 export async function probeReliability(url: string) {
-  try { const info = await fetchMediaInfo(url); return { ok: true, message: `This link can be read: ${info.title || "media found"}.` }; }
+  try { const info = await fetchMediaInfo(url); return { ok: true, message: `This link can be read: ${info.title || "media found"}.`, needsCookies: false }; }
   catch (error) {
     const raw = error instanceof Error ? error.message : String(error);
     const message = classifyYtDlpFailure(raw) || raw.slice(0, 280);
-    return { ok: false, message: message.replace(/\s+/g, " ").trim() };
+    const needsCookies =
+      /sign in to confirm|confirm you.?re not a bot|login required/i.test(raw);
+    return { ok: false, message: message.replace(/\s+/g, " ").trim(), needsCookies };
   }
 }

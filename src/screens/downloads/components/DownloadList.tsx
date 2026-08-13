@@ -25,6 +25,9 @@ interface DownloadListProps {
   queueJobIds: string[];
   allQueueJobsSelected: boolean;
   onToggleQueueSelection: () => void;
+  activeDownloadJobIds: string[];
+  allActiveDownloadsSelected: boolean;
+  onToggleActiveDownloadSelection: () => void;
   onToggleSelection: (id: string) => void;
   onRetrySelected: () => void;
   canRetrySelected: boolean;
@@ -89,19 +92,19 @@ function SectionHeader({
 }) {
   return (
     <div className="sticky top-0 z-10 flex items-center justify-between gap-3 rounded-2xl border border-border/60 bg-background/92 px-4 py-3 backdrop-blur-xl dark:border-white/8 dark:bg-background/88">
-      <div className="min-w-0 flex-1">
+      <div className="flex min-w-0 flex-1 flex-wrap items-center gap-2">
         <div className="flex items-center gap-2">
           <span className={`h-2 w-2 rounded-full ${accentClassName}`} />
           <h3 className="text-xs font-semibold uppercase tracking-[0.16em] text-foreground/90">
             {title}
           </h3>
         </div>
+        {action}
       </div>
       <div className="flex items-center gap-2">
         <div className="rounded-full border border-border/60 bg-card/80 px-2 py-1 text-[10px] font-semibold tabular-nums text-muted-foreground dark:border-white/10 dark:bg-white/5">
           {count}
         </div>
-        {action}
       </div>
     </div>
   );
@@ -120,6 +123,9 @@ export function DownloadList({
   queueJobIds,
   allQueueJobsSelected,
   onToggleQueueSelection,
+  activeDownloadJobIds,
+  allActiveDownloadsSelected,
+  onToggleActiveDownloadSelection,
   onToggleSelection,
   onRetrySelected,
   canRetrySelected,
@@ -404,16 +410,31 @@ export function DownloadList({
                       title="Queue"
                       count={liveJobs.length}
                       accentClassName="bg-sky-400 shadow-[0_0_16px_rgba(56,189,248,0.65)]"
-                      action={queueJobIds.length > 0 ? (
-                        <MotionButton
-                          type="button"
-                          variant="ghost"
-                          size="sm"
-                          className="h-7 rounded-full border border-border/60 bg-background/70 px-3 text-[11px] text-muted-foreground hover:border-border hover:text-foreground dark:border-white/10 dark:bg-white/5"
-                          onClick={onToggleQueueSelection}
-                        >
-                          {allQueueJobsSelected ? "Clear queue selection" : "Select queue"}
-                        </MotionButton>
+                      action={queueJobIds.length > 0 || activeDownloadJobIds.length > 0 ? (
+                        <div className="flex flex-wrap items-center gap-1.5">
+                          {activeDownloadJobIds.length > 0 ? (
+                            <MotionButton
+                              type="button"
+                              variant="outline"
+                              size="sm"
+                              className="h-7 rounded-full px-3 text-[11px]"
+                              onClick={onToggleActiveDownloadSelection}
+                            >
+                              {allActiveDownloadsSelected ? "Clear running" : "Select running"}
+                            </MotionButton>
+                          ) : null}
+                          {queueJobIds.length > 0 ? (
+                            <MotionButton
+                              type="button"
+                              variant="outline"
+                              size="sm"
+                              className="h-7 rounded-full px-3 text-[11px]"
+                              onClick={onToggleQueueSelection}
+                            >
+                              {allQueueJobsSelected ? "Clear queue" : "Select queue"}
+                            </MotionButton>
+                          ) : null}
+                        </div>
                       ) : undefined}
                     />
                     <div className="space-y-1.5">
