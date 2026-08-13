@@ -297,9 +297,9 @@ export function DownloadItem({
                 !isPausedJob &&
                 !isStoppedJob &&
                 !isRecentResult &&
-                "border-border/55 bg-card/74 hover:border-border/80 hover:bg-card/90 dark:border-white/6 dark:bg-background/45 dark:hover:border-white/12 dark:hover:bg-background/60",
+                "border-border/55 bg-card/74 hover:border-border/80 hover:bg-card/90 dark:border-white/8 dark:bg-[#0b1420]/82 dark:hover:border-white/14 dark:hover:bg-[#101c2c]/92",
               isRecentResult &&
-                "border-border/50 bg-card/68 opacity-[0.98] hover:border-border/80 hover:bg-card/84 dark:border-white/5 dark:bg-background/28 dark:hover:border-white/10 dark:hover:bg-background/40"
+                "border-border/50 bg-card/68 opacity-[0.98] hover:border-border/80 hover:bg-card/84 dark:border-white/7 dark:bg-[#0b1420]/66 dark:hover:border-white/12 dark:hover:bg-[#101c2c]/78"
               ,
               spotlighted &&
                 "border-emerald-400/45 bg-emerald-500/[0.10] shadow-[0_0_0_1px_rgba(52,211,153,0.22),0_18px_44px_rgba(16,185,129,0.16)]"

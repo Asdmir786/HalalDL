@@ -23,6 +23,7 @@ export function clearStoredAppUpdate() {
     downloadUrl: null,
     assetName: null,
     checksumUrl: null,
+    verifiedInstallerPath: null,
   });
 }
 

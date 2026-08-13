@@ -245,6 +245,14 @@ export function ToolRow({
             <Loader2 className="w-3.5 h-3.5 animate-spin mr-1.5" />
             Working
           </MotionButton>
+        ) : tool.status === "Checking" || tool.validationStatus === "idle" || tool.validationStatus === "checking" ? (
+          <Badge
+            variant="outline"
+            className="h-7 gap-1.5 border-amber-500/20 bg-amber-500/5 px-2.5 text-[11px] font-medium text-amber-600 dark:text-amber-300"
+          >
+            <Loader2 className="h-3 w-3 animate-spin" />
+            Validating
+          </Badge>
         ) : tool.status === "Missing" ? (
           <MotionButton
             size="sm"
@@ -254,6 +262,17 @@ export function ToolRow({
           >
             <Download className="w-3.5 h-3.5 mr-1.5" />
             Install
+          </MotionButton>
+        ) : tool.validationStatus === "failed" ? (
+          <MotionButton
+            variant="outline"
+            size="sm"
+            className="h-8 px-3 text-xs"
+            onClick={() => onRefresh(tool.id)}
+            disabled={disableUpgradeActions}
+          >
+            <RefreshCcw className="mr-1.5 h-3.5 w-3.5" />
+            Retry check
           </MotionButton>
         ) : tool.updateAvailable ? (
           <MotionButton

@@ -54,7 +54,6 @@ import { DownloadList } from "./downloads/components/DownloadList";
 import type { UrlPreviewStatus } from "./downloads/components/UrlInfoPreview";
 import type { PlaylistPickerStatus } from "./downloads/components/PlaylistPicker";
 import { getJobTs } from "./downloads/utils";
-import { buildClipSection } from "@/lib/clip";
 import { normalizeUrlIdentity } from "@/lib/url-identity";
 import { applySourceRule, resolveSourceRule } from "@/lib/source-rules";
 import type { ChapterMode } from "@/lib/chapters";
@@ -93,8 +92,6 @@ export function DownloadsScreen() {
   const [subtitleLanguageMode, setSubtitleLanguageMode] = useState<"all" | "preferred" | "custom">("preferred");
   const [subtitleLanguagesText, setSubtitleLanguagesText] = useState("en.*, en");
   const [subtitleFormat, setSubtitleFormat] = useState<"original" | "srt" | "vtt">("srt");
-  const [clipStartTime, setClipStartTime] = useState("");
-  const [clipEndTime, setClipEndTime] = useState("");
   const [chapterMode, setChapterMode] = useState<ChapterMode>("preserve");
 
   const { presets } = usePresetsStore();
@@ -269,8 +266,6 @@ export function DownloadsScreen() {
           )
         );
         setSubtitleFormat(subtitleDefaults.format);
-        setClipStartTime(composeDraft.overrides?.clipStartTime || "");
-        setClipEndTime(composeDraft.overrides?.clipEndTime || "");
         setComposeDraft(undefined);
       }, 0);
       return;
@@ -638,6 +633,18 @@ export function DownloadsScreen() {
     () => jobs.filter((job) => selectedIds.includes(job.id) && job.status === "Failed").length,
     [jobs, selectedIds]
   );
+  const selectedPausableJobIds = useMemo(
+    () =>
+      jobs
+        .filter(
+          (job) =>
+            selectedIds.includes(job.id) &&
+            job.status === "Downloading" &&
+            !isInstagramUrl(job.url)
+        )
+        .map((job) => job.id),
+    [jobs, selectedIds]
+  );
   const queueMetaById = useMemo(() => {
     const queueItems = jobs
       .filter((job) => job.status === "Queued" || job.status === "Paused" || job.status === "Stopped")
@@ -702,35 +709,6 @@ export function DownloadsScreen() {
     setIsAdding(true);
     try {
       const finalTemplate = `${filenameBase.trim() || "%(title)s"}.%(ext)s`;
-      const clipStartTrimmed = clipStartTime.trim();
-      const clipEndTrimmed = clipEndTime.trim();
-      const clipOverridesNeeded = Boolean(clipStartTrimmed || clipEndTrimmed);
-
-      if (clipOverridesNeeded && !buildClipSection(clipStartTrimmed, clipEndTrimmed)) {
-        toast.error("Clip times need a valid range", {
-          description: "Use seconds, mm:ss, or hh:mm:ss, and make sure the end is after the start.",
-        });
-        return;
-      }
-      if (clipOverridesNeeded && isInstagramUrl(trimmedUrl) && settings.instagramEngine !== "yt-dlp") {
-        toast.error("Clip download is not available for Instagram yet", {
-          description: "Leave start and end blank for Instagram downloads, or switch Instagram Engine to yt-dlp in Settings.",
-        });
-        return;
-      }
-      if (clipOverridesNeeded && isDirectImageInput) {
-        toast.error("Clip download is only for timed media", {
-          description: "Images do not have a timeline, so leave start and end blank.",
-        });
-        return;
-      }
-      if (clipOverridesNeeded && isPlaylistFlow && selectedPlaylistEntries.length > 1) {
-        toast.error("Clip range applies to one video at a time", {
-          description: "Select a single playlist item, or clear clip start/end for batch add.",
-        });
-        return;
-      }
-
       const customDirTrimmed = customDownloadDir.trim();
       const selectedPresetConfig = presets.find((preset) => preset.id === selectedPreset);
       const presetSubtitleDefaults = normalizeSubtitlePreferences({
@@ -754,19 +732,11 @@ export function DownloadsScreen() {
         outputConfigOpen ||
         isCustomPreset ||
         Boolean(customDirTrimmed) ||
-        subtitleOverridesNeeded ||
-        clipOverridesNeeded
+        subtitleOverridesNeeded
           ? {
               ...(outputConfigOpen || isCustomPreset ? { filenameTemplate: finalTemplate } : {}),
               ...(isCustomPreset ? { format: outputFormat } : {}),
               ...(customDirTrimmed ? { downloadDir: customDirTrimmed } : {}),
-              ...(clipOverridesNeeded
-                ? {
-                    ...(clipStartTrimmed ? { clipStartTime: clipStartTrimmed } : {}),
-                    ...(clipEndTrimmed ? { clipEndTime: clipEndTrimmed } : {}),
-                    chapterMode,
-                  }
-                : {}),
               ...(subtitleOverridesNeeded
                 ? {
                     subtitleMode,
@@ -927,13 +897,6 @@ export function DownloadsScreen() {
       : subtitleMode === "only"
         ? "Download subtitles only"
         : "Download sidecar subtitles when available";
-  const clipValidationMessage = useMemo(() => {
-    if (!clipStartTime.trim() && !clipEndTime.trim()) return null;
-    return buildClipSection(clipStartTime, clipEndTime)
-      ? null
-      : "Enter a valid range like 0:30 to 2:15. End time must be after start time.";
-  }, [clipEndTime, clipStartTime]);
-
   const sponsorBlockDisabled = Boolean(url.trim()) && !isYouTubeUrl(url.trim());
   const sponsorBlockDisabledReason = isInstagramUrl(url.trim())
     ? "Instagram downloads do not use yt-dlp, so SponsorBlock cannot apply."
@@ -1047,6 +1010,19 @@ export function DownloadsScreen() {
     await pauseActiveDownload(jobId);
   };
 
+  const handlePauseSelected = async () => {
+    if (!selectedPausableJobIds.length) return;
+
+    const results = await Promise.all(selectedPausableJobIds.map((jobId) => pauseActiveDownload(jobId)));
+    const pausedCount = results.filter(Boolean).length;
+
+    if (pausedCount > 0) {
+      toast.success(`Pause requested for ${formatDownloadCount(pausedCount)}`);
+    } else {
+      toast.error("Could not pause the selected downloads");
+    }
+  };
+
   const handleStopJob = async (jobId: string) => {
     await stopPostProcessingJob(jobId);
   };
@@ -1125,11 +1101,6 @@ export function DownloadsScreen() {
                     subtitleFormat={subtitleFormat}
                     onSubtitleFormatChange={setSubtitleFormat}
                     subtitleHint={subtitleHint}
-                    clipStartTime={clipStartTime}
-                    onClipStartTimeChange={setClipStartTime}
-                    clipEndTime={clipEndTime}
-                    onClipEndTimeChange={setClipEndTime}
-                    clipValidationMessage={clipValidationMessage}
                     chapterMode={chapterMode}
                     onChapterModeChange={setChapterMode}
                     instagramMediaSummary={instagramMediaSummary}
@@ -1198,6 +1169,8 @@ export function DownloadsScreen() {
           onRetrySelected={handleRetrySelected}
           canRetrySelected={selectedFailedCount > 0 && canFillMoreSlots}
           selectedFailedCount={selectedFailedCount}
+          onPauseSelected={handlePauseSelected}
+          selectedPausableCount={selectedPausableJobIds.length}
           onCopySelected={handleCopySelected}
           canCopySelected={canCopySelected}
           onRemoveSelected={handleRemoveSelected}

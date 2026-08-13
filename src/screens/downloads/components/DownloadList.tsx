@@ -1,6 +1,6 @@
 import { useEffect, useState, type ReactNode } from "react";
 import { AnimatePresence, motion, Variants } from "framer-motion";
-import { CheckCircle2, Copy, Download, Layers, MoreHorizontal, Plus, RotateCcw, Settings, Sparkles, Upload, X } from "lucide-react";
+import { CheckCircle2, Copy, Download, Layers, MoreHorizontal, Pause, Plus, RotateCcw, Settings, Sparkles, Upload, X } from "lucide-react";
 
 import { DownloadItem } from "./DownloadItem";
 import { MotionButton } from "@/components/motion/MotionButton";
@@ -29,6 +29,8 @@ interface DownloadListProps {
   onRetrySelected: () => void;
   canRetrySelected: boolean;
   selectedFailedCount: number;
+  onPauseSelected: () => void | Promise<void>;
+  selectedPausableCount: number;
   onCopySelected: () => void;
   canCopySelected: boolean;
   onRemoveSelected: () => void;
@@ -122,6 +124,8 @@ export function DownloadList({
   onRetrySelected,
   canRetrySelected,
   selectedFailedCount,
+  onPauseSelected,
+  selectedPausableCount,
   onCopySelected,
   canCopySelected,
   onRemoveSelected,
@@ -320,6 +324,18 @@ export function DownloadList({
                       >
                         <RotateCcw className="h-3.5 w-3.5" />
                         Retry Failed ({selectedFailedCount})
+                      </MotionButton>
+                    )}
+                    {selectedPausableCount > 0 && (
+                      <MotionButton
+                        type="button"
+                        variant="secondary"
+                        size="sm"
+                        className="h-7 rounded-full border border-amber-500/20 bg-amber-500/10 px-3 text-[11px] text-amber-700 shadow-sm gap-1.5 hover:bg-amber-500/20 dark:text-amber-200"
+                        onClick={() => void onPauseSelected()}
+                      >
+                        <Pause className="h-3.5 w-3.5" />
+                        Pause ({selectedPausableCount})
                       </MotionButton>
                     )}
                     <MotionButton

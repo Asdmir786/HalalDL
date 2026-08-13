@@ -110,7 +110,12 @@ export function useToolActions(modalApi: ModalApi) {
   /* ── Per-tool: detect installed + check latest ── */
   const refreshTool = useCallback(async (id: string) => {
     setBusyTools((prev) => ({ ...prev, [id]: true }));
-    updateTool(id, { status: "Checking" });
+    updateTool(id, {
+      status: "Checking",
+      validationStatus: "checking",
+      updateAvailable: undefined,
+      latestCheckedAt: undefined,
+    });
     try {
       let result: ToolCheckResult | null = null;
       switch (id) {
@@ -157,6 +162,7 @@ export function useToolActions(modalApi: ModalApi) {
         message: `Checking latest ${id} on ${latestTrack} track via ${latestSource}`,
       });
       let latest: string | null = null;
+      let latestLookupFailed = false;
       try {
         switch (id) {
           case "yt-dlp":
@@ -173,6 +179,7 @@ export function useToolActions(modalApi: ModalApi) {
             break;
         }
       } catch (latestError) {
+        latestLookupFailed = true;
         addLog({
           level: "warn",
           message: `Latest ${id} lookup failed: ${
@@ -188,6 +195,7 @@ export function useToolActions(modalApi: ModalApi) {
           latest || undefined
         ),
         latestCheckedAt: Date.now(),
+        validationStatus: latestLookupFailed ? "failed" : "verified",
       });
       addLog({
         level: "info",
@@ -200,6 +208,7 @@ export function useToolActions(modalApi: ModalApi) {
       });
       updateTool(id, {
         status: "Missing",
+        validationStatus: "failed",
         version: undefined,
         variant: undefined,
         systemPath: undefined,
@@ -226,7 +235,12 @@ export function useToolActions(modalApi: ModalApi) {
     const ids = useToolsStore.getState().tools.map((t) => t.id);
     // Immediate UI state so rows don't sit on stale Missing while the first probes start.
     for (const id of ids) {
-      updateTool(id, { status: "Checking" });
+      updateTool(id, {
+        status: "Checking",
+        validationStatus: "checking",
+        updateAvailable: undefined,
+        latestCheckedAt: undefined,
+      });
     }
     try {
       // Sequential probes: parallel cold starts of large bins often hit timeouts on Windows.
@@ -476,6 +490,7 @@ export function useToolActions(modalApi: ModalApi) {
     if (tool.channel === newChannel) return;
     updateTool(tool.id, {
       channel: newChannel,
+      validationStatus: "idle",
       latestVersion: undefined,
       updateAvailable: undefined,
       latestCheckedAt: undefined,
@@ -627,9 +642,14 @@ export function useToolActions(modalApi: ModalApi) {
     if (!path) return;
     try {
       const stagedPath = await stageManualTool(tool.id, path);
-      updateTool(tool.id, { path: stagedPath, mode: "Manual" });
+      updateTool(tool.id, {
+        path: stagedPath,
+        mode: "Manual",
+        status: "Checking",
+        validationStatus: "checking",
+      });
       addLog({ level: "info", message: `${tool.id} path set manually` });
-      toast.success(`${tool.id} path updated`);
+      await refreshTool(tool.id);
     } catch (e) {
       toast.error(
         `Failed: ${e instanceof Error ? e.message : String(e)}`
@@ -637,8 +657,14 @@ export function useToolActions(modalApi: ModalApi) {
     }
   };
 
-  const resetToAuto = (tool: Tool) => {
-    updateTool(tool.id, { mode: "Auto", path: undefined });
+  const resetToAuto = async (tool: Tool) => {
+    updateTool(tool.id, {
+      mode: "Auto",
+      path: undefined,
+      status: "Checking",
+      validationStatus: "checking",
+    });
+    await refreshTool(tool.id);
     toast.success(`${tool.name} reset to auto-detect`);
   };
 

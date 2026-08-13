@@ -1,0 +1,55 @@
+name: UI/UX feedback
+description: Report a visual or usability problem, or suggest an interface improvement
+title: "[UI/UX]: "
+labels:
+  - enhancement
+  - ui/ux
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Help us make HalalDL clearer, calmer, and easier to use. Screenshots, short recordings, sketches, and concrete before/after ideas are especially useful.
+
+        Please remove private URLs, cookies, names, and file paths before attaching anything.
+  - type: dropdown
+    id: feedback_type
+    attributes:
+      label: What kind of feedback is this?
+      options:
+        - Visual bug
+        - Usability improvement
+        - New interface idea
+        - Accessibility or clarity issue
+    validations:
+      required: true
+  - type: input
+    id: screen
+    attributes:
+      label: Affected screen or workflow
+      placeholder: "For example: Downloads queue, Preset editor, Settings > Tools"
+    validations:
+      required: true
+  - type: textarea
+    id: problem
+    attributes:
+      label: What feels wrong or difficult?
+      placeholder: Describe what is confusing, visually inconsistent, or hard to complete.
+    validations:
+      required: true
+  - type: textarea
+    id: proposal
+    attributes:
+      label: Suggested improvement
+      placeholder: Tell us how you think the screen or interaction could work better.
+    validations:
+      required: true
+  - type: textarea
+    id: visuals
+    attributes:
+      label: Screenshots, mockups, or examples
+      description: Attach images or link to a public example. Mark up the important area if you can.
+  - type: input
+    id: version
+    attributes:
+      label: HalalDL version and Windows version
+      placeholder: "HalalDL v0.6.0 on Windows 11 24H2"

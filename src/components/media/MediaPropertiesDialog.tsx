@@ -109,9 +109,12 @@ export function MediaPropertiesDialog({
   const clipDuration = historyEntry
     ? historyEntry.mediaDurationSeconds ?? (historyEntry.duration ?? 0) / 1000
     : 0;
+  const isVideoFile = Boolean(
+    historyEntry?.outputPath && /\.(mp4|mov|webm|mkv|avi|m4v)$/i.test(historyEntry.outputPath)
+  );
   const canMakeClip = Boolean(
     historyEntry?.status === "completed" && historyEntry.outputPath &&
-    (fileExists || getMarketingCaptureState() === "clips") && clipDuration > 1
+    (fileExists || getMarketingCaptureState() === "clips") && clipDuration > 1 && isVideoFile
   );
 
   useEffect(() => {
@@ -272,13 +275,13 @@ export function MediaPropertiesDialog({
               </div>
             )}
 
-            {historyEntry?.status === "completed" && (
+            {historyEntry?.status === "completed" && isVideoFile && (
               <div className="rounded-lg border border-border bg-muted/20 p-3">
                 <div className="flex items-start justify-between gap-3">
-                  <div><Label className="text-xs uppercase tracking-wider text-muted-foreground">Make a clip</Label><p className="mt-1 text-sm text-muted-foreground">Export a chosen part as a new local video or audio file.</p></div>
+                  <div><Label className="text-xs uppercase tracking-wider text-muted-foreground">Make a clip</Label><p className="mt-1 text-sm text-muted-foreground">Export a chosen part of this completed local video.</p></div>
                   <Button size="sm" variant="outline" onClick={() => { setClipSession((value) => value + 1); setClipOpen(true); }} disabled={!canMakeClip} title={canMakeClip ? "Create a clip from this file" : "The original file and its duration are needed to make a clip."}><Scissors className="mr-1.5 h-3.5 w-3.5" />Make a clip</Button>
                 </div>
-                {!canMakeClip && <p className="mt-2 text-xs text-muted-foreground">The original file must still be on disk and have a known duration.</p>}
+                {!canMakeClip && <p className="mt-2 text-xs text-muted-foreground">A completed video still on disk with a known duration is required.</p>}
               </div>
             )}
           </div>

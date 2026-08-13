@@ -1,6 +1,7 @@
 import { create } from "zustand";
 
 export type ToolStatus = "Detected" | "Missing" | "Checking";
+export type ToolValidationStatus = "idle" | "checking" | "verified" | "failed";
 export type ToolMode = "Auto" | "Manual" | "Bundled";
 export type ToolChannel = "stable" | "nightly";
 
@@ -8,6 +9,8 @@ export interface Tool {
   id: string;
   name: string;
   status: ToolStatus;
+  /** Current installed/latest-version verification state for the Tools UI. */
+  validationStatus: ToolValidationStatus;
   version?: string;
   variant?: string;
   latestVersion?: string;
@@ -38,6 +41,7 @@ const INITIAL_TOOLS: Tool[] = [
     name: "yt-dlp",
     // Not "Checking" — startup no longer probes tools; status is restored from storage or set on use.
     status: "Missing",
+    validationStatus: "idle",
     mode: "Auto",
     channel: "stable",
     required: true,
@@ -46,6 +50,7 @@ const INITIAL_TOOLS: Tool[] = [
     id: "ffmpeg",
     name: "FFmpeg",
     status: "Missing",
+    validationStatus: "idle",
     mode: "Auto",
     channel: "stable",
     required: false,
@@ -54,6 +59,7 @@ const INITIAL_TOOLS: Tool[] = [
     id: "aria2",
     name: "aria2",
     status: "Missing",
+    validationStatus: "idle",
     mode: "Auto",
     channel: "stable",
     required: false,
@@ -62,6 +68,7 @@ const INITIAL_TOOLS: Tool[] = [
     id: "deno",
     name: "Deno",
     status: "Missing",
+    validationStatus: "idle",
     mode: "Auto",
     channel: "stable",
     required: false,

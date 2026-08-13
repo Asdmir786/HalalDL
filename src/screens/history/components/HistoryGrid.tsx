@@ -2,7 +2,7 @@ import {
   RotateCcw, FolderOpen, Copy, Link, Trash2,
   FileText, CheckCircle2, XCircle, Clock, Play,
   Star, FileMinus,
-  Pencil
+  Pencil, Scissors
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { type HistoryEntry, useHistoryStore } from "@/store/history";
@@ -19,6 +19,7 @@ import { HistoryDetails } from "./HistoryDetails";
 import { useEffect, useState } from "react";
 import { getExplicitOutputPaths, getPreferredThumbnailSource } from "@/lib/output-paths";
 import { getMarketingCaptureState } from "@/lib/demo-mode";
+import { ClipMakerDialog } from "@/components/media/ClipMakerDialog";
 
 interface HistoryGridProps {
   entry: HistoryEntry;
@@ -46,6 +47,7 @@ export function HistoryGrid({
   onToggleSelection
 }: HistoryGridProps) {
   const [detailsOpen, setDetailsOpen] = useState(false);
+  const [clipOpen, setClipOpen] = useState(false);
   const addJob = useDownloadsStore((s) => s.addJob);
   const setScreen = useNavigationStore((s) => s.setScreen);
   const toggleFavorite = useHistoryStore((s) => s.toggleFavorite);
@@ -113,6 +115,14 @@ export function HistoryGrid({
   const relative = formatRelativeTime(entry.downloadedAt);
   const sizeStr = formatBytes(entry.fileSize);
   const displayThumbnail = getPreferredThumbnailSource(entry);
+  const clipDuration = entry.mediaDurationSeconds ?? (entry.duration ?? 0) / 1000;
+  const canMakeClip = Boolean(
+    isCompleted &&
+      entry.outputPath &&
+      fileExists &&
+      clipDuration > 1 &&
+      /\.(mp4|mov|webm|mkv|avi|m4v)$/i.test(entry.outputPath)
+  );
 
   return (
     <>
@@ -171,6 +181,18 @@ export function HistoryGrid({
                         </button>
                     </div>
                 )}
+                {canMakeClip && (
+                  <button
+                    onClick={(event) => {
+                      event.stopPropagation();
+                      setClipOpen(true);
+                    }}
+                    className="absolute right-2 top-2 rounded-full bg-background/85 p-2 text-foreground shadow-sm backdrop-blur-md transition-transform hover:scale-110 hover:bg-background dark:bg-white/10 dark:text-white dark:hover:bg-white/20"
+                    title="Make a clip"
+                  >
+                    <Scissors className="h-4 w-4" />
+                  </button>
+                )}
             </div>
 
             {/* Content */}
@@ -226,6 +248,11 @@ export function HistoryGrid({
               <Copy className="w-3.5 h-3.5 mr-2" /> Copy
             </ContextMenuItem>
         )}
+        {canMakeClip && (
+          <ContextMenuItem onClick={() => setClipOpen(true)}>
+            <Scissors className="mr-2 h-3.5 w-3.5" /> Make a clip
+          </ContextMenuItem>
+        )}
         <ContextMenuSeparator />
         <ContextMenuItem onClick={handleCopyUrl}>
           <Link className="w-3.5 h-3.5 mr-2" /> Copy URL
@@ -260,6 +287,14 @@ export function HistoryGrid({
         open={detailsOpen}
         onOpenChange={setDetailsOpen}
         fileExists={fileExists}
+      />
+    )}
+    {canMakeClip && entry.outputPath && (
+      <ClipMakerDialog
+        open={clipOpen}
+        onOpenChange={setClipOpen}
+        entry={entry}
+        inputPath={entry.outputPath}
       />
     )}
     </>

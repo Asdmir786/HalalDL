@@ -21,7 +21,7 @@
   --card-foreground: var(--brand-deep-navy);
   --popover: var(--brand-white);
   --popover-foreground: var(--brand-deep-navy);
-  --primary: var(--brand-primary-steel);
+  --primary: var(--brand-mint-accessible);
   --primary-foreground: var(--brand-white);
   --secondary: color-mix(in srgb, var(--brand-muted-steel) 14%, var(--brand-soft-light));
   --secondary-foreground: var(--brand-deep-navy);
@@ -33,7 +33,7 @@
   --destructive-foreground: var(--brand-white);
   --border: color-mix(in srgb, var(--brand-muted-steel) 22%, var(--brand-soft-light));
   --input: color-mix(in srgb, var(--brand-muted-steel) 22%, var(--brand-soft-light));
-  --ring: var(--brand-primary-steel);
+  --ring: var(--brand-mint-accessible);
   --chart-1: oklch(0.646 0.222 41.116);
   --chart-2: oklch(0.6 0.118 184.704);
   --chart-3: oklch(0.398 0.07 227.392);
@@ -49,8 +49,9 @@
   --card-foreground: var(--brand-soft-light);
   --popover: color-mix(in srgb, var(--brand-primary-steel) 55%, var(--brand-deep-navy));
   --popover-foreground: var(--brand-soft-light);
-  /* Default means steel in both themes. Mint is available only when deliberately chosen. */
-  --primary: color-mix(in srgb, var(--brand-white) 38%, var(--brand-primary-steel));
+  /* Keep the default action visibly active in dark mode, rather than the
+     pale steel treatment that can be mistaken for a disabled button. */
+  --primary: var(--brand-mint);
   --primary-foreground: var(--brand-deep-navy);
   --secondary: color-mix(in srgb, var(--brand-primary-steel) 70%, var(--brand-deep-navy));
   --secondary-foreground: var(--brand-soft-light);

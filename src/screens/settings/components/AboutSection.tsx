@@ -84,9 +84,6 @@ export function AboutSection() {
   const [assetName, setAssetName] = useState<string | null>(null);
   const [checksumUrl, setChecksumUrl] = useState<string | null>(null);
   const [updateStatus, setUpdateStatus] = useState<UpdateStatus>("idle");
-  const [verifiedInstallerPath, setVerifiedInstallerPath] = useState<
-    string | null
-  >(null);
   const [isDownloadingUpdate, setIsDownloadingUpdate] = useState(false);
   const [isLaunchingInstaller, setIsLaunchingInstaller] = useState(false);
   const [installDialogOpen, setInstallDialogOpen] = useState(false);
@@ -95,6 +92,8 @@ export function AboutSection() {
     appMode === "FULL" ? "Full" : appMode === "PORTABLE" ? "Portable" : "Lite";
 
   const storeUpdate = useAppUpdateStore();
+  const verifiedInstallerPath = storeUpdate.verifiedInstallerPath;
+  const setVerifiedInstallerPath = storeUpdate.setVerifiedInstallerPath;
   const installerType = storeUpdate.installContext?.installerType ?? "unknown";
   const isPortableInstall =
     appMode === "PORTABLE" || installerType === "portable";
@@ -161,14 +160,6 @@ export function AboutSection() {
     storeUpdate.checksumUrl,
   ]);
 
-  useEffect(() => {
-    const timer = window.setTimeout(() => {
-      setVerifiedInstallerPath(null);
-      setInstallDialogOpen(false);
-    }, 0);
-    return () => window.clearTimeout(timer);
-  }, [assetName, latestVersion]);
-
   const checkForUpdates = useCallback(async () => {
     setUpdateStatus("checking");
     try {
@@ -212,6 +203,9 @@ export function AboutSection() {
         assetName,
         checksumUrl,
       });
+      // Store readiness before notifying. A native-toast click may switch back
+      // to this view, and local component state would be lost on that remount.
+      setVerifiedInstallerPath(verifiedPath);
       await notifyUser(
         "HalalDL update ready",
         "The verified installer has been downloaded and is ready to run.",
@@ -224,14 +218,20 @@ export function AboutSection() {
           actionLabel: "Open About",
         }
       );
-      setVerifiedInstallerPath(verifiedPath);
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
       toast.error(`Verified update failed: ${message}`);
     } finally {
       setIsDownloadingUpdate(false);
     }
-  }, [assetName, checksumUrl, downloadUrl, isPortableInstall, releaseUrl]);
+  }, [
+    assetName,
+    checksumUrl,
+    downloadUrl,
+    isPortableInstall,
+    releaseUrl,
+    setVerifiedInstallerPath,
+  ]);
 
   const handleInstallUpdate = useCallback(async () => {
     if (!verifiedInstallerPath) return;

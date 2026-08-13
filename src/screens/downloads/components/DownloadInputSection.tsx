@@ -82,11 +82,6 @@ interface DownloadInputSectionProps {
   subtitleFormat: SubtitleFormat;
   onSubtitleFormatChange: (val: SubtitleFormat) => void;
   subtitleHint: string;
-  clipStartTime: string;
-  onClipStartTimeChange: (val: string) => void;
-  clipEndTime: string;
-  onClipEndTimeChange: (val: string) => void;
-  clipValidationMessage: string | null;
   chapterMode: ChapterMode;
   onChapterModeChange: (value: ChapterMode) => void;
   instagramMediaSummary: InstagramMediaSummary | null;
@@ -132,11 +127,6 @@ export function DownloadInputSection({
   subtitleFormat,
   onSubtitleFormatChange,
   subtitleHint,
-  clipStartTime,
-  onClipStartTimeChange,
-  clipEndTime,
-  onClipEndTimeChange,
-  clipValidationMessage,
   chapterMode,
   onChapterModeChange,
   instagramMediaSummary,
@@ -521,7 +511,7 @@ export function DownloadInputSection({
           : "Add";
 
   return (
-    <div className="flex flex-col gap-1.5 rounded-2xl border border-border/60 bg-card/60 p-1.5 dark:border-white/8 dark:bg-white/[0.03]">
+      <div className="flex flex-col gap-1.5 rounded-2xl border border-border/60 bg-card/60 p-1.5 dark:border-white/10 dark:bg-[#0b1420]/92 dark:shadow-[0_18px_48px_rgba(0,0,0,0.24)]">
       <div className="flex flex-col gap-1.5 xl:flex-row xl:items-center">
         <div className="relative min-w-0 flex-1">
           <Input
@@ -741,11 +731,6 @@ export function DownloadInputSection({
           subtitleFormat={subtitleFormat}
           onSubtitleFormatChange={onSubtitleFormatChange}
           subtitleHint={subtitleHint}
-          clipStartTime={clipStartTime}
-          onClipStartTimeChange={onClipStartTimeChange}
-          clipEndTime={clipEndTime}
-          onClipEndTimeChange={onClipEndTimeChange}
-          clipValidationMessage={clipValidationMessage}
           chapterMode={chapterMode}
           onChapterModeChange={onChapterModeChange}
           sponsorBlockMode={sponsorBlockMode}

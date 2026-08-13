@@ -200,7 +200,14 @@ fn remember_main_bounds<R: tauri::Runtime>(window: &WebviewWindow<R>, app: &AppH
 fn apply_saved_bounds<R: tauri::Runtime>(window: &WebviewWindow<R>, app: &AppHandle<R>) -> Result<(), String> {
     let state = app.state::<RuntimeState>();
     let saved = state.saved_main_bounds.lock().map_err(|_| "Runtime state lock poisoned".to_string())?;
-    if let Some(bounds) = saved.as_ref() {
+    // Never restore a compact quick-panel size for a full-window action such
+    // as a notification deep link. A valid normal window is at least this
+    // large; anything smaller falls back to the standard app dimensions.
+    let has_normal_bounds = saved
+        .as_ref()
+        .is_some_and(|bounds| bounds.size.width >= 700 && bounds.size.height >= 500);
+    if has_normal_bounds {
+        let bounds = saved.as_ref().expect("normal bounds checked above");
         window
             .set_size(Size::Physical(bounds.size))
             .map_err(|e| e.to_string())?;
