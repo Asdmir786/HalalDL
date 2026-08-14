@@ -1,4 +1,4 @@
-import { Bell, Clipboard, Trash2, FileWarning, History, Link2, AppWindow, Download, RefreshCw, Languages, MousePointerClick, MousePointer2 } from "lucide-react";
+import { Bell, Clipboard, Trash2, FileWarning, History, Link2, AppWindow, Download, RefreshCw, Languages, MousePointerClick, MousePointer2, BarChart3 } from "lucide-react";
 import { Switch } from "@/components/ui/switch";
 import {
   Select,
@@ -45,6 +45,8 @@ interface BehaviorSectionProps {
   onCheckToolUpdatesInBackgroundChange: (val: boolean) => void;
   checkAppUpdatesInBackground: boolean;
   onCheckAppUpdatesInBackgroundChange: (val: boolean) => void;
+  anonymousUsageEnabled: boolean;
+  onAnonymousUsageEnabledChange: (val: boolean) => void;
   quickDefaultPreset: string;
   onQuickDefaultPresetChange: (val: string) => void;
   quickActionBehavior: QuickActionBehavior;
@@ -73,6 +75,7 @@ export function BehaviorSection({
   enableBackgroundUpdateChecks, onEnableBackgroundUpdateChecksChange,
   checkToolUpdatesInBackground, onCheckToolUpdatesInBackgroundChange,
   checkAppUpdatesInBackground, onCheckAppUpdatesInBackgroundChange,
+  anonymousUsageEnabled, onAnonymousUsageEnabledChange,
   quickDefaultPreset, onQuickDefaultPresetChange,
   quickActionBehavior, onQuickActionBehaviorChange,
   quickDownloadStartMode, onQuickDownloadStartModeChange,
@@ -86,6 +89,10 @@ export function BehaviorSection({
     <SettingsSection id="behavior" icon={Bell} title="Behavior" description="Notifications, clipboard, and file handling preferences.">
       <SettingRow icon={Bell} label="Desktop Notifications" description="Allow HalalDL to show download, app update, and tool update alerts.">
         <Switch checked={notifications} onCheckedChange={onNotificationsChange} />
+      </SettingRow>
+
+      <SettingRow icon={BarChart3} label="Anonymous Usage" description="Share one anonymous daily app-use count with version, package type, and country. No URLs, downloads, logs, or IP addresses are stored.">
+        <Switch checked={anonymousUsageEnabled} onCheckedChange={onAnonymousUsageEnabledChange} />
       </SettingRow>
 
       <SettingRow icon={Trash2} label="Auto-Clear Completed" description="Automatically remove finished downloads from the list.">

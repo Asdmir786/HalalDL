@@ -65,6 +65,7 @@ export function usePersistenceInit(): MutableRefObject<boolean> {
       try {
         markStartup("persistence-start");
         if (isDemoModeEnabled()) {
+          setSettings({ ...DEFAULT_SETTINGS, anonymousUsagePrompted: true, anonymousUsageEnabled: false });
           seedMarketingDemoState();
           useRuntimeStore.getState().setPersistenceReady(true);
           initialized.current = true;

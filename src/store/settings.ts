@@ -64,6 +64,8 @@ export interface Settings {
   enableBackgroundUpdateChecks: boolean;
   checkToolUpdatesInBackground: boolean;
   checkAppUpdatesInBackground: boolean;
+  anonymousUsageEnabled: boolean;
+  anonymousUsagePrompted: boolean;
   quickDefaultPreset: string;
   quickActionBehavior: QuickActionBehavior;
   quickDownloadStartMode: DownloadsAddMode;
@@ -126,6 +128,8 @@ export const DEFAULT_SETTINGS: Settings = {
   enableBackgroundUpdateChecks: true,
   checkToolUpdatesInBackground: true,
   checkAppUpdatesInBackground: true,
+  anonymousUsageEnabled: true,
+  anonymousUsagePrompted: false,
   quickDefaultPreset: "default",
   quickActionBehavior: "ask",
   quickDownloadStartMode: "start",
@@ -155,6 +159,8 @@ function normalizeSettings(settings: Settings): Settings {
     sponsorBlockCategories: normalizeSponsorBlockCategories(settings.sponsorBlockCategories),
     instagramEngine: settings.instagramEngine === "yt-dlp" ? "yt-dlp" : "downloadgram",
     aria2Enabled: settings.aria2Enabled !== false,
+    anonymousUsageEnabled: settings.anonymousUsageEnabled !== false,
+    anonymousUsagePrompted: settings.anonymousUsagePrompted === true,
     cookiesFilePath:
       typeof settings.cookiesFilePath === "string" ? settings.cookiesFilePath.trim() : "",
   };

@@ -3,6 +3,7 @@ import { activateAttentionTarget, parseAttentionSearchParams } from "@/lib/atten
 import { useNavigationStore } from "@/store/navigation";
 import { PersistenceManager } from "@/components/PersistenceManager";
 import { UpgradePrompt } from "@/components/UpgradePrompt";
+import { DesktopTelemetry } from "@/components/telemetry/DesktopTelemetry";
 import { Toaster } from "@/components/ui/sonner";
 import { toast } from "sonner";
 import { AnimatePresence, motion } from "framer-motion";
@@ -741,6 +742,7 @@ export default function App() {
         </AnimatePresence>
       </main>
       {windowMode === "full" && deferredUiReady && persistenceReady && <UpgradePrompt />}
+      {windowMode === "full" && persistenceReady && <DesktopTelemetry />}
       <Toaster />
     </div>
   );

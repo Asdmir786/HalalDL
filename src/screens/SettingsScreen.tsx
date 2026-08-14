@@ -222,7 +222,11 @@ export function SettingsScreen() {
         }
       }
 
-      setSettings(defaults);
+      setSettings({
+        ...defaults,
+        anonymousUsageEnabled: settings.anonymousUsageEnabled,
+        anonymousUsagePrompted: settings.anonymousUsagePrompted,
+      });
       setEdits({});
 
       if (changedKeys.length > 0) {
@@ -256,9 +260,13 @@ export function SettingsScreen() {
 
   const resetAllDraft = useCallback(async () => {
     const defaults = await resolveDefaultSettings();
-    setDraftFromSettings(defaults);
+    setDraftFromSettings({
+      ...defaults,
+      anonymousUsageEnabled: savedSettings.anonymousUsageEnabled,
+      anonymousUsagePrompted: savedSettings.anonymousUsagePrompted,
+    });
     toast.info("Settings reset to defaults");
-  }, [setDraftFromSettings]);
+  }, [savedSettings.anonymousUsageEnabled, savedSettings.anonymousUsagePrompted, setDraftFromSettings]);
 
   const resetGroupDraft = useCallback(
     async (group: "appearance" | "storage" | "behavior" | "downloadEngine") => {
@@ -408,6 +416,8 @@ export function SettingsScreen() {
               onCheckToolUpdatesInBackgroundChange={(v) => setDraftValue("checkToolUpdatesInBackground", v)}
               checkAppUpdatesInBackground={draftSettings.checkAppUpdatesInBackground}
               onCheckAppUpdatesInBackgroundChange={(v) => setDraftValue("checkAppUpdatesInBackground", v)}
+              anonymousUsageEnabled={draftSettings.anonymousUsageEnabled}
+              onAnonymousUsageEnabledChange={(v) => setDraftValue("anonymousUsageEnabled", v)}
               quickDefaultPreset={draftSettings.quickDefaultPreset}
               onQuickDefaultPresetChange={(v) => setDraftValue("quickDefaultPreset", v)}
               quickActionBehavior={draftSettings.quickActionBehavior}
