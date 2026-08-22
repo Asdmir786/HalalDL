@@ -84,6 +84,8 @@ pub fn run() {
             app_update::get_install_context,
             app_update::download_and_verify_app_update,
             tools::resolve_system_tool_path,
+            tools::resolve_system_tool_paths,
+            tools::probe_executable_version,
             tools::upgrade_ytdlp_via_pip,
             tools::update_tool_at_path,
             tools::list_tool_backups,

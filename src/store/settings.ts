@@ -88,6 +88,15 @@ export interface Settings {
    */
   cookiesFilePath: string;
 
+  /**
+   * Absolute Deno path for yt-dlp `--js-runtimes deno:<path>`.
+   * Full/Portable prefer the app-managed binary; Lite stores the chosen system install.
+   * Empty = not selected.
+   */
+  denoJsRuntimePath: string;
+  /** Lite: user dismissed the missing-Deno card. Tools can still install later. */
+  denoJsRuntimeSkipped: boolean;
+
   // History
   historyRetention: number; // max entries to keep, 0 = unlimited
   watchlistDeliveryMode: WatchlistDeliveryMode;
@@ -139,6 +148,8 @@ export const DEFAULT_SETTINGS: Settings = {
   instagramEngine: "downloadgram",
   aria2Enabled: true,
   cookiesFilePath: "",
+  denoJsRuntimePath: "",
+  denoJsRuntimeSkipped: false,
   historyRetention: 0,
   watchlistDeliveryMode: "ask",
 };
@@ -163,6 +174,9 @@ function normalizeSettings(settings: Settings): Settings {
     anonymousUsagePrompted: settings.anonymousUsagePrompted === true,
     cookiesFilePath:
       typeof settings.cookiesFilePath === "string" ? settings.cookiesFilePath.trim() : "",
+    denoJsRuntimePath:
+      typeof settings.denoJsRuntimePath === "string" ? settings.denoJsRuntimePath.trim() : "",
+    denoJsRuntimeSkipped: settings.denoJsRuntimeSkipped === true,
   };
 }
 

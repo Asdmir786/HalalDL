@@ -9,6 +9,7 @@ import { downloadUrlToFile } from "@/lib/commands";
 import { isInstagramUrl } from "@/lib/media-engine";
 import { getExplicitOutputPaths } from "@/lib/output-paths";
 import { resolveTool, ytDlpEnv, isYouTubeUrl } from "./tool-env";
+import { appendJsRuntimeArgs } from "./js-runtime";
 import { runResolvedTool } from "@/lib/process/app-bin";
 import { getAppPaths } from "@/lib/app-paths";
 import { appendCookiesArgs } from "./cookies";
@@ -224,6 +225,7 @@ export async function fetchMediaInfo(url: string): Promise<MediaMetadataProbe> {
   const ytDlp = await resolveTool("yt-dlp");
   const args = ["--dump-single-json", "--skip-download", "--no-playlist", "--referer", url, url];
   appendCookiesArgs(args);
+  await appendJsRuntimeArgs(args, url);
   try {
     const { ytdlpCacheDir } = await getAppPaths();
     args.splice(0, 0, "--cache-dir", ytdlpCacheDir);
@@ -415,6 +417,7 @@ export async function fetchMetadata(jobId: string) {
     const ytDlpTool = await resolveTool("yt-dlp");
     const mediaUrlArgs = ["-f", "best", "-g", "--no-playlist", "--referer", job.url, job.url];
     appendCookiesArgs(mediaUrlArgs);
+    await appendJsRuntimeArgs(mediaUrlArgs, job.url);
     const mediaOutput = await runResolvedTool(
       ytDlpTool,
       "yt-dlp",

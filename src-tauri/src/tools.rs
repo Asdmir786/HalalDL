@@ -8,11 +8,9 @@ use crate::download::{
 use crate::extract::extract_from_zip;
 use crate::fs_utils::{safe_replace_with_backup, temp_path_for};
 
-/// Resolve the full system path of a tool using `where` / `which`.
-#[tauri::command]
-pub fn resolve_system_tool_path(tool: String) -> Result<Option<String>, String> {
+fn system_tool_bin_name(tool: &str) -> Result<&'static str, String> {
     #[cfg(target_os = "windows")]
-    let bin_name = match tool.as_str() {
+    let bin_name = match tool {
         "yt-dlp" => "yt-dlp.exe",
         "ffmpeg" => "ffmpeg.exe",
         "aria2" => "aria2c.exe",
@@ -20,13 +18,34 @@ pub fn resolve_system_tool_path(tool: String) -> Result<Option<String>, String> 
         _ => return Err(format!("Unknown tool: {}", tool)),
     };
     #[cfg(not(target_os = "windows"))]
-    let bin_name = match tool.as_str() {
+    let bin_name = match tool {
         "yt-dlp" => "yt-dlp",
         "ffmpeg" => "ffmpeg",
         "aria2" => "aria2c",
         "deno" => "deno",
         _ => return Err(format!("Unknown tool: {}", tool)),
     };
+    Ok(bin_name)
+}
+
+fn unique_tool_paths(stdout: &str) -> Vec<String> {
+    let mut seen = HashSet::new();
+    let mut paths = Vec::new();
+    for line in stdout.lines() {
+        let path = line.trim();
+        if path.is_empty() {
+            continue;
+        }
+        let key = path.to_lowercase();
+        if seen.insert(key) {
+            paths.push(path.to_string());
+        }
+    }
+    paths
+}
+
+fn collect_system_tool_paths(tool: &str) -> Result<Vec<String>, String> {
+    let bin_name = system_tool_bin_name(tool)?;
 
     #[cfg(target_os = "windows")]
     {
@@ -39,31 +58,98 @@ pub fn resolve_system_tool_path(tool: String) -> Result<Option<String>, String> 
             .map_err(|e| format!("Failed to run 'where': {}", e))?;
 
         if output.status.success() {
-            let stdout = String::from_utf8_lossy(&output.stdout);
-            let first_path = stdout.lines().next().unwrap_or("").trim();
-            if !first_path.is_empty() {
-                return Ok(Some(first_path.to_string()));
-            }
+            return Ok(unique_tool_paths(&String::from_utf8_lossy(&output.stdout)));
         }
     }
 
     #[cfg(not(target_os = "windows"))]
     {
-        let output = std::process::Command::new("which")
-            .arg(bin_name)
+        let mut cmd = std::process::Command::new("which");
+        cmd.arg("-a").arg(bin_name);
+        let output = cmd
             .output()
             .map_err(|e| format!("Failed to run 'which': {}", e))?;
 
         if output.status.success() {
-            let stdout = String::from_utf8_lossy(&output.stdout);
-            let first_path = stdout.lines().next().unwrap_or("").trim();
-            if !first_path.is_empty() {
-                return Ok(Some(first_path.to_string()));
+            let paths = unique_tool_paths(&String::from_utf8_lossy(&output.stdout));
+            if !paths.is_empty() {
+                return Ok(paths);
             }
+        }
+
+        let fallback = std::process::Command::new("which")
+            .arg(bin_name)
+            .output()
+            .map_err(|e| format!("Failed to run 'which': {}", e))?;
+        if fallback.status.success() {
+            return Ok(unique_tool_paths(&String::from_utf8_lossy(&fallback.stdout)));
         }
     }
 
-    Ok(None)
+    Ok(Vec::new())
+}
+
+/// Resolve the full system path of a tool using `where` / `which`.
+#[tauri::command]
+pub fn resolve_system_tool_path(tool: String) -> Result<Option<String>, String> {
+    Ok(collect_system_tool_paths(&tool)?.into_iter().next())
+}
+
+/// Resolve every `where` / `which` match for a tool (Windows PATH can list several denos).
+#[tauri::command]
+pub fn resolve_system_tool_paths(tool: String) -> Result<Vec<String>, String> {
+    collect_system_tool_paths(&tool)
+}
+
+/// Cheap `--version` probe for a specific executable (used to label Lite Deno picker rows).
+#[tauri::command]
+pub fn probe_executable_version(path: String) -> Result<Option<String>, String> {
+    let trimmed = path.trim();
+    if trimmed.is_empty() {
+        return Err("Executable path is empty".to_string());
+    }
+
+    let file_path = Path::new(trimmed);
+    let file_name = file_path
+        .file_name()
+        .and_then(|name| name.to_str())
+        .unwrap_or("")
+        .to_ascii_lowercase();
+    if file_name != "deno" && file_name != "deno.exe" {
+        return Err("Only deno executables can be version-probed this way".to_string());
+    }
+    if !file_path.is_file() {
+        return Ok(None);
+    }
+
+    #[cfg(target_os = "windows")]
+    use std::os::windows::process::CommandExt;
+
+    let mut cmd = std::process::Command::new(trimmed);
+    cmd.arg("--version");
+    #[cfg(target_os = "windows")]
+    {
+        cmd.creation_flags(0x08000000); // CREATE_NO_WINDOW
+    }
+
+    let output = cmd
+        .output()
+        .map_err(|e| format!("Failed to run '{} --version': {}", trimmed, e))?;
+    if !output.status.success() {
+        return Ok(None);
+    }
+
+    let first_line = String::from_utf8_lossy(&output.stdout)
+        .lines()
+        .next()
+        .unwrap_or("")
+        .trim()
+        .to_string();
+    if first_line.is_empty() {
+        Ok(None)
+    } else {
+        Ok(Some(first_line))
+    }
 }
 
 fn run_quiet(program: &Path, args: &[&str]) -> Result<(), String> {

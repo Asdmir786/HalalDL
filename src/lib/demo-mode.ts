@@ -20,6 +20,7 @@ const DEMO_SETTINGS_SECTIONS: DemoSettingsSection[] = ["appearance", "performanc
 const DEMO_USER_ROOT = "C:\\Users\\Demo";
 
 export type MarketingCaptureState = "playlist" | "queue" | "doctor" | "clips" | "library" | null;
+export type DenoCardPreview = "missing" | "picker" | null;
 
 function getSearchParams() {
   if (typeof window === "undefined") return null;
@@ -45,6 +46,14 @@ export function getMarketingCaptureState(): MarketingCaptureState {
   return raw === "playlist" || raw === "queue" || raw === "doctor" || raw === "clips" || raw === "library"
     ? raw
     : null;
+}
+
+/** URL-only Deno card states for visual review (`?preview=deno-missing`). */
+export function getDenoCardPreview(): DenoCardPreview {
+  const raw = getSearchParams()?.get("preview")?.trim().toLowerCase();
+  if (raw === "deno-missing" || raw === "missing" || raw === "deno-download" || raw === "download") return "missing";
+  if (raw === "deno-picker" || raw === "picker") return "picker";
+  return null;
 }
 
 function getRequestedScreen(): Screen {
@@ -522,6 +531,8 @@ export function seedMarketingDemoState() {
   const settings = {
     ...DEFAULT_SETTINGS,
     theme: getRequestedTheme(),
+    anonymousUsagePrompted: true,
+    anonymousUsageEnabled: false,
     defaultDownloadDir: `${DEMO_USER_ROOT}\\Downloads\\HalalDL`,
     downloadsAddMode: "start" as const,
     downloadsSelectedPreset: "default",

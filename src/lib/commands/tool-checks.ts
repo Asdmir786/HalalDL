@@ -1,7 +1,17 @@
 import { useLogsStore } from "@/store/logs";
+import { useSettingsStore } from "@/store/settings";
 import { invoke } from "@tauri-apps/api/core";
 import { resolveTool } from "@/lib/downloader/tool-env";
+import {
+  ensureLiteDenoJsRuntime,
+  parseDenoVersionLine,
+  persistDenoJsRuntimePath,
+  probeExecutableVersion,
+  resolveAppManagedDenoPath,
+  resolveSystemToolPaths,
+} from "@/lib/downloader/js-runtime";
 import { runResolvedTool } from "@/lib/process/app-bin";
+import { getAppMode } from "@/lib/tools/app-mode";
 import { fetchText, fetchJson } from "./version-utils";
 
 export interface ToolCheckResult {
@@ -18,6 +28,8 @@ const TOOL_CHECK_TIMEOUT_MS = 30000;
 export async function resolveSystemToolPath(tool: string): Promise<string | null> {
   return invoke<string | null>("resolve_system_tool_path", { tool });
 }
+
+export { resolveSystemToolPaths, probeExecutableVersion } from "@/lib/downloader/js-runtime";
 
 /** Cheap path heuristic: pip installs land under Scripts or site-packages. */
 export function isYtDlpPipPath(path?: string | null): boolean {
@@ -282,39 +294,81 @@ export async function checkAria2Version(): Promise<ToolCheckResult | null> {
 export async function checkDenoVersion(): Promise<ToolCheckResult | null> {
   const { addLog } = useLogsStore.getState();
   try {
-    const tool = await resolveTool("deno");
-    if (!tool.isLocal) {
-      const systemPath = await resolveSystemToolPath("deno").catch(() => null);
-      if (!systemPath) {
-        addLog({ level: "warn", message: "deno is unavailable (no app-managed binary and none on PATH)" });
-        return null;
-      }
+    if (getAppMode() === "LITE") {
+      await ensureLiteDenoJsRuntime("tools");
     }
 
-    addLog({ level: "command", message: "Checking for deno binary...", command: `${tool.path} --version` });
-    const output = await runResolvedTool(tool, "deno", ["--version"], {
-      timeoutMs: TOOL_CHECK_TIMEOUT_MS,
+    const managedPath = await resolveAppManagedDenoPath();
+    if (managedPath) {
+      const tool = await resolveTool("deno");
+      addLog({ level: "command", message: "Checking for deno binary...", command: `${managedPath} --version` });
+      const output = await runResolvedTool(tool, "deno", ["--version"], {
+        timeoutMs: TOOL_CHECK_TIMEOUT_MS,
+      });
+      if (output.code === 0) {
+        const firstLine = output.stdout.split("\n")[0] || "";
+        const version = parseDenoVersionLine(firstLine) || firstLine || "Detected";
+        persistDenoJsRuntimePath(managedPath);
+        addLog({ level: "info", message: `deno ${version} (Bundled) at ${managedPath}` });
+        return {
+          version,
+          variant: "Bundled",
+          systemPath: managedPath,
+          isLocal: true,
+          usingFallback: false,
+        };
+      }
+      addLog({ level: "warn", message: `deno version check returned code ${output.code}` });
+      return null;
+    }
+
+    const systemPaths = await resolveSystemToolPaths("deno").catch(() => []);
+    const persisted = useSettingsStore.getState().settings.denoJsRuntimePath?.trim() || "";
+    const persistedMatch = persisted
+      ? systemPaths.find(
+          (path) =>
+            path.replace(/\//g, "\\").toLowerCase() === persisted.replace(/\//g, "\\").toLowerCase()
+        )
+      : undefined;
+    const candidates = [
+      persistedMatch || persisted,
+      ...systemPaths,
+    ].filter((path, index, all): path is string => {
+      if (!path) return false;
+      const key = path.replace(/\//g, "\\").toLowerCase();
+      return all.findIndex((item) => item.replace(/\//g, "\\").toLowerCase() === key) === index;
     });
-    if (output.code === 0) {
-      const firstLine = output.stdout.split("\n")[0] || "";
-      const versionMatch = firstLine.match(/deno\s+(\S+)/i);
-      const version = versionMatch ? versionMatch[1] : (firstLine || "Detected");
-      const variant = tool.isLocal ? "Bundled" : "System";
 
-      const systemPath = !tool.isLocal
-        ? await resolveSystemToolPath("deno").catch(() => null)
-        : tool.path;
+    if (candidates.length === 0) {
+      addLog({ level: "warn", message: "deno is unavailable (no app-managed binary and none on PATH)" });
+      return null;
+    }
 
-      addLog({ level: "info", message: `deno ${version} (${variant}) at ${systemPath || tool.path}` });
+    for (const preferred of candidates) {
+      addLog({ level: "command", message: "Checking for deno binary...", command: `${preferred} --version` });
+      const firstLine = await probeExecutableVersion(preferred);
+      if (!firstLine) {
+        if (persisted && preferred.replace(/\//g, "\\").toLowerCase() === persisted.replace(/\//g, "\\").toLowerCase()) {
+          useSettingsStore.getState().updateSettings({ denoJsRuntimePath: "" });
+        }
+        continue;
+      }
+
+      const version = parseDenoVersionLine(firstLine) || firstLine || "Detected";
+      if (systemPaths.length === 1 || preferred === persisted || preferred === persistedMatch) {
+        persistDenoJsRuntimePath(preferred);
+      }
+      addLog({ level: "info", message: `deno ${version} (System) at ${preferred}` });
       return {
         version,
-        variant,
-        systemPath: systemPath ?? undefined,
-        isLocal: tool.isLocal,
-        usingFallback: !tool.isLocal,
+        variant: "System",
+        systemPath: preferred,
+        isLocal: false,
+        usingFallback: true,
       };
     }
-    addLog({ level: "warn", message: `deno version check returned code ${output.code}` });
+
+    addLog({ level: "warn", message: "deno version check returned no output" });
   } catch (e) {
     addLog({ level: "error", message: `deno check failed: ${String(e)}` });
   }

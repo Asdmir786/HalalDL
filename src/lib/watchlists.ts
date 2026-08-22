@@ -2,6 +2,7 @@ import { fetchPlaylistEntries } from "@/lib/downloader/playlist";
 import { getWatchlistArchiveIds } from "@/lib/downloader/archive";
 import { getWatchlistYtDlpArchivePath } from "@/lib/downloader/archive";
 import { resolveTool, ytDlpEnv } from "@/lib/downloader/tool-env";
+import { appendJsRuntimeArgs } from "@/lib/downloader/js-runtime";
 import { runResolvedTool } from "@/lib/process/app-bin";
 import { startQueuedJobs } from "@/lib/downloader";
 import { useDownloadsStore } from "@/store/downloads";
@@ -24,7 +25,9 @@ export async function checkWatchlist(watchlist: Watchlist, force = false) {
     if (!watchlist.initializedAt && watchlist.firstRunMode === "future-only") {
       const ytDlp = await resolveTool("yt-dlp");
       const archive = await getWatchlistYtDlpArchivePath(watchlist.id);
-      const baseline = await runResolvedTool(ytDlp, "yt-dlp", ["--flat-playlist", "--skip-download", "--force-write-archive", "--download-archive", archive, watchlist.url], { env: ytDlpEnv(), timeoutMs: 120000 });
+      const baselineArgs = ["--flat-playlist", "--skip-download", "--force-write-archive", "--download-archive", archive, watchlist.url];
+      await appendJsRuntimeArgs(baselineArgs, watchlist.url);
+      const baseline = await runResolvedTool(ytDlp, "yt-dlp", baselineArgs, { env: ytDlpEnv(), timeoutMs: 120000 });
       if (baseline.code !== 0) throw new Error(baseline.stderr.trim() || "Could not create the future-only baseline.");
       updateWatchlist(watchlist.id, { initializedAt: Date.now(), lastSuccessAt: Date.now(), lastError: undefined, lastDiscoveredCount: result.entries.length, lastQueuedCount: 0 });
       addActivity({ watchlistId: watchlist.id, kind: "checked", detail: `Baseline recorded: ${result.entries.length} item(s) discovered` });

@@ -9,6 +9,7 @@ import { join } from "@tauri-apps/api/path";
 import { OutputParser } from "@/lib/output-parser";
 import { copyFilesToClipboard, deleteFile, renameFile } from "@/lib/commands";
 import { resolveTool, ytDlpEnv, sendDownloadCompleteNotification, isYouTubeUrl } from "./tool-env";
+import { appendJsRuntimeArgs } from "./js-runtime";
 import { runResolvedTool, spawnResolvedTool, type SpawnedProcess } from "@/lib/process/app-bin";
 import { formatSponsorBlockCategories } from "@/lib/sponsorblock";
 import { cleanupThumbnailByJobId } from "./thumbnails";
@@ -782,6 +783,8 @@ export async function startDownload(jobId: string) {
     const ffmpegDir = ffmpeg.path.replace(/\\ffmpeg\.exe$/, "");
     args.push("--ffmpeg-location", ffmpegDir);
   }
+
+  await appendJsRuntimeArgs(args, job.url);
 
   if (aria2.isLocal && settings.aria2Enabled) {
     addLog({ level: "info", message: `Using local aria2c: ${aria2.path}`, jobId });

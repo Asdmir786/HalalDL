@@ -119,6 +119,9 @@ export function buildDiagnosticsPayload(redaction: DiagnosticsRedaction) {
     ...(redaction.redactPaths && settingsState.settings.cookiesFilePath
       ? { cookiesFilePath: redactPath(settingsState.settings.cookiesFilePath) }
       : {}),
+    ...(redaction.redactPaths && settingsState.settings.denoJsRuntimePath
+      ? { denoJsRuntimePath: redactPath(settingsState.settings.denoJsRuntimePath) }
+      : {}),
     ...(redaction.redactPaths && settingsState.settings.defaultDownloadDir
       ? { defaultDownloadDir: redactPath(settingsState.settings.defaultDownloadDir) }
       : {}),
