@@ -160,11 +160,13 @@ export function buildCopyDiagnosticsSummary({
   packageLabel,
   osLabel,
   userAgent = navigator.userAgent || "Unknown user agent",
+  includeLastFailedJob = true,
 }: {
   version: string;
   packageLabel: string;
   osLabel: string;
   userAgent?: string;
+  includeLastFailedJob?: boolean;
 }) {
   const downloadsState = useDownloadsStore.getState();
   const historyState = useHistoryStore.getState();
@@ -219,7 +221,7 @@ export function buildCopyDiagnosticsSummary({
       rustSetupCompleteMs: performance.rustSetupCompleteMs,
       persistenceCriticalReadyMs: performance.persistenceCriticalReadyMs,
     },
-    lastFailedJob,
+    lastFailedJob: includeLastFailedJob ? lastFailedJob : null,
   });
 }
 
