@@ -1115,6 +1115,7 @@ export function DownloadItem({
           title={job.title}
           url={job.url}
           failure={job.statusDetail || "Download failed"}
+          jobId={job.id}
           onRetry={() => onRetry(job.id)}
         />
       )}

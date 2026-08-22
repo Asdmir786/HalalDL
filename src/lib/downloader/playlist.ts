@@ -2,6 +2,7 @@ import { getAppPaths } from "@/lib/app-paths";
 import { runResolvedTool } from "@/lib/process/app-bin";
 import { appendCookiesArgs } from "./cookies";
 import { appendJsRuntimeArgs } from "./js-runtime";
+import { appendYoutubeReliabilityArgs } from "./youtube-args";
 import { resolveTool, ytDlpEnv } from "./tool-env";
 
 export type PlaylistEntry = {
@@ -190,6 +191,7 @@ export async function fetchPlaylistEntries(url: string): Promise<PlaylistScanRes
 
   appendCookiesArgs(args);
   await appendJsRuntimeArgs(args, url);
+  appendYoutubeReliabilityArgs(args, url);
 
   try {
     const { ytdlpCacheDir } = await getAppPaths();

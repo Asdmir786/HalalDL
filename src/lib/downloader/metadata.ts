@@ -10,6 +10,7 @@ import { isInstagramUrl } from "@/lib/media-engine";
 import { getExplicitOutputPaths } from "@/lib/output-paths";
 import { resolveTool, ytDlpEnv, isYouTubeUrl } from "./tool-env";
 import { appendJsRuntimeArgs } from "./js-runtime";
+import { appendYoutubeReliabilityArgs } from "./youtube-args";
 import { runResolvedTool } from "@/lib/process/app-bin";
 import { getAppPaths } from "@/lib/app-paths";
 import { appendCookiesArgs } from "./cookies";
@@ -226,6 +227,7 @@ export async function fetchMediaInfo(url: string): Promise<MediaMetadataProbe> {
   const args = ["--dump-single-json", "--skip-download", "--no-playlist", "--referer", url, url];
   appendCookiesArgs(args);
   await appendJsRuntimeArgs(args, url);
+  appendYoutubeReliabilityArgs(args, url);
   try {
     const { ytdlpCacheDir } = await getAppPaths();
     args.splice(0, 0, "--cache-dir", ytdlpCacheDir);
@@ -418,6 +420,7 @@ export async function fetchMetadata(jobId: string) {
     const mediaUrlArgs = ["-f", "best", "-g", "--no-playlist", "--referer", job.url, job.url];
     appendCookiesArgs(mediaUrlArgs);
     await appendJsRuntimeArgs(mediaUrlArgs, job.url);
+    appendYoutubeReliabilityArgs(mediaUrlArgs, job.url);
     const mediaOutput = await runResolvedTool(
       ytDlpTool,
       "yt-dlp",

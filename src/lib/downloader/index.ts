@@ -34,4 +34,5 @@ export {
 export { classifyYtDlpFailure, collectJobLogHints } from "./failure-messages";
 export { getCookiesFilePath, cookiesEnabled, appendCookiesArgs } from "./cookies";
 export { appendJsRuntimeArgs, resolveDenoJsRuntimePath } from "./js-runtime";
+export { appendYoutubeReliabilityArgs, shouldSkipAria2ForUrl } from "./youtube-args";
 export { isYouTubeUrl } from "./tool-env";

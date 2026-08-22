@@ -10,6 +10,7 @@ import { OutputParser } from "@/lib/output-parser";
 import { copyFilesToClipboard, deleteFile, renameFile } from "@/lib/commands";
 import { resolveTool, ytDlpEnv, sendDownloadCompleteNotification, isYouTubeUrl } from "./tool-env";
 import { appendJsRuntimeArgs } from "./js-runtime";
+import { appendYoutubeReliabilityArgs, shouldSkipAria2ForUrl } from "./youtube-args";
 import { runResolvedTool, spawnResolvedTool, type SpawnedProcess } from "@/lib/process/app-bin";
 import { formatSponsorBlockCategories } from "@/lib/sponsorblock";
 import { cleanupThumbnailByJobId } from "./thumbnails";
@@ -785,8 +786,16 @@ export async function startDownload(jobId: string) {
   }
 
   await appendJsRuntimeArgs(args, job.url);
+  appendYoutubeReliabilityArgs(args, job.url, { forDownload: true });
 
-  if (aria2.isLocal && settings.aria2Enabled) {
+  if (aria2.isLocal && settings.aria2Enabled && shouldSkipAria2ForUrl(job.url)) {
+    addLog({
+      level: "info",
+      message:
+        "Using yt-dlp native downloader for YouTube — aria2’s many connections often trigger HTTP 429",
+      jobId,
+    });
+  } else if (aria2.isLocal && settings.aria2Enabled) {
     addLog({ level: "info", message: `Using local aria2c: ${aria2.path}`, jobId });
     args.push("--external-downloader", aria2.path);
     args.push("--external-downloader-args", "aria2c:-x 16 -s 16 -k 1M --summary-interval=0");

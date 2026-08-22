@@ -13,7 +13,7 @@ export function classifyYtDlpFailure(text: string): string | null {
     /http error 429|too many requests|rate.?limit/i.test(raw) &&
     /sign in to confirm|confirm you.?re not a bot/i.test(raw)
   ) {
-    return "YouTube blocked this request (rate limit + bot check). Wait before retrying; if it continues, add an exported cookies.txt from a signed-in browser in Settings → Download Engine.";
+    return "YouTube blocked this request (rate limit + bot check). Waiting days rarely helps. Add a cookies.txt from a signed-in browser in Settings → Download Engine, keep Deno installed in Tools, and retry one video at a time.";
   }
 
   if (
@@ -38,7 +38,7 @@ export function classifyYtDlpFailure(text: string): string | null {
   }
 
   if (/http error 429|too many requests|rate.?limit/i.test(s)) {
-    return "The site rate-limited you. Wait a bit, then retry (or lower max concurrent downloads).";
+    return "The site rate-limited this request. Retry one at a time; for YouTube, add cookies.txt in Settings → Download Engine if it keeps happening.";
   }
 
   if (

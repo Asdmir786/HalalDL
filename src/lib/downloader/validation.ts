@@ -1,6 +1,7 @@
 import { isInstagramUrl, resolveInstagramWithDownloadgram } from "@/lib/media-engine";
 import { appendCookiesArgs } from "./cookies";
 import { appendJsRuntimeArgs } from "./js-runtime";
+import { appendYoutubeReliabilityArgs } from "./youtube-args";
 import { resolveTool, ytDlpEnv } from "./tool-env";
 import { runResolvedTool } from "@/lib/process/app-bin";
 
@@ -105,6 +106,7 @@ export async function probeMediaUrl(url: string): Promise<UrlProbeResult> {
     ];
     appendCookiesArgs(probeArgs);
     await appendJsRuntimeArgs(probeArgs, url);
+    appendYoutubeReliabilityArgs(probeArgs, url);
     const output = await runResolvedTool(
       ytDlp,
       "yt-dlp",
