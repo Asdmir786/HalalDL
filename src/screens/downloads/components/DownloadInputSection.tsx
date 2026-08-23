@@ -5,16 +5,19 @@ import {
   ChevronUp,
   Clipboard,
   Clock3,
+  Layers,
   LoaderCircle,
   Play,
   Plus,
   Settings2,
   Sparkles,
+  Zap,
 } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState, type KeyboardEvent } from "react";
 import { MotionButton } from "@/components/motion/MotionButton";
+import { cn } from "@/lib/utils";
 import { Input } from "@/components/ui/input";
-import { Select, SelectContent, SelectGroup, SelectItem, SelectLabel, SelectSeparator, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Select, SelectContent, SelectGroup, SelectItem, SelectLabel, SelectSeparator, SelectTrigger } from "@/components/ui/select";
 import { DownloadOutputOptions } from "./DownloadOutputOptions";
 import { DuplicateWarning } from "./DuplicateWarning";
 import { Preset } from "@/store/presets";
@@ -503,74 +506,48 @@ export function DownloadInputSection({
     playlistStatus !== "idle" && playlistSelectedCount > 0
       ? addMode === "start"
         ? `Start ${playlistSelectedCount}`
-        : `Add ${playlistSelectedCount}`
+        : `Queue ${playlistSelectedCount}`
       : isAdding
         ? "Adding..."
         : addMode === "start"
-          ? "Start"
-          : "Add";
+          ? "Start download"
+          : "Add to queue";
+  const presetTitle = isDirectImageUrl
+    ? "Direct image detected"
+    : isInstagramImageOnly
+      ? "No preset needed"
+      : isCustomPreset
+        ? "Custom configuration"
+        : selectedPresetConfig?.name || "Choose preset";
+  const presetDetail = isDirectImageUrl
+    ? "Original file only"
+    : instagramPresetMessage
+      || selectedPresetConfig?.description
+      || (isCustomPreset ? "Manual format, folder, and filename rules" : "Repeatable output settings");
 
   return (
-      <div className="flex flex-col gap-1.5 rounded-2xl border border-border/60 bg-card/60 p-1.5 dark:border-white/10 dark:bg-[#0b1420]/92 dark:shadow-[0_18px_48px_rgba(0,0,0,0.24)]">
-      <div className="flex flex-col gap-1.5 xl:flex-row xl:items-center">
-        <div className="relative min-w-0 flex-1">
-          <Input
-            id="download-url-input"
-            placeholder="Paste a video, playlist, or direct media URL"
-            value={url}
-            ref={inputRef}
-            onChange={(e) => handleUrlChange(e.target.value)}
-            onFocus={(e) => handleUrlFocus(e.currentTarget)}
-            onKeyDown={handleUrlKeyDown}
-            className="h-10 rounded-xl border-border/65 bg-background/95 px-3.5 shadow-sm focus-visible:ring-1 dark:border-white/10 dark:bg-background/90"
-          />
-        </div>
-
-        <div className="flex flex-wrap items-center gap-1.5 xl:shrink-0 xl:justify-end">
-          <MotionButton
-            type="button"
-            variant="outline"
-            size="sm"
-            className="h-9 rounded-xl border-border/65 bg-background/88 px-3 text-[11px] font-semibold dark:border-white/10 dark:bg-background/70"
-            onClick={() => void handlePasteFromClipboard()}
-          >
-            <Clipboard className="mr-1.5 h-3.5 w-3.5" />
-            Paste
-          </MotionButton>
-          <div className="flex h-9 items-center gap-0.5 rounded-xl border border-border/65 bg-background/88 p-0.5 shadow-sm dark:border-white/10 dark:bg-background/70">
-            <MotionButton
-              type="button"
-              variant={addMode === "queue" ? "secondary" : "ghost"}
-              size="sm"
-              className="h-7 gap-1.5 rounded-lg px-3 text-[10px] font-semibold uppercase tracking-wider data-[state=active]:shadow-sm"
-              onClick={() => setAddMode("queue")}
-              data-state={addMode === "queue" ? "active" : "inactive"}
-            >
-              <Clock3 className="w-3 h-3" />
-              Queue
-            </MotionButton>
-            <MotionButton
-              type="button"
-              variant={addMode === "start" ? "secondary" : "ghost"}
-              size="sm"
-              className="h-7 gap-1.5 rounded-lg px-3 text-[10px] font-semibold uppercase tracking-wider data-[state=active]:shadow-sm"
-              onClick={() => setAddMode("start")}
-              data-state={addMode === "start" ? "active" : "inactive"}
-            >
-              <Play className="w-3 h-3" />
-              Start
-            </MotionButton>
-          </div>
-
-          <MotionButton
-            onClick={onAdd}
-            disabled={!url.trim() || isAdding || playlistStatus === "loading"}
-            className="h-9 rounded-xl bg-linear-to-r from-primary/95 via-primary to-primary/85 px-4 shadow-md shadow-primary/20 hover:from-primary hover:to-primary"
-          >
-            <Plus className="mr-2 h-4 w-4" />
-            {isAdding ? "Adding..." : addLabel}
-          </MotionButton>
-        </div>
+      <div className="flex flex-col gap-2">
+      <div className="relative">
+        <Input
+          id="download-url-input"
+          placeholder="Paste a video, playlist, or direct media URL"
+          value={url}
+          ref={inputRef}
+          onChange={(e) => handleUrlChange(e.target.value)}
+          onFocus={(e) => handleUrlFocus(e.currentTarget)}
+          onKeyDown={handleUrlKeyDown}
+          className="h-11 rounded-lg border-primary/25 bg-background px-3 pr-[4.75rem] text-sm text-foreground shadow-none placeholder:text-foreground/45 focus-visible:ring-1 dark:bg-[#081018]"
+        />
+        <MotionButton
+          type="button"
+          variant="outline"
+          size="sm"
+          className="absolute right-1.5 top-1/2 h-8 -translate-y-1/2 rounded-md border-primary/30 px-2.5 text-[11px] font-semibold text-foreground hover:bg-primary/15"
+          onClick={() => void handlePasteFromClipboard()}
+        >
+          <Clipboard className="mr-1 h-3.5 w-3.5" />
+          Paste
+        </MotionButton>
       </div>
 
       {url.trim() && !dupDismissed && (
@@ -607,36 +584,9 @@ export function DownloadInputSection({
         onPreferSingleVideoChange={onPreferSingleVideoChange}
       />
 
-      <div className="rounded-xl border border-border/60 bg-background/82 px-3 py-2 shadow-sm dark:border-white/8 dark:bg-background/65">
-        <div className="space-y-1.5">
-          <div className="flex items-center justify-between gap-3">
-            <div className="min-w-0">
-              <label className="text-[10px] font-semibold uppercase tracking-[0.16em] text-muted-foreground">
-                Preset
-              </label>
-              <p className="truncate text-[11px] text-muted-foreground">
-                {isDirectImageUrl
-                  ? "Original file only"
-                  : selectedPresetConfig?.description || "Repeatable output settings"}
-              </p>
-            </div>
-            <MotionButton
-              variant="ghost"
-              size="sm"
-              className="h-7 shrink-0 rounded-full px-2.5 text-[10px] text-muted-foreground hover:text-foreground disabled:cursor-not-allowed disabled:opacity-45"
-              onClick={onToggleOutputConfig}
-              disabled={isDirectImageUrl || isInstagramImageOnly}
-            >
-              <Settings2 className="mr-1 h-3 w-3" />
-              {showOutputConfig ? "Hide options" : "Options"}
-              {showOutputConfig ? (
-                <ChevronUp className="ml-1 h-3 w-3" />
-              ) : (
-                <ChevronDown className="ml-1 h-3 w-3" />
-              )}
-            </MotionButton>
-          </div>
-          <Select
+      <div className="grid grid-cols-1 gap-2 sm:grid-cols-[minmax(0,1fr)_auto_auto_auto] sm:items-stretch">
+        <div className="min-w-0">
+        <Select
             value={selectedPreset}
             onValueChange={onPresetChange}
             open={presetSelectOpenEffective}
@@ -649,32 +599,25 @@ export function DownloadInputSection({
             }}
             disabled={presetSelectionDisabled}
           >
-            <SelectTrigger className="h-10 rounded-lg border-border/65 bg-background/95 px-3 shadow-sm focus:ring-1 disabled:cursor-not-allowed disabled:opacity-70 dark:border-white/10 dark:bg-background/90">
-              {isDirectImageUrl ? (
-                <div className="min-w-0 text-left">
-                  <div className="truncate text-sm font-semibold">Direct image detected</div>
-                </div>
-              ) : isInstagramImageOnly ? (
-                <div className="min-w-0 text-left">
-                  <div className="truncate text-sm font-semibold">No preset needed</div>
-                </div>
-              ) : isCustomPreset ? (
-                <div className="min-w-0 text-left">
-                  <div className="truncate text-sm font-semibold">Custom configuration</div>
-                </div>
-              ) : selectedPresetConfig ? (
-                <div className="min-w-0 text-left">
-                  <div className="truncate text-sm font-semibold">{selectedPresetConfig.name}</div>
-                </div>
-              ) : (
-                <SelectValue placeholder="Choose preset" />
-              )}
+            <SelectTrigger className="h-11 w-full justify-start gap-2 overflow-hidden rounded-lg border-white/10 bg-[#0d1520] px-3 py-0 text-left shadow-none focus:ring-1 focus:ring-primary/25 disabled:cursor-not-allowed disabled:opacity-70 [&>span]:flex [&>span]:min-w-0 [&>span]:max-w-[calc(100%-1.25rem)] [&>span]:flex-none [&>span]:items-center">
+              <span className="flex min-w-0 items-center gap-2">
+                <Layers className="h-4 w-4 shrink-0 text-primary/80" />
+                <span className="min-w-0 leading-none">
+                  <span className="block truncate text-sm font-medium">{presetTitle}</span>
+                  <span className="mt-1 block truncate text-[11px] font-normal text-foreground/55">{presetDetail}</span>
+                </span>
+              </span>
             </SelectTrigger>
-            <SelectContent className="max-h-[360px] overflow-y-auto rounded-2xl border-border/70 bg-popover/98 p-1.5 shadow-2xl" position="popper" sideOffset={6} align="start">
-              <SelectItem value="custom" className="rounded-xl py-2.5 font-semibold text-primary">
+            <SelectContent
+              position="popper"
+              sideOffset={6}
+              align="start"
+              className="w-80 max-w-[min(20rem,calc(100vw-2rem))] rounded-xl border-white/10 bg-[#101820] p-0 shadow-lg"
+            >
+              <SelectItem value="custom" className="rounded-lg py-2 font-semibold text-primary">
                 <div className="flex min-w-0 flex-col">
                   <span className="text-sm">Custom configuration</span>
-                  <span className="text-[11px] font-normal text-muted-foreground">
+                  <span className="text-[11px] font-normal text-foreground/60">
                     Manual control over format, subtitles, folder, and filename rules
                   </span>
                 </div>
@@ -683,14 +626,14 @@ export function DownloadInputSection({
               {presetGroups.map((entry, index) => (
                 <div key={entry.group}>
                   <SelectGroup>
-                    <SelectLabel className="py-1.5 text-[10px] uppercase tracking-wider text-muted-foreground/80">
+                    <SelectLabel className="px-2 py-1.5 pl-2 text-[10px] uppercase tracking-wider text-foreground/50">
                       {entry.label}
                     </SelectLabel>
                     {entry.presets.map((preset) => (
-                      <SelectItem key={preset.id} value={preset.id} title={preset.description} className="rounded-xl py-2.5">
+                      <SelectItem key={preset.id} value={preset.id} title={preset.description} className="rounded-lg py-2">
                         <div className="flex min-w-0 flex-col">
                           <span className="truncate text-sm font-medium">{preset.name}</span>
-                          <span className="truncate text-[11px] font-normal text-muted-foreground">
+                          <span className="truncate text-[11px] font-normal text-foreground/55">
                             {preset.description}
                           </span>
                         </div>
@@ -702,12 +645,63 @@ export function DownloadInputSection({
               ))}
             </SelectContent>
           </Select>
-          {instagramPresetMessage && (
-            <p className="text-[11px] text-muted-foreground">
-              {instagramPresetMessage}
-            </p>
-          )}
         </div>
+        <MotionButton
+          variant="outline"
+          size="sm"
+          className="h-11 shrink-0 rounded-lg border-primary/30 px-2.5 text-[11px] font-semibold text-foreground hover:bg-primary/15 disabled:cursor-not-allowed disabled:opacity-45"
+          onClick={onToggleOutputConfig}
+          disabled={isDirectImageUrl || isInstagramImageOnly}
+        >
+          <Settings2 className="mr-1 h-3.5 w-3.5" />
+          {showOutputConfig ? "Hide options" : "Options"}
+          {showOutputConfig ? (
+            <ChevronUp className="ml-1 h-3.5 w-3.5" />
+          ) : (
+            <ChevronDown className="ml-1 h-3.5 w-3.5" />
+          )}
+        </MotionButton>
+        <div className="relative grid h-11 w-[10.5rem] shrink-0 grid-cols-2 rounded-lg border border-white/10 bg-black/20 p-0.5">
+          <span
+            aria-hidden
+            className={cn(
+              "pointer-events-none absolute inset-y-0.5 w-[calc(50%-2px)] rounded-md bg-primary/20 ring-1 ring-primary/25 transition-transform duration-200 ease-out",
+              addMode === "start" ? "translate-x-[calc(100%+2px)]" : "translate-x-0"
+            )}
+          />
+          <button
+            type="button"
+            onClick={() => setAddMode("queue")}
+            data-state={addMode === "queue" ? "active" : "inactive"}
+            className={cn(
+              "relative z-10 inline-flex items-center justify-center gap-1 rounded-md text-[11px] font-semibold transition-colors",
+              addMode === "queue" ? "text-primary" : "text-foreground/65 hover:text-foreground"
+            )}
+          >
+            <Clock3 className="h-3 w-3" />
+            Later
+          </button>
+          <button
+            type="button"
+            onClick={() => setAddMode("start")}
+            data-state={addMode === "start" ? "active" : "inactive"}
+            className={cn(
+              "relative z-10 inline-flex items-center justify-center gap-1 rounded-md text-[11px] font-semibold transition-colors",
+              addMode === "start" ? "text-primary" : "text-foreground/65 hover:text-foreground"
+            )}
+          >
+            <Zap className="h-3 w-3" />
+            Now
+          </button>
+        </div>
+        <MotionButton
+          onClick={onAdd}
+          disabled={!url.trim() || isAdding || playlistStatus === "loading"}
+          className="h-11 shrink-0 rounded-lg px-3 text-[12px] font-semibold shadow-sm shadow-primary/15"
+        >
+          {addMode === "start" ? <Play className="mr-1.5 h-3.5 w-3.5" /> : <Plus className="mr-1.5 h-3.5 w-3.5" />}
+          {isAdding ? "Adding..." : addLabel}
+        </MotionButton>
       </div>
 
       {showOutputConfig && !isInstagramImageOnly && (

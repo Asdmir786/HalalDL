@@ -26,6 +26,7 @@ import { isInstagramUrl } from "@/lib/media-engine";
 import { formatBytes, formatMediaDuration, getJobTs } from "../utils";
 import { getStatusMeta, PHASE_ORDER, type Phase } from "../constants";
 import { getMarketingCaptureState } from "@/lib/demo-mode";
+import { BrandLogo } from "@/components/BrandLogo";
 
 interface DownloadItemProps {
   job: DownloadJob;
@@ -137,6 +138,7 @@ export function DownloadItem({
   const [sheetOpen, setSheetOpen] = useState(false);
   const [propertiesOpen, setPropertiesOpen] = useState(false);
   const [doctorOpen, setDoctorOpen] = useState(false);
+  const [failedThumbRetryReady, setFailedThumbRetryReady] = useState(false);
   useEffect(() => {
     if (job.id !== "demo-job-failed" || getMarketingCaptureState() !== "doctor") return;
     const timer = window.setTimeout(() => setDoctorOpen(true), 0);
@@ -151,9 +153,22 @@ export function DownloadItem({
       : job.thumbnail;
 
   const thumbnailLoading =
-    !displayThumbnail && job.thumbnailStatus !== "failed" && job.thumbnailStatus !== "ready";
+    job.status !== "Failed" &&
+    !displayThumbnail &&
+    job.thumbnailStatus !== "failed" &&
+    job.thumbnailStatus !== "ready";
 
   const thumbnailErrored = Boolean(displayThumbnail && thumbErrorSource === displayThumbnail);
+  const failedWithoutThumb = job.status === "Failed" && (!displayThumbnail || thumbnailErrored);
+
+  useEffect(() => {
+    if (!failedWithoutThumb) {
+      setFailedThumbRetryReady(false);
+      return;
+    }
+    const timer = window.setTimeout(() => setFailedThumbRetryReady(true), 8000);
+    return () => window.clearTimeout(timer);
+  }, [failedWithoutThumb, job.id]);
 
   const statusMeta = getStatusMeta(job.status);
   const StatusIcon = statusMeta.Icon;
@@ -393,6 +408,25 @@ export function DownloadItem({
                     className="w-full h-full object-cover opacity-90 group-hover:opacity-100 transition-opacity"
                     onError={() => setThumbErrorSource(displayThumbnail)}
                   />
+                ) : failedWithoutThumb ? (
+                  <div className="flex h-full w-full items-center justify-center">
+                    {failedThumbRetryReady ? (
+                      <button
+                        type="button"
+                        className="flex h-8 w-8 items-center justify-center rounded-full bg-primary text-primary-foreground shadow-sm transition-transform hover:scale-105 hover:bg-primary/90"
+                        onClick={(event) => {
+                          event.stopPropagation();
+                          onRetry(job.id);
+                        }}
+                        title="Retry download"
+                        aria-label="Retry download"
+                      >
+                        <RotateCcw className="h-3.5 w-3.5" />
+                      </button>
+                    ) : (
+                      <BrandLogo className="h-7 w-7 animate-pulse" alt="" />
+                    )}
+                  </div>
                 ) : thumbnailLoading ? (
                   <div className="w-full h-full flex items-center justify-center">
                     <div className="w-4 h-4 border-2 border-muted-foreground/20 border-t-muted-foreground/60 rounded-full animate-spin" />

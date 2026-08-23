@@ -627,11 +627,15 @@ export async function startDownload(jobId: string) {
   };
 
   const finalizeFailedDownload = async (failDetail: string) => {
+    const existing = useDownloadsStore.getState().jobs.find((candidate) => candidate.id === jobId);
     updateJob(jobId, {
       status: "Failed",
       phase: "Resolving formats",
       statusDetail: failDetail,
       ffmpegProgressKnown: undefined,
+      ...(existing?.thumbnail
+        ? {}
+        : { thumbnailStatus: "failed" as const, thumbnailError: existing?.thumbnailError }),
     });
 
     const failedJob = useDownloadsStore.getState().jobs.find((j) => j.id === jobId);

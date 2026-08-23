@@ -43,6 +43,7 @@ import { isInstagramUrl } from "@/lib/media-engine";
 import { copyFilesToClipboard } from "@/lib/commands";
 import { probeReliability } from "@/lib/reliability";
 import { Button } from "@/components/ui/button";
+import { FolderOpen } from "lucide-react";
 import { getExplicitOutputPaths } from "@/lib/output-paths";
 import { toast } from "sonner";
 import type { SponsorBlockCategoryId } from "@/lib/sponsorblock";
@@ -101,10 +102,6 @@ export function DownloadsScreen() {
   const { presets } = usePresetsStore();
   const { rules: sourceRules, collections } = useLibraryStore();
   const selectedPreset = resolveExistingPresetId(presets, settings.downloadsSelectedPreset || "default");
-  const selectedPresetConfig = useMemo(
-    () => presets.find((preset) => preset.id === selectedPreset) ?? null,
-    [presets, selectedPreset]
-  );
   const {
     jobs,
     addJob,
@@ -1076,15 +1073,14 @@ export function DownloadsScreen() {
       <FadeInStagger className="relative pb-8">
         <FadeInItem className="shrink-0">
           <header className="px-4 pb-1.5 pt-2.5">
-            <div className="rounded-[24px] border border-border/60 bg-card/78 shadow-[0_20px_60px_rgba(15,23,42,0.08)] backdrop-blur-xl dark:border-white/10 dark:bg-[linear-gradient(180deg,rgba(255,255,255,0.05),rgba(255,255,255,0.02))] dark:shadow-[0_20px_80px_rgba(0,0,0,0.22)]">
-              <div className="px-3 py-2">
-                <div className="space-y-1.5">
-                  <div className="flex flex-col gap-1 sm:flex-row sm:items-end sm:justify-between">
-                    <div>
-                      <h2 className="text-[1.45rem] font-bold tracking-tight">Downloads</h2>
-                      <div className="text-[11px] text-muted-foreground">
-                        {isCustomPreset ? "Custom" : selectedPresetConfig?.name || "Default"} • {destinationLabel}
-                      </div>
+            <div className="rounded-[24px] border border-primary/15 bg-card/90 shadow-[0_20px_60px_rgba(15,23,42,0.08)] backdrop-blur-xl dark:border-primary/20 dark:bg-[#0b1420] dark:shadow-[0_20px_80px_rgba(0,0,0,0.28)]">
+              <div className="px-3 py-2.5">
+                <div className="space-y-2">
+                  <div className="flex flex-col gap-1.5 sm:flex-row sm:items-center sm:justify-between">
+                    <h2 className="text-xl font-bold tracking-tight">Downloads</h2>
+                    <div className="glass inline-flex max-w-full items-center gap-1.5 rounded-full px-2.5 py-1 text-[11px] font-medium text-foreground/85">
+                      <FolderOpen className="h-3.5 w-3.5 shrink-0 text-primary/80" />
+                      <span className="min-w-0 truncate">{destinationLabel}</span>
                     </div>
                   </div>
 
@@ -1149,8 +1145,8 @@ export function DownloadsScreen() {
                   />
 
                   {url.trim() && (
-                    <div className="flex flex-col gap-2 border-t border-border/60 pt-3 sm:flex-row sm:items-center sm:justify-between">
-                      <p className="text-xs text-muted-foreground">Not sure whether this link will work? Check it first without downloading.</p>
+                    <div className="flex flex-col gap-2 border-t border-primary/15 pt-3 sm:flex-row sm:items-center sm:justify-between">
+                      <p className="text-xs text-foreground/70">Not sure whether this link will work? Check it first without downloading.</p>
                       <Button variant="outline" size="sm" disabled={checkingLink} onClick={() => void (async () => { const checkedUrl = url.trim(); setCheckingLink(true); const result = await probeReliability(checkedUrl); setLinkCheckResult({ url: checkedUrl, message: result.message, needsCookies: result.needsCookies }); setCheckingLink(false); })()}>{checkingLink ? "Checking link…" : "Check this link"}</Button>
                     </div>
                   )}

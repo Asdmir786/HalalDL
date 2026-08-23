@@ -19,6 +19,44 @@ interface DownloadStatsBarProps {
   onSortModeChange: (mode: "newest" | "status") => void;
 }
 
+const FILTERS: Array<{
+  id: DownloadStatusFilter;
+  label: string;
+  dot: string;
+  active: string;
+}> = [
+  {
+    id: "all",
+    label: "All",
+    dot: "bg-primary",
+    active: "bg-primary text-primary-foreground border-primary",
+  },
+  {
+    id: "active",
+    label: "Active",
+    dot: "bg-sky-400",
+    active: "border-sky-400 bg-sky-400 text-[#081018]",
+  },
+  {
+    id: "queued",
+    label: "Queued",
+    dot: "bg-amber-400",
+    active: "border-amber-400 bg-amber-400 text-[#081018]",
+  },
+  {
+    id: "failed",
+    label: "Failed",
+    dot: "bg-red-400",
+    active: "border-red-400 bg-red-400 text-[#081018]",
+  },
+  {
+    id: "done",
+    label: "Done",
+    dot: "bg-emerald-400",
+    active: "border-emerald-400 bg-emerald-400 text-[#081018]",
+  },
+];
+
 export function DownloadStatsBar({
   queuedCount,
   activeCount,
@@ -33,59 +71,28 @@ export function DownloadStatsBar({
   sortMode,
   onSortModeChange,
 }: DownloadStatsBarProps) {
-  const totalCount = queuedCount + activeCount + failedCount + doneCount;
-  const filters = [
-    {
-      id: "all" as const,
-      label: "All",
-      count: totalCount,
-      tone:
-        "border-border/65 bg-card/70 text-foreground/85 hover:border-border/85 hover:bg-card/90 dark:border-white/10 dark:bg-white/5 dark:hover:border-white/15 dark:hover:bg-white/10",
-    },
-    {
-      id: "active" as const,
-      label: "Active",
-      count: activeCount,
-      tone:
-        "border-sky-500/25 bg-sky-500/12 text-sky-700 hover:border-sky-500/35 hover:bg-sky-500/18 dark:text-sky-300",
-    },
-    {
-      id: "queued" as const,
-      label: "Queued",
-      count: queuedCount,
-      tone:
-        "border-yellow-500/25 bg-yellow-500/12 text-yellow-700 hover:border-yellow-500/35 hover:bg-yellow-500/18 dark:text-yellow-300",
-    },
-    {
-      id: "failed" as const,
-      label: "Failed",
-      count: failedCount,
-      tone:
-        "border-destructive/20 bg-destructive/10 text-destructive hover:border-destructive/30 hover:bg-destructive/15",
-    },
-    {
-      id: "done" as const,
-      label: "Done",
-      count: doneCount,
-      tone:
-        "border-emerald-500/25 bg-emerald-500/12 text-emerald-700 hover:border-emerald-500/35 hover:bg-emerald-500/18 dark:text-emerald-300",
-    },
-  ];
+  const counts: Record<DownloadStatusFilter, number> = {
+    all: queuedCount + activeCount + failedCount + doneCount,
+    active: activeCount,
+    queued: queuedCount,
+    failed: failedCount,
+    done: doneCount,
+  };
 
   return (
-    <div className="flex flex-col gap-1.5 border-t border-border/50 pt-1.5 dark:border-white/6">
-      <div className="flex flex-col gap-1.5 sm:flex-row sm:items-center sm:justify-between">
-        <div className="flex shrink-0 flex-wrap items-center gap-1.5">
-          <div className="flex h-7 items-center gap-1 rounded-full border border-border/60 bg-card/70 px-1.5 py-1 dark:border-white/8 dark:bg-white/5">
-            <ArrowUpDown className="h-3 w-3 text-muted-foreground" />
+    <div className="flex flex-col gap-2 border-t border-border/50 pt-2 dark:border-white/10">
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <div className="flex flex-wrap items-center gap-2">
+          <div className="inline-flex h-8 items-center gap-1 rounded-full border border-primary/25 bg-background px-1.5">
+            <ArrowUpDown className="ml-1 h-3.5 w-3.5 text-primary" />
             <button
               type="button"
               onClick={() => onSortModeChange("newest")}
               className={cn(
-                "rounded-full px-2 py-0.5 text-[10px] font-medium transition-colors",
+                "rounded-full px-2.5 py-1 text-[11px] font-semibold transition-colors",
                 sortMode === "newest"
-                  ? "bg-primary text-primary-foreground shadow-sm"
-                  : "text-muted-foreground hover:text-foreground"
+                  ? "bg-primary text-primary-foreground"
+                  : "text-foreground/80 hover:bg-primary/15 hover:text-foreground"
               )}
             >
               Newest
@@ -94,10 +101,10 @@ export function DownloadStatsBar({
               type="button"
               onClick={() => onSortModeChange("status")}
               className={cn(
-                "rounded-full px-2 py-0.5 text-[10px] font-medium transition-colors",
+                "rounded-full px-2.5 py-1 text-[11px] font-semibold transition-colors",
                 sortMode === "status"
-                  ? "bg-primary text-primary-foreground shadow-sm"
-                  : "text-muted-foreground hover:text-foreground"
+                  ? "bg-primary text-primary-foreground"
+                  : "text-foreground/80 hover:bg-primary/15 hover:text-foreground"
               )}
             >
               Status
@@ -111,7 +118,7 @@ export function DownloadStatsBar({
               size="sm"
               onClick={onRetryFailed}
               disabled={!canRetryFailed}
-              className="h-7 rounded-full border-destructive/25 px-3 text-[10px] font-semibold text-destructive gap-1.5 transition-all hover:bg-destructive/10 disabled:opacity-40"
+              className="h-8 rounded-full border-red-400/50 bg-red-500/15 px-3 text-[11px] font-semibold text-red-300 hover:bg-red-500/25 hover:text-red-200 disabled:opacity-40"
             >
               <RotateCcw className="h-3.5 w-3.5" />
               Retry
@@ -123,7 +130,7 @@ export function DownloadStatsBar({
               variant="default"
               size="sm"
               onClick={onStartQueue}
-              className="h-7 rounded-full bg-linear-to-r from-primary/95 via-primary to-primary/85 px-3 text-[10px] font-semibold gap-1.5 shadow-md shadow-primary/20 transition-all hover:from-primary hover:to-primary"
+              className="h-8 rounded-full px-3 text-[11px] font-semibold"
             >
               <Play className="h-3.5 w-3.5" />
               Start Queue
@@ -132,9 +139,10 @@ export function DownloadStatsBar({
         </div>
       </div>
 
-      <div className="flex min-w-0 flex-nowrap items-center gap-1.5 overflow-x-auto sm:pb-0 [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden">
-        {filters.map(({ id, label, count, tone }) => {
+      <div className="flex min-w-0 flex-nowrap items-center gap-1.5 overflow-x-auto [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden">
+        {FILTERS.map(({ id, label, dot, active }) => {
           const isActive = statusFilter === id;
+          const count = counts[id];
 
           return (
             <button
@@ -142,13 +150,20 @@ export function DownloadStatsBar({
               type="button"
               onClick={() => onStatusFilterChange(id)}
               className={cn(
-                "group inline-flex h-7 shrink-0 items-center gap-1.5 rounded-full border px-2.5 text-[10px] font-semibold transition-all",
-                tone,
-                isActive && "shadow-[0_8px_30px_rgba(15,23,42,0.12)] ring-1 ring-border/60 dark:ring-white/10 dark:shadow-[0_8px_30px_rgba(0,0,0,0.18)]",
+                "inline-flex h-8 shrink-0 items-center gap-1.5 rounded-full border px-2.5 text-[11px] font-semibold transition-colors",
+                isActive
+                  ? active
+                  : "border-primary/20 bg-background text-foreground hover:border-primary/40 hover:bg-primary/10"
               )}
             >
+              <span className={cn("h-2 w-2 rounded-full", isActive ? "bg-current/40" : dot)} />
               <span>{label}</span>
-              <span className="rounded-full bg-foreground/[0.06] px-1.5 py-0.5 text-[10px] tabular-nums dark:bg-black/10">
+              <span
+                className={cn(
+                  "tabular-nums",
+                  isActive ? "opacity-90" : count > 0 ? "text-foreground" : "text-foreground/55"
+                )}
+              >
                 {count}
               </span>
             </button>

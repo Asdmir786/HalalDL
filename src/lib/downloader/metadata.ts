@@ -274,18 +274,27 @@ export async function fetchMediaInfo(url: string): Promise<MediaMetadataProbe> {
   };
 }
 
+function isMetadataTargetActive(jobId: string): boolean {
+  const job = useDownloadsStore.getState().jobs.find((candidate) => candidate.id === jobId);
+  return Boolean(job && job.status !== "Failed" && job.status !== "Stopped");
+}
+
 export async function fetchMetadata(jobId: string) {
   const { jobs, updateJob } = useDownloadsStore.getState();
   const { addLog } = useLogsStore.getState();
   const job = jobs.find((j) => j.id === jobId);
-  if (!job) return;
+  if (!job || !isMetadataTargetActive(jobId)) return;
 
   try {
-    updateJob(jobId, {
-      phase: "Generating thumbnail",
-      statusDetail: "Fetching metadata",
-      subtitleStatus: "checking",
-    });
+    if (job.status === "Downloading" || job.status === "Post-processing" || job.status === "Queued") {
+      updateJob(jobId, {
+        phase: job.status === "Queued" ? job.phase : "Generating thumbnail",
+        statusDetail: job.status === "Queued" ? job.statusDetail : "Fetching metadata",
+        subtitleStatus: "checking",
+      });
+    } else {
+      updateJob(jobId, { subtitleStatus: "checking" });
+    }
 
     const ffmpeg = await resolveTool("ffmpeg");
     const thumbsDir = await ensureThumbnailDir();
@@ -308,6 +317,7 @@ export async function fetchMetadata(jobId: string) {
 
     try {
       const info = await fetchMediaInfo(job.url);
+      if (!isMetadataTargetActive(jobId)) return;
       title = info.title;
       thumbnailUrl = info.thumbnailUrl;
 
@@ -339,13 +349,17 @@ export async function fetchMetadata(jobId: string) {
         jobId,
       });
     } catch (infoError) {
-      updateJob(jobId, { subtitleStatus: "error" });
+      if (isMetadataTargetActive(jobId)) {
+        updateJob(jobId, { subtitleStatus: "error" });
+      }
       addLog({
         level: "warn",
         message: `[meta] Metadata probe failed: ${String(infoError)}`,
         jobId,
       });
     }
+
+    if (!isMetadataTargetActive(jobId)) return;
 
     if (thumbnailUrl && /^https?:/i.test(thumbnailUrl) && thumbnailUrl.toUpperCase() !== "NA") {
       if (isTauriLocalAssetUrl(thumbnailUrl)) {
@@ -364,6 +378,7 @@ export async function fetchMetadata(jobId: string) {
 
       try {
         await downloadUrlToFile(thumbnailUrl, thumbDest, job.url);
+        if (!isMetadataTargetActive(jobId)) return;
         if (await exists(thumbDest)) {
           const assetUrl = await thumbnailAssetUrl(thumbRelPath);
           updateJob(jobId, { thumbnail: assetUrl, thumbnailStatus: "ready" });
@@ -405,6 +420,8 @@ export async function fetchMetadata(jobId: string) {
     }
 
     addLog({ level: "warn", message: `[meta] No usable thumbnail URL from metadata probe`, jobId });
+
+    if (!isMetadataTargetActive(jobId)) return;
 
     if (isYouTubeUrl(job.url)) {
       updateJob(jobId, {
@@ -471,11 +488,13 @@ export async function fetchMetadata(jobId: string) {
       return;
     }
     useLogsStore.getState().addLog({ level: "error", message: `[meta] Exception in fetchMetadata: ${message}`, jobId });
-    updateJob(jobId, {
-      subtitleStatus: "error",
-      thumbnailStatus: "failed",
-      thumbnailError: message,
-    });
+    if (isMetadataTargetActive(jobId)) {
+      updateJob(jobId, {
+        subtitleStatus: "error",
+        thumbnailStatus: "failed",
+        thumbnailError: message,
+      });
+    }
   }
 }
 
