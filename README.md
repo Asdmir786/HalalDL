@@ -12,8 +12,9 @@ HalalDL is a local-first Windows media downloader powered by `yt-dlp`, with pres
 - **Best for power users:** choose `HalalDL-Lite-...-setup.exe` if you want to manage `yt-dlp`, `ffmpeg`, and optional tools yourself
 - **Best for no-install use:** choose `HalalDL-Portable-...zip` if you want the app, settings, archive, thumbnails, and managed tools kept together in one folder
 - **WinGet:** install Full with `winget install --id Asdmir786.HalalDL`, Lite with `winget install --id Asdmir786.HalalDL.Lite`, or Portable with `winget install --id Asdmir786.HalalDL.Portable`. Catalog propagation can lag behind GitHub Releases, especially for Portable.
+- **Chocolatey:** install Full with `choco install halaldl`. Community moderation can lag behind GitHub Releases.
 - **AlternativeTo:** [view the HalalDL listing](https://alternativeto.net/software/halaldl/about/) for discovery and comparisons
-- **Scoop / Chocolatey:** no verified package-manager install path is published yet
+- **Scoop:** no verified package-manager install path is published yet
 - **Platform today:** Windows 10 and Windows 11, x64
 - **Use it responsibly:** only download content you are allowed to access and save; respect platform rules, copyright, and local law
 
@@ -89,7 +90,7 @@ HalalDL releases are currently **not code-signed**, so Windows SmartScreen may w
 Open PowerShell in the folder where you downloaded the installer and run:
 
 ```powershell
-Get-FileHash .\HalalDL-Full-v0.5.1-win10+11-x64-setup.exe -Algorithm SHA256
+Get-FileHash .\HalalDL-Full-v0.6.0-win10+11-x64-setup.exe -Algorithm SHA256
 ```
 
 Compare the `Hash` value with the matching line in `SHA256SUMS.txt` from the same GitHub Release. If the filename differs, replace the filename in the command with the file you downloaded.
