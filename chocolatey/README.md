@@ -13,7 +13,7 @@ choco pack
 
 ```powershell
 choco apikey --key YOUR_KEY --source https://push.chocolatey.org/
-choco push halaldl.0.6.0.nupkg --source https://push.chocolatey.org/
+choco push halaldl.0.6.1.nupkg --source https://push.chocolatey.org/
 ```
 
 Do not commit API keys. After push, watch moderation on https://community.chocolatey.org/packages/halaldl

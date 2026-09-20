@@ -2,7 +2,7 @@
 <package xmlns="http://schemas.microsoft.com/packaging/2015/06/nuspec.xsd">
   <metadata>
     <id>halaldl</id>
-    <version>0.6.0</version>
+    <version>0.6.1</version>
     <title>HalalDL</title>
     <authors>Asdmir786</authors>
     <owners>Asdmir786</owners>
@@ -35,7 +35,7 @@ This package installs the **Full** setup build (app-managed tools).
 - Official site: [https://halaldl.vercel.app](https://halaldl.vercel.app)
 - Releases are not code-signed yet; Windows SmartScreen may warn on first run
 ]]></description>
-    <releaseNotes>https://github.com/Asdmir786/HalalDL/releases/tag/v0.6.0</releaseNotes>
+    <releaseNotes>https://github.com/Asdmir786/HalalDL/releases/tag/v0.6.1</releaseNotes>
     <tags>halaldl yt-dlp video-downloader media-downloader tauri ffmpeg windows local-first</tags>
   </metadata>
   <files>
