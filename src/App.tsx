@@ -1,10 +1,10 @@
 import { Sidebar } from "@/components/Sidebar";
 import { activateAttentionTarget, parseAttentionSearchParams } from "@/lib/attention";
+import { parseHalalDlDeepLink } from "@/lib/deep-links";
 import { useNavigationStore } from "@/store/navigation";
 import { PersistenceManager } from "@/components/PersistenceManager";
 import { UpgradePrompt } from "@/components/UpgradePrompt";
 import { DenoJsRuntimePrompt } from "@/components/DenoJsRuntimePrompt";
-import { DesktopTelemetry } from "@/components/telemetry/DesktopTelemetry";
 import { Toaster } from "@/components/ui/sonner";
 import { toast } from "sonner";
 import { AnimatePresence, motion } from "framer-motion";
@@ -317,30 +317,15 @@ export default function App() {
   const processLaunchUrls = useCallback(
     async (urls: string[]) => {
       for (const rawUrl of urls) {
-        let parsed: URL;
-        try {
-          parsed = new URL(rawUrl);
-        } catch {
-          continue;
-        }
+        const parsed = parseHalalDlDeepLink(rawUrl);
+        if (!parsed) continue;
 
-        const action = parsed.hostname || parsed.pathname.replace(/^\/+/, "");
         const { setScreen } = useNavigationStore.getState();
         const { addJob, setComposeDraft } = useDownloadsStore.getState();
         const runtime = useRuntimeStore.getState();
         const latestSettings = useSettingsStore.getState().settings;
-        if (action === "open") {
-          const screen = parsed.searchParams.get("screen");
-          if (
-            screen === "downloads" ||
-            screen === "presets" ||
-            screen === "tools" ||
-            screen === "logs" ||
-            screen === "history" ||
-            screen === "settings"
-          ) {
-            setScreen(screen);
-          }
+        if (parsed.action === "open") {
+          if (parsed.screen) setScreen(parsed.screen);
           runtime.restoreFullMode();
           await restoreMainWindow().catch(() => {
             void 0;
@@ -348,27 +333,21 @@ export default function App() {
           continue;
         }
 
-        if (action === "attention") {
+        if (parsed.action === "attention") {
           const target = parseAttentionSearchParams(parsed.searchParams);
           if (!target) continue;
           await activateAttentionTarget(target, { restoreWindow: true });
           continue;
         }
 
-        if (action !== "download") continue;
-
-        const targetUrl = parsed.searchParams.get("url");
-        if (!targetUrl) continue;
         const presetId = resolveExistingPresetId(
           usePresetsStore.getState().presets,
-          parsed.searchParams.get("preset") || latestSettings.quickDefaultPreset || "default"
+          parsed.preset || latestSettings.quickDefaultPreset || "default"
         );
-        const advanced = parsed.searchParams.get("advanced") === "1";
-        const startImmediately = parsed.searchParams.get("start") !== "queue";
 
-        if (advanced) {
+        if (parsed.advanced) {
           setComposeDraft({
-            url: targetUrl,
+            url: parsed.targetUrl,
             presetId,
             overrides: {
               origin: "deeplink",
@@ -382,8 +361,8 @@ export default function App() {
           continue;
         }
 
-        const id = addJob(targetUrl, presetId, { origin: "deeplink" });
-        if (startImmediately) {
+        const id = addJob(parsed.targetUrl, presetId, { origin: "deeplink" });
+        if (parsed.startImmediately) {
           startQueuedJobs([id], { ignoreQueuePaused: true });
         }
         void fetchMetadata(id);
@@ -744,7 +723,6 @@ export default function App() {
       </main>
       {windowMode === "full" && deferredUiReady && persistenceReady && <UpgradePrompt />}
       {deferredUiReady && persistenceReady && <DenoJsRuntimePrompt />}
-      {windowMode === "full" && persistenceReady && <DesktopTelemetry />}
       <Toaster />
     </div>
   );

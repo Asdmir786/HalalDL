@@ -435,7 +435,7 @@ function buildDemoLogs(now: number): LogEntry[] {
       id: "log-07",
       timestamp: stamp(8),
       level: "info",
-      message: "Background update check found HalalDL v0.6.0 ready.",
+      message: "Background update check found HalalDL v0.6.1 ready.",
     },
     {
       id: "log-08",
@@ -531,8 +531,6 @@ export function seedMarketingDemoState() {
   const settings = {
     ...DEFAULT_SETTINGS,
     theme: getRequestedTheme(),
-    anonymousUsagePrompted: true,
-    anonymousUsageEnabled: false,
     defaultDownloadDir: `${DEMO_USER_ROOT}\\Downloads\\HalalDL`,
     downloadsAddMode: "start" as const,
     downloadsSelectedPreset: "default",

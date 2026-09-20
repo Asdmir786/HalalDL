@@ -64,8 +64,6 @@ export interface Settings {
   enableBackgroundUpdateChecks: boolean;
   checkToolUpdatesInBackground: boolean;
   checkAppUpdatesInBackground: boolean;
-  anonymousUsageEnabled: boolean;
-  anonymousUsagePrompted: boolean;
   quickDefaultPreset: string;
   quickActionBehavior: QuickActionBehavior;
   quickDownloadStartMode: DownloadsAddMode;
@@ -137,8 +135,6 @@ export const DEFAULT_SETTINGS: Settings = {
   enableBackgroundUpdateChecks: true,
   checkToolUpdatesInBackground: true,
   checkAppUpdatesInBackground: true,
-  anonymousUsageEnabled: true,
-  anonymousUsagePrompted: false,
   quickDefaultPreset: "default",
   quickActionBehavior: "ask",
   quickDownloadStartMode: "start",
@@ -158,8 +154,14 @@ export const SETTINGS_KEYS = Object.keys(DEFAULT_SETTINGS) as (keyof Settings)[]
 
 function normalizeSettings(settings: Settings): Settings {
   // The option moved to presets. Drop the legacy global key when old settings load.
-  const currentSettings = { ...settings } as Settings & { squareAlbumArt?: unknown };
+  const currentSettings = { ...settings } as Settings & {
+    squareAlbumArt?: unknown;
+    anonymousUsageEnabled?: unknown;
+    anonymousUsagePrompted?: unknown;
+  };
   delete currentSettings.squareAlbumArt;
+  delete currentSettings.anonymousUsageEnabled;
+  delete currentSettings.anonymousUsagePrompted;
 
   return {
     ...currentSettings,
@@ -170,8 +172,6 @@ function normalizeSettings(settings: Settings): Settings {
     sponsorBlockCategories: normalizeSponsorBlockCategories(settings.sponsorBlockCategories),
     instagramEngine: settings.instagramEngine === "yt-dlp" ? "yt-dlp" : "downloadgram",
     aria2Enabled: settings.aria2Enabled !== false,
-    anonymousUsageEnabled: settings.anonymousUsageEnabled !== false,
-    anonymousUsagePrompted: settings.anonymousUsagePrompted === true,
     cookiesFilePath:
       typeof settings.cookiesFilePath === "string" ? settings.cookiesFilePath.trim() : "",
     denoJsRuntimePath:

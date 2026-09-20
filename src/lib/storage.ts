@@ -1,5 +1,5 @@
 import { getStateFilePath } from "@/lib/app-paths";
-import { readTextFile, writeTextFile } from "@/lib/commands";
+import { deleteFile, readTextFile, writeTextFile } from "@/lib/commands";
 
 const FILE_NAMES = {
   settings: "settings.json",
@@ -12,7 +12,6 @@ const FILE_NAMES = {
   collections: "collections.json",
   sourceRules: "source-rules.json",
   runtimeFlags: "runtime-flags.json",
-  telemetry: "telemetry.json",
   aiProfiles: "ai-profiles.json",
 } as const;
 
@@ -41,7 +40,6 @@ class StorageManager {
           collections: await getStateFilePath(FILE_NAMES.collections),
           sourceRules: await getStateFilePath(FILE_NAMES.sourceRules),
           runtimeFlags: await getStateFilePath(FILE_NAMES.runtimeFlags),
-          telemetry: await getStateFilePath(FILE_NAMES.telemetry),
           aiProfiles: await getStateFilePath(FILE_NAMES.aiProfiles),
         };
         this.initError = null;
@@ -150,8 +148,10 @@ class StorageManager {
   async saveRuntimeFlags<T>(data: T) {
     await this.writeJson("runtimeFlags", data);
   }
-  async getTelemetry<T>() { return this.readJson<T>("telemetry"); }
-  async saveTelemetry<T>(data: T) { await this.writeJson("telemetry", data); }
+  async removeLegacyTelemetry() {
+    const path = await getStateFilePath("telemetry.json");
+    await deleteFile(path);
+  }
   async getAiProfiles<T>() { return this.readJson<T>("aiProfiles"); }
   async saveAiProfiles<T>(data: T) { await this.writeJson("aiProfiles", data); }
 }
