@@ -435,7 +435,7 @@ function buildDemoLogs(now: number): LogEntry[] {
       id: "log-07",
       timestamp: stamp(8),
       level: "info",
-      message: "Background update check found HalalDL v0.6.0 ready.",
+      message: "Background update check found HalalDL v0.6.1 ready.",
     },
     {
       id: "log-08",
