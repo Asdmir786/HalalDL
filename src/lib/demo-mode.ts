@@ -531,8 +531,6 @@ export function seedMarketingDemoState() {
   const settings = {
     ...DEFAULT_SETTINGS,
     theme: getRequestedTheme(),
-    anonymousUsagePrompted: true,
-    anonymousUsageEnabled: false,
     defaultDownloadDir: `${DEMO_USER_ROOT}\\Downloads\\HalalDL`,
     downloadsAddMode: "start" as const,
     downloadsSelectedPreset: "default",

@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState, type KeyboardEvent } from "react";
+import { useCallback, useEffect, useMemo, useState, type KeyboardEvent } from "react";
 import {
   Dialog,
   DialogContent,
@@ -94,9 +94,15 @@ export function DenoJsRuntimePrompt() {
   );
 
   const visibleKind = promptKind ?? (preview === "picker" ? "picker" : preview === "missing" ? "missing" : null);
-  const visibleCandidates = candidates.length > 0 ? candidates : preview === "picker" ? PREVIEW_CANDIDATES : [];
+  const visibleCandidates = useMemo(
+    () => (candidates.length > 0 ? candidates : preview === "picker" ? PREVIEW_CANDIDATES : []),
+    [candidates, preview]
+  );
   const recommendedPath = uniqueNewestPath(visibleCandidates);
-  const selected = visibleCandidates.find((candidate) => candidate.path === selectedPath);
+  const activeSelectedPath = visibleCandidates.some((candidate) => candidate.path === selectedPath)
+    ? selectedPath
+    : recommendedPath ?? visibleCandidates[0]?.path ?? "";
+  const selected = visibleCandidates.find((candidate) => candidate.path === activeSelectedPath);
 
   const open =
     visibleKind !== null &&
@@ -111,14 +117,6 @@ export function DenoJsRuntimePrompt() {
     }
   }, [preview]);
 
-  useEffect(() => {
-    if (visibleKind !== "picker" || visibleCandidates.length === 0) return;
-    setSelectedPath((current) => {
-      if (visibleCandidates.some((item) => item.path === current)) return current;
-      return recommendedPath ?? visibleCandidates[0].path;
-    });
-  }, [recommendedPath, visibleCandidates, visibleKind]);
-
   const refreshDenoTool = useCallback(async () => {
     const result = await checkDenoVersion().catch(() => null);
     useToolsStore.getState().updateTool("deno", {
@@ -131,11 +129,11 @@ export function DenoJsRuntimePrompt() {
   }, []);
 
   const handleConfirmPicker = async () => {
-    if (!selectedPath) return;
-    await confirmLiteDenoJsRuntime(selectedPath);
+    if (!activeSelectedPath) return;
+    await confirmLiteDenoJsRuntime(activeSelectedPath);
     useLogsStore.getState().addLog({
       level: "info",
-      message: `Using Deno JS runtime: ${selectedPath}`,
+      message: `Using Deno JS runtime: ${activeSelectedPath}`,
     });
     await refreshDenoTool();
   };
@@ -170,12 +168,12 @@ export function DenoJsRuntimePrompt() {
   const handlePickerKeyDown = (event: KeyboardEvent<HTMLDivElement>) => {
     if (event.key !== "ArrowDown" && event.key !== "ArrowUp") return;
     event.preventDefault();
-    const index = visibleCandidates.findIndex((candidate) => candidate.path === selectedPath);
+    const index = visibleCandidates.findIndex((candidate) => candidate.path === activeSelectedPath);
     const nextIndex =
       event.key === "ArrowDown"
         ? Math.min(visibleCandidates.length - 1, Math.max(0, index) + 1)
         : Math.max(0, (index < 0 ? 0 : index) - 1);
-    setSelectedPath(visibleCandidates[nextIndex]?.path ?? selectedPath);
+    setSelectedPath(visibleCandidates[nextIndex]?.path ?? activeSelectedPath);
   };
 
   return (
@@ -216,7 +214,7 @@ export function DenoJsRuntimePrompt() {
                 onKeyDown={handlePickerKeyDown}
               >
                 {visibleCandidates.map((candidate) => {
-                  const isSelected = candidate.path === selectedPath;
+                  const isSelected = candidate.path === activeSelectedPath;
                   const isRecommended = candidate.path === recommendedPath;
                   return (
                     <button
@@ -286,7 +284,7 @@ export function DenoJsRuntimePrompt() {
                 <MotionButton
                   type="button"
                   onClick={() => void handleConfirmPicker()}
-                  disabled={!selectedPath}
+                  disabled={!activeSelectedPath}
                   className="h-11 w-full flex-1 gap-2 rounded-xl bg-primary text-primary-foreground shadow-lg shadow-primary/20 hover:bg-primary/90"
                 >
                   {selected?.version ? `Use Deno ${selected.version}` : "Use this Deno"}

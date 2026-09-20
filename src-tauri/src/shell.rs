@@ -42,7 +42,11 @@ pub async fn show_in_folder(path: String) -> Result<(), String> {
     {
         use std::process::Command;
         Command::new("xdg-open")
-            .arg(std::path::Path::new(&path).parent().unwrap_or(std::path::Path::new("/")))
+            .arg(
+                std::path::Path::new(&path)
+                    .parent()
+                    .unwrap_or(std::path::Path::new("/")),
+            )
             .spawn()
             .map_err(|e| e.to_string())?;
     }
@@ -54,12 +58,18 @@ pub async fn open_path(path: String) -> Result<(), String> {
     #[cfg(target_os = "windows")]
     {
         use std::os::windows::process::CommandExt;
+        use std::path::Path;
         use std::process::Command;
 
         let normalized = path.replace('/', "\\");
-        // cmd start opens with the default association without a PowerShell host.
-        Command::new("cmd")
-            .args(["/C", "start", "", &normalized])
+        if normalized.trim().is_empty() || !Path::new(&normalized).exists() {
+            return Err(format!("Path does not exist: {}", normalized));
+        }
+
+        // Explorer delegates files to their registered handler without passing
+        // user-controlled path text through cmd.exe command parsing.
+        Command::new("explorer")
+            .arg(&normalized)
             .creation_flags(0x08000000)
             .spawn()
             .map_err(|e| e.to_string())?;

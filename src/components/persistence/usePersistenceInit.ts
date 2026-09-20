@@ -65,7 +65,7 @@ export function usePersistenceInit(): MutableRefObject<boolean> {
       try {
         markStartup("persistence-start");
         if (isDemoModeEnabled()) {
-          setSettings({ ...DEFAULT_SETTINGS, anonymousUsagePrompted: true, anonymousUsageEnabled: false });
+          setSettings(DEFAULT_SETTINGS);
           seedMarketingDemoState();
           useRuntimeStore.getState().setPersistenceReady(true);
           initialized.current = true;
@@ -74,11 +74,25 @@ export function usePersistenceInit(): MutableRefObject<boolean> {
         }
 
         await storage.init();
+        try {
+          await storage.removeLegacyTelemetry();
+        } catch (error) {
+          addLog({
+            level: "warn",
+            message: `Could not remove legacy telemetry data: ${String(error)}`,
+          });
+        }
         addLog({ level: "debug", message: "Storage initialized" });
 
         const savedSettings = await storage.getSettings<Settings>();
         if (savedSettings) {
-          const mergedSettings = { ...DEFAULT_SETTINGS, ...savedSettings };
+          const supportedSettings = { ...savedSettings } as Settings & {
+            anonymousUsageEnabled?: unknown;
+            anonymousUsagePrompted?: unknown;
+          };
+          delete supportedSettings.anonymousUsageEnabled;
+          delete supportedSettings.anonymousUsagePrompted;
+          const mergedSettings = { ...DEFAULT_SETTINGS, ...supportedSettings };
           mergedSettings.downloadsSelectedPreset = canonicalizePresetId(mergedSettings.downloadsSelectedPreset);
           mergedSettings.quickDefaultPreset = canonicalizePresetId(mergedSettings.quickDefaultPreset);
           setSettings(mergedSettings);

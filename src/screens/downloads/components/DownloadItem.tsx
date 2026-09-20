@@ -138,7 +138,7 @@ export function DownloadItem({
   const [sheetOpen, setSheetOpen] = useState(false);
   const [propertiesOpen, setPropertiesOpen] = useState(false);
   const [doctorOpen, setDoctorOpen] = useState(false);
-  const [failedThumbRetryReady, setFailedThumbRetryReady] = useState(false);
+  const [failedThumbRetryKey, setFailedThumbRetryKey] = useState<string | null>(null);
   useEffect(() => {
     if (job.id !== "demo-job-failed" || getMarketingCaptureState() !== "doctor") return;
     const timer = window.setTimeout(() => setDoctorOpen(true), 0);
@@ -160,15 +160,18 @@ export function DownloadItem({
 
   const thumbnailErrored = Boolean(displayThumbnail && thumbErrorSource === displayThumbnail);
   const failedWithoutThumb = job.status === "Failed" && (!displayThumbnail || thumbnailErrored);
+  const failedThumbRetryTarget = failedWithoutThumb
+    ? `${job.id}:${job.statusChangedAt ?? 0}:${displayThumbnail ?? "none"}`
+    : null;
+  const failedThumbRetryReady = Boolean(
+    failedThumbRetryTarget && failedThumbRetryKey === failedThumbRetryTarget,
+  );
 
   useEffect(() => {
-    if (!failedWithoutThumb) {
-      setFailedThumbRetryReady(false);
-      return;
-    }
-    const timer = window.setTimeout(() => setFailedThumbRetryReady(true), 8000);
+    if (!failedThumbRetryTarget) return;
+    const timer = window.setTimeout(() => setFailedThumbRetryKey(failedThumbRetryTarget), 8000);
     return () => window.clearTimeout(timer);
-  }, [failedWithoutThumb, job.id]);
+  }, [failedThumbRetryTarget]);
 
   const statusMeta = getStatusMeta(job.status);
   const StatusIcon = statusMeta.Icon;
